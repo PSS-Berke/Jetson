@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jetson Capacity Planning
+
+A modern Next.js application for production capacity planning and job management, built with React, TypeScript, and Tailwind CSS.
+
+## Features
+
+### Machines View
+- **Production Line Cards**: Visual cards displaying all production lines with key specifications
+- **Status Filtering**: Filter machines by status (All, Running, Available, Maintenance)
+- **Real-time Information**: Shows current job assignments, machine specs, speed, and capacity
+- **Color-coded Status**: Visual indicators for machine availability and status
+
+### Add Job Modal
+A comprehensive 4-step wizard for adding new jobs:
+
+1. **Job Details**: Job number, client name, description, quantity, service type, dates, and notes
+2. **Requirements**: Process type, machine type, envelope size, pockets, shifts, and material status
+3. **Machine Selection**: Interactive table to select available machines for the job
+4. **Review & Confirm**: Summary of all entered information before submission
+
+### Design System
+- **Consistent Color Palette**: Professional blue, green, yellow, and red status colors
+- **Responsive Layout**: Mobile-first design that works on all screen sizes
+- **Modern UI Components**: Clean cards, buttons, forms, and modals
+- **Smooth Interactions**: Hover effects, transitions, and focus states
 
 ## Getting Started
 
-First, run the development server:
+### Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3001](http://localhost:3001) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## Technology Stack
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework**: Next.js 15.5.6 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS with custom CSS variables
+- **UI**: React with Client Components
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+├── components/
+│   └── AddJobModal.tsx    # Multi-step job creation modal
+├── globals.css            # Global styles and CSS variables
+├── layout.tsx             # Root layout
+└── page.tsx               # Main page with machines view
+```
 
-## Deploy on Vercel
+## Color Scheme
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Primary Blue**: `#2563eb` - Navigation, primary actions
+- **Dark Blue**: `#1e40af` - Headings, important text
+- **Success Green**: `#10b981` - Available status, success states
+- **Warning Yellow**: `#f59e0b` - Maintenance, warnings
+- **Accent Red**: `#ef4444` - Alerts, errors
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Key Components
+
+### Machine Cards
+Display production line information including:
+- Line number and type
+- Current status (Running/Available/Maintenance)
+- Specifications (max size, pockets, speed, shift capacity)
+- Current job assignment (if running)
+
+### Add Job Modal
+Multi-step form with:
+- Step indicator showing progress
+- Form validation
+- Dynamic content based on step
+- Previous/Next navigation
+- Review summary before submission
+
+## Future Enhancements
+
+- Dashboard view with active jobs and capacity overview
+- Materials tracking page
+- Job editing and deletion
+- Real-time updates via WebSocket
+- Backend API integration
+- User authentication
+- Advanced filtering and search
+- Export reports (PDF, Excel)
