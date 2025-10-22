@@ -19,20 +19,53 @@ interface User {
   id: number;
   email: string;
   admin: boolean;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 interface AuthResponse {
   authToken: string;
   user?: User;
-  [key: string]: any;
+  [key: string]: string | number | boolean | User | undefined;
+}
+
+type MachineStatus = 'running' | 'available' | 'avalible' | 'maintenance';
+
+interface Machine {
+  id: number;
+  created_at: number;
+  line: number;
+  type: string;
+  max_size: string;
+  speed_hr: string;
+  status: MachineStatus;
+  pockets?: number;
+  shiftCapacity?: number;
+  currentJob?: {
+    number: string;
+    name: string;
+  };
+  [key: string]: string | number | boolean | object | undefined;
+}
+
+interface Job {
+  id: number;
+  created_at: number;
+  job_number: number;
+  service_type: string;
+  quantity: number;
+  description: string;
+  start_date: number;
+  due_date: number;
+  client: string;
+  machines: string;
+  [key: string]: string | number | boolean | undefined;
 }
 
 // Store token in cookies with fallback to localStorage
 export const setToken = (token: string): void => {
   try {
     Cookies.set(TOKEN_KEY, token, { expires: 7, secure: true, sameSite: 'strict' });
-  } catch (error) {
+  } catch {
     // Fallback to localStorage if cookies fail
     if (typeof window !== 'undefined') {
       localStorage.setItem(TOKEN_KEY, token);
@@ -51,7 +84,7 @@ export const getToken = (): string | null => {
       return localStorage.getItem(TOKEN_KEY);
     }
     return null;
-  } catch (error) {
+  } catch {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(TOKEN_KEY);
     }
@@ -63,7 +96,7 @@ export const getToken = (): string | null => {
 export const removeToken = (): void => {
   try {
     Cookies.remove(TOKEN_KEY);
-  } catch (error) {
+  } catch {
     // Ignore errors
   }
   if (typeof window !== 'undefined') {
@@ -72,11 +105,11 @@ export const removeToken = (): void => {
 };
 
 // Generic fetch wrapper with automatic token attachment
-const apiFetch = async (
+const apiFetch = async <T = unknown>(
   endpoint: string,
   options: RequestInit = {},
   useAuthBase: boolean = false
-): Promise<any> => {
+): Promise<T> => {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -114,7 +147,7 @@ const apiFetch = async (
 
 // Login user
 export const login = async (credentials: LoginCredentials): Promise<User> => {
-  const data: AuthResponse = await apiFetch('/auth/login', {
+  const data = await apiFetch<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(credentials),
   }, true);
@@ -123,12 +156,12 @@ export const login = async (credentials: LoginCredentials): Promise<User> => {
     setToken(data.authToken);
   }
 
-  return data.user || data as any;
+  return data.user || (data as unknown as User);
 };
 
 // Signup (admin creates new user)
 export const signup = async (userData: SignupData): Promise<User> => {
-  const data = await apiFetch('/auth/signup', {
+  const data = await apiFetch<User>('/auth/signup', {
     method: 'POST',
     body: JSON.stringify(userData),
   }, true);
@@ -138,7 +171,7 @@ export const signup = async (userData: SignupData): Promise<User> => {
 
 // Get current user
 export const getMe = async (): Promise<User> => {
-  const data = await apiFetch('/auth/me', {
+  const data = await apiFetch<User>('/auth/me', {
     method: 'GET',
   }, true);
 
@@ -151,7 +184,7 @@ export const logout = (): void => {
 };
 
 // Get all machines
-export const getMachines = async (status?: string, facilitiesId?: number): Promise<any[]> => {
+export const getMachines = async (status?: string, facilitiesId?: number): Promise<Machine[]> => {
   const params = new URLSearchParams();
 
   if (status && status !== '') {
@@ -167,7 +200,7 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
   const queryString = params.toString();
   const endpoint = queryString ? `/machines?${queryString}` : '/machines';
 
-  const data = await apiFetch(endpoint, {
+  const data = await apiFetch<Machine[]>(endpoint, {
     method: 'GET',
   });
 
@@ -175,7 +208,7 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
 };
 
 // Get all jobs
-export const getJobs = async (): Promise<any[]> => {
+export const getJobs = async (): Promise<Job[]> => {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
