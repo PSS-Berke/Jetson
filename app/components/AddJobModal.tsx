@@ -19,69 +19,61 @@ interface Machine {
   status: string;
 }
 
-interface Process {
-  id: number;
-  processType: string;
-  machineType: string;
-  paperSize: string;
-  pockets: string;
-  shift: string;
-  materialStatus: string;
-  materialArrival: string;
-  materialVendor: string;
-  materialDesc: string;
-  processNotes: string;
+interface Requirement {
+  process_type: string;
+  paper_size: string;
+  pockets: number;
+  shifts_id: number;
 }
 
 interface JobFormData {
-  jobNumber: string;
-  clientId: number | null;
-  clientName: string;
+  job_number: string;
+  clients_id: number | null;
+  client_name: string;
+  job_name: string;
   description: string;
   quantity: string;
-  startDate: string;
-  dueDate: string;
-  specialNotes: string;
-  processType: string;
-  machineType: string;
-  envelopeSize: string;
+  csr: string;
+  prgm: string;
+  price_per_m: string;
+  ext_price: string;
+  add_on_charges: string;
+  total_billing: string;
+  start_date: string;
+  due_date: string;
+  service_type: string;
   pockets: string;
-  shifts: string;
-  materialStatus: string;
-  processes: Process[];
+  machines_id: number[];
+  requirements: Requirement[];
 }
 
 export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<JobFormData>({
-    jobNumber: '',
-    clientId: null,
-    clientName: '',
+    job_number: '',
+    clients_id: null,
+    client_name: '',
+    job_name: '',
     description: '',
     quantity: '',
-    startDate: '',
-    dueDate: '',
-    specialNotes: '',
-    processType: 'inserting',
-    machineType: 'FM Standard - Letter',
-    envelopeSize: '9x12',
-    pockets: '6',
-    shifts: '1',
-    materialStatus: 'ready',
-    processes: [
+    csr: '',
+    prgm: '',
+    price_per_m: '',
+    ext_price: '',
+    add_on_charges: '',
+    total_billing: '',
+    start_date: '',
+    due_date: '',
+    service_type: 'insert',
+    pockets: '2',
+    machines_id: [],
+    requirements: [
       {
-        id: 1,
-        processType: '',
-        machineType: '',
-        paperSize: '',
-        pockets: '',
-        shift: '1',
-        materialStatus: 'available',
-        materialArrival: '',
-        materialVendor: '',
-        materialDesc: '',
-        processNotes: ''
+        process_type: '',
+        paper_size: '',
+        pockets: 0,
+        shifts_id: 0
       }
     ]
   });
@@ -100,7 +92,6 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
     };
   }, [isOpen]);
 
-
   if (!isOpen) return null;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -113,45 +104,37 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
   const handleClientChange = (clientId: number, clientName: string) => {
     setFormData({
       ...formData,
-      clientId,
-      clientName
+      clients_id: clientId,
+      client_name: clientName
     });
   };
 
-  const handleProcessChange = (processId: number, field: keyof Process, value: string) => {
+  const handleRequirementChange = (requirementIndex: number, field: keyof Requirement, value: string | number) => {
     setFormData(prev => ({
       ...prev,
-      processes: prev.processes.map(p =>
-        p.id === processId ? { ...p, [field]: value } : p
+      requirements: prev.requirements.map((req, idx) =>
+        idx === requirementIndex ? { ...req, [field]: value } : req
       )
     }));
   };
 
-  const addProcess = () => {
-    const newProcessId = Math.max(...formData.processes.map(p => p.id), 0) + 1;
+  const addRequirement = () => {
     setFormData(prev => ({
       ...prev,
-      processes: [...prev.processes, {
-        id: newProcessId,
-        processType: '',
-        machineType: '',
-        paperSize: '',
-        pockets: '',
-        shift: '1',
-        materialStatus: 'available',
-        materialArrival: '',
-        materialVendor: '',
-        materialDesc: '',
-        processNotes: ''
+      requirements: [...prev.requirements, {
+        process_type: '',
+        paper_size: '',
+        pockets: 0,
+        shifts_id: 0
       }]
     }));
   };
 
-  const removeProcess = (processId: number) => {
-    if (formData.processes.length > 1) {
+  const removeRequirement = (requirementIndex: number) => {
+    if (formData.requirements.length > 1) {
       setFormData(prev => ({
         ...prev,
-        processes: prev.processes.filter(p => p.id !== processId)
+        requirements: prev.requirements.filter((_, idx) => idx !== requirementIndex)
       }));
     }
   };
@@ -159,19 +142,19 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
   const handleNext = () => {
     // Validate step 1 - only job number and client ID are required
     if (currentStep === 1) {
-      if (!formData.jobNumber || !formData.clientId) {
+      if (!formData.job_number || !formData.clients_id) {
         alert('Please fill in job number and client name');
         return;
       }
     }
 
-    // Validate step 2 - all processes must have required fields
+    // Validate step 2 - all requirements must have required fields
     if (currentStep === 2) {
-      const allProcessesValid = formData.processes.every(p =>
-        p.processType && p.machineType && p.paperSize
+      const allRequirementsValid = formData.requirements.every(r =>
+        r.process_type && r.paper_size && r.shifts_id > 0
       );
-      if (!allProcessesValid) {
-        alert('Please fill in all required process fields');
+      if (!allRequirementsValid) {
+        alert('Please fill in all required requirement fields');
         return;
       }
     }
@@ -196,12 +179,23 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
 
       // Prepare the payload according to the API specification
       const payload = {
-        start_date: formData.startDate || null,
-        due_date: formData.dueDate || null,
+        start_date: formData.start_date || null,
+        due_date: formData.due_date || null,
         description: formData.description,
         quantity: parseInt(formData.quantity),
-        clients_id: formData.clientId,
-        job_number: parseInt(formData.jobNumber)
+        clients_id: formData.clients_id,
+        machines_id: formData.machines_id,
+        job_number: parseInt(formData.job_number),
+        service_type: formData.service_type,
+        pockets: parseInt(formData.pockets),
+        job_name: formData.job_name,
+        prgm: formData.prgm,
+        csr: formData.csr,
+        price_per_m: parseFloat(formData.price_per_m) || 0,
+        add_on_charges: parseFloat(formData.add_on_charges) || 0,
+        ext_price: parseFloat(formData.ext_price) || 0,
+        total_billing: parseFloat(formData.total_billing) || 0,
+        requirements: formData.requirements
       };
 
       const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs', {
@@ -222,33 +216,29 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
 
       // Reset form and close modal
       setFormData({
-        jobNumber: '',
-        clientId: null,
-        clientName: '',
+        job_number: '',
+        clients_id: null,
+        client_name: '',
+        job_name: '',
         description: '',
         quantity: '',
-        startDate: '',
-        dueDate: '',
-        specialNotes: '',
-        processType: 'inserting',
-        machineType: 'FM Standard - Letter',
-        envelopeSize: '9x12',
-        pockets: '6',
-        shifts: '1',
-        materialStatus: 'ready',
-        processes: [
+        csr: '',
+        prgm: '',
+        price_per_m: '',
+        ext_price: '',
+        add_on_charges: '',
+        total_billing: '',
+        start_date: '',
+        due_date: '',
+        service_type: 'insert',
+        pockets: '2',
+        machines_id: [],
+        requirements: [
           {
-            id: 1,
-            processType: '',
-            machineType: '',
-            paperSize: '',
-            pockets: '',
-            shift: '1',
-            materialStatus: 'available',
-            materialArrival: '',
-            materialVendor: '',
-            materialDesc: '',
-            processNotes: ''
+            process_type: '',
+            paper_size: '',
+            pockets: 0,
+            shifts_id: 0
           }
         ]
       });
@@ -287,7 +277,7 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
 
         {/* Step Indicator */}
         <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
-          {[1, 2, 3].map((step, index) => (
+          {[1, 2, 3].map((step) => (
             <div key={step} className="flex items-center" style={{ flex: step === 3 ? '0 1 auto' : '1 1 0%' }}>
               <div className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
@@ -304,7 +294,7 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                     step === currentStep ? 'text-[var(--primary-blue)]' : 'text-gray-500'
                   }`}>
                     {step === 1 && 'Job Details'}
-                    {step === 2 && 'Step Requirements'}
+                    {step === 2 && 'Requirements'}
                     {step === 3 && 'Review'}
                   </div>
                 </div>
@@ -326,105 +316,243 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Job Number <span className="text-red-500">*</span>
+                    Client <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="jobNumber"
-                    value={formData.jobNumber}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="e.g., 7018"
+                  <SmartClientSelect
+                    value={formData.clients_id}
+                    onChange={handleClientChange}
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Client Name <span className="text-red-500">*</span>
+                    Job Name
                   </label>
-                  <SmartClientSelect
-                    value={formData.clientId}
-                    onChange={handleClientChange}
-                    required
+                  <input
+                    type="text"
+                    name="job_name"
+                    value={formData.job_name}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="Job name"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                  Job Description <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                  placeholder="e.g., INS 2 IN 9X12 INLINE OME"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                  Quantity <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                  placeholder="e.g., 372000"
-                  required
-                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Start Date <span className="text-red-500">*</span>
+                    Job # <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="date"
-                    name="startDate"
-                    value={formData.startDate}
+                    type="text"
+                    name="job_number"
+                    value={formData.job_number}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="e.g., 43"
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Due Date <span className="text-red-500">*</span>
+                    Service Type
+                  </label>
+                  <select
+                    name="service_type"
+                    value={formData.service_type}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                  >
+                    <option value="insert">Insert</option>
+                    <option value="fold">Fold</option>
+                    <option value="affix">Affix Label</option>
+                    <option value="print">Variable Print</option>
+                    <option value="polybag">Poly Bag</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    CSR
+                  </label>
+                  <input
+                    type="text"
+                    name="csr"
+                    value={formData.csr}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="CSR name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Program
+                  </label>
+                  <input
+                    type="text"
+                    name="prgm"
+                    value={formData.prgm}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="Program"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Start Date
                   </label>
                   <input
                     type="date"
-                    name="dueDate"
-                    value={formData.dueDate}
+                    name="start_date"
+                    value={formData.start_date}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    name="due_date"
+                    value={formData.due_date}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="e.g., 73"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Pockets
+                  </label>
+                  <input
+                    type="number"
+                    name="pockets"
+                    value={formData.pockets}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="e.g., 2"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="Job description"
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Price (per/m)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="price_per_m"
+                    value={formData.price_per_m}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Ext Price
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="ext_price"
+                    value={formData.ext_price}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Add-on Charges
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="add_on_charges"
+                    value={formData.add_on_charges}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Total Billing
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="total_billing"
+                    value={formData.total_billing}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="0.00"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 2: Step Requirements */}
+          {/* Step 2: Requirements */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">Step Requirements</h3>
+              <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">Job Requirements</h3>
 
-              {formData.processes.map((process, index) => (
-                <div key={process.id} className="border border-[var(--border)] rounded-lg p-6 space-y-4">
-                  {/* Process Header */}
+              {formData.requirements.map((requirement, index) => (
+                <div key={index} className="border border-[var(--border)] rounded-lg p-6 space-y-4">
+                  {/* Requirement Header */}
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-[var(--text-dark)]">Process {index + 1}</h4>
+                    <h4 className="font-semibold text-[var(--text-dark)]">Requirement {index + 1}</h4>
                     {index > 0 && (
                       <button
                         type="button"
-                        onClick={() => removeProcess(process.id)}
+                        onClick={() => removeRequirement(index)}
                         className="text-red-500 hover:text-red-700 font-semibold text-sm"
                       >
                         ✕ Remove
@@ -432,15 +560,15 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                     )}
                   </div>
 
-                  {/* Process Type & Machine Type */}
+                  {/* Process Type & Paper Size */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Process Type <span className="text-red-500">*</span>
                       </label>
                       <select
-                        value={process.processType}
-                        onChange={(e) => handleProcessChange(process.id, 'processType', e.target.value)}
+                        value={requirement.process_type}
+                        onChange={(e) => handleRequirementChange(index, 'process_type', e.target.value)}
                         className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                         required
                       >
@@ -454,33 +582,11 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Machine Type <span className="text-red-500">*</span>
+                        Paper Size <span className="text-red-500">*</span>
                       </label>
                       <select
-                        value={process.machineType}
-                        onChange={(e) => handleProcessChange(process.id, 'machineType', e.target.value)}
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        required
-                      >
-                        <option value="">Select machine type...</option>
-                        <option value="fm-standard">FM Standard</option>
-                        <option value="ome">OME</option>
-                        <option value="large-format">Large Format</option>
-                        <option value="folder">Folder</option>
-                        <option value="printer">Printer</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Paper Size & Pockets */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Envelope/Paper Size <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={process.paperSize}
-                        onChange={(e) => handleProcessChange(process.id, 'paperSize', e.target.value)}
+                        value={requirement.paper_size}
+                        onChange={(e) => handleRequirementChange(index, 'paper_size', e.target.value)}
                         className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                         required
                       >
@@ -490,68 +596,57 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                         <option value="9x12">9x12</option>
                         <option value="10x13">10x13</option>
                         <option value="12x15">12x15</option>
-                        <option value="10-regular">#10 Regular</option>
+                        <option value="#10">10 Regular</option>
                         <option value="11x17">11x17</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Pockets & Shift */}
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Number of Pockets/Inserts
                       </label>
                       <input
                         type="number"
-                        value={process.pockets}
-                        onChange={(e) => handleProcessChange(process.id, 'pockets', e.target.value)}
+                        value={requirement.pockets}
+                        onChange={(e) => handleRequirementChange(index, 'pockets', parseInt(e.target.value) || 0)}
                         className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        placeholder="e.g., 6"
-                        min="1"
+                        placeholder="e.g., 2"
+                        min="0"
                         max="12"
                       />
                     </div>
-                  </div>
-
-                  {/* Shift & Estimated Time */}
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Shift Preference
+                        Shift <span className="text-red-500">*</span>
                       </label>
                       <select
-                        value={process.shift}
-                        onChange={(e) => handleProcessChange(process.id, 'shift', e.target.value)}
+                        value={requirement.shifts_id}
+                        onChange={(e) => handleRequirementChange(index, 'shifts_id', parseInt(e.target.value))}
                         className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                        required
                       >
-                        <option value="1">1 Shift (7.5 hrs)</option>
-                        <option value="2">2 Shifts (15 hrs)</option>
-                        <option value="3">3 Shifts (24 hrs)</option>
+                        <option value={0}>Select shift...</option>
+                        <option value={1}>Shift One</option>
+                        <option value={2}>Shift Two</option>
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Estimated Time
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-gray-100"
-                        placeholder="Auto-calculated"
-                        readOnly
-                      />
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* Add Process Button */}
+              {/* Add Requirement Button */}
               <button
                 type="button"
-                onClick={addProcess}
+                onClick={addRequirement}
                 className="w-full px-6 py-3 border-2 border-dashed border-[var(--border)] rounded-lg font-semibold text-[var(--primary-blue)] hover:bg-blue-50 transition-colors"
               >
-                + Add Another Process
+                + Add Another Requirement
               </button>
             </div>
           )}
-
 
           {/* Step 3: Review */}
           {currentStep === 3 && (
@@ -560,48 +655,68 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                 <h3 className="font-semibold text-[var(--text-dark)] mb-2">Job Summary</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-[var(--text-light)]">Job Number:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.jobNumber}</span>
+                    <span className="text-[var(--text-light)]">Job #:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_number}</span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Client:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.clientName}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.client_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Job Name:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_name || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Service Type:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.service_type}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">CSR:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.csr || 'N/A'}</span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Quantity:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{parseInt(formData.quantity).toLocaleString()} pieces</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{parseInt(formData.quantity || '0').toLocaleString()}</span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Start Date:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.startDate}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.start_date || 'N/A'}</span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Due Date:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.dueDate}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.due_date || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Price/M:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.price_per_m ? `$${formData.price_per_m}` : 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Ext Price:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.ext_price ? `$${formData.ext_price}` : 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Add-on Charges:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.add_on_charges ? `$${formData.add_on_charges}` : 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Total Billing:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.total_billing ? `$${formData.total_billing}` : 'N/A'}</span>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-3">Production Requirements</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-[var(--text-light)]">Machine Type:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.machineType}</span>
+                <h3 className="font-semibold text-[var(--text-dark)] mb-3">Job Requirements</h3>
+                {formData.requirements.map((req, index) => (
+                  <div key={index} className="mb-3 pb-3 border-b border-[var(--border)] last:border-b-0">
+                    <div className="text-sm">
+                      <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
+                      <span className="font-semibold text-[var(--text-dark)]">
+                        {req.process_type} | {req.paper_size} | Pockets: {req.pockets} | Shift: {req.shifts_id}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Size:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.envelopeSize}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Pockets:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.pockets}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Shifts:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.shifts}</span>
-                  </div>
-                </div>
+                ))}
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -612,47 +727,46 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
               </div>
             </div>
           )}
-        </form>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-[var(--border)] bg-gray-50">
-          <div className="text-sm text-[var(--text-light)]">
-            Step {currentStep} of 3
+          {/* Footer - Inside Form */}
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-[var(--border)]">
+            <div className="text-sm text-[var(--text-light)]">
+              Step {currentStep} of 3
+            </div>
+            <div className="flex gap-3">
+              {currentStep > 1 && (
+                <button
+                  type="button"
+                  onClick={handlePrevious}
+                  className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+                >
+                  Previous
+                </button>
+              )}
+              {currentStep < 3 ? (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={
+                    (currentStep === 1 && (!formData.job_number || !formData.clients_id || !formData.quantity)) ||
+                    (currentStep === 2 && formData.requirements.some(r => !r.process_type || !r.paper_size || !r.shifts_id))
+                  }
+                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Creating Job...' : 'Submit Job'}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex gap-3">
-            {currentStep > 1 && (
-              <button
-                type="button"
-                onClick={handlePrevious}
-                className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
-              >
-                Previous
-              </button>
-            )}
-            {currentStep < 3 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={
-                  (currentStep === 1 && (!formData.jobNumber || !formData.clientId)) ||
-                  (currentStep === 2 && formData.processes.some(p => !p.processType || !p.machineType || !p.paperSize))
-                }
-                className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? 'Creating Job...' : 'Submit Job'}
-              </button>
-            )}
-          </div>
-        </div>
+        </form>
       </div>
     </div>
   );

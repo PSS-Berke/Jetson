@@ -3,18 +3,10 @@
 import { useState, useEffect } from 'react';
 import { getJobs } from '@/lib/api';
 
-export interface Job {
-  id: number;
-  created_at: number;
-  job_number: number;
-  service_type: string;
-  quantity: number;
-  description: string;
-  start_date: number;
-  due_date: number;
-  client: string; // JSON string: {"id": 2, "name": "grocery store"}
-  machines: string; // JSON string: [{"id": 1, "line": 1}, {"id": 2, "line": 2}]
-}
+// Re-export Job from api for consistency
+import type { Job } from '@/lib/api';
+
+export type { Job };
 
 export interface ParsedJob extends Omit<Job, 'client' | 'machines'> {
   client: { id: number; name: string };

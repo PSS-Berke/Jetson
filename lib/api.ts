@@ -47,7 +47,7 @@ interface Machine {
   [key: string]: string | number | boolean | object | undefined;
 }
 
-interface Job {
+export interface Job {
   id: number;
   created_at: number;
   job_number: number;
@@ -56,9 +56,19 @@ interface Job {
   description: string;
   start_date: number;
   due_date: number;
+  time_estimate: number | null;
+  clients_id: number;
+  machines_id: string;
+  requirements: string;
+  job_name: string;
+  prgm: string;
+  csr: string;
+  price_per_m: string;
+  add_on_charges: string;
+  ext_price: string;
+  total_billing: string;
   client: string;
   machines: string;
-  [key: string]: string | number | boolean | undefined;
 }
 
 // Store token in cookies with fallback to localStorage

@@ -5,17 +5,25 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
-import { useJobs } from '@/hooks/useJobs';
+import { useJobs, type ParsedJob } from '@/hooks/useJobs';
 import AddJobModal from '../components/AddJobModal';
+import JobDetailsModal from '../components/JobDetailsModal';
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
+  const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
   const { jobs, isLoading: jobsLoading, error: jobsError } = useJobs();
   const { logout } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const handleJobClick = (job: ParsedJob) => {
+    setSelectedJob(job);
+    setIsJobDetailsOpen(true);
+  };
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -179,18 +187,18 @@ export default function Dashboard() {
                     Due Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                    Machines
+                    Total Billing
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={job.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleJobClick(job)}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
                       {job.job_number}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                      {job.client.name}
+                      {job.client?.name || 'Unknown'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
                       <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
@@ -204,13 +212,13 @@ export default function Dashboard() {
                       {job.description}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                      {new Date(job.start_date).toLocaleDateString()}
+                      {job.start_date ? new Date(job.start_date).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                      {new Date(job.due_date).toLocaleDateString()}
+                      {job.due_date ? new Date(job.due_date).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                      {job.machines.map((m) => `Line ${m.line}`).join(', ')}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[var(--text-dark)]">
+                      ${parseFloat(job.total_billing || '0').toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -222,6 +230,13 @@ export default function Dashboard() {
 
       {/* Add Job Modal */}
       <AddJobModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      {/* Job Details Modal */}
+      <JobDetailsModal
+        isOpen={isJobDetailsOpen}
+        job={selectedJob}
+        onClose={() => setIsJobDetailsOpen(false)}
+      />
     </>
   );
 }
