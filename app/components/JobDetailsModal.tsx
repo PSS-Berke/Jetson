@@ -150,7 +150,35 @@ export default function JobDetailsModal({ isOpen, job, onClose }: JobDetailsModa
           {/* Requirements Section */}
           <div className="border-t border-[var(--border)] pt-6">
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Requirements</h3>
-            <p className="text-sm text-[var(--text-light)] text-gray-600">{job.requirements || 'No specific requirements'}</p>
+            {job.requirements && job.requirements.length > 0 ? (
+              <div className="space-y-4">
+                {job.requirements.map((req, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">Requirement {index + 1}</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Pockets</label>
+                        <p className="text-base text-[var(--text-dark)]">{req.pockets ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Shifts ID</label>
+                        <p className="text-base text-[var(--text-dark)]">{req.shifts_id ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Paper Size</label>
+                        <p className="text-base text-[var(--text-dark)]">{req.paper_size || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Process Type</label>
+                        <p className="text-base text-[var(--text-dark)]">{req.process_type || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-base text-[var(--text-light)]">No specific requirements</p>
+            )}
           </div>
 
           {/* Footer */}
