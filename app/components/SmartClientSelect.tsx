@@ -15,7 +15,7 @@ interface SmartClientSelectProps {
   required?: boolean;
 }
 
-export default function SmartClientSelect({ value, onChange, required = false }: SmartClientSelectProps) {
+export default function SmartClientSelect({ onChange, required = false }: SmartClientSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);

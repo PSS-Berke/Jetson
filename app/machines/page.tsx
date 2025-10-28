@@ -32,7 +32,7 @@ export default function Machines() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
-  const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility);
+  const { machines, isLoading: machinesLoading, error: machinesError } = useMachines(filterStatus, filterFacility);
   const { logout } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -86,13 +86,19 @@ export default function Machines() {
                 href="/dashboard"
                 className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
               >
-                Dashboard
+                Jobs
               </Link>
               <Link
                 href="/machines"
                 className="px-4 py-2 rounded-lg font-medium transition-colors bg-[var(--primary-blue)] text-white"
               >
                 Machines
+              </Link>
+              <Link
+                href="/calendar"
+                className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
+              >
+                Calendar
               </Link>
             </nav>
 
@@ -322,8 +328,6 @@ function MachineCard({ machine }: { machine: Machine }) {
     avalible: 'Available',
     maintenance: 'Maintenance'
   };
-
-  const normalizedStatus = machine.status === 'avalible' ? 'available' : machine.status;
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border border-[var(--border)] p-5 hover:shadow-md transition-shadow ${

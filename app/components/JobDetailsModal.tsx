@@ -1,15 +1,93 @@
 'use client';
 
+import { useState } from 'react';
 import { type ParsedJob } from '@/hooks/useJobs';
+import { deleteJob } from '@/lib/api';
+import EditJobModal from './EditJobModal';
+import Toast from './Toast';
 
 interface JobDetailsModalProps {
   isOpen: boolean;
   job: ParsedJob | null;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
-export default function JobDetailsModal({ isOpen, job, onClose }: JobDetailsModalProps) {
+export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: JobDetailsModalProps) {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
+  const [deletedJobNumber, setDeletedJobNumber] = useState<number | null>(null);
+
   if (!isOpen || !job) return null;
+
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditClose = () => {
+    setIsEditModalOpen(false);
+  };
+
+  const handleEditSuccess = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      const jobNum = job.job_number;
+      const jobIdValue = job.id;
+
+      // Validation check
+      if (!jobIdValue || jobIdValue === 0) {
+        throw new Error(`Invalid job ID: ${jobIdValue}`);
+      }
+
+      console.log('Attempting to delete job:', {
+        jobId: jobIdValue,
+        jobNumber: jobNum,
+        jobIdType: typeof jobIdValue
+      });
+
+      await deleteJob(jobIdValue);
+
+      setShowDeleteConfirm(false);
+      setDeletedJobNumber(jobNum);
+      setShowDeleteToast(true);
+      onClose();
+
+      // Delay refresh to show toast
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Unknown error occurred';
+
+      alert(`Failed to delete job #${job.job_number}.\n\nError: ${errorMessage}\n\nPlease check the console for details or contact support.`);
+
+      // Keep the confirmation dialog open so user can try again or cancel
+      // setShowDeleteConfirm(false); // Don't close on error
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
@@ -101,7 +179,7 @@ export default function JobDetailsModal({ isOpen, job, onClose }: JobDetailsModa
                 <p className="text-base text-[var(--text-dark)]">{job.csr || 'N/A'}</p>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Program</label>
+                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Program Cadence</label>
                 <p className="text-base text-[var(--text-dark)]">{job.prgm || 'N/A'}</p>
               </div>
             </div>
@@ -182,16 +260,76 @@ export default function JobDetailsModal({ isOpen, job, onClose }: JobDetailsModa
           </div>
 
           {/* Footer */}
-          <div className="border-t border-[var(--border)] pt-6 flex justify-end gap-3">
+          <div className="border-t border-[var(--border)] pt-6 flex justify-between gap-3">
             <button
-              onClick={onClose}
-              className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+              onClick={handleDeleteClick}
+              className="px-6 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold hover:bg-red-50 transition-colors"
             >
-              Close
+              Delete Job
             </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleEdit}
+                className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+              >
+                Edit Job
+              </button>
+              <button
+                onClick={onClose}
+                className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={handleDeleteCancel} />
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative z-10">
+            <h3 className="text-xl font-bold text-[var(--dark-blue)] mb-4">Confirm Delete</h3>
+            <p className="text-[var(--text-dark)] mb-6">
+              Are you sure you want to delete <strong>Job #{job.job_number}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleDeleteCancel}
+                disabled={isDeleting}
+                className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Job'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Job Modal */}
+      <EditJobModal
+        isOpen={isEditModalOpen}
+        job={job}
+        onClose={handleEditClose}
+        onSuccess={handleEditSuccess}
+      />
+
+      {/* Delete Success Toast */}
+      {showDeleteToast && deletedJobNumber && (
+        <Toast
+          message={`Job #${deletedJobNumber} deleted successfully!`}
+          type="success"
+          onClose={() => setShowDeleteToast(false)}
+        />
+      )}
     </div>
   );
 }

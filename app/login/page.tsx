@@ -14,7 +14,7 @@ export default function LoginPage() {
     try {
       await login({ email, password });
       // useAuth handles redirect on success
-    } catch (err) {
+    } catch (_err) {
       // Error is handled by useAuth hook
     }
   };

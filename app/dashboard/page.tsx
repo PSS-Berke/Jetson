@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
-  const { jobs, isLoading: jobsLoading, error: jobsError } = useJobs();
+  const { jobs, isLoading: jobsLoading, error: jobsError, refetch } = useJobs();
   const { logout } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -66,13 +66,19 @@ export default function Dashboard() {
                 href="/dashboard"
                 className="px-4 py-2 rounded-lg font-medium transition-colors bg-[var(--primary-blue)] text-white"
               >
-                Dashboard
+                Jobs
               </Link>
               <Link
                 href="/machines"
                 className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
               >
                 Machines
+              </Link>
+              <Link
+                href="/calendar"
+                className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
+              >
+                Calendar
               </Link>
             </nav>
 
@@ -229,13 +235,18 @@ export default function Dashboard() {
       </main>
 
       {/* Add Job Modal */}
-      <AddJobModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddJobModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={refetch}
+      />
 
       {/* Job Details Modal */}
       <JobDetailsModal
         isOpen={isJobDetailsOpen}
         job={selectedJob}
         onClose={() => setIsJobDetailsOpen(false)}
+        onRefresh={refetch}
       />
     </>
   );

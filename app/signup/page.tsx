@@ -33,7 +33,7 @@ export default function SignupPage() {
       setEmail('');
       setPassword('');
       setIsAdmin(false);
-    } catch (err) {
+    } catch (_err) {
       // Error is handled by useAuth hook
     }
   };
