@@ -34,3 +34,165 @@ body {
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
+
+/* Calendar Styles */
+.calendar-container {
+  font-family: inherit;
+}
+
+.calendar-container .rbc-calendar {
+  font-family: inherit;
+}
+
+.calendar-container .rbc-header {
+  padding: 12px 4px;
+  font-weight: 600;
+  color: var(--text-dark);
+  background-color: var(--bg-card);
+  border-bottom: 2px solid var(--border);
+}
+
+.calendar-container .rbc-today {
+  background-color: var(--bg-alert-info);
+}
+
+.calendar-container .rbc-off-range-bg {
+  background-color: #f9fafb;
+}
+
+.calendar-container .rbc-event {
+  background-color: var(--primary-blue);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 0.875rem;
+}
+
+.calendar-container .rbc-event-label {
+  font-size: 0.75rem;
+}
+
+.calendar-container .rbc-toolbar {
+  padding: 15px 0;
+  margin-bottom: 15px;
+}
+
+.calendar-container .rbc-toolbar button {
+  color: var(--text-dark);
+  border: 1px solid var(--border);
+  background-color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.calendar-container .rbc-toolbar button:hover {
+  background-color: var(--primary-blue);
+  color: white;
+  border-color: var(--primary-blue);
+}
+
+.calendar-container .rbc-toolbar button:active,
+.calendar-container .rbc-toolbar button.rbc-active {
+  background-color: var(--primary-blue);
+  color: white;
+  border-color: var(--primary-blue);
+  box-shadow: none;
+}
+
+.calendar-container .rbc-toolbar button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Custom date header styles */
+.calendar-date-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px;
+  width: 100%;
+}
+
+.calendar-date-header .date-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+}
+
+.calendar-date-header .date-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.calendar-date-header .pieces {
+  font-size: 0.75rem;
+  color: var(--primary-blue);
+  font-weight: 600;
+}
+
+.calendar-date-header .revenue {
+  font-size: 0.75rem;
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Month view cell height */
+.calendar-container .rbc-month-row {
+  min-height: 100px;
+}
+
+.calendar-container .rbc-date-cell {
+  padding: 4px;
+}
+
+/* Week and Day view styles */
+.calendar-container .rbc-time-slot {
+  min-height: 40px;
+}
+
+.calendar-container .rbc-time-header-content {
+  border-left: 1px solid var(--border);
+}
+
+.calendar-container .rbc-time-content {
+  border-top: 1px solid var(--border);
+}
+
+/* Selected slot style */
+.calendar-container .rbc-selected-cell {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+/* Capacity color classes */
+.capacity-low {
+  background-color: var(--success);
+}
+
+.capacity-medium {
+  background-color: var(--warning);
+}
+
+.capacity-high {
+  background-color: var(--accent-red);
+}
+
+/* Responsive calendar */
+@media (max-width: 1024px) {
+  .calendar-container .rbc-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .calendar-date-header .date-summary {
+    font-size: 0.7rem;
+  }
+}
+
+/* Smooth transitions */
+.calendar-container * {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}

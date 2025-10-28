@@ -66,13 +66,19 @@ export default function Dashboard() {
                 href="/dashboard"
                 className="px-4 py-2 rounded-lg font-medium transition-colors bg-[var(--primary-blue)] text-white"
               >
-                Dashboard
+                Jobs
               </Link>
               <Link
                 href="/machines"
                 className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
               >
                 Machines
+              </Link>
+              <Link
+                href="/calendar"
+                className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
+              >
+                Calendar
               </Link>
             </nav>
 

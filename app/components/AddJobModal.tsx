@@ -354,23 +354,6 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Service Type
-                  </label>
-                  <select
-                    name="service_type"
-                    value={formData.service_type}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                  >
-                    <option value="insert">Insert</option>
-                    <option value="fold">Fold</option>
-                    <option value="affix">Affix Label</option>
-                    <option value="print">Variable Print</option>
-                    <option value="polybag">Poly Bag</option>
-                  </select>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -389,16 +372,19 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Program
+                    Program Cadence
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="prgm"
                     value={formData.prgm}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="Program"
-                  />
+                  >
+                    <option value="">Select cadence...</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="One Time">One Time</option>
+                  </select>
                 </div>
               </div>
 
@@ -442,19 +428,6 @@ export default function AddJobModal({ isOpen, onClose }: AddJobModalProps) {
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 73"
                     required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Pockets
-                  </label>
-                  <input
-                    type="number"
-                    name="pockets"
-                    value={formData.pockets}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="e.g., 2"
                   />
                 </div>
               </div>

@@ -101,7 +101,7 @@ export default function JobDetailsModal({ isOpen, job, onClose }: JobDetailsModa
                 <p className="text-base text-[var(--text-dark)]">{job.csr || 'N/A'}</p>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Program</label>
+                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Program Cadence</label>
                 <p className="text-base text-[var(--text-dark)]">{job.prgm || 'N/A'}</p>
               </div>
             </div>
