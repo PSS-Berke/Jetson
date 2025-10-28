@@ -2,11 +2,13 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import SmartClientSelect from './SmartClientSelect';
-import { getToken } from '@/lib/api';
+import { updateJob } from '@/lib/api';
+import { type ParsedJob } from '@/hooks/useJobs';
 import Toast from './Toast';
 
-interface AddJobModalProps {
+interface EditJobModalProps {
   isOpen: boolean;
+  job: ParsedJob | null;
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -39,11 +41,10 @@ interface JobFormData {
   requirements: Requirement[];
 }
 
-export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalProps) {
+export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJobModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: '',
     clients_id: null,
@@ -72,6 +73,51 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     ]
   });
 
+  // Initialize form with job data when modal opens
+  useEffect(() => {
+    if (isOpen && job) {
+      // Parse requirements if it's a JSON string
+      let parsedRequirements: Requirement[];
+      try {
+        parsedRequirements = typeof job.requirements === 'string'
+          ? JSON.parse(job.requirements)
+          : Array.isArray(job.requirements)
+            ? job.requirements
+            : [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
+      } catch {
+        parsedRequirements = [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
+      }
+
+      // Convert timestamps to YYYY-MM-DD format for date inputs
+      const formatDate = (timestamp: number | null | undefined) => {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toISOString().split('T')[0];
+      };
+
+      setFormData({
+        job_number: job.job_number?.toString() || '',
+        clients_id: job.client?.id || null,
+        client_name: job.client?.name || '',
+        job_name: job.job_name || '',
+        description: job.description || '',
+        quantity: job.quantity?.toString() || '',
+        csr: job.csr || '',
+        prgm: job.prgm || '',
+        price_per_m: job.price_per_m?.toString() || '',
+        ext_price: job.ext_price?.toString() || '',
+        add_on_charges: job.add_on_charges?.toString() || '',
+        total_billing: job.total_billing?.toString() || '',
+        start_date: formatDate(job.start_date),
+        due_date: formatDate(job.due_date),
+        service_type: job.service_type || 'insert',
+        pockets: '2',
+        machines_id: job.machines?.map(m => m.id) || [],
+        requirements: parsedRequirements
+      });
+    }
+  }, [isOpen, job]);
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -80,13 +126,12 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       document.body.style.overflow = 'unset';
     }
 
-    // Cleanup function to restore scroll on unmount
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !job) return null;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -134,7 +179,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   };
 
   const handleNext = () => {
-    // Validate step 1 - only job number and client ID are required
     if (currentStep === 1) {
       if (!formData.job_number || !formData.clients_id) {
         alert('Please fill in job number and client name');
@@ -142,7 +186,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       }
     }
 
-    // Validate step 2 - all requirements must have required fields
     if (currentStep === 2) {
       const allRequirementsValid = formData.requirements.every(r =>
         r.process_type && r.paper_size && r.shifts_id > 0
@@ -169,78 +212,38 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     setSubmitting(true);
 
     try {
-      const token = getToken();
+      // Convert date strings to timestamps
+      const startDateTimestamp: number | undefined = formData.start_date
+        ? new Date(formData.start_date).getTime()
+        : undefined;
+      const dueDateTimestamp: number | undefined = formData.due_date
+        ? new Date(formData.due_date).getTime()
+        : undefined;
 
-      // Prepare the payload according to the API specification
       const payload = {
-        start_date: formData.start_date || null,
-        due_date: formData.due_date || null,
+        start_date: startDateTimestamp,
+        due_date: dueDateTimestamp,
         description: formData.description,
         quantity: parseInt(formData.quantity),
-        clients_id: formData.clients_id,
-        machines_id: formData.machines_id,
+        clients_id: formData.clients_id ?? undefined,
+        machines_id: JSON.stringify(formData.machines_id),
         job_number: parseInt(formData.job_number),
         service_type: formData.service_type,
         pockets: parseInt(formData.pockets),
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
-        price_per_m: parseFloat(formData.price_per_m) || 0,
-        add_on_charges: parseFloat(formData.add_on_charges) || 0,
-        ext_price: parseFloat(formData.ext_price) || 0,
-        total_billing: parseFloat(formData.total_billing) || 0,
-        requirements: formData.requirements
+        price_per_m: formData.price_per_m,
+        add_on_charges: formData.add_on_charges,
+        ext_price: formData.ext_price,
+        total_billing: formData.total_billing,
+        requirements: JSON.stringify(formData.requirements)
       };
 
-      const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      await updateJob(job.id, payload);
 
-      if (!response.ok) {
-        throw new Error('Failed to create job');
-      }
-
-      const result = await response.json();
-      console.log('Job created successfully:', result);
-
-      const jobNum = parseInt(formData.job_number);
-      setCreatedJobNumber(jobNum);
-      setShowSuccessToast(true);
-
-      // Reset form and close modal
-      setFormData({
-        job_number: '',
-        clients_id: null,
-        client_name: '',
-        job_name: '',
-        description: '',
-        quantity: '',
-        csr: '',
-        prgm: '',
-        price_per_m: '',
-        ext_price: '',
-        add_on_charges: '',
-        total_billing: '',
-        start_date: '',
-        due_date: '',
-        service_type: 'insert',
-        pockets: '2',
-        machines_id: [],
-        requirements: [
-          {
-            process_type: '',
-            paper_size: '',
-            pockets: 0,
-            shifts_id: 0
-          }
-        ]
-      });
       setCurrentStep(1);
+      setShowSuccessToast(true);
 
       // Delay closing to show toast
       setTimeout(() => {
@@ -252,8 +255,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         }
       }, 500);
     } catch (error) {
-      console.error('Error creating job:', error);
-      alert('Failed to create job. Please try again.');
+      console.error('Error updating job:', error);
+      alert('Failed to update job. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -273,7 +276,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-          <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Add New Job</h2>
+          <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Edit Job #{job.job_number}</h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
@@ -526,7 +529,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
               {formData.requirements.map((requirement, index) => (
                 <div key={index} className="border border-[var(--border)] rounded-lg p-6 space-y-4">
-                  {/* Requirement Header */}
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-semibold text-[var(--text-dark)]">Requirement {index + 1}</h4>
                     {index > 0 && (
@@ -540,7 +542,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     )}
                   </div>
 
-                  {/* Process Type & Paper Size */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
@@ -582,7 +583,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     </div>
                   </div>
 
-                  {/* Pockets & Shift */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
@@ -617,7 +617,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               ))}
 
-              {/* Add Requirement Button */}
               <button
                 type="button"
                 onClick={addRequirement}
@@ -700,15 +699,15 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="font-semibold text-green-900 mb-2">Ready to Submit</h3>
+                <h3 className="font-semibold text-green-900 mb-2">Ready to Update</h3>
                 <p className="text-sm text-green-800">
-                  All required fields are filled. Click Submit to create this job.
+                  Click Update Job to save your changes.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Footer - Inside Form */}
+          {/* Footer */}
           <div className="flex items-center justify-between mt-6 pt-6 border-t border-[var(--border)]">
             <div className="text-sm text-[var(--text-light)]">
               Step {currentStep} of 3
@@ -741,7 +740,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   disabled={submitting}
                   className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Creating Job...' : 'Submit Job'}
+                  {submitting ? 'Updating Job...' : 'Update Job'}
                 </button>
               )}
             </div>
@@ -750,9 +749,9 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       </div>
 
       {/* Success Toast */}
-      {showSuccessToast && createdJobNumber && (
+      {showSuccessToast && (
         <Toast
-          message={`Job #${createdJobNumber} created successfully!`}
+          message={`Job #${job.job_number} updated successfully!`}
           type="success"
           onClose={() => setShowSuccessToast(false)}
         />

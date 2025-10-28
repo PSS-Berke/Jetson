@@ -32,7 +32,7 @@ export default function Machines() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
-  const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility);
+  const { machines, isLoading: machinesLoading, error: machinesError } = useMachines(filterStatus, filterFacility);
   const { logout } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -328,8 +328,6 @@ function MachineCard({ machine }: { machine: Machine }) {
     avalible: 'Available',
     maintenance: 'Maintenance'
   };
-
-  const normalizedStatus = machine.status === 'avalible' ? 'available' : machine.status;
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border border-[var(--border)] p-5 hover:shadow-md transition-shadow ${

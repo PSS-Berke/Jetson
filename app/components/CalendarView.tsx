@@ -121,7 +121,7 @@ export default function CalendarView({
   }, [onDateClick]);
 
   // Handle event selection
-  const handleSelectEvent = useCallback((event: any) => {
+  const handleSelectEvent = useCallback((event: CalendarEvent & { resource?: CalendarEvent }) => {
     if (onEventClick && event.resource) {
       onEventClick(event.resource);
     }

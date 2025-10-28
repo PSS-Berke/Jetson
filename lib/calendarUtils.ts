@@ -8,14 +8,12 @@ import {
   MachineCapacityData,
   MachineCapacityDay,
   Machine,
-  JobMachineAllocation,
-  MachineJobAllocation
+  JobMachineAllocation
 } from '@/types/calendar';
 import {
   timestampToDate,
   getDaysBetween,
-  getDateKey,
-  TOTAL_HOURS_PER_DAY
+  getDateKey
 } from './dateUtils';
 import {
   calculateMultiMachineTimeEstimate,
@@ -25,7 +23,6 @@ import {
   calculateDailyPieces,
   calculateDailyMachineCapacity,
   calculateUtilizationPercent,
-  getUtilizationColor,
   getUtilizationColorVar
 } from './capacityUtils';
 
@@ -34,20 +31,20 @@ import {
  */
 export const transformJobsToEvents = (
   jobs: ParsedJob[],
-  machines: Machine[]
+  _machines: Machine[]
 ): CalendarEvent[] => {
   return jobs.map(job => {
     const startDate = timestampToDate(job.start_date);
     const endDate = timestampToDate(job.due_date);
 
     // Get machines for this job
-    const jobMachines = machines.filter(m =>
-      job.machines.some(jm => jm.id === m.id)
-    );
+    // const jobMachines = machines.filter(m =>
+    //   job.machines.some(jm => jm.id === m.id)
+    // );
 
     // Calculate time estimate if not provided
-    const timeEstimate = job.time_estimate ||
-      calculateMultiMachineTimeEstimate(job.quantity, jobMachines);
+    // const timeEstimate = job.time_estimate ||
+    //   calculateMultiMachineTimeEstimate(job.quantity, jobMachines);
 
     const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
     const dailyRevenue = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
@@ -72,7 +69,7 @@ export const transformJobsToEvents = (
  */
 export const calculateDailySummaries = (
   jobs: ParsedJob[],
-  machines: Machine[],
+  _machines: Machine[],
   startDate: Date,
   endDate: Date
 ): Map<string, DailySummary> => {
@@ -354,7 +351,7 @@ export const getDayBreakdown = (
 /**
  * Get a color for a job based on various factors
  */
-export const getJobColor = (job: ParsedJob): string => {
+export const getJobColor = (_job: ParsedJob): string => {
   // Could be enhanced with different color schemes
   // For now, return a default color
   return 'var(--primary-blue)';

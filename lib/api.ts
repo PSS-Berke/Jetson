@@ -240,3 +240,75 @@ export const getJobs = async (): Promise<Job[]> => {
 
   return response.json();
 };
+
+// Update a job
+export const updateJob = async (jobId: number, jobData: Partial<Job>): Promise<Job> => {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/${jobId}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(jobData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
+// Delete a job
+export const deleteJob = async (jobId: number): Promise<void> => {
+  const url = `https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/${jobId}`;
+
+  // Diagnostic logging
+  console.log('DELETE Job Request:', {
+    jobId,
+    jobIdType: typeof jobId,
+    url,
+    hasToken: !!getToken()
+  });
+
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers,
+  });
+
+  // Log response details
+  console.log('DELETE Job Response:', {
+    status: response.status,
+    statusText: response.statusText,
+    ok: response.ok,
+    headers: Object.fromEntries(response.headers.entries())
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    console.error('DELETE Job Error Details:', {
+      status: response.status,
+      statusText: response.statusText,
+      error
+    });
+    throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  console.log('DELETE Job Success: Job', jobId, 'deleted successfully');
+};
