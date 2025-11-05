@@ -7,12 +7,10 @@ import { useMachineCapacity } from '@/hooks/useMachineCapacity';
 import { CalendarViewType } from '@/types/calendar';
 import { getMonthRange, getWeekRange } from '@/lib/dateUtils';
 import CalendarView from './CalendarView';
-import CompactFilterDropdown from './CompactFilterDropdown';
-import FacilityToggle from './FacilityToggle';
 
 interface EmbeddedCalendarProps {
   startDate?: Date;
-  selectedFacility: number | null;
+  selectedFacility?: number | null;
   selectedClients?: number[];
   selectedServiceTypes?: string[];
   height?: number;
@@ -20,7 +18,6 @@ interface EmbeddedCalendarProps {
 
 export default function EmbeddedCalendar({
   startDate,
-  selectedFacility,
   selectedClients = [],
   selectedServiceTypes = [],
   height = 500,

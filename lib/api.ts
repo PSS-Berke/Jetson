@@ -139,12 +139,12 @@ export const logout = (): void => {
 export const getMachines = async (status?: string, facilitiesId?: number): Promise<Machine[]> => {
   const params = new URLSearchParams();
 
+  // Only append status parameter if it has a value
   if (status && status !== '') {
     params.append('status', status);
-  } else {
-    params.append('status', '');
   }
 
+  // Only append facilities_id parameter if it has a value
   if (facilitiesId && facilitiesId > 0) {
     params.append('facilities_id', facilitiesId.toString());
   }

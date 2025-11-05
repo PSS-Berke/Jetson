@@ -52,6 +52,7 @@ export interface Job {
   job_name: string;
   prgm: string;
   csr: string;
+  facilities_id?: number;
   price_per_m: string;
   add_on_charges: string;
   ext_price: string;
@@ -68,6 +69,7 @@ export interface JobRequirement {
   paper_size?: string;
   pockets?: number;
   shifts_id?: number;
+  price_per_m?: string;
   [key: string]: string | number | undefined;
 }
 

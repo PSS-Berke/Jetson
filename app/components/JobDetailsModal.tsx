@@ -115,6 +115,12 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                 <p className="text-base text-[var(--text-dark)]">{job.job_number}</p>
               </div>
               <div>
+                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Facility</label>
+                <p className="text-base text-[var(--text-dark)]">
+                  {job.facilities_id === 1 ? 'Bolingbrook' : job.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                </p>
+              </div>
+              <div>
                 <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Job Name</label>
                 <p className="text-base text-[var(--text-dark)]">{job.job_name || 'N/A'}</p>
               </div>
@@ -199,29 +205,52 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
           {/* Pricing Section */}
           <div className="border-t border-[var(--border)] pt-6">
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Pricing</h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Price per M</label>
-                <p className="text-base text-[var(--text-dark)]">${parseFloat(job.price_per_m || '0').toFixed(2)}</p>
+            {job.requirements && job.requirements.length > 0 && job.requirements.some(req => req.price_per_m) ? (
+              <div className="space-y-4">
+                {job.requirements.map((req, index) => {
+                  const pricePerM = parseFloat(req.price_per_m || '0');
+                  const requirementTotal = (job.quantity / 1000) * pricePerM;
+
+                  return (
+                    <div key={index} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--text-dark)]">Requirement {index + 1}</p>
+                          <p className="text-xs text-[var(--text-light)] mt-1">
+                            {req.process_type} | {req.paper_size}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-[var(--text-light)]">${pricePerM.toFixed(2)}/m</p>
+                          <p className="text-base font-semibold text-[var(--text-dark)]">${requirementTotal.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="border-t-2 border-[var(--primary-blue)] pt-4 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-[var(--text-dark)]">Total Job Price:</span>
+                    <span className="text-2xl font-bold text-[var(--primary-blue)]">
+                      ${job.requirements.reduce((total, req) => {
+                        const pricePerM = parseFloat(req.price_per_m || '0');
+                        return total + ((job.quantity / 1000) * pricePerM);
+                      }, 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Extended Price</label>
-                <p className="text-base text-[var(--text-dark)]">${parseFloat(job.ext_price || '0').toFixed(2)}</p>
+            ) : (
+              <div className="text-base text-[var(--text-light)]">
+                <p>No pricing information available for this job.</p>
+                <p className="text-xs mt-2">(This job may have been created before the new pricing structure)</p>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Add-on Charges</label>
-                <p className="text-base text-[var(--text-dark)]">${parseFloat(job.add_on_charges || '0').toFixed(2)}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Total Billing</label>
-                <p className="text-lg font-semibold text-[var(--primary-blue)]">${parseFloat(job.total_billing || '0').toFixed(2)}</p>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Requirements Section */}
           <div className="border-t border-[var(--border)] pt-6">
-            <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Requirements</h3>
+            <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Requirements Details</h3>
             {job.requirements && job.requirements.length > 0 ? (
               <div className="space-y-4">
                 {job.requirements.map((req, index) => (
@@ -229,21 +258,29 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                     <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">Requirement {index + 1}</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Pockets</label>
-                        <p className="text-base text-[var(--text-dark)]">{req.pockets ?? 'N/A'}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Shifts ID</label>
-                        <p className="text-base text-[var(--text-dark)]">{req.shifts_id ?? 'N/A'}</p>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Process Type</label>
+                        <p className="text-base text-[var(--text-dark)]">{req.process_type || 'N/A'}</p>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Paper Size</label>
                         <p className="text-base text-[var(--text-dark)]">{req.paper_size || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Process Type</label>
-                        <p className="text-base text-[var(--text-dark)]">{req.process_type || 'N/A'}</p>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Pockets</label>
+                        <p className="text-base text-[var(--text-dark)]">{req.pockets ?? 'N/A'}</p>
                       </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Shift</label>
+                        <p className="text-base text-[var(--text-dark)]">
+                          {req.shifts_id === 1 ? 'Shift One' : req.shifts_id === 2 ? 'Shift Two' : 'N/A'}
+                        </p>
+                      </div>
+                      {req.price_per_m && (
+                        <div>
+                          <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Price (per/m)</label>
+                          <p className="text-base text-[var(--text-dark)]">${parseFloat(req.price_per_m).toFixed(2)}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -13,6 +13,7 @@ export interface ParsedRequirement {
   shifts_id?: number;
   paper_size?: string;
   process_type?: string;
+  price_per_m?: string;
 }
 
 export interface ParsedJob extends Omit<Job, 'client' | 'machines' | 'requirements'> {

@@ -8,10 +8,13 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
 
+  console.log('[Middleware]', { pathname, hasToken: !!token });
+
   // Allow access to public routes
   if (publicRoutes.includes(pathname)) {
     // If already logged in and trying to access login, redirect to home
     if (token && pathname === '/login') {
+      console.log('[Middleware] Redirecting from login to /');
       return NextResponse.redirect(new URL('/', request.url));
     }
     return NextResponse.next();
@@ -19,11 +22,13 @@ export function middleware(request: NextRequest) {
 
   // Redirect to login if no token and not on a public route
   if (!token) {
+    console.log('[Middleware] No token, redirecting to login');
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
+  console.log('[Middleware] Allowing access to', pathname);
   return NextResponse.next();
 }
 
