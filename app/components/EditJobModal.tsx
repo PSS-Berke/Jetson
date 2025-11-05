@@ -38,6 +38,7 @@ interface JobFormData {
   pockets: string;
   machines_id: number[];
   requirements: Requirement[];
+  weekly_split: number[];
 }
 
 export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJobModalProps) {
@@ -70,7 +71,8 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         shifts_id: 0,
         price_per_m: ''
       }
-    ]
+    ],
+    weekly_split: []
   });
 
   // Initialize form with job data when modal opens
@@ -124,6 +126,14 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       
       console.log('EditJobModal - Setting formData with:', { clientId, clientName });
       
+      // Parse weekly_split if it exists
+      let weeklySplit: number[] = [];
+      if ((job as any).weekly_split) {
+        if (Array.isArray((job as any).weekly_split)) {
+          weeklySplit = (job as any).weekly_split;
+        }
+      }
+
       setFormData({
         job_number: toStringValue(job.job_number),
         clients_id: clientId,
@@ -139,10 +149,43 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         service_type: job.service_type || 'insert',
         pockets: '2', // Default value - pockets are defined in requirements
         machines_id: job.machines?.map(m => m.id) || [],
-        requirements: parsedRequirements
+        requirements: parsedRequirements,
+        weekly_split: weeklySplit
       });
     }
   }, [isOpen, job]);
+
+  // Calculate weeks and split quantity when dates or quantity changes
+  useEffect(() => {
+    if (formData.start_date && formData.due_date && formData.quantity) {
+      const startDate = new Date(formData.start_date);
+      const dueDate = new Date(formData.due_date);
+      const quantity = parseInt(formData.quantity);
+      
+      if (!isNaN(quantity) && quantity > 0 && dueDate >= startDate) {
+        // Calculate number of weeks (ceiling to capture partial weeks)
+        const daysDiff = Math.ceil((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const weeks = Math.ceil(daysDiff / 7);
+        
+        if (weeks > 0 && formData.weekly_split.length === 0) {
+          // Only auto-calculate if weekly_split is empty (not pre-populated from existing job)
+          // Split quantity evenly across weeks
+          const baseAmount = Math.floor(quantity / weeks);
+          const remainder = quantity % weeks;
+          
+          // Create array with base amounts
+          const newSplit = Array(weeks).fill(baseAmount);
+          
+          // Distribute remainder across first weeks
+          for (let i = 0; i < remainder; i++) {
+            newSplit[i]++;
+          }
+          
+          setFormData(prev => ({ ...prev, weekly_split: newSplit }));
+        }
+      }
+    }
+  }, [formData.start_date, formData.due_date, formData.quantity]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -205,10 +248,33 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
     }
   };
 
+  const handleWeeklySplitChange = (weekIndex: number, value: string) => {
+    const newValue = parseInt(value) || 0;
+    setFormData(prev => {
+      const newSplit = [...prev.weekly_split];
+      newSplit[weekIndex] = newValue;
+      return { ...prev, weekly_split: newSplit };
+    });
+  };
+
+  const getWeeklySplitSum = () => {
+    return formData.weekly_split.reduce((sum, val) => sum + val, 0);
+  };
+
+  const getWeeklySplitDifference = () => {
+    const quantity = parseInt(formData.quantity) || 0;
+    return getWeeklySplitSum() - quantity;
+  };
+
   const handleNext = () => {
     if (currentStep === 1) {
       if (!formData.job_number || !formData.clients_id) {
         alert('Please fill in job number and client name');
+        return;
+      }
+      // Validate weekly split if present
+      if (formData.weekly_split.length > 0 && getWeeklySplitDifference() !== 0) {
+        alert('Weekly split total must equal the total quantity');
         return;
       }
     }
@@ -294,7 +360,12 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         requirements: JSON.stringify(formData.requirements),
         job_name: formData.job_name,
         prgm: formData.prgm,
-        csr: formData.csr
+        csr: formData.csr,
+        price_per_m: formData.price_per_m || '0',
+        add_on_charges: formData.add_on_charges || '0',
+        ext_price: formData.ext_price || '0',
+        total_billing: formData.total_billing || '0',
+        weekly_split: formData.weekly_split
       };
 
       // Only include dates if they are valid timestamps (not 0 or undefined)
@@ -566,6 +637,50 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   />
                 </div>
               </div>
+
+              {/* Weekly Split Section */}
+              {formData.weekly_split.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-[var(--text-dark)]">
+                      Weekly Quantity Split ({formData.weekly_split.length} weeks)
+                    </h4>
+                    <div className={`text-sm font-semibold ${
+                      getWeeklySplitDifference() === 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}>
+                      Total: {getWeeklySplitSum().toLocaleString()} / {parseInt(formData.quantity || '0').toLocaleString()}
+                      {getWeeklySplitDifference() !== 0 && (
+                        <span className="ml-1">
+                          ({getWeeklySplitDifference() > 0 ? '+' : ''}{getWeeklySplitDifference()})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3">
+                    {formData.weekly_split.map((amount, index) => (
+                      <div key={index}>
+                        <label className="block text-xs font-medium text-[var(--text-light)] mb-1">
+                          Week {index + 1}
+                        </label>
+                        <input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
+                          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm"
+                          min="0"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {getWeeklySplitDifference() !== 0 && (
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      ⚠️ Weekly split total must equal the total quantity
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

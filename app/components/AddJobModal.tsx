@@ -36,6 +36,7 @@ interface JobFormData {
   pockets: string;
   machines_id: number[];
   requirements: Requirement[];
+  weekly_split: number[];
 }
 
 export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalProps) {
@@ -66,8 +67,40 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         shifts_id: 0,
         price_per_m: ''
       }
-    ]
+    ],
+    weekly_split: []
   });
+
+  // Calculate weeks and split quantity when dates or quantity changes
+  useEffect(() => {
+    if (formData.start_date && formData.due_date && formData.quantity) {
+      const startDate = new Date(formData.start_date);
+      const dueDate = new Date(formData.due_date);
+      const quantity = parseInt(formData.quantity);
+      
+      if (!isNaN(quantity) && quantity > 0 && dueDate >= startDate) {
+        // Calculate number of weeks (ceiling to capture partial weeks)
+        const daysDiff = Math.ceil((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const weeks = Math.ceil(daysDiff / 7);
+        
+        if (weeks > 0) {
+          // Split quantity evenly across weeks
+          const baseAmount = Math.floor(quantity / weeks);
+          const remainder = quantity % weeks;
+          
+          // Create array with base amounts
+          const newSplit = Array(weeks).fill(baseAmount);
+          
+          // Distribute remainder across first weeks
+          for (let i = 0; i < remainder; i++) {
+            newSplit[i]++;
+          }
+          
+          setFormData(prev => ({ ...prev, weekly_split: newSplit }));
+        }
+      }
+    }
+  }, [formData.start_date, formData.due_date, formData.quantity]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -131,11 +164,34 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     }
   };
 
+  const handleWeeklySplitChange = (weekIndex: number, value: string) => {
+    const newValue = parseInt(value) || 0;
+    setFormData(prev => {
+      const newSplit = [...prev.weekly_split];
+      newSplit[weekIndex] = newValue;
+      return { ...prev, weekly_split: newSplit };
+    });
+  };
+
+  const getWeeklySplitSum = () => {
+    return formData.weekly_split.reduce((sum, val) => sum + val, 0);
+  };
+
+  const getWeeklySplitDifference = () => {
+    const quantity = parseInt(formData.quantity) || 0;
+    return getWeeklySplitSum() - quantity;
+  };
+
   const handleNext = () => {
     // Validate step 1 - job number, client ID, and facility are required
     if (currentStep === 1) {
       if (!formData.job_number || !formData.clients_id || !formData.facilities_id) {
         alert('Please fill in job number, client name, and facility');
+        return;
+      }
+      // Validate weekly split if present
+      if (formData.weekly_split.length > 0 && getWeeklySplitDifference() !== 0) {
+        alert('Weekly split total must equal the total quantity');
         return;
       }
     }
@@ -184,7 +240,12 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         prgm: formData.prgm,
         csr: formData.csr,
         facilities_id: formData.facilities_id,
-        requirements: formData.requirements
+        price_per_m: parseFloat(formData.price_per_m) || 0,
+        add_on_charges: parseFloat(formData.add_on_charges) || 0,
+        ext_price: parseFloat(formData.ext_price) || 0,
+        total_billing: parseFloat(formData.total_billing) || 0,
+        requirements: formData.requirements,
+        weekly_split: formData.weekly_split
       };
 
       const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs', {
@@ -230,7 +291,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
             shifts_id: 0,
             price_per_m: ''
           }
-        ]
+        ],
+        weekly_split: []
       });
       setCurrentStep(1);
 
@@ -440,6 +502,50 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   />
                 </div>
               </div>
+
+              {/* Weekly Split Section */}
+              {formData.weekly_split.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-[var(--text-dark)]">
+                      Weekly Quantity Split ({formData.weekly_split.length} weeks)
+                    </h4>
+                    <div className={`text-sm font-semibold ${
+                      getWeeklySplitDifference() === 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}>
+                      Total: {getWeeklySplitSum().toLocaleString()} / {parseInt(formData.quantity || '0').toLocaleString()}
+                      {getWeeklySplitDifference() !== 0 && (
+                        <span className="ml-1">
+                          ({getWeeklySplitDifference() > 0 ? '+' : ''}{getWeeklySplitDifference()})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3">
+                    {formData.weekly_split.map((amount, index) => (
+                      <div key={index}>
+                        <label className="block text-xs font-medium text-[var(--text-light)] mb-1">
+                          Week {index + 1}
+                        </label>
+                        <input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
+                          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm"
+                          min="0"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {getWeeklySplitDifference() !== 0 && (
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      ⚠️ Weekly split total must equal the total quantity
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
