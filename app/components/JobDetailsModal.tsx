@@ -205,9 +205,9 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
           {/* Pricing Section */}
           <div className="border-t border-[var(--border)] pt-6">
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Pricing</h3>
-            {job.parsedRequirements && job.parsedRequirements.length > 0 && job.parsedRequirements.some(req => req.price_per_m) ? (
+            {job.requirements && job.requirements.length > 0 && job.requirements.some(req => req.price_per_m) ? (
               <div className="space-y-4">
-                {job.parsedRequirements.map((req, index) => {
+                {job.requirements.map((req, index) => {
                   const pricePerM = parseFloat(req.price_per_m || '0');
                   const requirementTotal = (job.quantity / 1000) * pricePerM;
 
@@ -232,7 +232,7 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-bold text-[var(--text-dark)]">Total Job Price:</span>
                     <span className="text-2xl font-bold text-[var(--primary-blue)]">
-                      ${job.parsedRequirements.reduce((total, req) => {
+                      ${job.requirements.reduce((total, req) => {
                         const pricePerM = parseFloat(req.price_per_m || '0');
                         return total + ((job.quantity / 1000) * pricePerM);
                       }, 0).toFixed(2)}
@@ -251,9 +251,9 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
           {/* Requirements Section */}
           <div className="border-t border-[var(--border)] pt-6">
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Requirements Details</h3>
-            {job.parsedRequirements && job.parsedRequirements.length > 0 ? (
+            {job.requirements && job.requirements.length > 0 ? (
               <div className="space-y-4">
-                {job.parsedRequirements.map((req, index) => (
+                {job.requirements.map((req, index) => (
                   <div key={index} className="bg-gray-50 rounded-lg p-4">
                     <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">Requirement {index + 1}</h4>
                     <div className="grid grid-cols-2 gap-4">
