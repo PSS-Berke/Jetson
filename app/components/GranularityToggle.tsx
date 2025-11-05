@@ -1,32 +1,28 @@
 'use client';
 
-import { useRef, useLayoutEffect, useState, useMemo } from 'react';
+import { useRef, useLayoutEffect, useState } from 'react';
 
-interface FacilityToggleProps {
-  currentFacility: number | null;
-  onFacilityChange: (facility: number | null) => void;
-  showAll?: boolean;
+export type Granularity = 'weekly' | 'monthly' | 'quarterly';
+
+interface GranularityToggleProps {
+  currentGranularity: Granularity;
+  onGranularityChange: (granularity: Granularity) => void;
 }
 
-export default function FacilityToggle({ currentFacility, onFacilityChange, showAll = true }: FacilityToggleProps) {
-  const facilities = useMemo(() => showAll
-    ? [
-        { value: null, label: 'All' },
-        { value: 1, label: 'Bolingbrook' },
-        { value: 2, label: 'Lemont' }
-      ]
-    : [
-        { value: 1, label: 'Bolingbrook' },
-        { value: 2, label: 'Lemont' }
-      ], [showAll]);
+const granularities: { value: Granularity; label: string }[] = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' }
+];
 
+export default function GranularityToggle({ currentGranularity, onGranularityChange }: GranularityToggleProps) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [bubbleStyle, setBubbleStyle] = useState({ width: 0, left: 0 });
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = facilities.findIndex(f => f.value === currentFacility);
+      const selectedIndex = granularities.findIndex(g => g.value === currentGranularity);
       const selectedButton = buttonRefs.current[selectedIndex];
       const container = containerRef.current;
 
@@ -49,7 +45,7 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
     // Update on window resize to handle responsive changes
     window.addEventListener('resize', updateBubblePosition);
     return () => window.removeEventListener('resize', updateBubblePosition);
-  }, [currentFacility, facilities]);
+  }, [currentGranularity]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -67,18 +63,18 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
         />
 
         {/* Buttons */}
-        {facilities.map((facility, index) => (
+        {granularities.map((granularity, index) => (
           <button
-            key={facility.value === null ? 'all' : facility.value}
+            key={granularity.value}
             ref={el => { buttonRefs.current[index] = el; }}
-            onClick={() => onFacilityChange(facility.value)}
+            onClick={() => onGranularityChange(granularity.value)}
             className={`relative z-10 px-6 py-2 rounded-full text-sm font-semibold transition-colors ${
-              currentFacility === facility.value
+              currentGranularity === granularity.value
                 ? 'text-white'
                 : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
             }`}
           >
-            {facility.label}
+            {granularity.label}
           </button>
         ))}
       </div>

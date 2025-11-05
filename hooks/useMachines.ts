@@ -2,24 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getMachines } from '@/lib/api';
-
-type MachineStatus = 'running' | 'available' | 'avalible' | 'maintenance';
-
-interface Machine {
-  id: number;
-  created_at: number;
-  line: number;
-  type: string;
-  max_size: string;
-  speed_hr: string;
-  status: MachineStatus;
-  pockets?: number;
-  shiftCapacity?: number;
-  currentJob?: {
-    number: string;
-    name: string;
-  };
-}
+import type { Machine } from '@/types';
 
 interface UseMachinesReturn {
   machines: Machine[];

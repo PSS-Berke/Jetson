@@ -1,13 +1,9 @@
 import { TOTAL_HOURS_PER_DAY, calculateDaysDifference, timestampToDate } from './dateUtils';
+import { getCapacityColor } from './theme';
+import type { Machine, ParsedJob } from '@/types';
 
-export interface Machine {
-  id: number;
-  line: number;
-  type: string;
-  speed_hr: string;
-  shiftCapacity?: number;
-  status: string;
-}
+// Re-export types for backwards compatibility
+export type { Machine };
 
 export interface Job {
   id: number;
@@ -158,9 +154,9 @@ export const getUtilizationColor = (utilizationPercent: number): string => {
  * Get CSS color variable for utilization
  */
 export const getUtilizationColorVar = (utilizationPercent: number): string => {
-  if (utilizationPercent < 50) return 'var(--success)';
-  if (utilizationPercent <= 80) return 'var(--warning)';
-  return 'var(--accent-red)';
+  // Convert percentage to 0-1 scale for theme function
+  const utilization = utilizationPercent / 100;
+  return getCapacityColor(utilization);
 };
 
 /**

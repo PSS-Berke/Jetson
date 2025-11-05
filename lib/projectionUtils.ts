@@ -1,5 +1,5 @@
 import { ParsedJob } from '@/hooks/useJobs';
-import { getDateKey, getDaysBetween } from './dateUtils';
+import { getDateKey, getDaysBetween, MonthRange, QuarterRange } from './dateUtils';
 
 export interface WeekRange {
   weekNumber: number;
@@ -8,15 +8,18 @@ export interface WeekRange {
   label: string; // e.g., "8/25", "9/1"
 }
 
+// Generic time period range that can be week, month, or quarter
+export type TimeRange = WeekRange | MonthRange | QuarterRange;
+
 export interface JobProjection {
   job: ParsedJob;
-  weeklyQuantities: Map<string, number>; // weekLabel -> quantity
+  weeklyQuantities: Map<string, number>; // weekLabel -> quantity (kept for backwards compatibility, but will hold any period)
   totalQuantity: number;
 }
 
 export interface ServiceTypeSummary {
   serviceType: string;
-  weeklyTotals: Map<string, number>; // weekLabel -> total quantity
+  weeklyTotals: Map<string, number>; // weekLabel -> total quantity (kept for backwards compatibility, but will hold any period)
   grandTotal: number;
 }
 
@@ -216,4 +219,151 @@ export function getStartOfWeek(date: Date = new Date()): Date {
 export function formatQuantity(quantity: number): string {
   if (quantity === 0) return '';
   return quantity.toLocaleString();
+}
+
+/**
+ * Generic function to calculate job distribution across any time periods (weeks, months, quarters)
+ */
+export function calculateJobDistribution(
+  job: ParsedJob,
+  timeRanges: TimeRange[]
+): Map<string, number> {
+  const quantities = new Map<string, number>();
+
+  // Initialize all periods to 0
+  timeRanges.forEach(range => {
+    quantities.set(range.label, 0);
+  });
+
+  // If job has no dates or quantity, return zeros
+  if (!job.start_date || !job.due_date || !job.quantity) {
+    return quantities;
+  }
+
+  const jobStart = new Date(job.start_date);
+  const jobEnd = new Date(job.due_date);
+
+  // Normalize to start of day
+  jobStart.setHours(0, 0, 0, 0);
+  jobEnd.setHours(0, 0, 0, 0);
+
+  // Get all days the job spans
+  const jobDays = getDaysBetween(jobStart, jobEnd);
+  const totalJobDays = jobDays.length;
+
+  if (totalJobDays === 0) {
+    return quantities;
+  }
+
+  // Calculate daily quantity
+  const dailyQuantity = job.quantity / totalJobDays;
+
+  // For each time period, count how many job days fall within it
+  timeRanges.forEach(range => {
+    let daysInPeriod = 0;
+
+    jobDays.forEach(day => {
+      const dayTime = day.getTime();
+      if (dayTime >= range.startDate.getTime() && dayTime <= range.endDate.getTime()) {
+        daysInPeriod++;
+      }
+    });
+
+    const periodQuantity = Math.round(dailyQuantity * daysInPeriod);
+    quantities.set(range.label, periodQuantity);
+  });
+
+  return quantities;
+}
+
+/**
+ * Calculate projections for all jobs using generic time ranges
+ */
+export function calculateGenericJobProjections(
+  jobs: ParsedJob[],
+  timeRanges: TimeRange[]
+): JobProjection[] {
+  return jobs.map(job => {
+    const weeklyQuantities = calculateJobDistribution(job, timeRanges);
+
+    // Calculate total from quantities (may differ slightly from job.quantity due to rounding)
+    let totalQuantity = 0;
+    weeklyQuantities.forEach(qty => {
+      totalQuantity += qty;
+    });
+
+    return {
+      job,
+      weeklyQuantities,
+      totalQuantity,
+    };
+  });
+}
+
+/**
+ * Aggregate projections by service type using generic time ranges
+ */
+export function calculateGenericServiceTypeSummaries(
+  jobProjections: JobProjection[],
+  timeRanges: TimeRange[]
+): ServiceTypeSummary[] {
+  const summaryMap = new Map<string, ServiceTypeSummary>();
+
+  jobProjections.forEach(projection => {
+    const serviceType = projection.job.service_type || 'Unknown';
+
+    if (!summaryMap.has(serviceType)) {
+      const weeklyTotals = new Map<string, number>();
+      timeRanges.forEach(range => {
+        weeklyTotals.set(range.label, 0);
+      });
+
+      summaryMap.set(serviceType, {
+        serviceType,
+        weeklyTotals,
+        grandTotal: 0,
+      });
+    }
+
+    const summary = summaryMap.get(serviceType)!;
+
+    // Add this job's quantities to the service type totals
+    projection.weeklyQuantities.forEach((quantity, label) => {
+      const currentTotal = summary.weeklyTotals.get(label) || 0;
+      summary.weeklyTotals.set(label, currentTotal + quantity);
+    });
+
+    summary.grandTotal += projection.totalQuantity;
+  });
+
+  // Convert to array and sort by service type name
+  return Array.from(summaryMap.values()).sort((a, b) =>
+    a.serviceType.localeCompare(b.serviceType)
+  );
+}
+
+/**
+ * Calculate grand totals across all service types using generic time ranges
+ */
+export function calculateGenericGrandTotals(
+  summaries: ServiceTypeSummary[],
+  timeRanges: TimeRange[]
+): { weeklyTotals: Map<string, number>; grandTotal: number } {
+  const weeklyTotals = new Map<string, number>();
+
+  timeRanges.forEach(range => {
+    weeklyTotals.set(range.label, 0);
+  });
+
+  let grandTotal = 0;
+
+  summaries.forEach(summary => {
+    summary.weeklyTotals.forEach((quantity, label) => {
+      const currentTotal = weeklyTotals.get(label) || 0;
+      weeklyTotals.set(label, currentTotal + quantity);
+    });
+    grandTotal += summary.grandTotal;
+  });
+
+  return { weeklyTotals, grandTotal };
 }

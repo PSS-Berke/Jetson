@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { ParsedJob } from '@/hooks/useJobs';
 import { getStartOfWeek } from '@/lib/projectionUtils';
+import { startOfMonth, startOfQuarter } from 'date-fns';
+import type { Granularity } from './GranularityToggle';
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -14,6 +16,7 @@ interface ProjectionFiltersProps {
   onServiceTypesChange: (types: string[]) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  granularity: Granularity;
 }
 
 export default function ProjectionFilters({
@@ -26,6 +29,7 @@ export default function ProjectionFilters({
   onServiceTypesChange,
   searchQuery,
   onSearchChange,
+  granularity,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -70,26 +74,96 @@ export default function ProjectionFilters({
     }
   };
 
-  const handlePreviousWeek = () => {
+  const handlePrevious = () => {
     const newDate = new Date(startDate);
-    newDate.setDate(newDate.getDate() - 7);
+    switch (granularity) {
+      case 'monthly':
+        newDate.setMonth(newDate.getMonth() - 1);
+        break;
+      case 'quarterly':
+        newDate.setMonth(newDate.getMonth() - 3);
+        break;
+      case 'weekly':
+      default:
+        newDate.setDate(newDate.getDate() - 7);
+        break;
+    }
     onStartDateChange(newDate);
   };
 
-  const handleNextWeek = () => {
+  const handleNext = () => {
     const newDate = new Date(startDate);
-    newDate.setDate(newDate.getDate() + 7);
+    switch (granularity) {
+      case 'monthly':
+        newDate.setMonth(newDate.getMonth() + 1);
+        break;
+      case 'quarterly':
+        newDate.setMonth(newDate.getMonth() + 3);
+        break;
+      case 'weekly':
+      default:
+        newDate.setDate(newDate.getDate() + 7);
+        break;
+    }
     onStartDateChange(newDate);
   };
 
   const handleToday = () => {
-    onStartDateChange(getStartOfWeek());
+    switch (granularity) {
+      case 'monthly':
+        onStartDateChange(startOfMonth(new Date()));
+        break;
+      case 'quarterly':
+        onStartDateChange(startOfQuarter(new Date()));
+        break;
+      case 'weekly':
+      default:
+        onStartDateChange(getStartOfWeek());
+        break;
+    }
   };
 
   const formatDateRange = () => {
     const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 34); // 5 weeks = 35 days
+    let days = 0;
+    switch (granularity) {
+      case 'monthly':
+        days = 90; // ~3 months
+        break;
+      case 'quarterly':
+        days = 365; // ~4 quarters
+        break;
+      case 'weekly':
+      default:
+        days = 34; // 5 weeks
+        break;
+    }
+    endDate.setDate(endDate.getDate() + days);
     return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+  };
+
+  const getPeriodLabel = () => {
+    switch (granularity) {
+      case 'monthly':
+        return 'Month Range';
+      case 'quarterly':
+        return 'Quarter Range';
+      case 'weekly':
+      default:
+        return 'Week Range';
+    }
+  };
+
+  const getTodayButtonLabel = () => {
+    switch (granularity) {
+      case 'monthly':
+        return 'This Month';
+      case 'quarterly':
+        return 'This Quarter';
+      case 'weekly':
+      default:
+        return 'This Week';
+    }
   };
 
   return (
@@ -97,11 +171,11 @@ export default function ProjectionFilters({
       <div className="flex flex-wrap gap-4 items-center">
         {/* Date Range Selector */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--text-dark)]">Week Range:</span>
+          <span className="text-sm font-medium text-[var(--text-dark)]">{getPeriodLabel()}:</span>
           <button
-            onClick={handlePreviousWeek}
+            onClick={handlePrevious}
             className="px-2 py-1 rounded hover:bg-gray-100 transition-colors"
-            aria-label="Previous week"
+            aria-label={`Previous ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
           >
             <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -111,9 +185,9 @@ export default function ProjectionFilters({
             {formatDateRange()}
           </div>
           <button
-            onClick={handleNextWeek}
+            onClick={handleNext}
             className="px-2 py-1 rounded hover:bg-gray-100 transition-colors"
-            aria-label="Next week"
+            aria-label={`Next ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
           >
             <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -123,7 +197,7 @@ export default function ProjectionFilters({
             onClick={handleToday}
             className="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
           >
-            This Week
+            {getTodayButtonLabel()}
           </button>
         </div>
 
