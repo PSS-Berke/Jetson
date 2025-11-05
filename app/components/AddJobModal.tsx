@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import SmartClientSelect from './SmartClientSelect';
+import FacilityToggle from './FacilityToggle';
 import { getToken } from '@/lib/api';
 import Toast from './Toast';
 
@@ -16,6 +17,7 @@ interface Requirement {
   paper_size: string;
   pockets: number;
   shifts_id: number;
+  price_per_m: string;
 }
 
 interface JobFormData {
@@ -27,10 +29,7 @@ interface JobFormData {
   quantity: string;
   csr: string;
   prgm: string;
-  price_per_m: string;
-  ext_price: string;
-  add_on_charges: string;
-  total_billing: string;
+  facilities_id: number | null;
   start_date: string;
   due_date: string;
   service_type: string;
@@ -53,10 +52,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     quantity: '',
     csr: '',
     prgm: '',
-    price_per_m: '',
-    ext_price: '',
-    add_on_charges: '',
-    total_billing: '',
+    facilities_id: null,
     start_date: '',
     due_date: '',
     service_type: 'insert',
@@ -67,7 +63,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         process_type: '',
         paper_size: '',
         pockets: 0,
-        shifts_id: 0
+        shifts_id: 0,
+        price_per_m: ''
       }
     ]
   });
@@ -119,7 +116,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         process_type: '',
         paper_size: '',
         pockets: 0,
-        shifts_id: 0
+        shifts_id: 0,
+        price_per_m: ''
       }]
     }));
   };
@@ -134,10 +132,10 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   };
 
   const handleNext = () => {
-    // Validate step 1 - only job number and client ID are required
+    // Validate step 1 - job number, client ID, and facility are required
     if (currentStep === 1) {
-      if (!formData.job_number || !formData.clients_id) {
-        alert('Please fill in job number and client name');
+      if (!formData.job_number || !formData.clients_id || !formData.facilities_id) {
+        alert('Please fill in job number, client name, and facility');
         return;
       }
     }
@@ -145,10 +143,10 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     // Validate step 2 - all requirements must have required fields
     if (currentStep === 2) {
       const allRequirementsValid = formData.requirements.every(r =>
-        r.process_type && r.paper_size && r.shifts_id > 0
+        r.process_type && r.paper_size && r.shifts_id > 0 && r.price_per_m
       );
       if (!allRequirementsValid) {
-        alert('Please fill in all required requirement fields');
+        alert('Please fill in all required requirement fields including price');
         return;
       }
     }
@@ -185,10 +183,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
-        price_per_m: parseFloat(formData.price_per_m) || 0,
-        add_on_charges: parseFloat(formData.add_on_charges) || 0,
-        ext_price: parseFloat(formData.ext_price) || 0,
-        total_billing: parseFloat(formData.total_billing) || 0,
+        facilities_id: formData.facilities_id,
         requirements: formData.requirements
       };
 
@@ -221,10 +216,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         quantity: '',
         csr: '',
         prgm: '',
-        price_per_m: '',
-        ext_price: '',
-        add_on_charges: '',
-        total_billing: '',
+        facilities_id: null,
         start_date: '',
         due_date: '',
         service_type: 'insert',
@@ -235,7 +227,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
             process_type: '',
             paper_size: '',
             pockets: 0,
-            shifts_id: 0
+            shifts_id: 0,
+            price_per_m: ''
           }
         ]
       });
@@ -360,6 +353,16 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     required
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Facility <span className="text-red-500">*</span>
+                  </label>
+                  <FacilityToggle
+                    currentFacility={formData.facilities_id}
+                    onFacilityChange={(facility) => setFormData({ ...formData, facilities_id: facility })}
+                    showAll={false}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -450,68 +453,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="Job description"
                     rows={2}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Price (per/m)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="price_per_m"
-                    value={formData.price_per_m}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Ext Price
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="ext_price"
-                    value={formData.ext_price}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Add-on Charges
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="add_on_charges"
-                    value={formData.add_on_charges}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Total Billing
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="total_billing"
-                    value={formData.total_billing}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="0.00"
                   />
                 </div>
               </div>
@@ -615,6 +556,24 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                       </select>
                     </div>
                   </div>
+
+                  {/* Price per M */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                        Price (per/m) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={requirement.price_per_m}
+                        onChange={(e) => handleRequirementChange(index, 'price_per_m', e.target.value)}
+                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
 
@@ -638,6 +597,12 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   <div>
                     <span className="text-[var(--text-light)]">Job #:</span>
                     <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_number}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Facility:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.facilities_id === 1 ? 'Bolingbrook' : formData.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Client:</span>
@@ -667,37 +632,49 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     <span className="text-[var(--text-light)]">Due Date:</span>
                     <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.due_date || 'N/A'}</span>
                   </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Price/M:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.price_per_m ? `$${formData.price_per_m}` : 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Ext Price:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.ext_price ? `$${formData.ext_price}` : 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Add-on Charges:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.add_on_charges ? `$${formData.add_on_charges}` : 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">Total Billing:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.total_billing ? `$${formData.total_billing}` : 'N/A'}</span>
-                  </div>
                 </div>
               </div>
 
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-3">Job Requirements</h3>
-                {formData.requirements.map((req, index) => (
-                  <div key={index} className="mb-3 pb-3 border-b border-[var(--border)] last:border-b-0">
-                    <div className="text-sm">
-                      <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
-                      <span className="font-semibold text-[var(--text-dark)]">
-                        {req.process_type} | {req.paper_size} | Pockets: {req.pockets} | Shift: {req.shifts_id}
-                      </span>
+                <h3 className="font-semibold text-[var(--text-dark)] mb-3">Job Requirements & Pricing</h3>
+                {formData.requirements.map((req, index) => {
+                  const quantity = parseInt(formData.quantity || '0');
+                  const pricePerM = parseFloat(req.price_per_m || '0');
+                  const requirementTotal = (quantity / 1000) * pricePerM;
+
+                  return (
+                    <div key={index} className="mb-3 pb-3 border-b border-[var(--border)] last:border-b-0">
+                      <div className="text-sm">
+                        <div className="mb-1">
+                          <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
+                          <span className="font-semibold text-[var(--text-dark)]">
+                            {req.process_type} | {req.paper_size} | Pockets: {req.pockets} | Shift: {req.shifts_id}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toFixed(2)}/m</span>
+                          <span className="font-semibold text-[var(--text-dark)]">
+                            Subtotal: ${requirementTotal.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
+                  );
+                })}
+
+                {/* Total Price Calculation */}
+                <div className="mt-4 pt-4 border-t-2 border-[var(--primary-blue)]">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-[var(--text-dark)] text-lg">Total Job Price:</span>
+                    <span className="font-bold text-[var(--primary-blue)] text-xl">
+                      ${formData.requirements.reduce((total, req) => {
+                        const quantity = parseInt(formData.quantity || '0');
+                        const pricePerM = parseFloat(req.price_per_m || '0');
+                        return total + ((quantity / 1000) * pricePerM);
+                      }, 0).toFixed(2)}
+                    </span>
                   </div>
-                ))}
+                </div>
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
