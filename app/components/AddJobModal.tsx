@@ -261,7 +261,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         throw new Error('Failed to create job');
       }
 
-      const result = await response.json();
+      await response.json();
 
       const jobNum = parseInt(formData.job_number);
       setCreatedJobNumber(jobNum);

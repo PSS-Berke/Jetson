@@ -128,9 +128,10 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       
       // Parse weekly_split if it exists
       let weeklySplit: number[] = [];
-      if ((job as any).weekly_split) {
-        if (Array.isArray((job as any).weekly_split)) {
-          weeklySplit = (job as any).weekly_split;
+      const jobWithSplit = job as typeof job & { weekly_split?: number[] | string };
+      if (jobWithSplit.weekly_split) {
+        if (Array.isArray(jobWithSplit.weekly_split)) {
+          weeklySplit = jobWithSplit.weekly_split;
         }
       }
 
