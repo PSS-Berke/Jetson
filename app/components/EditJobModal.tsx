@@ -88,7 +88,13 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         if (typeof job.requirements === 'string') {
           parsedRequirements = JSON.parse(job.requirements);
         } else if (Array.isArray(job.requirements)) {
-          parsedRequirements = job.requirements;
+          // Map ParsedRequirement[] to Requirement[] with default values for optional properties
+          parsedRequirements = job.requirements.map(req => ({
+            process_type: req.process_type || '',
+            paper_size: req.paper_size || '',
+            pockets: req.pockets || 0,
+            shifts_id: req.shifts_id || 0
+          }));
         } else {
           parsedRequirements = [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
         }
