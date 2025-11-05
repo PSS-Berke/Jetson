@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getJobs, getMachines } from '@/lib/api';
+import { getJobs } from '@/lib/api';
 
 // Re-export Job from api for consistency
 import type { Job } from '@/lib/api';
@@ -32,7 +32,6 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
   const [jobs, setJobs] = useState<ParsedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [facilityMachineIds, setFacilityMachineIds] = useState<Set<number> | null>(null);
 
   const parseJob = (job: Job): ParsedJob => {
     try {
@@ -90,31 +89,20 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
     setError(null);
 
     try {
-      let machineIds: Set<number> | null = null;
-
-      // If a specific facility is selected, first fetch machines for that facility
-      if (facilityId !== undefined && facilityId !== null) {
-        const machines = await getMachines('', facilityId);
-        machineIds = new Set(machines.map(m => m.id));
-        setFacilityMachineIds(machineIds);
-      } else {
-        setFacilityMachineIds(null);
-      }
-
-      const data = await getJobs();
+      // Pass facilities_id directly to the API
+      const facilityParam = facilityId !== undefined && facilityId !== null ? facilityId : undefined;
+      console.log('[useJobs] Fetching jobs for facility:', facilityParam || 'all');
+      
+      const data = await getJobs(facilityParam);
+      console.log('[useJobs] Response received:', { count: data.length, jobs: data });
+      
       const parsedJobs = data.map(parseJob);
+      console.log('[useJobs] Parsed jobs:', { count: parsedJobs.length, jobs: parsedJobs });
 
-      // Filter jobs based on facility machines if applicable
-      let filteredJobs = parsedJobs;
-      if (facilityId !== undefined && facilityId !== null && machineIds) {
-        filteredJobs = parsedJobs.filter(job =>
-          job.machines.some(machine => machineIds!.has(machine.id))
-        );
-      }
-
-      setJobs(filteredJobs);
+      setJobs(parsedJobs);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch jobs';
+      console.error('[useJobs] Error:', err);
       setError(errorMessage);
       setJobs([]);
     } finally {

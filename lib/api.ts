@@ -49,6 +49,17 @@ const apiFetch = async <T = unknown>(
   }
 
   const baseUrl = baseType === 'auth' ? AUTH_BASE_URL : baseType === 'jobs' ? JOBS_BASE_URL : API_BASE_URL;
+  
+  // Debug logging for jobs endpoint
+  if (endpoint.includes('/jobs')) {
+    console.log('[apiFetch] Jobs request:', {
+      url: `${baseUrl}${endpoint}`,
+      method: options.method,
+      body: options.body,
+      headers
+    });
+  }
+  
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
@@ -76,7 +87,14 @@ const apiFetch = async <T = unknown>(
     throw new Error(error.message || `HTTP ${response.status}`);
   }
 
-  return response.json();
+  const responseData = await response.json();
+  
+  // Debug logging for jobs endpoint
+  if (endpoint.includes('/jobs')) {
+    console.log('[apiFetch] Jobs response:', responseData);
+  }
+  
+  return responseData;
 };
 
 // Login user
@@ -142,8 +160,26 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
 };
 
 // Get all jobs
-export const getJobs = async (): Promise<Job[]> => {
-  return apiFetch<Job[]>('/jobs', {
+export const getJobs = async (facilitiesId?: number): Promise<Job[]> => {
+  console.log('[getJobs] Called with facilitiesId:', facilitiesId, 'Type:', typeof facilitiesId);
+  
+  const params = new URLSearchParams();
+
+  if (facilitiesId !== undefined && facilitiesId !== null) {
+    params.append('facilities_id', facilitiesId.toString());
+    console.log('[getJobs] Added facilities_id to params:', facilitiesId);
+  } else {
+    console.log('[getJobs] No facilities_id added (was undefined or null)');
+  }
+
+  const queryString = params.toString();
+  const endpoint = queryString ? `/jobs?${queryString}` : '/jobs';
+  const fullUrl = `${JOBS_BASE_URL}${endpoint}`;
+  
+  console.log('[getJobs] Full URL:', fullUrl);
+  console.log('[getJobs] Endpoint:', endpoint);
+
+  return apiFetch<Job[]>(endpoint, {
     method: 'GET',
   }, 'jobs');
 };
