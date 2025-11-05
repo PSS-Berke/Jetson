@@ -220,7 +220,20 @@ export default function ProjectionsPage() {
         {/* Content */}
         {error ? (
           <div className="text-center py-12">
-            <div className="text-red-600">Error loading projections: {error}</div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl mx-auto">
+              <div className="text-red-800 font-semibold text-lg mb-2">Error Loading Projections</div>
+              <div className="text-red-600 mb-4">{error}</div>
+              <div className="text-sm text-red-700 mb-4">
+                This may be caused by corrupted data in the database. Check the browser console for detailed error information,
+                or check your Xano backend logs for the /jobs endpoint.
+              </div>
+              <button
+                onClick={refetch}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         ) : isLoading ? (
           <div className="text-center py-12">
