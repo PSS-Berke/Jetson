@@ -258,14 +258,43 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         ? new Date(formData.due_date).getTime()
         : undefined;
 
-      const payload = {
+      // Validate that we have at least one machine selected
+      if (!formData.machines_id || formData.machines_id.length === 0) {
+        alert('Please select at least one machine');
+        return;
+      }
+
+      // Validate that we have requirements
+      if (!formData.requirements || formData.requirements.length === 0) {
+        alert('Please add at least one requirement');
+        return;
+      }
+
+      const payload: Partial<{
+        jobs_id: number;
+        job_number: number;
+        service_type: string;
+        quantity: number;
+        description: string;
+        start_date: number;
+        due_date: number;
+        time_estimate: number | null;
+        clients_id: number;
+        machines_id: string;
+        requirements: string;
+        job_name: string;
+        prgm: string;
+        csr: string;
+        price_per_m: string;
+        add_on_charges: string;
+        ext_price: string;
+        total_billing: string;
+      }> = {
         jobs_id: job.id,
         job_number: parseInt(formData.job_number),
         service_type: formData.service_type,
         quantity: parseInt(formData.quantity),
         description: formData.description,
-        start_date: startDateTimestamp || 0,
-        due_date: dueDateTimestamp || 0,
         time_estimate: null,
         clients_id: formData.clients_id || 0,
         machines_id: JSON.stringify(formData.machines_id),
@@ -278,6 +307,14 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         ext_price: formData.ext_price || '0',
         total_billing: formData.total_billing || '0'
       };
+
+      // Only include dates if they are valid timestamps (not 0 or undefined)
+      if (startDateTimestamp && startDateTimestamp > 0) {
+        payload.start_date = startDateTimestamp;
+      }
+      if (dueDateTimestamp && dueDateTimestamp > 0) {
+        payload.due_date = dueDateTimestamp;
+      }
 
       await updateJob(job.id, payload);
 

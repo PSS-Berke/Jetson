@@ -57,6 +57,13 @@ const apiFetch = async <T = unknown>(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
 
+    // Log error details for debugging
+    console.error('[API Error]', {
+      endpoint,
+      status: response.status,
+      error
+    });
+
     // Handle unauthorized/expired token
     if (response.status === 401 || error.code === 'ERROR_CODE_UNAUTHORIZED') {
       removeToken();
