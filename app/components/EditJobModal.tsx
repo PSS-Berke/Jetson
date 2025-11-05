@@ -50,6 +50,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
+  const [confirmReview, setConfirmReview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState<JobFormData>({
@@ -394,6 +395,10 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
+      // Reset confirmation checkbox when entering review step
+      if (currentStep === 2) {
+        setConfirmReview(false);
+      }
     }
   };
 
@@ -502,7 +507,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         if (onSuccess) {
           onSuccess();
         }
-      }, 500);
+      }, 2000);
     } catch (error) {
       console.error('Error updating job:', error);
       alert('Failed to update job. Please try again.');
@@ -1019,11 +1024,23 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </div>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="font-semibold text-green-900 mb-2">Ready to Update</h3>
-                <p className="text-sm text-green-800">
-                  Click Update Job to save your changes.
-                </p>
+              <div className="bg-blue-50 border-2 border-[var(--primary-blue)] rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmReview}
+                    onChange={(e) => setConfirmReview(e.target.checked)}
+                    className="mt-1 w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-2 focus:ring-[var(--primary-blue)]"
+                  />
+                  <div>
+                    <p className="font-semibold text-[var(--dark-blue)] mb-1">
+                      Confirm Job Details
+                    </p>
+                    <p className="text-sm text-[var(--text-dark)]">
+                      I have reviewed all job details above and confirm they are correct. I am ready to update this job.
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
           )}
@@ -1068,7 +1085,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                       }
                     }, 0);
                   }}
-                  disabled={submitting}
+                  disabled={submitting || !confirmReview}
                   className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Updating Job...' : 'Update Job'}

@@ -48,6 +48,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
+  const [confirmReview, setConfirmReview] = useState(false);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: '',
     clients_id: null,
@@ -300,6 +301,10 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
+      // Reset confirmation checkbox when entering review step
+      if (currentStep === 2) {
+        setConfirmReview(false);
+      }
     }
   };
 
@@ -399,7 +404,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         if (onSuccess) {
           onSuccess();
         }
-      }, 500);
+      }, 2000);
     } catch (error) {
       console.error('Error creating job:', error);
       alert('Failed to create job. Please try again.');
@@ -877,11 +882,23 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="font-semibold text-green-900 mb-2">Ready to Submit</h3>
-                <p className="text-sm text-green-800">
-                  All required fields are filled. Click Submit to create this job.
-                </p>
+              <div className="bg-blue-50 border-2 border-[var(--primary-blue)] rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmReview}
+                    onChange={(e) => setConfirmReview(e.target.checked)}
+                    className="mt-1 w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-2 focus:ring-[var(--primary-blue)]"
+                  />
+                  <div>
+                    <p className="font-semibold text-[var(--dark-blue)] mb-1">
+                      Confirm Job Details
+                    </p>
+                    <p className="text-sm text-[var(--text-dark)]">
+                      I have reviewed all job details above and confirm they are correct. I am ready to submit this job.
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
           )}
@@ -916,7 +933,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
               ) : (
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !confirmReview}
                   className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Creating Job...' : 'Submit Job'}
