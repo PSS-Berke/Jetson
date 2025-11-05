@@ -269,10 +269,93 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   };
 
   const handleWeeklySplitChange = (weekIndex: number, value: string) => {
-    const newValue = parseInt(value) || 0;
+    // Remove commas from the input value before parsing
+    const cleanedValue = value.replace(/,/g, '');
+    const newValue = parseInt(cleanedValue) || 0;
+
     setFormData(prev => {
+      const oldValue = prev.weekly_split[weekIndex];
+      const difference = newValue - oldValue;
+
+      // If only one week, just set it to the value
+      if (prev.weekly_split.length === 1) {
+        return { ...prev, weekly_split: [newValue] };
+      }
+
+      // Create new split array with the changed value
       const newSplit = [...prev.weekly_split];
       newSplit[weekIndex] = newValue;
+
+      // Calculate how much we need to distribute to other weeks
+      const amountToDistribute = -difference;
+
+      // If no distribution needed (difference is 0), return as is
+      if (amountToDistribute === 0) {
+        return { ...prev, weekly_split: newSplit };
+      }
+
+      // Get indices of other weeks (excluding the one being edited)
+      const otherIndices = newSplit
+        .map((_, idx) => idx)
+        .filter(idx => idx !== weekIndex);
+
+      // Calculate total of other weeks for proportional distribution
+      const otherWeeksTotal = otherIndices.reduce((sum, idx) => sum + prev.weekly_split[idx], 0);
+
+      // If all other weeks are 0, distribute evenly
+      if (otherWeeksTotal === 0) {
+        const baseAmount = Math.floor(amountToDistribute / otherIndices.length);
+        const remainder = amountToDistribute - (baseAmount * otherIndices.length);
+
+        otherIndices.forEach((idx, i) => {
+          newSplit[idx] = Math.max(0, baseAmount + (i < remainder ? 1 : 0));
+        });
+      } else {
+        // Distribute proportionally based on current values
+        let remainingToDistribute = amountToDistribute;
+        const adjustments: number[] = [];
+
+        // Calculate proportional adjustments
+        otherIndices.forEach(idx => {
+          const proportion = prev.weekly_split[idx] / otherWeeksTotal;
+          const adjustment = Math.round(amountToDistribute * proportion);
+          adjustments.push(adjustment);
+        });
+
+        // Apply adjustments and handle negatives
+        otherIndices.forEach((idx, i) => {
+          const newAmount = prev.weekly_split[idx] + adjustments[i];
+          if (newAmount < 0) {
+            // If would go negative, set to 0 and track remaining
+            remainingToDistribute -= prev.weekly_split[idx];
+            newSplit[idx] = 0;
+          } else {
+            newSplit[idx] = newAmount;
+            remainingToDistribute -= adjustments[i];
+          }
+        });
+
+        // If there's remaining amount due to rounding or negatives, distribute to non-zero weeks
+        if (remainingToDistribute !== 0) {
+          const nonZeroIndices = otherIndices.filter(idx => newSplit[idx] > 0);
+          if (nonZeroIndices.length > 0) {
+            // Add remainder to the first non-zero week
+            newSplit[nonZeroIndices[0]] += remainingToDistribute;
+            // Ensure it doesn't go negative
+            if (newSplit[nonZeroIndices[0]] < 0) {
+              newSplit[nonZeroIndices[0]] = 0;
+            }
+          }
+        }
+      }
+
+      // Final safety check: ensure no negatives
+      for (let i = 0; i < newSplit.length; i++) {
+        if (newSplit[i] < 0) {
+          newSplit[i] = 0;
+        }
+      }
+
       return { ...prev, weekly_split: newSplit };
     });
   };
@@ -690,11 +773,10 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                           Week {index + 1}
                         </label>
                         <input
-                          type="number"
-                          value={amount}
+                          type="text"
+                          value={amount.toLocaleString()}
                           onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
                           className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm"
-                          min="0"
                         />
                       </div>
                     ))}
