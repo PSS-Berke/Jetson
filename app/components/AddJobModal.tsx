@@ -206,7 +206,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       }
 
       const result = await response.json();
-      console.log('Job created successfully:', result);
 
       const jobNum = parseInt(formData.job_number);
       setCreatedJobNumber(jobNum);

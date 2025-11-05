@@ -12,50 +12,21 @@ import FacilityToggle from './FacilityToggle';
 
 interface EmbeddedCalendarProps {
   startDate?: Date;
-  filterMode: 'synced' | 'independent';
-  onFilterModeChange: (mode: 'synced' | 'independent') => void;
   selectedFacility: number | null;
   selectedClients?: number[];
   selectedServiceTypes?: string[];
-  independentFilters: {
-    facility: number | null;
-    clients: number[];
-    serviceTypes: string[];
-  };
-  onIndependentFiltersChange: (filters: {
-    facility: number | null;
-    clients: number[];
-    serviceTypes: string[];
-  }) => void;
   height?: number;
 }
 
 export default function EmbeddedCalendar({
   startDate,
-  filterMode,
-  onFilterModeChange,
   selectedFacility,
   selectedClients = [],
   selectedServiceTypes = [],
-  independentFilters,
-  onIndependentFiltersChange,
   height = 500,
 }: EmbeddedCalendarProps) {
   const [viewType, setViewType] = useState<CalendarViewType>('month');
   const [currentDate, setCurrentDate] = useState(startDate || new Date());
-
-  // Determine active filters based on mode
-  const activeFilters = useMemo(() => {
-    if (filterMode === 'synced') {
-      return {
-        facility: selectedFacility,
-        clients: selectedClients,
-        serviceTypes: selectedServiceTypes,
-      };
-    } else {
-      return independentFilters;
-    }
-  }, [filterMode, selectedFacility, selectedClients, selectedServiceTypes, independentFilters]);
 
   // Get date range based on view type
   const dateRange = useMemo(() => {
@@ -77,8 +48,8 @@ export default function EmbeddedCalendar({
     startDate: dateRange.start,
     endDate: dateRange.end,
     selectedMachines: [], // Use all machines for embedded view
-    selectedClients: activeFilters.clients,
-    selectedServiceTypes: activeFilters.serviceTypes,
+    selectedClients: selectedClients,
+    selectedServiceTypes: selectedServiceTypes,
   });
 
   const { dailySummaries, overallUtilization } = useMachineCapacity({
@@ -124,35 +95,6 @@ export default function EmbeddedCalendar({
     } else {
       return `Week of ${currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
-  };
-
-  // Extract unique clients and service types from jobs for filter dropdowns
-  const clientOptions = useMemo(() => {
-    const clientMap = new Map<number, { id: number; name: string }>();
-    filteredJobs.forEach(job => {
-      if (job.client) {
-        clientMap.set(job.client.id, { id: job.client.id, name: job.client.name });
-      }
-    });
-    return Array.from(clientMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredJobs]);
-
-  const serviceTypeOptions = useMemo(() => {
-    const types = new Set<string>();
-    filteredJobs.forEach(job => {
-      if (job.service_type) {
-        types.add(job.service_type);
-      }
-    });
-    return Array.from(types).sort().map(type => ({ id: type, name: type }));
-  }, [filteredJobs]);
-
-  const handleClearIndependentFilters = () => {
-    onIndependentFiltersChange({
-      facility: null,
-      clients: [],
-      serviceTypes: [],
-    });
   };
 
   return (
@@ -204,29 +146,6 @@ export default function EmbeddedCalendar({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Filter Mode Toggle */}
-            <button
-              onClick={() => onFilterModeChange(filterMode === 'synced' ? 'independent' : 'synced')}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-[var(--border)] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-              title={filterMode === 'synced' ? 'Using same filters as projections' : 'Using independent calendar filters'}
-            >
-              {filterMode === 'synced' ? (
-                <>
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <span className="text-blue-700">Synced</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                  <span className="text-gray-700">Independent</span>
-                </>
-              )}
-            </button>
-
             {/* View Toggle */}
             <div className="inline-flex rounded-lg border border-[var(--border)] bg-white p-1">
               <button
@@ -253,53 +172,6 @@ export default function EmbeddedCalendar({
           </div>
         </div>
       </div>
-
-      {/* Independent Filters Bar */}
-      {filterMode === 'independent' && (
-        <div className="px-6 py-3 bg-gray-50 border-b border-[var(--border)]">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-[var(--text-dark)]">
-              Calendar Filters:
-            </span>
-
-            {/* Facility Toggle */}
-            <FacilityToggle
-              currentFacility={independentFilters.facility}
-              onFacilityChange={(facility) =>
-                onIndependentFiltersChange({ ...independentFilters, facility })
-              }
-            />
-
-            {/* Client Filter */}
-            <CompactFilterDropdown
-              label="Clients"
-              options={clientOptions}
-              selected={independentFilters.clients}
-              onChange={(clients) =>
-                onIndependentFiltersChange({ ...independentFilters, clients: clients as number[] })
-              }
-            />
-
-            {/* Service Type Filter */}
-            <CompactFilterDropdown
-              label="Service Types"
-              options={serviceTypeOptions}
-              selected={independentFilters.serviceTypes}
-              onChange={(serviceTypes) =>
-                onIndependentFiltersChange({ ...independentFilters, serviceTypes: serviceTypes as string[] })
-              }
-            />
-
-            {/* Clear Filters Button */}
-            <button
-              onClick={handleClearIndependentFilters}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium ml-auto"
-            >
-              Clear All
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Calendar Content */}
       <div className="p-4">

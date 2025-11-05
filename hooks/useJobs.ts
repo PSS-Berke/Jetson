@@ -38,6 +38,7 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
     try {
       // Parse requirements - the format is unusual with JSON strings as both keys and values
       let parsedRequirements: ParsedRequirement[] = [];
+      console.log(`[DEBUG] Job ${job.job_number} - Raw requirements:`, job.requirements);
       if (job.requirements && job.requirements !== '{}') {
         try {
           // Remove outer braces and split by the pattern "},"{
@@ -45,13 +46,16 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
 
           // Split by the pattern that separates requirements: ","
           const matches = reqString.match(/"\{[^}]+\}"/g);
+          console.log(`[DEBUG] Job ${job.job_number} - Regex matches:`, matches);
 
           if (matches) {
             parsedRequirements = matches.map((match: string) => {
               try {
                 // Remove the outer quotes and parse the JSON
                 const cleaned = match.slice(1, -1).replace(/\\/g, '');
-                return JSON.parse(cleaned);
+                const parsed = JSON.parse(cleaned);
+                console.log(`[DEBUG] Job ${job.job_number} - Parsed requirement:`, parsed);
+                return parsed;
               } catch {
                 return null;
               }
@@ -62,6 +66,7 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
           parsedRequirements = [];
         }
       }
+      console.log(`[DEBUG] Job ${job.job_number} - Final parsedRequirements:`, parsedRequirements);
 
       return {
         ...job,

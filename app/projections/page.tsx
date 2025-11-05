@@ -7,26 +7,21 @@ import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjections, type ProjectionFilters } from '@/hooks/useProjections';
 import { getStartOfWeek } from '@/lib/projectionUtils';
-import ProjectionFilters from '../components/ProjectionFilters';
+import { startOfMonth, startOfQuarter } from 'date-fns';
+import ProjectionFiltersComponent from '../components/ProjectionFilters';
 import ProjectionsTable from '../components/ProjectionsTable';
 import FacilityToggle from '../components/FacilityToggle';
+import GranularityToggle, { type Granularity } from '../components/GranularityToggle';
 import EmbeddedCalendar from '../components/EmbeddedCalendar';
 
 export default function ProjectionsPage() {
+  const [granularity, setGranularity] = useState<Granularity>('weekly');
   const [startDate, setStartDate] = useState<Date>(getStartOfWeek());
   const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-
-  // Calendar filter mode state
-  const [calendarFilterMode, setCalendarFilterMode] = useState<'synced' | 'independent'>('synced');
-  const [independentCalendarFilters, setIndependentCalendarFilters] = useState({
-    facility: null as number | null,
-    clients: [] as number[],
-    serviceTypes: [] as string[],
-  });
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -38,18 +33,43 @@ export default function ProjectionsPage() {
     clients: selectedClients,
     serviceTypes: selectedServiceTypes,
     searchQuery,
+    granularity,
   };
 
   const {
+    timeRanges,
     weekRanges,
     jobProjections,
     serviceSummaries,
     grandTotals,
     filteredJobProjections,
+    processTypeCounts,
     isLoading,
     error,
     refetch,
   } = useProjections(startDate, filters);
+
+  console.log('[DEBUG] ProjectionsPage - processTypeCounts received:', processTypeCounts);
+  console.log('[DEBUG] ProjectionsPage - filteredJobProjections count:', filteredJobProjections.length);
+
+  // Handle granularity change and adjust start date accordingly
+  const handleGranularityChange = (newGranularity: Granularity) => {
+    setGranularity(newGranularity);
+
+    // Adjust start date to align with the new granularity
+    switch (newGranularity) {
+      case 'monthly':
+        setStartDate(startOfMonth(new Date()));
+        break;
+      case 'quarterly':
+        setStartDate(startOfQuarter(new Date()));
+        break;
+      case 'weekly':
+      default:
+        setStartDate(getStartOfWeek());
+        break;
+    }
+  };
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -169,16 +189,22 @@ export default function ProjectionsPage() {
       <main className="max-w-[1800px] mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-6">
-            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">5-Week Projections</h2>
+            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
+              {granularity === 'weekly' ? '5-Week' : granularity === 'monthly' ? '3-Month' : '4-Quarter'} Projections
+            </h2>
             <FacilityToggle
               currentFacility={selectedFacility}
               onFacilityChange={setSelectedFacility}
             />
           </div>
+          <GranularityToggle
+            currentGranularity={granularity}
+            onGranularityChange={handleGranularityChange}
+          />
         </div>
 
         {/* Filters */}
-        <ProjectionFilters
+        <ProjectionFiltersComponent
           jobs={jobProjections.map(p => p.job)}
           startDate={startDate}
           onStartDateChange={setStartDate}
@@ -188,6 +214,7 @@ export default function ProjectionsPage() {
           onServiceTypesChange={setSelectedServiceTypes}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          granularity={granularity}
         />
 
         {/* Content */}
@@ -202,7 +229,7 @@ export default function ProjectionsPage() {
         ) : (
           <>
             {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-6">
               <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
                 <div className="text-sm text-[var(--text-light)]">Total Jobs</div>
                 <div className="text-2xl font-bold text-[var(--dark-blue)]">
@@ -222,16 +249,72 @@ export default function ProjectionsPage() {
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Avg per Week</div>
+                <div className="text-sm text-[var(--text-light)]">
+                  Avg per {granularity === 'weekly' ? 'Week' : granularity === 'monthly' ? 'Month' : 'Quarter'}
+                </div>
                 <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {Math.round(grandTotals.grandTotal / 5).toLocaleString()}
+                  {Math.round(grandTotals.grandTotal / timeRanges.length).toLocaleString()}
+                </div>
+              </div>
+
+              {/* Service Type Tiles */}
+              {serviceSummaries.map(summary => (
+                <div key={summary.serviceType} className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                  <div className="text-sm text-[var(--text-light)]">{summary.serviceType}</div>
+                  <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                    {summary.grandTotal.toLocaleString()}
+                  </div>
+                </div>
+              ))}
+
+              {/* Process Type Tiles */}
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total Inserted</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.insert}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total Sort</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.sort}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total IJ</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.ij}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total L/A</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.la}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total Fold</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.fold}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total Laser</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.laser}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                <div className="text-sm text-[var(--text-light)]">Total HP Press</div>
+                <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                  {processTypeCounts.hpPress}
                 </div>
               </div>
             </div>
 
             {/* Projections Table */}
             <ProjectionsTable
-              weekRanges={weekRanges}
+              timeRanges={timeRanges}
               jobProjections={filteredJobProjections}
               serviceSummaries={serviceSummaries}
               grandTotals={grandTotals}
@@ -242,13 +325,9 @@ export default function ProjectionsPage() {
             <div className="mt-8">
               <EmbeddedCalendar
                 startDate={startDate}
-                filterMode={calendarFilterMode}
-                onFilterModeChange={setCalendarFilterMode}
                 selectedFacility={selectedFacility}
                 selectedClients={selectedClients}
                 selectedServiceTypes={selectedServiceTypes}
-                independentFilters={independentCalendarFilters}
-                onIndependentFiltersChange={setIndependentCalendarFilters}
                 height={550}
               />
             </div>

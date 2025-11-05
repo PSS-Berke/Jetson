@@ -51,12 +51,6 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
         throw new Error(`Invalid job ID: ${jobIdValue}`);
       }
 
-      console.log('Attempting to delete job:', {
-        jobId: jobIdValue,
-        jobNumber: jobNum,
-        jobIdType: typeof jobIdValue
-      });
-
       await deleteJob(jobIdValue);
 
       setShowDeleteConfirm(false);

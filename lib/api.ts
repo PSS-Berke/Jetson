@@ -1,124 +1,41 @@
 import Cookies from 'js-cookie';
+import type {
+  Machine,
+  Job,
+  User,
+  LoginCredentials,
+  SignupData,
+  AuthResponse
+} from '@/types';
 
 const AUTH_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:spcRzPtb';
 const API_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb';
+const JOBS_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6';
 const TOKEN_KEY = 'auth_token';
 
-interface LoginCredentials {
-  email: string;
-  password: string;
-}
+// Re-export types for backwards compatibility
+export type { Machine, Job, User };
 
-interface SignupData {
-  email: string;
-  password: string;
-  admin: boolean;
-}
-
-interface User {
-  id: number;
-  email: string;
-  admin: boolean;
-  [key: string]: string | number | boolean | undefined;
-}
-
-interface AuthResponse {
-  authToken: string;
-  user?: User;
-  [key: string]: string | number | boolean | User | undefined;
-}
-
-type MachineStatus = 'running' | 'available' | 'avalible' | 'maintenance';
-
-interface Machine {
-  id: number;
-  created_at: number;
-  line: number;
-  type: string;
-  max_size: string;
-  speed_hr: string;
-  status: MachineStatus;
-  pockets?: number;
-  shiftCapacity?: number;
-  currentJob?: {
-    number: string;
-    name: string;
-  };
-  [key: string]: string | number | boolean | object | undefined;
-}
-
-export interface Job {
-  id: number;
-  created_at: number;
-  job_number: number;
-  service_type: string;
-  quantity: number;
-  description: string;
-  start_date: number;
-  due_date: number;
-  time_estimate: number | null;
-  clients_id: number;
-  machines_id: string;
-  requirements: string;
-  job_name: string;
-  prgm: string;
-  csr: string;
-  price_per_m: string;
-  add_on_charges: string;
-  ext_price: string;
-  total_billing: string;
-  client: string;
-  machines: string;
-}
-
-// Store token in cookies with fallback to localStorage
+// Store token in cookies only
 export const setToken = (token: string): void => {
-  try {
-    Cookies.set(TOKEN_KEY, token, { expires: 7, secure: true, sameSite: 'strict' });
-  } catch {
-    // Fallback to localStorage if cookies fail
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-    }
-  }
+  Cookies.set(TOKEN_KEY, token, { expires: 7, secure: true, sameSite: 'strict' });
 };
 
-// Get token from cookies with fallback to localStorage
+// Get token from cookies
 export const getToken = (): string | null => {
-  try {
-    const token = Cookies.get(TOKEN_KEY);
-    if (token) return token;
-
-    // Fallback to localStorage
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(TOKEN_KEY);
-    }
-    return null;
-  } catch {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(TOKEN_KEY);
-    }
-    return null;
-  }
+  return Cookies.get(TOKEN_KEY) || null;
 };
 
-// Remove token from both cookies and localStorage
+// Remove token from cookies
 export const removeToken = (): void => {
-  try {
-    Cookies.remove(TOKEN_KEY);
-  } catch {
-    // Ignore errors
-  }
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(TOKEN_KEY);
-  }
+  Cookies.remove(TOKEN_KEY);
 };
 
 // Generic fetch wrapper with automatic token attachment
 const apiFetch = async <T = unknown>(
   endpoint: string,
   options: RequestInit = {},
-  useAuthBase: boolean = false
+  baseType: 'auth' | 'api' | 'jobs' = 'api'
 ): Promise<T> => {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -131,7 +48,7 @@ const apiFetch = async <T = unknown>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const baseUrl = useAuthBase ? AUTH_BASE_URL : API_BASE_URL;
+  const baseUrl = baseType === 'auth' ? AUTH_BASE_URL : baseType === 'jobs' ? JOBS_BASE_URL : API_BASE_URL;
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
@@ -160,7 +77,7 @@ export const login = async (credentials: LoginCredentials): Promise<User> => {
   const data = await apiFetch<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(credentials),
-  }, true);
+  }, 'auth');
 
   if (data.authToken) {
     setToken(data.authToken);
@@ -174,7 +91,7 @@ export const signup = async (userData: SignupData): Promise<User> => {
   const data = await apiFetch<User>('/auth/signup', {
     method: 'POST',
     body: JSON.stringify(userData),
-  }, true);
+  }, 'auth');
 
   return data;
 };
@@ -183,7 +100,7 @@ export const signup = async (userData: SignupData): Promise<User> => {
 export const getMe = async (): Promise<User> => {
   const data = await apiFetch<User>('/auth/me', {
     method: 'GET',
-  }, true);
+  }, 'auth');
 
   return data;
 };
@@ -219,96 +136,22 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
 
 // Get all jobs
 export const getJobs = async (): Promise<Job[]> => {
-  const token = getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs', {
+  return apiFetch<Job[]>('/jobs', {
     method: 'GET',
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
-  }
-
-  return response.json();
+  }, 'jobs');
 };
 
 // Update a job
 export const updateJob = async (jobId: number, jobData: Partial<Job>): Promise<Job> => {
-  const token = getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/${jobId}`, {
+  return apiFetch<Job>(`/jobs/${jobId}`, {
     method: 'PATCH',
-    headers,
     body: JSON.stringify(jobData),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
-  }
-
-  return response.json();
+  }, 'jobs');
 };
 
 // Delete a job
 export const deleteJob = async (jobId: number): Promise<void> => {
-  const url = `https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/${jobId}`;
-
-  // Diagnostic logging
-  console.log('DELETE Job Request:', {
-    jobId,
-    jobIdType: typeof jobId,
-    url,
-    hasToken: !!getToken()
-  });
-
-  const token = getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, {
+  await apiFetch<void>(`/jobs/${jobId}`, {
     method: 'DELETE',
-    headers,
-  });
-
-  // Log response details
-  console.log('DELETE Job Response:', {
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
-    headers: Object.fromEntries(response.headers.entries())
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    console.error('DELETE Job Error Details:', {
-      status: response.status,
-      statusText: response.statusText,
-      error
-    });
-    throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  console.log('DELETE Job Success: Job', jobId, 'deleted successfully');
+  }, 'jobs');
 };

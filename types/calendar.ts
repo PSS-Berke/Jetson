@@ -1,19 +1,8 @@
 import { ParsedJob } from '@/hooks/useJobs';
+import type { Machine } from '@/types';
 
-export interface Machine {
-  id: number;
-  line: number;
-  type: string;
-  speed_hr: string;
-  status: string;
-  shiftCapacity?: number;
-  max_size: string;
-  pockets?: number;
-  currentJob?: {
-    number: string;
-    name: string;
-  };
-}
+// Re-export for convenience
+export type { Machine };
 
 /**
  * Calendar event representing a job on the calendar

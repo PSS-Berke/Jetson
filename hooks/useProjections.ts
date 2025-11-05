@@ -5,13 +5,30 @@ import {
   calculateJobProjections,
   calculateServiceTypeSummaries,
   calculateGrandTotals,
+  calculateGenericJobProjections,
+  calculateGenericServiceTypeSummaries,
+  calculateGenericGrandTotals,
   type WeekRange,
   type JobProjection,
   type ServiceTypeSummary,
+  type TimeRange,
 } from '@/lib/projectionUtils';
+import { generateMonthRanges, generateQuarterRanges } from '@/lib/dateUtils';
+import type { Granularity } from '@/app/components/GranularityToggle';
+
+export interface ProcessTypeCounts {
+  insert: number;
+  sort: number;
+  ij: number;
+  la: number;
+  fold: number;
+  laser: number;
+  hpPress: number;
+}
 
 export interface ProjectionsData {
-  weekRanges: WeekRange[];
+  timeRanges: TimeRange[]; // Can be weeks, months, or quarters
+  weekRanges: WeekRange[]; // Kept for backwards compatibility
   jobProjections: JobProjection[];
   serviceSummaries: ServiceTypeSummary[];
   grandTotals: {
@@ -19,6 +36,7 @@ export interface ProjectionsData {
     grandTotal: number;
   };
   filteredJobProjections: JobProjection[];
+  processTypeCounts: ProcessTypeCounts;
 }
 
 export interface ProjectionFilters {
@@ -26,6 +44,79 @@ export interface ProjectionFilters {
   clients: number[];
   serviceTypes: string[];
   searchQuery: string;
+  granularity?: Granularity;
+}
+
+// Helper function to count process types from job projections
+function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCounts {
+  console.log('[DEBUG] calculateProcessTypeCounts - Total projections:', projections.length);
+
+  const counts: ProcessTypeCounts = {
+    insert: 0,
+    sort: 0,
+    ij: 0,
+    la: 0,
+    fold: 0,
+    laser: 0,
+    hpPress: 0,
+  };
+
+  // Track which jobs have already been counted for each process type
+  const countedJobs = new Set<string>();
+
+  projections.forEach((projection) => {
+    const job = projection.job;
+    console.log(`[DEBUG] Job ${job.job_number} - Requirements:`, job.requirements);
+
+    // Get unique process types for this job
+    const processTypesInJob = new Set<string>();
+    job.requirements?.forEach((req) => {
+      console.log(`[DEBUG] Job ${job.job_number} - Requirement:`, req, '| process_type:', req.process_type);
+      if (req.process_type) {
+        processTypesInJob.add(req.process_type.toLowerCase());
+      }
+    });
+
+    console.log(`[DEBUG] Job ${job.job_number} - Process types found:`, Array.from(processTypesInJob));
+
+    // Count each unique job once per process type
+    processTypesInJob.forEach((processType) => {
+      const key = `${job.id}-${processType}`;
+      if (!countedJobs.has(key)) {
+        countedJobs.add(key);
+
+        // Increment the appropriate counter
+        switch (processType) {
+          case 'insert':
+            counts.insert++;
+            break;
+          case 'sort':
+            counts.sort++;
+            break;
+          case 'ij':
+          case 'ink jet':
+            counts.ij++;
+            break;
+          case 'l/a':
+          case 'label/affix':
+            counts.la++;
+            break;
+          case 'fold':
+            counts.fold++;
+            break;
+          case 'laser':
+            counts.laser++;
+            break;
+          case 'hp press':
+            counts.hpPress++;
+            break;
+        }
+      }
+    });
+  });
+
+  console.log('[DEBUG] Final processTypeCounts:', counts);
+  return counts;
 }
 
 export function useProjections(
@@ -33,12 +124,28 @@ export function useProjections(
   filters: ProjectionFilters
 ) {
   const { jobs, isLoading, error, refetch } = useJobs(filters.facility);
+  const granularity = filters.granularity || 'weekly';
 
   const projectionsData = useMemo<ProjectionsData>(() => {
+    // Generate time ranges based on granularity
+    let timeRanges: TimeRange[];
+    switch (granularity) {
+      case 'monthly':
+        timeRanges = generateMonthRanges(startDate, 3);
+        break;
+      case 'quarterly':
+        timeRanges = generateQuarterRanges(startDate, 4);
+        break;
+      case 'weekly':
+      default:
+        timeRanges = generateWeekRanges(startDate);
+        break;
+    }
+
     if (!jobs || jobs.length === 0) {
-      const emptyWeeks = generateWeekRanges(startDate);
       return {
-        weekRanges: emptyWeeks,
+        timeRanges,
+        weekRanges: timeRanges as WeekRange[], // For backwards compatibility
         jobProjections: [],
         serviceSummaries: [],
         grandTotals: {
@@ -46,14 +153,20 @@ export function useProjections(
           grandTotal: 0,
         },
         filteredJobProjections: [],
+        processTypeCounts: {
+          insert: 0,
+          sort: 0,
+          ij: 0,
+          la: 0,
+          fold: 0,
+          laser: 0,
+          hpPress: 0,
+        },
       };
     }
 
-    // Generate week ranges
-    const weekRanges = generateWeekRanges(startDate);
-
-    // Calculate projections for all jobs
-    const jobProjections = calculateJobProjections(jobs, weekRanges);
+    // Calculate projections for all jobs using generic function
+    const jobProjections = calculateGenericJobProjections(jobs, timeRanges);
 
     // Apply filters
     let filteredProjections = jobProjections;
@@ -85,22 +198,27 @@ export function useProjections(
       });
     }
 
-    // Calculate summaries based on filtered projections
-    const serviceSummaries = calculateServiceTypeSummaries(
+    // Calculate summaries based on filtered projections using generic function
+    const serviceSummaries = calculateGenericServiceTypeSummaries(
       filteredProjections,
-      weekRanges
+      timeRanges
     );
 
-    const grandTotals = calculateGrandTotals(serviceSummaries, weekRanges);
+    const grandTotals = calculateGenericGrandTotals(serviceSummaries, timeRanges);
+
+    // Calculate process type counts from filtered projections
+    const processTypeCounts = calculateProcessTypeCounts(filteredProjections);
 
     return {
-      weekRanges,
+      timeRanges,
+      weekRanges: timeRanges as WeekRange[], // For backwards compatibility
       jobProjections,
       serviceSummaries,
       grandTotals,
       filteredJobProjections: filteredProjections,
+      processTypeCounts,
     };
-  }, [jobs, startDate, filters]);
+  }, [jobs, startDate, filters, granularity]);
 
   return {
     ...projectionsData,

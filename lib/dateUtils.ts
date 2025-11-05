@@ -9,10 +9,14 @@ import {
   eachDayOfInterval,
   differenceInDays,
   addDays,
+  addMonths,
   isWithinInterval,
   parseISO,
   fromUnixTime,
-  getUnixTime
+  getUnixTime,
+  getQuarter,
+  startOfQuarter,
+  endOfQuarter
 } from 'date-fns';
 
 /**
@@ -156,4 +160,79 @@ export const getDateKey = (date: Date): string => {
  */
 export const isSameDay = (date1: Date, date2: Date): boolean => {
   return getDateKey(date1) === getDateKey(date2);
+};
+
+/**
+ * Get start and end of quarter for a given date
+ */
+export const getQuarterRange = (date: Date = new Date()): { start: Date; end: Date } => {
+  return {
+    start: startOfQuarter(date),
+    end: endOfQuarter(date)
+  };
+};
+
+/**
+ * Get quarter label (e.g., "Q1 2025")
+ */
+export const getQuarterLabel = (date: Date): string => {
+  const quarter = getQuarter(date);
+  const year = format(date, 'yyyy');
+  return `Q${quarter} ${year}`;
+};
+
+/**
+ * Generate consecutive month ranges starting from a given date
+ */
+export interface MonthRange {
+  monthNumber: number;
+  startDate: Date;
+  endDate: Date;
+  label: string;
+}
+
+export const generateMonthRanges = (startDate: Date, count: number = 3): MonthRange[] => {
+  const ranges: MonthRange[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const monthStart = startOfMonth(addMonths(startDate, i));
+    const monthEnd = endOfMonth(addMonths(startDate, i));
+
+    ranges.push({
+      monthNumber: i + 1,
+      startDate: monthStart,
+      endDate: monthEnd,
+      label: format(monthStart, 'MMM yyyy') // e.g., "Jan 2025"
+    });
+  }
+
+  return ranges;
+};
+
+/**
+ * Generate consecutive quarter ranges starting from a given date
+ */
+export interface QuarterRange {
+  quarterNumber: number;
+  startDate: Date;
+  endDate: Date;
+  label: string;
+}
+
+export const generateQuarterRanges = (startDate: Date, count: number = 4): QuarterRange[] => {
+  const ranges: QuarterRange[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const quarterStart = startOfQuarter(addMonths(startDate, i * 3));
+    const quarterEnd = endOfQuarter(addMonths(startDate, i * 3));
+
+    ranges.push({
+      quarterNumber: i + 1,
+      startDate: quarterStart,
+      endDate: quarterEnd,
+      label: getQuarterLabel(quarterStart)
+    });
+  }
+
+  return ranges;
 };
