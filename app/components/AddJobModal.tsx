@@ -37,6 +37,10 @@ interface JobFormData {
   machines_id: number[];
   requirements: Requirement[];
   weekly_split: number[];
+  price_per_m: string;
+  add_on_charges: string;
+  ext_price: string;
+  total_billing: string;
 }
 
 export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalProps) {
@@ -68,7 +72,11 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         price_per_m: ''
       }
     ],
-    weekly_split: []
+    weekly_split: [],
+    price_per_m: '',
+    add_on_charges: '',
+    ext_price: '',
+    total_billing: ''
   });
 
   // Calculate weeks and split quantity when dates or quantity changes
@@ -292,7 +300,11 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
             price_per_m: ''
           }
         ],
-        weekly_split: []
+        weekly_split: [],
+        price_per_m: '',
+        add_on_charges: '',
+        ext_price: '',
+        total_billing: ''
       });
       setCurrentStep(1);
 
