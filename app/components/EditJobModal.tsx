@@ -2,7 +2,7 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import SmartClientSelect from './SmartClientSelect';
-import { updateJob } from '@/lib/api';
+import { updateJob, deleteJob } from '@/lib/api';
 import { type ParsedJob } from '@/hooks/useJobs';
 import Toast from './Toast';
 
@@ -45,6 +45,9 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: '',
     clients_id: null,
@@ -76,15 +79,32 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   // Initialize form with job data when modal opens
   useEffect(() => {
     if (isOpen && job) {
-      // Parse requirements if it's a JSON string
+      console.log('EditJobModal - Initializing with job:', job);
+      console.log('EditJobModal - Client data:', job.client);
+      
+      // Parse requirements if it's a JSON string or already an array
       let parsedRequirements: Requirement[];
       try {
-        parsedRequirements = typeof job.requirements === 'string'
-          ? JSON.parse(job.requirements)
-          : Array.isArray(job.requirements)
-            ? job.requirements
-            : [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
-      } catch {
+        if (typeof job.requirements === 'string') {
+          parsedRequirements = JSON.parse(job.requirements);
+        } else if (Array.isArray(job.requirements)) {
+          // Map ParsedRequirement[] to Requirement[] with default values for optional properties
+          parsedRequirements = job.requirements.map(req => ({
+            process_type: req.process_type || '',
+            paper_size: req.paper_size || '',
+            pockets: req.pockets || 0,
+            shifts_id: req.shifts_id || 0
+          }));
+        } else {
+          parsedRequirements = [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
+        }
+        
+        // Ensure requirements is an array with at least one item
+        if (!parsedRequirements || parsedRequirements.length === 0) {
+          parsedRequirements = [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
+        }
+      } catch (error) {
+        console.error('Failed to parse requirements:', error);
         parsedRequirements = [{ process_type: '', paper_size: '', pockets: 0, shifts_id: 0 }];
       }
 
@@ -95,23 +115,34 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         return date.toISOString().split('T')[0];
       };
 
+      // Helper to safely convert to string, handling both string and number types
+      const toStringValue = (value: unknown) => {
+        if (value === null || value === undefined) return '';
+        return String(value);
+      };
+
+      const clientId = job.client?.id || null;
+      const clientName = job.client?.name || '';
+      
+      console.log('EditJobModal - Setting formData with:', { clientId, clientName });
+      
       setFormData({
-        job_number: job.job_number?.toString() || '',
-        clients_id: job.client?.id || null,
-        client_name: job.client?.name || '',
-        job_name: job.job_name || '',
-        description: job.description || '',
-        quantity: job.quantity?.toString() || '',
-        csr: job.csr || '',
-        prgm: job.prgm || '',
-        price_per_m: job.price_per_m?.toString() || '',
-        ext_price: job.ext_price?.toString() || '',
-        add_on_charges: job.add_on_charges?.toString() || '',
-        total_billing: job.total_billing?.toString() || '',
+        job_number: toStringValue(job.job_number),
+        clients_id: clientId,
+        client_name: clientName,
+        job_name: toStringValue(job.job_name),
+        description: toStringValue(job.description),
+        quantity: toStringValue(job.quantity),
+        csr: toStringValue(job.csr),
+        prgm: toStringValue(job.prgm),
+        price_per_m: toStringValue(job.price_per_m),
+        ext_price: toStringValue(job.ext_price),
+        add_on_charges: toStringValue(job.add_on_charges),
+        total_billing: toStringValue(job.total_billing),
         start_date: formatDate(job.start_date),
         due_date: formatDate(job.due_date),
         service_type: job.service_type || 'insert',
-        pockets: '2',
+        pockets: '2', // Default value - pockets are defined in requirements
         machines_id: job.machines?.map(m => m.id) || [],
         requirements: parsedRequirements
       });
@@ -209,6 +240,13 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    
+    // Only allow submission on step 3 (review step) and if explicitly allowed
+    if (currentStep !== 3 || !canSubmit) {
+      return;
+    }
+    
+    setCanSubmit(false); // Reset the flag
     setSubmitting(true);
 
     try {
@@ -221,23 +259,24 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         : undefined;
 
       const payload = {
-        start_date: startDateTimestamp,
-        due_date: dueDateTimestamp,
-        description: formData.description,
-        quantity: parseInt(formData.quantity),
-        clients_id: formData.clients_id ?? undefined,
-        machines_id: JSON.stringify(formData.machines_id),
+        jobs_id: job.id,
         job_number: parseInt(formData.job_number),
         service_type: formData.service_type,
-        pockets: parseInt(formData.pockets),
+        quantity: parseInt(formData.quantity),
+        description: formData.description,
+        start_date: startDateTimestamp || null,
+        due_date: dueDateTimestamp || null,
+        time_estimate: null,
+        clients_id: formData.clients_id || 0,
+        machines_id: formData.machines_id,
+        requirements: formData.requirements,
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
-        price_per_m: formData.price_per_m,
-        add_on_charges: formData.add_on_charges,
-        ext_price: formData.ext_price,
-        total_billing: formData.total_billing,
-        requirements: JSON.stringify(formData.requirements)
+        price_per_m: parseFloat(formData.price_per_m) || 0,
+        add_on_charges: parseFloat(formData.add_on_charges) || 0,
+        ext_price: parseFloat(formData.ext_price) || 0,
+        total_billing: parseFloat(formData.total_billing) || 0
       };
 
       await updateJob(job.id, payload);
@@ -267,6 +306,33 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
     onClose();
   };
 
+  const handleDelete = async () => {
+    if (!job) return;
+    
+    setDeleting(true);
+    try {
+      await deleteJob(job.id);
+      
+      setShowDeleteConfirm(false);
+      setShowSuccessToast(true);
+      
+      // Delay closing to show toast
+      setTimeout(() => {
+        onClose();
+        
+        // Call success callback to refresh jobs list
+        if (onSuccess) {
+          onSuccess();
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      alert('Failed to delete job. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
       <div
@@ -277,12 +343,20 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
           <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Edit Job #{job.job_number}</h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
-          >
-            &times;
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
+            >
+              &times;
+            </button>
+          </div>
         </div>
 
         {/* Step Indicator */}
@@ -319,7 +393,16 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         </div>
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+        <form 
+          onSubmit={handleSubmit} 
+          onKeyDown={(e) => {
+            // Prevent Enter key from submitting form on steps 1 and 2
+            if (e.key === 'Enter' && currentStep !== 3 && e.target instanceof HTMLInputElement) {
+              e.preventDefault();
+            }
+          }}
+          className="flex-1 overflow-y-auto p-6"
+        >
           {/* Step 1: Job Details */}
           {currentStep === 1 && (
             <div className="space-y-4">
@@ -331,6 +414,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   <SmartClientSelect
                     value={formData.clients_id}
                     onChange={handleClientChange}
+                    initialClientName={formData.client_name}
                     required
                   />
                 </div>
@@ -736,7 +820,17 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => {
+                    setCanSubmit(true);
+                    // Use setTimeout to allow state to update before form submission
+                    setTimeout(() => {
+                      const form = document.querySelector('form');
+                      if (form) {
+                        form.requestSubmit();
+                      }
+                    }, 0);
+                  }}
                   disabled={submitting}
                   className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -755,6 +849,50 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           type="success"
           onClose={() => setShowSuccessToast(false)}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowDeleteConfirm(false)}
+          />
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full relative z-10">
+            {/* Header */}
+            <div className="p-6 border-b border-[var(--border)]">
+              <h3 className="text-xl font-bold text-[var(--dark-blue)]">Confirm Deletion</h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-[var(--text-dark)] mb-4">
+                Are you sure you want to delete <span className="font-bold">Job #{job.job_number}</span>?
+              </p>
+              <p className="text-[var(--text-light)] text-sm">
+                This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Job'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

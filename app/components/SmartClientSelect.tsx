@@ -13,9 +13,10 @@ interface SmartClientSelectProps {
   value: number | null;
   onChange: (clientId: number, clientName: string) => void;
   required?: boolean;
+  initialClientName?: string;
 }
 
-export default function SmartClientSelect({ onChange, required = false }: SmartClientSelectProps) {
+export default function SmartClientSelect({ value, onChange, required = false, initialClientName }: SmartClientSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
@@ -25,6 +26,8 @@ export default function SmartClientSelect({ onChange, required = false }: SmartC
   const [newClientName, setNewClientName] = useState('');
   const [addingClient, setAddingClient] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  console.log('SmartClientSelect - Props:', { value, initialClientName, selectedClient });
 
   // Fetch clients from API
   const fetchClients = async (search: string = '') => {
@@ -55,6 +58,60 @@ export default function SmartClientSelect({ onChange, required = false }: SmartC
       setLoading(false);
     }
   };
+
+  // Set initial client from props if provided
+  useEffect(() => {
+    if (value && value > 0 && initialClientName) {
+      // Only update if the selected client doesn't match the value
+      if (!selectedClient || selectedClient.id !== value) {
+        console.log('Setting initial client:', { id: value, name: initialClientName }); // Debug
+        setSelectedClient({ id: value, name: initialClientName, created_at: 0 });
+      }
+    } else if (!value) {
+      setSelectedClient(null);
+    }
+  }, [value, initialClientName, selectedClient]);
+
+  // Fetch and set the selected client when value changes (only if we don't have initialClientName)
+  useEffect(() => {
+    const fetchSelectedClient = async () => {
+      // Skip fetching if we have initialClientName - it was already set in the previous useEffect
+      if (initialClientName) {
+        return;
+      }
+      
+      if (value && value > 0) {
+        // Don't fetch if we already have the correct client selected
+        if (selectedClient && selectedClient.id === value) {
+          return;
+        }
+        
+        try {
+          const token = getToken();
+          const response = await fetch(`https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients/${value}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            const client = await response.json();
+            console.log('Fetched client:', client); // Debug log
+            setSelectedClient(client);
+          } else {
+            console.error('Error fetching client:', response.status, await response.text());
+          }
+        } catch (error) {
+          console.error('Error fetching client:', error);
+        }
+      } else if (value === null) {
+        setSelectedClient(null);
+      }
+    };
+
+    fetchSelectedClient();
+  }, [value, initialClientName, selectedClient]);
 
   // Fetch clients on mount and when search changes
   useEffect(() => {
