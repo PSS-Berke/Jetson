@@ -349,6 +349,11 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         prgm: string;
         csr: string;
         facilities_id: number;
+        price_per_m: string;
+        add_on_charges: string;
+        ext_price: string;
+        total_billing: string;
+        weekly_split: number[];
       }> = {
         jobs_id: job.id,
         job_number: parseInt(formData.job_number),
