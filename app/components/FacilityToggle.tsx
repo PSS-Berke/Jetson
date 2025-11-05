@@ -1,20 +1,17 @@
 'use client';
 
 import { useRef, useLayoutEffect, useState, useMemo } from 'react';
-import { getJobs } from '@/lib/api';
-import type { Job } from '@/types';
 
 interface FacilityToggleProps {
   currentFacility: number | null;
   onFacilityChange: (facility: number | null) => void;
-  onJobsLoaded?: (jobs: Job[]) => void;
   showAll?: boolean;
 }
 
-export default function FacilityToggle({ currentFacility, onFacilityChange, onJobsLoaded, showAll = true }: FacilityToggleProps) {
+export default function FacilityToggle({ currentFacility, onFacilityChange, showAll = true }: FacilityToggleProps) {
   const facilities = useMemo(() => showAll
     ? [
-        { value: null, label: 'All' },
+        { value: 0, label: 'All' },
         { value: 1, label: 'Bolingbrook' },
         { value: 2, label: 'Lemont' }
       ]
@@ -26,8 +23,6 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, onJo
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [bubbleStyle, setBubbleStyle] = useState({ width: 0, left: 0 });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
@@ -51,24 +46,13 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, onJo
 
     updateBubblePosition();
 
-    // Use requestAnimationFrame to ensure DOM has updated
-    const frameId = requestAnimationFrame(updateBubblePosition);
-
     // Update on window resize to handle responsive changes
     window.addEventListener('resize', updateBubblePosition);
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener('resize', updateBubblePosition);
-    };
-  }, [currentFacility, facilities, isLoading]);
+    return () => window.removeEventListener('resize', updateBubblePosition);
+  }, [currentFacility, facilities]);
 
   return (
     <div className="flex flex-col gap-2">
-      {error && (
-        <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
-          {error}
-        </div>
-      )}
       <div
         ref={containerRef}
         className="relative inline-flex rounded-full border-2 border-[var(--primary-blue)] bg-gray-50 p-1"
@@ -87,29 +71,14 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, onJo
           <button
             key={facility.value === null ? 'all' : facility.value}
             ref={el => { buttonRefs.current[index] = el; }}
-            onClick={async () => {
-              setIsLoading(true);
-              setError(null);
-              try {
-                onFacilityChange(facility.value);
-                const jobs = await getJobs(facility.value === null ? undefined : facility.value);
-                onJobsLoaded?.(jobs);
-              } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'Failed to fetch jobs';
-                setError(errorMessage);
-                console.error('Error fetching jobs:', err);
-              } finally {
-                setIsLoading(false);
-              }
-            }}
-            disabled={isLoading}
-            className={`relative z-10 px-6 py-2 rounded-full text-sm font-semibold transition-colors disabled:opacity-50 ${
+            onClick={() => onFacilityChange(facility.value)}
+            className={`relative z-10 px-6 py-2 rounded-full text-sm font-semibold transition-colors ${
               currentFacility === facility.value
                 ? 'text-white'
                 : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
             }`}
           >
-            {isLoading ? 'Loading...' : facility.label}
+            {facility.label}
           </button>
         ))}
       </div>
