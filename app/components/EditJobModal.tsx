@@ -110,7 +110,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       };
 
       // Helper to safely convert to string, handling both string and number types
-      const toStringValue = (value: any) => {
+      const toStringValue = (value: unknown) => {
         if (value === null || value === undefined) return '';
         return String(value);
       };

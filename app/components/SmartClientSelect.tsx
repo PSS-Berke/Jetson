@@ -70,7 +70,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     } else if (!value) {
       setSelectedClient(null);
     }
-  }, [value, initialClientName]);
+  }, [value, initialClientName, selectedClient]);
 
   // Fetch and set the selected client when value changes (only if we don't have initialClientName)
   useEffect(() => {
@@ -111,7 +111,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     };
 
     fetchSelectedClient();
-  }, [value, initialClientName]);
+  }, [value, initialClientName, selectedClient]);
 
   // Fetch clients on mount and when search changes
   useEffect(() => {

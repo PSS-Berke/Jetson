@@ -49,7 +49,7 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
     // Update on window resize to handle responsive changes
     window.addEventListener('resize', updateBubblePosition);
     return () => window.removeEventListener('resize', updateBubblePosition);
-  }, [currentFacility]);
+  }, [currentFacility, facilities]);
 
   return (
     <div className="flex flex-col gap-2">
