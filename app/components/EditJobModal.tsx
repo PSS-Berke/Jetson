@@ -39,6 +39,10 @@ interface JobFormData {
   machines_id: number[];
   requirements: Requirement[];
   weekly_split: number[];
+  price_per_m: string;
+  add_on_charges: string;
+  ext_price: string;
+  total_billing: string;
 }
 
 export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJobModalProps) {
@@ -72,7 +76,11 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         price_per_m: ''
       }
     ],
-    weekly_split: []
+    weekly_split: [],
+    price_per_m: '',
+    add_on_charges: '',
+    ext_price: '',
+    total_billing: ''
   });
 
   // Initialize form with job data when modal opens
@@ -135,6 +143,13 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         }
       }
 
+      const jobWithFields = job as typeof job & {
+        price_per_m?: string | number;
+        add_on_charges?: string | number;
+        ext_price?: string | number;
+        total_billing?: string | number;
+      };
+
       setFormData({
         job_number: toStringValue(job.job_number),
         clients_id: clientId,
@@ -151,7 +166,11 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         pockets: '2', // Default value - pockets are defined in requirements
         machines_id: job.machines?.map(m => m.id) || [],
         requirements: parsedRequirements,
-        weekly_split: weeklySplit
+        weekly_split: weeklySplit,
+        price_per_m: toStringValue(jobWithFields.price_per_m || ''),
+        add_on_charges: toStringValue(jobWithFields.add_on_charges || ''),
+        ext_price: toStringValue(jobWithFields.ext_price || ''),
+        total_billing: toStringValue(jobWithFields.total_billing || '')
       });
     }
   }, [isOpen, job]);
