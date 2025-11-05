@@ -264,19 +264,19 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         service_type: formData.service_type,
         quantity: parseInt(formData.quantity),
         description: formData.description,
-        start_date: startDateTimestamp || null,
-        due_date: dueDateTimestamp || null,
+        start_date: startDateTimestamp || 0,
+        due_date: dueDateTimestamp || 0,
         time_estimate: null,
         clients_id: formData.clients_id || 0,
-        machines_id: formData.machines_id,
-        requirements: formData.requirements,
+        machines_id: JSON.stringify(formData.machines_id),
+        requirements: JSON.stringify(formData.requirements),
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
-        price_per_m: parseFloat(formData.price_per_m) || 0,
-        add_on_charges: parseFloat(formData.add_on_charges) || 0,
-        ext_price: parseFloat(formData.ext_price) || 0,
-        total_billing: parseFloat(formData.total_billing) || 0
+        price_per_m: formData.price_per_m || '0',
+        add_on_charges: formData.add_on_charges || '0',
+        ext_price: formData.ext_price || '0',
+        total_billing: formData.total_billing || '0'
       };
 
       await updateJob(job.id, payload);
