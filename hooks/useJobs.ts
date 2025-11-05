@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getJobs } from '@/lib/api';
+import { getJobs, getMachines } from '@/lib/api';
 
 // Re-export Job from api for consistency
 import type { Job } from '@/lib/api';
@@ -28,10 +28,11 @@ interface UseJobsReturn {
   refetch: () => Promise<void>;
 }
 
-export const useJobs = (): UseJobsReturn => {
+export const useJobs = (facilityId?: number | null): UseJobsReturn => {
   const [jobs, setJobs] = useState<ParsedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [facilityMachineIds, setFacilityMachineIds] = useState<Set<number> | null>(null);
 
   const parseJob = (job: Job): ParsedJob => {
     try {
@@ -84,9 +85,29 @@ export const useJobs = (): UseJobsReturn => {
     setError(null);
 
     try {
+      let machineIds: Set<number> | null = null;
+
+      // If a specific facility is selected, first fetch machines for that facility
+      if (facilityId !== undefined && facilityId !== null) {
+        const machines = await getMachines('', facilityId);
+        machineIds = new Set(machines.map(m => m.id));
+        setFacilityMachineIds(machineIds);
+      } else {
+        setFacilityMachineIds(null);
+      }
+
       const data = await getJobs();
       const parsedJobs = data.map(parseJob);
-      setJobs(parsedJobs);
+
+      // Filter jobs based on facility machines if applicable
+      let filteredJobs = parsedJobs;
+      if (facilityId !== undefined && facilityId !== null && machineIds) {
+        filteredJobs = parsedJobs.filter(job =>
+          job.machines.some(machine => machineIds!.has(machine.id))
+        );
+      }
+
+      setJobs(filteredJobs);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch jobs';
       setError(errorMessage);
@@ -98,7 +119,7 @@ export const useJobs = (): UseJobsReturn => {
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [facilityId]);
 
   return {
     jobs,

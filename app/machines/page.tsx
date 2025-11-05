@@ -7,32 +7,15 @@ import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useMachines } from '@/hooks/useMachines';
 import AddJobModal from '../components/AddJobModal';
-
-type MachineStatus = 'running' | 'available' | 'avalible' | 'maintenance';
-
-interface Machine {
-  id: number;
-  created_at: number;
-  line: number;
-  type: string;
-  max_size: string;
-  speed_hr: string;
-  status: MachineStatus;
-  pockets?: number;
-  shiftCapacity?: number;
-  currentJob?: {
-    number: string;
-    name: string;
-  };
-}
+import FacilityToggle from '../components/FacilityToggle';
 
 export default function Machines() {
   const [filterStatus, setFilterStatus] = useState<string>('');
-  const [filterFacility, setFilterFacility] = useState<number>(1); // Default to Bolingbrook (1)
+  const [filterFacility, setFilterFacility] = useState<number | null>(null); // Default to All
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
-  const { machines, isLoading: machinesLoading, error: machinesError } = useMachines(filterStatus, filterFacility);
+  const { machines, isLoading: machinesLoading, error: machinesError } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -58,7 +41,7 @@ export default function Machines() {
     setFilterStatus(status);
   };
 
-  const handleFacilityChange = (facility: number) => {
+  const handleFacilityChange = (facility: number | null) => {
     setFilterFacility(facility);
   };
 
@@ -95,10 +78,10 @@ export default function Machines() {
                 Machines
               </Link>
               <Link
-                href="/calendar"
+                href="/projections"
                 className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
               >
-                Calendar
+                Projections
               </Link>
             </nav>
 
@@ -171,32 +154,13 @@ export default function Machines() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6 pb-6 border-b border-[var(--border)]">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Production Lines</h2>
-
-            {/* Facility Tabs */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleFacilityChange(1)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filterFacility === 1
-                    ? 'bg-[var(--primary-blue)] text-white'
-                    : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
-                }`}
-              >
-                Bolingbrook
-              </button>
-              <button
-                onClick={() => handleFacilityChange(2)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filterFacility === 2
-                    ? 'bg-[var(--primary-blue)] text-white'
-                    : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
-                }`}
-              >
-                Lemont
-              </button>
-            </div>
+            <FacilityToggle
+              currentFacility={filterFacility}
+              onFacilityChange={handleFacilityChange}
+              showAll={true}
+            />
           </div>
         </div>
 
@@ -246,26 +210,105 @@ export default function Machines() {
           </div>
         </div>
 
-        {/* Machine Cards Grid */}
+        {/* Machines Table */}
         {machinesError ? (
           <div className="text-center py-12">
             <div className="text-red-600">Error loading machines: {machinesError}</div>
           </div>
         ) : machinesLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, index) => (
-              <MachineCardSkeleton key={index} />
-            ))}
+          <div className="text-center py-12">
+            <div className="text-[var(--text-light)]">Loading machines...</div>
           </div>
         ) : machines.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-[var(--text-light)] text-lg">No machines found</div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {machines.map(machine => (
-              <MachineCard key={machine.id} machine={machine} />
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Line
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Max Size
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Pockets
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Speed/hr
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Shift Capacity
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    Current Job
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {machines.map(machine => {
+                  const statusColors = {
+                    running: 'bg-blue-100 text-blue-800 border-blue-200',
+                    available: 'bg-green-100 text-green-800 border-green-200',
+                    avalible: 'bg-green-100 text-green-800 border-green-200',
+                    maintenance: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                  };
+
+                  const statusLabels = {
+                    running: 'Running',
+                    available: 'Available',
+                    avalible: 'Available',
+                    maintenance: 'Maintenance'
+                  };
+
+                  return (
+                    <tr key={machine.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
+                        Line {machine.line}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {machine.type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
+                          {statusLabels[machine.status]}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {machine.max_size || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {machine.pockets || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {machine.shiftCapacity ? machine.shiftCapacity.toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                        {machine.currentJob ? (
+                          <span>Job #{machine.currentJob.number} - {machine.currentJob.name}</span>
+                        ) : (machine.status === 'available' || machine.status === 'avalible') ? (
+                          <span className="text-[var(--success)]">Ready for next job</span>
+                        ) : (
+                          <span className="text-[var(--text-light)]">No active job</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </main>
@@ -273,111 +316,5 @@ export default function Machines() {
       {/* Add Job Modal */}
       <AddJobModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </>
-  );
-}
-
-function MachineCardSkeleton() {
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-5 animate-pulse">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1">
-          <div className="h-6 bg-gray-200 rounded w-24 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-32"></div>
-        </div>
-        <div className="h-6 bg-gray-200 rounded w-20"></div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <div className="h-3 bg-gray-200 rounded w-16 mb-2"></div>
-          <div className="h-5 bg-gray-200 rounded w-12"></div>
-        </div>
-        <div>
-          <div className="h-3 bg-gray-200 rounded w-16 mb-2"></div>
-          <div className="h-5 bg-gray-200 rounded w-8"></div>
-        </div>
-        <div>
-          <div className="h-3 bg-gray-200 rounded w-16 mb-2"></div>
-          <div className="h-5 bg-gray-200 rounded w-20"></div>
-        </div>
-        <div>
-          <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-          <div className="h-5 bg-gray-200 rounded w-16"></div>
-        </div>
-      </div>
-
-      <div className="pt-4 border-t border-[var(--border)]">
-        <div className="h-3 bg-gray-200 rounded w-24 mb-2"></div>
-        <div className="h-5 bg-gray-200 rounded w-full"></div>
-      </div>
-    </div>
-  );
-}
-
-function MachineCard({ machine }: { machine: Machine }) {
-  const statusColors = {
-    running: 'bg-blue-100 text-blue-800 border-blue-200',
-    available: 'bg-green-100 text-green-800 border-green-200',
-    avalible: 'bg-green-100 text-green-800 border-green-200',
-    maintenance: 'bg-yellow-100 text-yellow-800 border-yellow-200'
-  };
-
-  const statusLabels = {
-    running: 'Running',
-    available: 'Available',
-    avalible: 'Available',
-    maintenance: 'Maintenance'
-  };
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border border-[var(--border)] p-5 hover:shadow-md transition-shadow ${
-      machine.status === 'running' ? 'border-l-4 border-l-blue-500' :
-      (machine.status === 'available' || machine.status === 'avalible') ? 'border-l-4 border-l-green-500' :
-      'border-l-4 border-l-yellow-500'
-    }`}>
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <div className="text-xl font-bold text-[var(--dark-blue)]">Line {machine.line}</div>
-          <div className="text-sm text-[var(--text-light)]">{machine.type}</div>
-        </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
-          {statusLabels[machine.status]}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <div className="text-xs text-[var(--text-light)] uppercase">Max Size</div>
-          <div className="font-semibold text-[var(--text-dark)]">{machine.max_size || 'N/A'}</div>
-        </div>
-        <div>
-          <div className="text-xs text-[var(--text-light)] uppercase">Pockets</div>
-          <div className="font-semibold text-[var(--text-dark)]">{machine.pockets || 'N/A'}</div>
-        </div>
-        <div>
-          <div className="text-xs text-[var(--text-light)] uppercase">Speed</div>
-          <div className="font-semibold text-[var(--text-dark)]">{machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}</div>
-        </div>
-        <div>
-          <div className="text-xs text-[var(--text-light)] uppercase">Shift Cap.</div>
-          <div className="font-semibold text-[var(--text-dark)]">{machine.shiftCapacity ? machine.shiftCapacity.toLocaleString() : 'N/A'}</div>
-        </div>
-      </div>
-
-      <div className="pt-4 border-t border-[var(--border)]">
-        {machine.currentJob ? (
-          <>
-            <div className="text-xs text-[var(--text-light)] uppercase mb-1">Current Job</div>
-            <div className="font-semibold text-[var(--text-dark)]">
-              Job #{machine.currentJob.number} - {machine.currentJob.name}
-            </div>
-          </>
-        ) : (machine.status === 'available' || machine.status === 'avalible') ? (
-          <div className="text-[var(--success)] font-semibold">Ready for next job</div>
-        ) : (
-          <div className="text-[var(--text-light)] font-semibold">No active job</div>
-        )}
-      </div>
-    </div>
   );
 }

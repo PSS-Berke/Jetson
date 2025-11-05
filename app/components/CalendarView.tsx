@@ -30,6 +30,7 @@ interface CalendarViewProps {
   onEventClick?: (event: CalendarEvent) => void;
   onViewChange?: (view: View) => void;
   onNavigate?: (date: Date) => void;
+  compactMode?: boolean;
 }
 
 export default function CalendarView({
@@ -40,7 +41,8 @@ export default function CalendarView({
   onDateClick,
   onEventClick,
   onViewChange,
-  onNavigate
+  onNavigate,
+  compactMode = false
 }: CalendarViewProps) {
   // Convert our CalendarEvent to react-big-calendar format
   const calendarEvents = useMemo(() => {
@@ -139,7 +141,7 @@ export default function CalendarView({
         events={calendarEvents}
         startAccessor="start"
         endAccessor="end"
-        style={{ height: '700px' }}
+        style={{ height: compactMode ? '100%' : '700px' }}
         view={mapViewType(viewType)}
         onView={onViewChange}
         onNavigate={onNavigate}
@@ -149,6 +151,7 @@ export default function CalendarView({
         dayPropGetter={dayPropGetter}
         selectable
         popup
+        toolbar={!compactMode}
         components={{
           month: {
             dateHeader: DateHeader

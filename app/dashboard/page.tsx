@@ -8,14 +8,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { useJobs, type ParsedJob } from '@/hooks/useJobs';
 import AddJobModal from '../components/AddJobModal';
 import JobDetailsModal from '../components/JobDetailsModal';
+import FacilityToggle from '../components/FacilityToggle';
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
   const { user, isLoading: userLoading } = useUser();
-  const { jobs, isLoading: jobsLoading, error: jobsError, refetch } = useJobs();
+  const { jobs, isLoading: jobsLoading, error: jobsError, refetch } = useJobs(selectedFacility);
   const { logout } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -75,10 +77,10 @@ export default function Dashboard() {
                 Machines
               </Link>
               <Link
-                href="/calendar"
+                href="/projections"
                 className="px-4 py-2 rounded-lg font-medium transition-colors text-[var(--text-dark)] hover:bg-gray-100"
               >
-                Calendar
+                Projections
               </Link>
             </nav>
 
@@ -151,7 +153,13 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Jobs</h2>
+          <div className="flex items-center gap-6">
+            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Jobs</h2>
+            <FacilityToggle
+              currentFacility={selectedFacility}
+              onFacilityChange={setSelectedFacility}
+            />
+          </div>
         </div>
 
         {jobsError ? (
