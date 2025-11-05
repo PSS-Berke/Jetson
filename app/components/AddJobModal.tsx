@@ -553,11 +553,13 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                         required
                       >
                         <option value="">Select process...</option>
-                        <option value="insert">Insert</option>
-                        <option value="fold">Fold</option>
-                        <option value="affix">Affix Label</option>
-                        <option value="print">Variable Print</option>
-                        <option value="polybag">Poly Bag</option>
+                        <option value="Insert">Insert</option>
+                        <option value="Sort">Sort</option>
+                        <option value="IJ">IJ</option>
+                        <option value="L/A">L/A</option>
+                        <option value="Fold">Fold</option>
+                        <option value="Laser">Laser</option>
+                        <option value="HP Press">HP Press</option>
                       </select>
                     </div>
                     <div>
