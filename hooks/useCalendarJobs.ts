@@ -82,8 +82,8 @@ export const useCalendarJobs = ({
 
   // Transform filtered jobs into calendar events
   const events = useMemo(() => {
-    return transformJobsToEvents(filteredJobs, machines);
-  }, [filteredJobs, machines]);
+    return transformJobsToEvents(filteredJobs);
+  }, [filteredJobs]);
 
   return {
     jobs,
