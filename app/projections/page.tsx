@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
+import { useJobs } from '@/hooks/useJobs';
 import { useProjections, type ProjectionFilters } from '@/hooks/useProjections';
 import { getStartOfWeek } from '@/lib/projectionUtils';
 import { startOfMonth, startOfQuarter } from 'date-fns';
@@ -14,6 +15,7 @@ import EmbeddedCalendar from '../components/EmbeddedCalendar';
 import PageHeader from '../components/PageHeader';
 import AddJobModal from '../components/AddJobModal';
 import Pagination from '../components/Pagination';
+import ProjectionsCalendar from '../components/ProjectionsCalendar';
 
 type ViewMode = 'table' | 'calendar';
 
@@ -53,6 +55,9 @@ export default function ProjectionsPage() {
     error,
     refetch,
   } = useProjections(startDate, filters);
+
+  // Fetch all jobs for the calendar (not filtered by projection timeframe)
+  const { jobs: allJobs } = useJobs(selectedFacility);
 
   console.log('[DEBUG] ProjectionsPage - processTypeCounts received:', processTypeCounts);
   console.log('[DEBUG] ProjectionsPage - filteredJobProjections count:', filteredJobProjections.length);
@@ -314,6 +319,14 @@ export default function ProjectionsPage() {
                   onPageChange={setCurrentPage}
                   onItemsPerPageChange={setItemsPerPage}
                 />
+
+                {/* Jobs Calendar */}
+                <div className="mt-8">
+                  <ProjectionsCalendar
+                    jobs={allJobs}
+                    startDate={new Date()}
+                  />
+                </div>
               </>
             )}
 

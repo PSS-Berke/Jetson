@@ -50,7 +50,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [canSubmit, setCanSubmit] = useState(false);
-  const [confirmReview, setConfirmReview] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false); // true = Schedule, false = Soft Schedule
   const [formData, setFormData] = useState<JobFormData>({
     job_number: '',
     clients_id: null,
@@ -181,88 +181,10 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     const newValue = parseInt(cleanedValue) || 0;
 
     setFormData(prev => {
-      const oldValue = prev.weekly_split[weekIndex];
-      const difference = newValue - oldValue;
-
-      // If only one week, just set it to the value
-      if (prev.weekly_split.length === 1) {
-        return { ...prev, weekly_split: [newValue] };
-      }
-
-      // Create new split array with the changed value
+      // Simply update the specific week without affecting others
       const newSplit = [...prev.weekly_split];
       newSplit[weekIndex] = newValue;
-
-      // Calculate how much we need to distribute to other weeks
-      const amountToDistribute = -difference;
-
-      // If no distribution needed (difference is 0), return as is
-      if (amountToDistribute === 0) {
-        return { ...prev, weekly_split: newSplit };
-      }
-
-      // Get indices of other weeks (excluding the one being edited)
-      const otherIndices = newSplit
-        .map((_, idx) => idx)
-        .filter(idx => idx !== weekIndex);
-
-      // Calculate total of other weeks for proportional distribution
-      const otherWeeksTotal = otherIndices.reduce((sum, idx) => sum + prev.weekly_split[idx], 0);
-
-      // If all other weeks are 0, distribute evenly
-      if (otherWeeksTotal === 0) {
-        const baseAmount = Math.floor(amountToDistribute / otherIndices.length);
-        const remainder = amountToDistribute - (baseAmount * otherIndices.length);
-
-        otherIndices.forEach((idx, i) => {
-          newSplit[idx] = Math.max(0, baseAmount + (i < remainder ? 1 : 0));
-        });
-      } else {
-        // Distribute proportionally based on current values
-        let remainingToDistribute = amountToDistribute;
-        const adjustments: number[] = [];
-
-        // Calculate proportional adjustments
-        otherIndices.forEach(idx => {
-          const proportion = prev.weekly_split[idx] / otherWeeksTotal;
-          const adjustment = Math.round(amountToDistribute * proportion);
-          adjustments.push(adjustment);
-        });
-
-        // Apply adjustments and handle negatives
-        otherIndices.forEach((idx, i) => {
-          const newAmount = prev.weekly_split[idx] + adjustments[i];
-          if (newAmount < 0) {
-            // If would go negative, set to 0 and track remaining
-            remainingToDistribute -= prev.weekly_split[idx];
-            newSplit[idx] = 0;
-          } else {
-            newSplit[idx] = newAmount;
-            remainingToDistribute -= adjustments[i];
-          }
-        });
-
-        // If there's remaining amount due to rounding or negatives, distribute to non-zero weeks
-        if (remainingToDistribute !== 0) {
-          const nonZeroIndices = otherIndices.filter(idx => newSplit[idx] > 0);
-          if (nonZeroIndices.length > 0) {
-            // Add remainder to the first non-zero week
-            newSplit[nonZeroIndices[0]] += remainingToDistribute;
-            // Ensure it doesn't go negative
-            if (newSplit[nonZeroIndices[0]] < 0) {
-              newSplit[nonZeroIndices[0]] = 0;
-            }
-          }
-        }
-      }
-
-      // Final safety check: ensure no negatives
-      for (let i = 0; i < newSplit.length; i++) {
-        if (newSplit[i] < 0) {
-          newSplit[i] = 0;
-        }
-      }
-
+      
       return { ...prev, weekly_split: newSplit };
     });
   };
@@ -304,9 +226,9 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
-      // Reset confirmation checkbox when entering review step
+      // Reset schedule type to soft schedule when entering review step
       if (currentStep === 2) {
-        setConfirmReview(false);
+        setIsConfirmed(false);
       }
     }
   };
@@ -315,6 +237,76 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  /**
+   * Convert weekly split into daily breakdown for each week
+   * Returns a 2D array where each inner array represents 7 days of a week [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+   * 
+   * Example:
+   * If job starts on Wednesday and has weekly_split = [5000, 7000]
+   * Week 1 (Wed-Sun): [0, 0, 1000, 1000, 1000, 1000, 1000] - 5000 split across 5 days
+   * Week 2 (Mon-Sun): [1000, 1000, 1000, 1000, 1000, 1000, 1000] - 7000 split across 7 days
+   * 
+   * Result: [[0, 0, 1000, 1000, 1000, 1000, 1000], [1000, 1000, 1000, 1000, 1000, 1000, 1000]]
+   */
+  const convertWeeklySplitToDailyBreakdown = (
+    weeklySplit: number[],
+    startDate: string,
+    dueDate: string
+  ): number[][] => {
+    if (!startDate || !dueDate || weeklySplit.length === 0) {
+      return [];
+    }
+
+    const start = new Date(startDate);
+    const due = new Date(dueDate);
+    const dailyBreakdown: number[][] = [];
+
+    // For each week in the split
+    for (let weekIndex = 0; weekIndex < weeklySplit.length; weekIndex++) {
+      const weekTotal = weeklySplit[weekIndex];
+      const weekArray = [0, 0, 0, 0, 0, 0, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+
+      // Calculate the start and end date for this week
+      const weekStartDate = new Date(start);
+      weekStartDate.setDate(start.getDate() + (weekIndex * 7));
+      
+      const weekEndDate = new Date(weekStartDate);
+      weekEndDate.setDate(weekStartDate.getDate() + 6);
+
+      // Determine which days in this week are active
+      const actualStartDate = weekIndex === 0 ? start : weekStartDate;
+      const actualEndDate = weekIndex === weeklySplit.length - 1 
+        ? (due < weekEndDate ? due : weekEndDate)
+        : weekEndDate;
+
+      // Count active days in this week
+      const activeDays: number[] = [];
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const currentDay = new Date(weekStartDate);
+        currentDay.setDate(weekStartDate.getDate() + dayOffset);
+
+        if (currentDay >= actualStartDate && currentDay <= actualEndDate) {
+          activeDays.push(dayOffset);
+        }
+      }
+
+      // Distribute the week's total evenly across active days
+      if (activeDays.length > 0) {
+        const amountPerDay = Math.floor(weekTotal / activeDays.length);
+        const remainder = weekTotal % activeDays.length;
+
+        activeDays.forEach((dayIndex, idx) => {
+          // Distribute remainder across first few days
+          weekArray[dayIndex] = amountPerDay + (idx < remainder ? 1 : 0);
+        });
+      }
+
+      dailyBreakdown.push(weekArray);
+    }
+
+    return dailyBreakdown;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -349,6 +341,16 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         ? new Date(formData.due_date).getTime()
         : undefined;
 
+      // Convert weekly split to daily breakdown
+      const dailyBreakdown = convertWeeklySplitToDailyBreakdown(
+        formData.weekly_split,
+        formData.start_date,
+        formData.due_date
+      );
+
+      console.log('[AddJobModal] Weekly split converted to daily breakdown:', dailyBreakdown);
+      console.log('[AddJobModal] Daily breakdown format example:', JSON.stringify(dailyBreakdown, null, 2));
+
       // Prepare the payload according to the API specification
       const payload: Record<string, unknown> = {
         description: formData.description,
@@ -366,7 +368,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         ext_price: (parseFloat(formData.ext_price) || 0).toString(),
         total_billing: calculatedTotalBilling.toString(),
         requirements: JSON.stringify(formData.requirements),
-        weekly_split: formData.weekly_split
+        daily_split: dailyBreakdown,
+        confirmed: isConfirmed
       };
 
       // Only include dates if they are valid timestamps (not 0 or undefined)
@@ -929,33 +932,37 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               </div>
 
-              <div className={`border-2 rounded-lg p-4 transition-colors ${
-                confirmReview
-                  ? 'bg-blue-50 border-[#2E3192]'
-                  : 'bg-red-50 border-[#EF3340]'
-              }`}>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={confirmReview}
-                    onChange={(e) => setConfirmReview(e.target.checked)}
-                    className={`mt-1 w-5 h-5 border-gray-300 rounded focus:ring-2 ${
-                      confirmReview
-                        ? 'text-[#2E3192] focus:ring-[#2E3192]'
-                        : 'text-[#EF3340] focus:ring-[#EF3340]'
+              <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
+                <h4 className="font-semibold text-[var(--text-dark)] mb-3">Schedule Type</h4>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmed(false)}
+                    className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                      !isConfirmed
+                        ? 'bg-[#2E3192] text-white shadow-md'
+                        : 'bg-white text-[var(--text-dark)] border-2 border-gray-300 hover:border-[#2E3192]'
                     }`}
-                  />
-                  <div>
-                    <p className={`font-semibold mb-1 ${
-                      confirmReview ? 'text-[#2E3192]' : 'text-[#EF3340]'
-                    }`}>
-                      Confirm Job Details
-                    </p>
-                    <p className="text-sm text-[var(--text-dark)]">
-                      I have reviewed all job details above and confirm they are correct. I am ready to create this job.
-                    </p>
-                  </div>
-                </label>
+                  >
+                    Soft Schedule
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmed(true)}
+                    className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                      isConfirmed
+                        ? 'bg-[#EF3340] text-white shadow-md'
+                        : 'bg-white text-[var(--text-dark)] border-2 border-gray-300 hover:border-[#EF3340]'
+                    }`}
+                  >
+                    Schedule
+                  </button>
+                </div>
+                <p className="text-sm text-[var(--text-light)] mt-3">
+                  {isConfirmed 
+                    ? '✓ This job will be confirmed and scheduled immediately.'
+                    : 'ℹ This job will be added as a soft schedule and can be confirmed later.'}
+                </p>
               </div>
             </div>
           )}
@@ -1000,7 +1007,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                       }
                     }, 0);
                   }}
-                  disabled={submitting || !confirmReview}
+                  disabled={submitting}
                   className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Creating Job...' : 'Submit Job'}

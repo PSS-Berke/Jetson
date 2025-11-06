@@ -20,6 +20,7 @@ export interface ParsedJob extends Omit<Job, 'client' | 'machines' | 'requiremen
   client: { id: number; name: string };
   machines: { id: number; line: number }[];
   requirements: ParsedRequirement[];
+  daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
 }
 
 interface UseJobsReturn {
@@ -81,11 +82,27 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
       console.log(`[DEBUG] Job ${job.job_number} - Final parsedRequirements:`, parsedRequirements);
       console.log(`[DEBUG] Job ${job.job_number} - total_billing:`, job.total_billing);
 
+      // Parse daily_split if it exists
+      let parsedDailySplit: number[][] | undefined = undefined;
+      if ((job as any).daily_split) {
+        try {
+          if (typeof (job as any).daily_split === 'string') {
+            parsedDailySplit = JSON.parse((job as any).daily_split);
+            console.log(`[DEBUG] Job ${job.job_number} - Parsed daily_split:`, parsedDailySplit);
+          } else if (Array.isArray((job as any).daily_split)) {
+            parsedDailySplit = (job as any).daily_split;
+          }
+        } catch (error) {
+          console.error(`[DEBUG] Job ${job.job_number} - Failed to parse daily_split:`, error);
+        }
+      }
+
       return {
         ...job,
         client: JSON.parse(job.client),
         machines: JSON.parse(job.machines),
         requirements: parsedRequirements,
+        daily_split: parsedDailySplit,
       };
     } catch (e) {
       console.error('Failed to parse job data:', e);

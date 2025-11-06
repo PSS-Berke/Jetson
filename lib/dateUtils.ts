@@ -79,9 +79,18 @@ export const calculateDaysDifference = (startDate: Date, endDate: Date): number 
 
 /**
  * Convert Unix timestamp to Date object
+ * Handles both seconds and milliseconds timestamps
  */
 export const timestampToDate = (timestamp: number): Date => {
-  return fromUnixTime(timestamp);
+  // If timestamp is in milliseconds (> 10 digits), use directly
+  // If timestamp is in seconds (≤ 10 digits), convert to milliseconds
+  if (timestamp > 9999999999) {
+    // Milliseconds timestamp
+    return new Date(timestamp);
+  } else {
+    // Seconds timestamp
+    return fromUnixTime(timestamp);
+  }
 };
 
 /**
