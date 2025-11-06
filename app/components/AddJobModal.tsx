@@ -239,6 +239,76 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     }
   };
 
+  /**
+   * Convert weekly split into daily breakdown for each week
+   * Returns a 2D array where each inner array represents 7 days of a week [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+   * 
+   * Example:
+   * If job starts on Wednesday and has weekly_split = [5000, 7000]
+   * Week 1 (Wed-Sun): [0, 0, 1000, 1000, 1000, 1000, 1000] - 5000 split across 5 days
+   * Week 2 (Mon-Sun): [1000, 1000, 1000, 1000, 1000, 1000, 1000] - 7000 split across 7 days
+   * 
+   * Result: [[0, 0, 1000, 1000, 1000, 1000, 1000], [1000, 1000, 1000, 1000, 1000, 1000, 1000]]
+   */
+  const convertWeeklySplitToDailyBreakdown = (
+    weeklySplit: number[],
+    startDate: string,
+    dueDate: string
+  ): number[][] => {
+    if (!startDate || !dueDate || weeklySplit.length === 0) {
+      return [];
+    }
+
+    const start = new Date(startDate);
+    const due = new Date(dueDate);
+    const dailyBreakdown: number[][] = [];
+
+    // For each week in the split
+    for (let weekIndex = 0; weekIndex < weeklySplit.length; weekIndex++) {
+      const weekTotal = weeklySplit[weekIndex];
+      const weekArray = [0, 0, 0, 0, 0, 0, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+
+      // Calculate the start and end date for this week
+      const weekStartDate = new Date(start);
+      weekStartDate.setDate(start.getDate() + (weekIndex * 7));
+      
+      const weekEndDate = new Date(weekStartDate);
+      weekEndDate.setDate(weekStartDate.getDate() + 6);
+
+      // Determine which days in this week are active
+      const actualStartDate = weekIndex === 0 ? start : weekStartDate;
+      const actualEndDate = weekIndex === weeklySplit.length - 1 
+        ? (due < weekEndDate ? due : weekEndDate)
+        : weekEndDate;
+
+      // Count active days in this week
+      const activeDays: number[] = [];
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const currentDay = new Date(weekStartDate);
+        currentDay.setDate(weekStartDate.getDate() + dayOffset);
+
+        if (currentDay >= actualStartDate && currentDay <= actualEndDate) {
+          activeDays.push(dayOffset);
+        }
+      }
+
+      // Distribute the week's total evenly across active days
+      if (activeDays.length > 0) {
+        const amountPerDay = Math.floor(weekTotal / activeDays.length);
+        const remainder = weekTotal % activeDays.length;
+
+        activeDays.forEach((dayIndex, idx) => {
+          // Distribute remainder across first few days
+          weekArray[dayIndex] = amountPerDay + (idx < remainder ? 1 : 0);
+        });
+      }
+
+      dailyBreakdown.push(weekArray);
+    }
+
+    return dailyBreakdown;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -271,6 +341,16 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         ? new Date(formData.due_date).getTime()
         : undefined;
 
+      // Convert weekly split to daily breakdown
+      const dailyBreakdown = convertWeeklySplitToDailyBreakdown(
+        formData.weekly_split,
+        formData.start_date,
+        formData.due_date
+      );
+
+      console.log('[AddJobModal] Weekly split converted to daily breakdown:', dailyBreakdown);
+      console.log('[AddJobModal] Daily breakdown format example:', JSON.stringify(dailyBreakdown, null, 2));
+
       // Prepare the payload according to the API specification
       const payload: Record<string, unknown> = {
         description: formData.description,
@@ -288,7 +368,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         ext_price: (parseFloat(formData.ext_price) || 0).toString(),
         total_billing: calculatedTotalBilling.toString(),
         requirements: JSON.stringify(formData.requirements),
-        weekly_split: formData.weekly_split,
+        daily_split: dailyBreakdown,
         confirmed: isConfirmed
       };
 
