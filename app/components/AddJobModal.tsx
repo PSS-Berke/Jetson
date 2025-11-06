@@ -350,7 +350,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         : undefined;
 
       // Prepare the payload according to the API specification
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         description: formData.description,
         quantity: quantity,
         clients_id: formData.clients_id,
