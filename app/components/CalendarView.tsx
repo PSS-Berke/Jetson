@@ -141,6 +141,7 @@ export default function CalendarView({
         events={calendarEvents}
         startAccessor="start"
         endAccessor="end"
+        titleAccessor="title"
         style={{ height: compactMode ? '100%' : '700px' }}
         view={mapViewType(viewType)}
         onView={onViewChange}
@@ -159,7 +160,7 @@ export default function CalendarView({
         }}
         tooltipAccessor={(event) => {
           const e = event as CalendarEvent;
-          return `${e.job.job_number} - ${e.job.client.name}\n${formatNumber(e.dailyPieces)} pieces\n${formatCurrency(e.dailyRevenue)}`;
+          return `${e.serviceType}\n${formatNumber(e.totalPieces)} pieces\n${e.jobCount} job${e.jobCount > 1 ? 's' : ''}`;
         }}
       />
     </div>

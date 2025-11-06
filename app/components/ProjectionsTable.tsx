@@ -5,6 +5,7 @@ import { ParsedJob } from '@/hooks/useJobs';
 import { JobProjection, ServiceTypeSummary } from '@/hooks/useProjections';
 import { formatQuantity, TimeRange } from '@/lib/projectionUtils';
 import JobDetailsModal from './JobDetailsModal';
+import ProcessTypeBadge from './ProcessTypeBadge';
 
 interface ProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
@@ -51,7 +52,7 @@ export default function ProjectionsTable({
                 Sub Client
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Type
+                Process Types
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
                 Job Name / Description
@@ -99,10 +100,17 @@ export default function ProjectionsTable({
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-dark)]">
                       {job.client?.name || 'Unknown'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                        {job.service_type}
-                      </span>
+                    <td className="px-4 py-3 text-sm text-[var(--text-dark)]">
+                      <div className="flex flex-wrap gap-1">
+                        {job.requirements && job.requirements.length > 0 ? (
+                          // Get unique process types from requirements
+                          [...new Set(job.requirements.map(req => req.process_type).filter(Boolean))].map((processType, idx) => (
+                            <ProcessTypeBadge key={idx} processType={processType as string} />
+                          ))
+                        ) : (
+                          <span className="text-gray-400 text-xs">No processes</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-[var(--text-dark)] max-w-xs truncate">
                       {job.description || 'N/A'}

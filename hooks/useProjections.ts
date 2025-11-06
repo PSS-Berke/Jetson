@@ -17,13 +17,13 @@ import { generateMonthRanges, generateQuarterRanges } from '@/lib/dateUtils';
 import type { Granularity } from '@/app/components/GranularityToggle';
 
 export interface ProcessTypeCounts {
-  insert: number;
-  sort: number;
-  ij: number;
-  la: number;
-  fold: number;
-  laser: number;
-  hpPress: number;
+  insert: { jobs: number; pieces: number };
+  sort: { jobs: number; pieces: number };
+  inkjet: { jobs: number; pieces: number };
+  labelApply: { jobs: number; pieces: number };
+  fold: { jobs: number; pieces: number };
+  laser: { jobs: number; pieces: number };
+  hpPress: { jobs: number; pieces: number };
 }
 
 export interface ProjectionsData {
@@ -37,6 +37,8 @@ export interface ProjectionsData {
   };
   filteredJobProjections: JobProjection[];
   processTypeCounts: ProcessTypeCounts;
+  totalRevenue: number;
+  totalJobsInTimeframe: number;
 }
 
 export interface ProjectionFilters {
@@ -52,13 +54,13 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
   console.log('[DEBUG] calculateProcessTypeCounts - Total projections:', projections.length);
 
   const counts: ProcessTypeCounts = {
-    insert: 0,
-    sort: 0,
-    ij: 0,
-    la: 0,
-    fold: 0,
-    laser: 0,
-    hpPress: 0,
+    insert: { jobs: 0, pieces: 0 },
+    sort: { jobs: 0, pieces: 0 },
+    inkjet: { jobs: 0, pieces: 0 },
+    labelApply: { jobs: 0, pieces: 0 },
+    fold: { jobs: 0, pieces: 0 },
+    laser: { jobs: 0, pieces: 0 },
+    hpPress: { jobs: 0, pieces: 0 },
   };
 
   // Track which jobs have already been counted for each process type
@@ -79,36 +81,46 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
 
     console.log(`[DEBUG] Job ${job.job_number} - Process types found:`, Array.from(processTypesInJob));
 
-    // Count each unique job once per process type
+    // Count each unique job once per process type and add its quantity
     processTypesInJob.forEach((processType) => {
       const key = `${job.id}-${processType}`;
       if (!countedJobs.has(key)) {
         countedJobs.add(key);
+        const jobQuantity = projection.totalQuantity;
 
         // Increment the appropriate counter
         switch (processType) {
           case 'insert':
-            counts.insert++;
+            counts.insert.jobs++;
+            counts.insert.pieces += jobQuantity;
             break;
           case 'sort':
-            counts.sort++;
+            counts.sort.jobs++;
+            counts.sort.pieces += jobQuantity;
             break;
-          case 'ij':
+          case 'inkjet':
+          case 'ij': // Support legacy value
           case 'ink jet':
-            counts.ij++;
+            counts.inkjet.jobs++;
+            counts.inkjet.pieces += jobQuantity;
             break;
-          case 'l/a':
+          case 'label/apply':
+          case 'l/a': // Support legacy value
           case 'label/affix':
-            counts.la++;
+            counts.labelApply.jobs++;
+            counts.labelApply.pieces += jobQuantity;
             break;
           case 'fold':
-            counts.fold++;
+            counts.fold.jobs++;
+            counts.fold.pieces += jobQuantity;
             break;
           case 'laser':
-            counts.laser++;
+            counts.laser.jobs++;
+            counts.laser.pieces += jobQuantity;
             break;
           case 'hp press':
-            counts.hpPress++;
+            counts.hpPress.jobs++;
+            counts.hpPress.pieces += jobQuantity;
             break;
         }
       }
@@ -154,14 +166,16 @@ export function useProjections(
         },
         filteredJobProjections: [],
         processTypeCounts: {
-          insert: 0,
-          sort: 0,
-          ij: 0,
-          la: 0,
-          fold: 0,
-          laser: 0,
-          hpPress: 0,
+          insert: { jobs: 0, pieces: 0 },
+          sort: { jobs: 0, pieces: 0 },
+          inkjet: { jobs: 0, pieces: 0 },
+          labelApply: { jobs: 0, pieces: 0 },
+          fold: { jobs: 0, pieces: 0 },
+          laser: { jobs: 0, pieces: 0 },
+          hpPress: { jobs: 0, pieces: 0 },
         },
+        totalRevenue: 0,
+        totalJobsInTimeframe: 0,
       };
     }
 
@@ -178,11 +192,17 @@ export function useProjections(
       );
     }
 
-    // Filter by service types
+    // Filter by process types from requirements
     if (filters.serviceTypes.length > 0) {
-      filteredProjections = filteredProjections.filter(p =>
-        filters.serviceTypes.includes(p.job.service_type)
-      );
+      filteredProjections = filteredProjections.filter(p => {
+        // Check if any requirement has a matching process type
+        if (p.job.requirements && p.job.requirements.length > 0) {
+          return p.job.requirements.some(req =>
+            req.process_type && filters.serviceTypes.includes(req.process_type)
+          );
+        }
+        return false;
+      });
     }
 
     // Filter by search query (job number, client name, or description)
@@ -209,6 +229,36 @@ export function useProjections(
     // Calculate process type counts from filtered projections
     const processTypeCounts = calculateProcessTypeCounts(filteredProjections);
 
+    // Calculate total revenue proportionally based on what portion of each job falls within the timeframe
+    console.log(`[Total Revenue] Starting calculation for ${filteredProjections.length} filtered jobs`);
+    const totalRevenue = filteredProjections.reduce((total, projection) => {
+      const job = projection.job;
+      const jobBilling = parseFloat(job.total_billing || '0');
+
+      // Calculate what percentage of the job falls within the timeframe
+      const totalJobQuantity = job.quantity || 0;
+      if (totalJobQuantity === 0) {
+        console.log(`[Total Revenue] Job ${job.job_number}: skipping (quantity is 0)`);
+        return total;
+      }
+
+      // Use the same proportion as quantity distribution
+      const portionInTimeframe = projection.totalQuantity / totalJobQuantity;
+      const proportionalRevenue = jobBilling * portionInTimeframe;
+
+      console.log(`[Total Revenue] Job ${job.job_number}: total_billing=$${jobBilling.toFixed(2)}, portion=${(portionInTimeframe * 100).toFixed(1)}%, proportional_revenue=$${proportionalRevenue.toFixed(2)}`);
+      return total + proportionalRevenue;
+    }, 0);
+    console.log(`[Total Revenue] Final total: $${totalRevenue.toFixed(2)} from ${filteredProjections.length} jobs`);
+
+    // Calculate total jobs with activity in timeframe
+    const totalJobsInTimeframe = new Set(
+      filteredProjections
+        .filter(p => p.totalQuantity > 0)
+        .map(p => p.job.id)
+    ).size;
+    console.log(`[Total Jobs] ${totalJobsInTimeframe} jobs have activity in the selected timeframe (out of ${filteredProjections.length} total)`);
+
     return {
       timeRanges,
       weekRanges: timeRanges as WeekRange[], // For backwards compatibility
@@ -217,6 +267,8 @@ export function useProjections(
       grandTotals,
       filteredJobProjections: filteredProjections,
       processTypeCounts,
+      totalRevenue,
+      totalJobsInTimeframe,
     };
   }, [jobs, startDate, filters, granularity]);
 

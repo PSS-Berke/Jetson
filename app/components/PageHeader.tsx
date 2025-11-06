@@ -10,7 +10,7 @@ interface User {
 }
 
 interface PageHeaderProps {
-  currentPage: 'jobs' | 'machines' | 'projections';
+  currentPage: 'machines' | 'projections';
   user?: User | null;
   onAddJobClick?: () => void;
   showAddJobButton?: boolean;
@@ -49,23 +49,15 @@ export default function PageHeader({
     <header className="bg-white shadow-sm border-b border-[var(--border)]">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="text-2xl font-bold text-[var(--primary-blue)]">JETSON</div>
-            <div className="text-xl font-semibold text-[var(--dark-blue)]">Capacity Planning</div>
-          </div>
+          <Link href="/machines" className="flex items-center cursor-pointer">
+            <img
+              src="/logo.png"
+              alt="Jetson Marketing Solutions"
+              className="h-14 w-auto"
+            />
+          </Link>
 
           <nav className="flex gap-2 relative z-10">
-            <Link
-              href="/dashboard"
-              onClick={() => console.log('Jobs link clicked')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
-                currentPage === 'jobs'
-                  ? 'bg-[var(--primary-blue)] text-white'
-                  : 'text-[var(--text-dark)] hover:bg-gray-100'
-              }`}
-            >
-              Jobs
-            </Link>
             <Link
               href="/machines"
               onClick={() => console.log('Machines link clicked')}

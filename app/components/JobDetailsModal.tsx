@@ -221,8 +221,8 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-[var(--text-light)]">${pricePerM.toFixed(2)}/m</p>
-                          <p className="text-base font-semibold text-[var(--text-dark)]">${requirementTotal.toFixed(2)}</p>
+                          <p className="text-sm text-[var(--text-light)]">${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</p>
+                          <p className="text-base font-semibold text-[var(--text-dark)]">${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                       </div>
                     </div>
@@ -235,7 +235,7 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                       ${job.requirements.reduce((total, req) => {
                         const pricePerM = parseFloat(req.price_per_m || '0');
                         return total + ((job.quantity / 1000) * pricePerM);
-                      }, 0).toFixed(2)}
+                      }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -278,7 +278,7 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                       {req.price_per_m && (
                         <div>
                           <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Price (per/m)</label>
-                          <p className="text-base text-[var(--text-dark)]">${parseFloat(req.price_per_m).toFixed(2)}</p>
+                          <p className="text-base text-[var(--text-dark)]">${parseFloat(req.price_per_m).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                       )}
                     </div>

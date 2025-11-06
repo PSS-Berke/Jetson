@@ -36,30 +36,42 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
 
   const parseJob = (job: Job): ParsedJob => {
     try {
-      // Parse requirements - the format is unusual with JSON strings as both keys and values
+      // Parse requirements - handle multiple formats
       let parsedRequirements: ParsedRequirement[] = [];
       console.log(`[DEBUG] Job ${job.job_number} - Raw requirements:`, job.requirements);
-      if (job.requirements && job.requirements !== '{}') {
+
+      if (job.requirements && job.requirements !== '{}' && job.requirements !== '') {
         try {
-          // Remove outer braces and split by the pattern "},"{
-          const reqString = job.requirements.slice(1, -1); // Remove { and }
+          // Check if it's already an array (newer format)
+          if (Array.isArray(job.requirements)) {
+            console.log(`[DEBUG] Job ${job.job_number} - Requirements is already an array`);
+            parsedRequirements = job.requirements;
+          }
+          // Try parsing as a simple JSON array string
+          else if (typeof job.requirements === 'string' && job.requirements.trim().startsWith('[')) {
+            console.log(`[DEBUG] Job ${job.job_number} - Parsing as JSON array`);
+            parsedRequirements = JSON.parse(job.requirements);
+          }
+          // Handle the old nested format with escaped JSON strings
+          else if (typeof job.requirements === 'string') {
+            console.log(`[DEBUG] Job ${job.job_number} - Parsing as old nested format`);
+            const reqString = job.requirements.slice(1, -1); // Remove { and }
+            const matches = reqString.match(/"\{[^}]+\}"/g);
+            console.log(`[DEBUG] Job ${job.job_number} - Regex matches:`, matches);
 
-          // Split by the pattern that separates requirements: ","
-          const matches = reqString.match(/"\{[^}]+\}"/g);
-          console.log(`[DEBUG] Job ${job.job_number} - Regex matches:`, matches);
-
-          if (matches) {
-            parsedRequirements = matches.map((match: string) => {
-              try {
-                // Remove the outer quotes and parse the JSON
-                const cleaned = match.slice(1, -1).replace(/\\/g, '');
-                const parsed = JSON.parse(cleaned);
-                console.log(`[DEBUG] Job ${job.job_number} - Parsed requirement:`, parsed);
-                return parsed;
-              } catch {
-                return null;
-              }
-            }).filter(Boolean);
+            if (matches) {
+              parsedRequirements = matches.map((match: string) => {
+                try {
+                  // Remove the outer quotes and parse the JSON
+                  const cleaned = match.slice(1, -1).replace(/\\/g, '');
+                  const parsed = JSON.parse(cleaned);
+                  console.log(`[DEBUG] Job ${job.job_number} - Parsed requirement:`, parsed);
+                  return parsed;
+                } catch {
+                  return null;
+                }
+              }).filter(Boolean);
+            }
           }
         } catch (error) {
           console.error('Failed to parse requirements:', error, job.requirements);
@@ -67,6 +79,7 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
         }
       }
       console.log(`[DEBUG] Job ${job.job_number} - Final parsedRequirements:`, parsedRequirements);
+      console.log(`[DEBUG] Job ${job.job_number} - total_billing:`, job.total_billing);
 
       return {
         ...job,

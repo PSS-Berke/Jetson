@@ -13,6 +13,9 @@ import GranularityToggle, { type Granularity } from '../components/GranularityTo
 import EmbeddedCalendar from '../components/EmbeddedCalendar';
 import PageHeader from '../components/PageHeader';
 import AddJobModal from '../components/AddJobModal';
+import Pagination from '../components/Pagination';
+
+type ViewMode = 'table' | 'calendar';
 
 export default function ProjectionsPage() {
   const [granularity, setGranularity] = useState<Granularity>('weekly');
@@ -22,6 +25,9 @@ export default function ProjectionsPage() {
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -42,6 +48,8 @@ export default function ProjectionsPage() {
     grandTotals,
     filteredJobProjections,
     processTypeCounts,
+    totalRevenue,
+    totalJobsInTimeframe,
     isLoading,
     error,
     refetch,
@@ -50,9 +58,15 @@ export default function ProjectionsPage() {
   console.log('[DEBUG] ProjectionsPage - processTypeCounts received:', processTypeCounts);
   console.log('[DEBUG] ProjectionsPage - filteredJobProjections count:', filteredJobProjections.length);
 
+  // Calculate paginated job projections
+  const indexOfLastJob = currentPage * itemsPerPage;
+  const indexOfFirstJob = indexOfLastJob - itemsPerPage;
+  const paginatedJobProjections = filteredJobProjections.slice(indexOfFirstJob, indexOfLastJob);
+
   // Handle granularity change and adjust start date accordingly
   const handleGranularityChange = (newGranularity: Granularity) => {
     setGranularity(newGranularity);
+    setCurrentPage(1); // Reset to first page when granularity changes
 
     // Adjust start date to align with the new granularity
     switch (newGranularity) {
@@ -105,6 +119,30 @@ export default function ProjectionsPage() {
           />
         </div>
 
+        {/* View Mode Tabs */}
+        <div className="flex gap-2 mb-6 border-b border-[var(--border)]">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-6 py-3 font-medium transition-colors relative ${
+              viewMode === 'table'
+                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+            }`}
+          >
+            Table View
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`px-6 py-3 font-medium transition-colors relative ${
+              viewMode === 'calendar'
+                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+            }`}
+          >
+            Calendar View
+          </button>
+        </div>
+
         {/* Filters */}
         <ProjectionFiltersComponent
           jobs={jobProjections.map(p => p.job)}
@@ -143,109 +181,193 @@ export default function ProjectionsPage() {
           </div>
         ) : (
           <>
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total Jobs</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {filteredJobProjections.length}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total Quantity</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {grandTotals.grandTotal.toLocaleString()}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Service Types</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {serviceSummaries.length}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">
-                  Avg per {granularity === 'weekly' ? 'Week' : granularity === 'monthly' ? 'Month' : 'Quarter'}
-                </div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {Math.round(grandTotals.grandTotal / timeRanges.length).toLocaleString()}
-                </div>
-              </div>
+            {/* Table View */}
+            {viewMode === 'table' && (
+              <>
+                {/* Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-6">
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Jobs</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {totalJobsInTimeframe}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Revenue</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Quantity</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {grandTotals.grandTotal.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Service Types</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {serviceSummaries.length}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">
+                      Avg per {granularity === 'weekly' ? 'Week' : granularity === 'monthly' ? 'Month' : 'Quarter'}
+                    </div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {Math.round(grandTotals.grandTotal / timeRanges.length).toLocaleString()}
+                    </div>
+                  </div>
 
-              {/* Service Type Tiles */}
-              {serviceSummaries.map(summary => (
-                <div key={summary.serviceType} className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                  <div className="text-sm text-[var(--text-light)]">{summary.serviceType}</div>
-                  <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                    {summary.grandTotal.toLocaleString()}
+                  {/* Service Type Tiles */}
+                  {serviceSummaries.filter(summary => summary.serviceType.toLowerCase() !== 'insert').map(summary => (
+                    <div key={summary.serviceType} className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                      <div className="text-sm text-[var(--text-light)]">{summary.serviceType}</div>
+                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                        {summary.grandTotal.toLocaleString()} pcs
+                      </div>
+                      <div className="text-sm text-[var(--text-light)] mt-1">
+                        {summary.jobCount} jobs
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Process Type Tiles */}
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Insert</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.insert.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.insert.jobs} jobs
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Sort</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.sort.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.sort.jobs} jobs
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Inkjet</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.inkjet.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.inkjet.jobs} jobs
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Label/Apply</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.labelApply.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.labelApply.jobs} jobs
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Fold</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.fold.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.fold.jobs} jobs
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total Laser</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.laser.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.laser.jobs} jobs
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                    <div className="text-sm text-[var(--text-light)]">Total HP Press</div>
+                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                      {processTypeCounts.hpPress.pieces.toLocaleString()} pcs
+                    </div>
+                    <div className="text-sm text-[var(--text-light)] mt-1">
+                      {processTypeCounts.hpPress.jobs} jobs
+                    </div>
                   </div>
                 </div>
-              ))}
 
-              {/* Process Type Tiles */}
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total Inserted</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.insert}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total Sort</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.sort}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total IJ</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.ij}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total L/A</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.la}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total Fold</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.fold}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total Laser</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.laser}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                <div className="text-sm text-[var(--text-light)]">Total HP Press</div>
-                <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                  {processTypeCounts.hpPress}
-                </div>
-              </div>
-            </div>
+                {/* Projections Table */}
+                <ProjectionsTable
+                  timeRanges={timeRanges}
+                  jobProjections={paginatedJobProjections}
+                  serviceSummaries={serviceSummaries}
+                  grandTotals={grandTotals}
+                  onRefresh={refetch}
+                />
 
-            {/* Projections Table */}
-            <ProjectionsTable
-              timeRanges={timeRanges}
-              jobProjections={filteredJobProjections}
-              serviceSummaries={serviceSummaries}
-              grandTotals={grandTotals}
-              onRefresh={refetch}
-            />
+                {/* Pagination */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredJobProjections.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={setItemsPerPage}
+                />
+              </>
+            )}
 
-            {/* Embedded Calendar */}
-            <div className="mt-8">
-              <EmbeddedCalendar
-                startDate={startDate}
-                selectedFacility={selectedFacility}
-                selectedClients={selectedClients}
-                selectedServiceTypes={selectedServiceTypes}
-                height={550}
-              />
-            </div>
+            {/* Calendar View */}
+            {viewMode === 'calendar' && (
+              <div className="space-y-4">
+                {/* Process Type Legend */}
+                <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                  <h3 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">Process Type Colors</h3>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#3B82F6' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">Insert</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#10B981' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">Sort</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#F59E0B' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">Inkjet</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#8B5CF6' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">Label/Apply</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#EC4899' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">Fold</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#EF4444' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">Laser</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#14B8A6' }}></div>
+                      <span className="text-sm text-[var(--text-light)]">HP Press</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Calendar */}
+                <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6">
+                  <EmbeddedCalendar
+                    startDate={startDate}
+                    selectedFacility={selectedFacility}
+                    selectedClients={selectedClients}
+                    selectedServiceTypes={selectedServiceTypes}
+                    height={800}
+                  />
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>

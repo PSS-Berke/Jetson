@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, FormEvent, useEffect } from 'react';
@@ -48,6 +49,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
+  const [canSubmit, setCanSubmit] = useState(false);
   const [confirmReview, setConfirmReview] = useState(false);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: '',
@@ -277,6 +279,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const handleNext = () => {
     // Validate step 1 - job number, client ID, and facility are required
     if (currentStep === 1) {
+      console.log('[AddJobModal] Validation - facilities_id:', formData.facilities_id);
       if (!formData.job_number || !formData.clients_id || !formData.facilities_id) {
         alert('Please fill in job number, client name, and facility');
         return;
@@ -316,17 +319,40 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    // Only allow submission on step 3 (review step) and if explicitly allowed
+    if (currentStep !== 3 || !canSubmit) {
+      return;
+    }
+
+    setCanSubmit(false); // Reset the flag
     setSubmitting(true);
 
     try {
       const token = getToken();
 
+      // Calculate total billing from requirements
+      const quantity = parseInt(formData.quantity);
+      const calculatedRevenue = formData.requirements.reduce((total, req) => {
+        const pricePerM = parseFloat(req.price_per_m || '0');
+        return total + ((quantity / 1000) * pricePerM);
+      }, 0);
+
+      const addOnCharges = parseFloat(formData.add_on_charges) || 0;
+      const calculatedTotalBilling = calculatedRevenue + addOnCharges;
+
+      // Convert date strings to timestamps
+      const startDateTimestamp: number | undefined = formData.start_date
+        ? new Date(formData.start_date).getTime()
+        : undefined;
+      const dueDateTimestamp: number | undefined = formData.due_date
+        ? new Date(formData.due_date).getTime()
+        : undefined;
+
       // Prepare the payload according to the API specification
-      const payload = {
-        start_date: formData.start_date || null,
-        due_date: formData.due_date || null,
+      const payload: any = {
         description: formData.description,
-        quantity: parseInt(formData.quantity),
+        quantity: quantity,
         clients_id: formData.clients_id,
         machines_id: formData.machines_id,
         job_number: parseInt(formData.job_number),
@@ -335,14 +361,31 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
-        facilities_id: formData.facilities_id,
-        price_per_m: parseFloat(formData.price_per_m) || 0,
-        add_on_charges: parseFloat(formData.add_on_charges) || 0,
-        ext_price: parseFloat(formData.ext_price) || 0,
-        total_billing: parseFloat(formData.total_billing) || 0,
-        requirements: formData.requirements,
+        price_per_m: (parseFloat(formData.price_per_m) || 0).toString(),
+        add_on_charges: addOnCharges.toString(),
+        ext_price: (parseFloat(formData.ext_price) || 0).toString(),
+        total_billing: calculatedTotalBilling.toString(),
+        requirements: JSON.stringify(formData.requirements),
         weekly_split: formData.weekly_split
       };
+
+      // Only include dates if they are valid timestamps (not 0 or undefined)
+      if (startDateTimestamp && startDateTimestamp > 0) {
+        payload.start_date = startDateTimestamp;
+      }
+      if (dueDateTimestamp && dueDateTimestamp > 0) {
+        payload.due_date = dueDateTimestamp;
+      }
+
+      // Only include facilities_id if it's not null
+      if (formData.facilities_id !== null) {
+        payload.facilities_id = formData.facilities_id;
+      }
+
+      console.log('[AddJobModal] facilities_id in formData:', formData.facilities_id);
+      console.log('[AddJobModal] facilities_id in payload:', payload.facilities_id);
+      console.log('[AddJobModal] Full payload being sent to Xano:', payload);
+      console.log('[AddJobModal] JSON stringified payload:', JSON.stringify(payload, null, 2));
 
       const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs', {
         method: 'POST',
@@ -354,10 +397,14 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create job');
+        const errorData = await response.json();
+        console.error('Xano API Error:', errorData);
+        throw new Error(`Failed to create job: ${JSON.stringify(errorData)}`);
       }
 
-      await response.json();
+      const responseData = await response.json();
+      console.log('Xano API Response:', responseData);
+      console.log('[AddJobModal] facilities_id in API response:', responseData.facilities_id);
 
       const jobNum = parseInt(formData.job_number);
       setCreatedJobNumber(jobNum);
@@ -404,7 +451,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         if (onSuccess) {
           onSuccess();
         }
-      }, 2000);
+      }, 500);
     } catch (error) {
       console.error('Error creating job:', error);
       alert('Failed to create job. Please try again.');
@@ -443,16 +490,16 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
               <div className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
                   step === currentStep
-                    ? 'bg-[var(--primary-blue)] text-white'
+                    ? 'bg-[#EF3340] text-white'
                     : step < currentStep
-                    ? 'bg-[var(--success)] text-white'
+                    ? 'bg-[#2E3192] text-white'
                     : 'bg-gray-200 text-gray-500'
                 }`}>
                   {step < currentStep ? '✓' : step}
                 </div>
                 <div className="ml-3">
                   <div className={`text-xs font-medium whitespace-nowrap ${
-                    step === currentStep ? 'text-[var(--primary-blue)]' : 'text-gray-500'
+                    step === currentStep ? 'text-[#EF3340]' : step < currentStep ? 'text-[#2E3192]' : 'text-gray-500'
                   }`}>
                     {step === 1 && 'Job Details'}
                     {step === 2 && 'Requirements'}
@@ -462,7 +509,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
               </div>
               {step < 3 && (
                 <div className={`h-0.5 flex-1 mx-4 ${
-                  step < currentStep ? 'bg-[var(--success)]' : 'bg-gray-200'
+                  step < currentStep ? 'bg-[#2E3192]' : 'bg-gray-200'
                 }`} />
               )}
             </div>
@@ -700,8 +747,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                         <option value="">Select process...</option>
                         <option value="Insert">Insert</option>
                         <option value="Sort">Sort</option>
-                        <option value="IJ">IJ</option>
-                        <option value="L/A">L/A</option>
+                        <option value="Inkjet">Inkjet</option>
+                        <option value="Label/Apply">Label/Apply</option>
                         <option value="Fold">Fold</option>
                         <option value="Laser">Laser</option>
                         <option value="HP Press">HP Press</option>
@@ -857,9 +904,9 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                           </span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toFixed(2)}/m</span>
+                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            Subtotal: ${requirementTotal.toFixed(2)}
+                            Subtotal: ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>
@@ -876,26 +923,36 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                         const quantity = parseInt(formData.quantity || '0');
                         const pricePerM = parseFloat(req.price_per_m || '0');
                         return total + ((quantity / 1000) * pricePerM);
-                      }, 0).toFixed(2)}
+                      }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-blue-50 border-2 border-[var(--primary-blue)] rounded-lg p-4">
+              <div className={`border-2 rounded-lg p-4 transition-colors ${
+                confirmReview
+                  ? 'bg-blue-50 border-[#2E3192]'
+                  : 'bg-red-50 border-[#EF3340]'
+              }`}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={confirmReview}
                     onChange={(e) => setConfirmReview(e.target.checked)}
-                    className="mt-1 w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    className={`mt-1 w-5 h-5 border-gray-300 rounded focus:ring-2 ${
+                      confirmReview
+                        ? 'text-[#2E3192] focus:ring-[#2E3192]'
+                        : 'text-[#EF3340] focus:ring-[#EF3340]'
+                    }`}
                   />
                   <div>
-                    <p className="font-semibold text-[var(--dark-blue)] mb-1">
+                    <p className={`font-semibold mb-1 ${
+                      confirmReview ? 'text-[#2E3192]' : 'text-[#EF3340]'
+                    }`}>
                       Confirm Job Details
                     </p>
                     <p className="text-sm text-[var(--text-dark)]">
-                      I have reviewed all job details above and confirm they are correct. I am ready to submit this job.
+                      I have reviewed all job details above and confirm they are correct. I am ready to create this job.
                     </p>
                   </div>
                 </label>
@@ -932,9 +989,19 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => {
+                    setCanSubmit(true);
+                    // Use setTimeout to allow state to update before form submission
+                    setTimeout(() => {
+                      const form = document.querySelector('form');
+                      if (form) {
+                        form.requestSubmit();
+                      }
+                    }, 0);
+                  }}
                   disabled={submitting || !confirmReview}
-                  className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Creating Job...' : 'Submit Job'}
                 </button>

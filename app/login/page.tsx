@@ -22,7 +22,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
-        <div>
+        <div className="flex flex-col items-center">
+          <img
+            src="/logo.png"
+            alt="Jetson Marketing Solutions"
+            className="mb-6 w-auto h-auto max-w-[300px]"
+          />
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
             Sign in to your account
           </h2>

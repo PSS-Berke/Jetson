@@ -440,6 +440,16 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         return;
       }
 
+      // Calculate total billing from requirements
+      const quantity = parseInt(formData.quantity);
+      const calculatedRevenue = formData.requirements.reduce((total, req) => {
+        const pricePerM = parseFloat(req.price_per_m || '0');
+        return total + ((quantity / 1000) * pricePerM);
+      }, 0);
+
+      const addOnCharges = parseFloat(formData.add_on_charges || '0');
+      const calculatedTotalBilling = calculatedRevenue + addOnCharges;
+
       const payload: Partial<{
         jobs_id: number;
         job_number: number;
@@ -465,7 +475,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         jobs_id: job.id,
         job_number: parseInt(formData.job_number),
         service_type: formData.service_type,
-        quantity: parseInt(formData.quantity),
+        quantity: quantity,
         description: formData.description,
         time_estimate: null,
         clients_id: formData.clients_id || 0,
@@ -475,9 +485,9 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         prgm: formData.prgm,
         csr: formData.csr,
         price_per_m: formData.price_per_m || '0',
-        add_on_charges: formData.add_on_charges || '0',
+        add_on_charges: addOnCharges.toString(),
         ext_price: formData.ext_price || '0',
-        total_billing: formData.total_billing || '0',
+        total_billing: calculatedTotalBilling.toString(),
         weekly_split: formData.weekly_split
       };
 
@@ -494,7 +504,9 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         payload.facilities_id = formData.facilities_id;
       }
 
+      console.log('Payload being sent to Xano (Edit):', payload);
       await updateJob(job.id, payload);
+      console.log('Job updated successfully');
 
       setCurrentStep(1);
       setShowSuccessToast(true);
@@ -581,16 +593,16 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
               <div className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
                   step === currentStep
-                    ? 'bg-[var(--primary-blue)] text-white'
+                    ? 'bg-[#EF3340] text-white'
                     : step < currentStep
-                    ? 'bg-[var(--success)] text-white'
+                    ? 'bg-[#EF3340] text-white'
                     : 'bg-gray-200 text-gray-500'
                 }`}>
                   {step < currentStep ? '✓' : step}
                 </div>
                 <div className="ml-3">
                   <div className={`text-xs font-medium whitespace-nowrap ${
-                    step === currentStep ? 'text-[var(--primary-blue)]' : 'text-gray-500'
+                    step === currentStep ? 'text-[#EF3340]' : 'text-gray-500'
                   }`}>
                     {step === 1 && 'Job Details'}
                     {step === 2 && 'Requirements'}
@@ -600,7 +612,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
               </div>
               {step < 3 && (
                 <div className={`h-0.5 flex-1 mx-4 ${
-                  step < currentStep ? 'bg-[var(--success)]' : 'bg-gray-200'
+                  step < currentStep ? 'bg-[#EF3340]' : 'bg-gray-200'
                 }`} />
               )}
             </div>
@@ -844,11 +856,13 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                         required
                       >
                         <option value="">Select process...</option>
-                        <option value="insert">Insert</option>
-                        <option value="fold">Fold</option>
-                        <option value="affix">Affix Label</option>
-                        <option value="print">Variable Print</option>
-                        <option value="polybag">Poly Bag</option>
+                        <option value="Insert">Insert</option>
+                        <option value="Sort">Sort</option>
+                        <option value="Inkjet">Inkjet</option>
+                        <option value="Label/Apply">Label/Apply</option>
+                        <option value="Fold">Fold</option>
+                        <option value="Laser">Laser</option>
+                        <option value="HP Press">HP Press</option>
                       </select>
                     </div>
                     <div>
@@ -999,9 +1013,9 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                           </span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toFixed(2)}/m</span>
+                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            Subtotal: ${requirementTotal.toFixed(2)}
+                            Subtotal: ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>
@@ -1018,22 +1032,32 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                         const quantity = parseInt(formData.quantity || '0');
                         const pricePerM = parseFloat(req.price_per_m || '0');
                         return total + ((quantity / 1000) * pricePerM);
-                      }, 0).toFixed(2)}
+                      }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-blue-50 border-2 border-[var(--primary-blue)] rounded-lg p-4">
+              <div className={`border-2 rounded-lg p-4 transition-colors ${
+                confirmReview
+                  ? 'bg-blue-50 border-[#2E3192]'
+                  : 'bg-red-50 border-[#EF3340]'
+              }`}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={confirmReview}
                     onChange={(e) => setConfirmReview(e.target.checked)}
-                    className="mt-1 w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    className={`mt-1 w-5 h-5 border-gray-300 rounded focus:ring-2 ${
+                      confirmReview
+                        ? 'text-[#2E3192] focus:ring-[#2E3192]'
+                        : 'text-[#EF3340] focus:ring-[#EF3340]'
+                    }`}
                   />
                   <div>
-                    <p className="font-semibold text-[var(--dark-blue)] mb-1">
+                    <p className={`font-semibold mb-1 ${
+                      confirmReview ? 'text-[#2E3192]' : 'text-[#EF3340]'
+                    }`}>
                       Confirm Job Details
                     </p>
                     <p className="text-sm text-[var(--text-dark)]">
@@ -1086,7 +1110,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                     }, 0);
                   }}
                   disabled={submitting || !confirmReview}
-                  className="px-6 py-2 bg-[var(--success)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Updating Job...' : 'Update Job'}
                 </button>

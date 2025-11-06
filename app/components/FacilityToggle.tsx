@@ -11,7 +11,7 @@ interface FacilityToggleProps {
 export default function FacilityToggle({ currentFacility, onFacilityChange, showAll = true }: FacilityToggleProps) {
   const facilities = useMemo(() => showAll
     ? [
-        { value: 0, label: 'All' },
+        { value: null, label: 'All' },
         { value: 1, label: 'Bolingbrook' },
         { value: 2, label: 'Lemont' }
       ]
@@ -27,6 +27,13 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
       const selectedIndex = facilities.findIndex(f => f.value === currentFacility);
+
+      // Reset bubble if no valid selection
+      if (selectedIndex === -1) {
+        setBubbleStyle({ width: 0, left: 0 });
+        return;
+      }
+
       const selectedButton = buttonRefs.current[selectedIndex];
       const container = containerRef.current;
 
@@ -57,14 +64,16 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
         ref={containerRef}
         className="relative inline-flex rounded-full border-2 border-[var(--primary-blue)] bg-gray-50 p-1"
       >
-        {/* Sliding bubble indicator */}
-        <div
-          className="absolute top-1 bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
-          style={{
-            width: `${bubbleStyle.width}px`,
-            transform: `translateX(${bubbleStyle.left}px)`
-          }}
-        />
+        {/* Sliding bubble indicator - Show when facility is selected (including null for "All") */}
+        {bubbleStyle.width > 0 && (
+          <div
+            className="absolute top-1 bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
+            style={{
+              width: `${bubbleStyle.width}px`,
+              transform: `translateX(${bubbleStyle.left}px)`
+            }}
+          />
+        )}
 
         {/* Buttons */}
         {facilities.map((facility, index) => (

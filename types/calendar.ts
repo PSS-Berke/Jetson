@@ -5,17 +5,18 @@ import type { Machine } from '@/types';
 export type { Machine };
 
 /**
- * Calendar event representing a job on the calendar
+ * Calendar event representing aggregated service type production on the calendar
  */
 export interface CalendarEvent {
-  id: number;
+  id: string;
   title: string;
   start: Date;
   end: Date;
-  job: ParsedJob;
-  dailyPieces: number;
-  dailyRevenue: number;
-  utilizationPercent: number;
+  serviceType: string;
+  totalPieces: number;
+  totalRevenue: number;
+  jobCount: number;
+  jobs: ParsedJob[];
   color: string;
   allDay?: boolean;
 }

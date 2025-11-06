@@ -21,6 +21,7 @@ export interface ServiceTypeSummary {
   serviceType: string;
   weeklyTotals: Map<string, number>; // weekLabel -> total quantity (kept for backwards compatibility, but will hold any period)
   grandTotal: number;
+  jobCount: number;
 }
 
 /**
@@ -322,6 +323,7 @@ export function calculateGenericServiceTypeSummaries(
         serviceType,
         weeklyTotals,
         grandTotal: 0,
+        jobCount: 0,
       });
     }
 
@@ -334,6 +336,7 @@ export function calculateGenericServiceTypeSummaries(
     });
 
     summary.grandTotal += projection.totalQuantity;
+    summary.jobCount++;
   });
 
   // Convert to array and sort by service type name

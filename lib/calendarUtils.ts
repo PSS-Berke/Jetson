@@ -27,41 +27,73 @@ import {
 } from './capacityUtils';
 
 /**
- * Transform jobs into calendar events
+ * Transform jobs into calendar events aggregated by service type and date
  */
 export const transformJobsToEvents = (
   jobs: ParsedJob[],
   _machines: Machine[]
 ): CalendarEvent[] => {
-  return jobs.map(job => {
+  // Group jobs by service type and date
+  const serviceTypeByDate = new Map<string, Map<string, ParsedJob[]>>();
+
+  jobs.forEach(job => {
     const startDate = timestampToDate(job.start_date);
     const endDate = timestampToDate(job.due_date);
+    const jobDays = getDaysBetween(startDate, endDate);
+    const serviceType = job.service_type || 'Unknown';
 
-    // Get machines for this job
-    // const jobMachines = machines.filter(m =>
-    //   job.machines.some(jm => jm.id === m.id)
-    // );
+    // Add job to each day it spans
+    jobDays.forEach(day => {
+      const dateKey = getDateKey(day);
 
-    // Calculate time estimate if not provided
-    // const timeEstimate = job.time_estimate ||
-    //   calculateMultiMachineTimeEstimate(job.quantity, jobMachines);
+      if (!serviceTypeByDate.has(dateKey)) {
+        serviceTypeByDate.set(dateKey, new Map());
+      }
 
-    const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
-    const dailyRevenue = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
+      const dayServiceTypes = serviceTypeByDate.get(dateKey)!;
+      if (!dayServiceTypes.has(serviceType)) {
+        dayServiceTypes.set(serviceType, []);
+      }
 
-    return {
-      id: job.id,
-      title: `${job.job_number} - ${job.client.name}`,
-      start: startDate,
-      end: endDate,
-      job,
-      dailyPieces,
-      dailyRevenue,
-      utilizationPercent: 0, // Will be calculated separately
-      color: getJobColor(job),
-      allDay: true
-    };
+      dayServiceTypes.get(serviceType)!.push(job);
+    });
   });
+
+  // Create aggregated events
+  const events: CalendarEvent[] = [];
+
+  serviceTypeByDate.forEach((serviceTypes, dateKey) => {
+    serviceTypes.forEach((jobs, serviceType) => {
+      const date = new Date(dateKey);
+
+      // Calculate aggregated quantities
+      let totalPieces = 0;
+      let totalRevenue = 0;
+
+      jobs.forEach(job => {
+        const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
+        const dailyRevenue = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
+        totalPieces += dailyPieces;
+        totalRevenue += dailyRevenue;
+      });
+
+      events.push({
+        id: `${dateKey}-${serviceType}`,
+        title: `${serviceType}: ${Math.round(totalPieces).toLocaleString()} pcs`,
+        start: date,
+        end: date,
+        serviceType,
+        totalPieces,
+        totalRevenue,
+        jobCount: jobs.length,
+        jobs,
+        color: getServiceTypeColor(serviceType),
+        allDay: true
+      });
+    });
+  });
+
+  return events;
 };
 
 /**
@@ -349,12 +381,30 @@ export const getDayBreakdown = (
 };
 
 /**
- * Get a color for a job based on various factors
+ * Get a color for a service type
  */
-export const getJobColor = (_job: ParsedJob): string => {
-  // Could be enhanced with different color schemes
-  // For now, return a default color
-  return 'var(--primary-blue)';
+export const getServiceTypeColor = (serviceType: string): string => {
+  const colors: { [key: string]: string } = {
+    'Insert': '#3B82F6',        // Blue
+    'Sort': '#10B981',          // Green
+    'Inkjet': '#F59E0B',        // Orange
+    'IJ': '#F59E0B',            // Orange (legacy support)
+    'Label/Apply': '#8B5CF6',   // Purple
+    'L/A': '#8B5CF6',           // Purple (legacy support)
+    'Fold': '#EC4899',          // Pink
+    'Laser': '#EF4444',         // Red
+    'HP Press': '#14B8A6',      // Teal
+    'Unknown': '#6B7280'        // Gray
+  };
+
+  return colors[serviceType] || '#6366F1'; // Default to indigo if not found
+};
+
+/**
+ * Get a color for a job based on various factors (legacy, kept for compatibility)
+ */
+export const getJobColor = (job: ParsedJob): string => {
+  return getServiceTypeColor(job.service_type || 'Unknown');
 };
 
 /**
