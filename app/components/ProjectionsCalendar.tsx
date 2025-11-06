@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { startOfWeek, addDays, format, isSameDay, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
+import { startOfWeek, addDays, format, isSameDay, startOfMonth, isSameMonth } from 'date-fns';
 import { ParsedJob } from '@/hooks/useJobs';
 import { timestampToDate, getDateKey } from '@/lib/dateUtils';
 
@@ -33,7 +33,6 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
   // Calculate calendar grid (5 weeks)
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(startDate);
-    const monthEnd = endOfMonth(startDate);
     const start = startOfWeek(monthStart);
     const days: DayData[] = [];
 
@@ -63,7 +62,7 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
     console.log('[ProjectionsCalendar] Processing', jobs.length, 'jobs');
 
     // Process each job
-    jobs.forEach((job, idx) => {
+    jobs.forEach((job) => {
       if (!job.start_date || !job.due_date) {
         console.log(`[ProjectionsCalendar] Job ${job.job_number} missing dates`);
         return;
@@ -111,8 +110,8 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
         console.log(`[ProjectionsCalendar] Job ${job.job_number} using daily_split:`, dailySplit);
         
         let dayOffset = 0;
-        dailySplit.forEach((week, weekIndex) => {
-          week.forEach((dayQuantity, dayIndex) => {
+        dailySplit.forEach((week) => {
+          week.forEach((dayQuantity) => {
             if (dayQuantity > 0) {
               // Calculate the actual date - sequential days from start_date
               const date = addDays(jobStart, dayOffset);
@@ -169,9 +168,9 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
                 const end = job.due_date ? timestampToDate(job.due_date) : null;
                 return (
                   <div key={job.id} className="ml-2">
-                    #{job.job_number}: {start ? format(start, 'MM/dd/yy') : 'N/A'} to {end ? format(end, 'MM/dd/yy') : 'N/A'} | 
-                    Qty: {job.quantity} | 
-                    Split: {(job as any).daily_split ? 'Yes' : 'No'}
+                    #{job.job_number}: {start ? format(start, 'MM/dd/yy') : 'N/A'} to {end ? format(end, 'MM/dd/yy') : 'N/A'} |
+                    Qty: {job.quantity} |
+                    Split: {job.daily_split ? 'Yes' : 'No'}
                   </div>
                 );
               })}
@@ -209,7 +208,7 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
                   return (
                     <div key={job.id} className="py-1 border-b border-gray-200">
                       Job #{job.job_number}: {start ? format(start, 'MMM d, yyyy') : 'No start'} - {end ? format(end, 'MMM d, yyyy') : 'No end'}
-                      {(job as any).daily_split ? ' (has daily_split)' : ' (no daily_split)'}
+                      {job.daily_split ? ' (has daily_split)' : ' (no daily_split)'}
                     </div>
                   );
                 })}
