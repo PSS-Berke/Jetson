@@ -30,8 +30,7 @@ import {
  * Transform jobs into calendar events aggregated by service type and date
  */
 export const transformJobsToEvents = (
-  jobs: ParsedJob[],
-  _machines: Machine[]
+  jobs: ParsedJob[]
 ): CalendarEvent[] => {
   // Group jobs by service type and date
   const serviceTypeByDate = new Map<string, Map<string, ParsedJob[]>>();

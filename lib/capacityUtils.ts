@@ -1,6 +1,6 @@
 import { TOTAL_HOURS_PER_DAY, calculateDaysDifference, timestampToDate } from './dateUtils';
 import { getCapacityColor } from './theme';
-import type { Machine, ParsedJob } from '@/types';
+import type { Machine } from '@/types';
 
 // Re-export types for backwards compatibility
 export type { Machine };

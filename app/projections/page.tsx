@@ -42,7 +42,6 @@ export default function ProjectionsPage() {
 
   const {
     timeRanges,
-    weekRanges,
     jobProjections,
     serviceSummaries,
     grandTotals,

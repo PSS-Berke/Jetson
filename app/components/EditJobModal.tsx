@@ -206,7 +206,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         }
       }
     }
-  }, [formData.start_date, formData.due_date, formData.quantity]);
+  }, [formData.start_date, formData.due_date, formData.quantity, formData.weekly_split.length]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {

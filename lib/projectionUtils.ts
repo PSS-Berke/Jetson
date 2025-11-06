@@ -1,5 +1,5 @@
 import { ParsedJob } from '@/hooks/useJobs';
-import { getDateKey, getDaysBetween, MonthRange, QuarterRange } from './dateUtils';
+import { getDaysBetween, MonthRange, QuarterRange } from './dateUtils';
 
 export interface WeekRange {
   weekNumber: number;
@@ -156,6 +156,7 @@ export function calculateServiceTypeSummaries(
         serviceType,
         weeklyTotals,
         grandTotal: 0,
+        jobCount: 0,
       });
     }
 
@@ -168,6 +169,7 @@ export function calculateServiceTypeSummaries(
     });
 
     summary.grandTotal += projection.totalQuantity;
+    summary.jobCount++;
   });
 
   // Convert to array and sort by service type name

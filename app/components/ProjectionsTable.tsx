@@ -21,8 +21,6 @@ interface ProjectionsTableProps {
 export default function ProjectionsTable({
   timeRanges,
   jobProjections,
-  serviceSummaries,
-  grandTotals,
   onRefresh,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
@@ -85,7 +83,7 @@ export default function ProjectionsTable({
                 </td>
               </tr>
             ) : (
-              jobProjections.map((projection, index) => {
+              jobProjections.map((projection) => {
                 const job = projection.job;
 
                 return (
