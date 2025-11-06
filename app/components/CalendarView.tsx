@@ -160,15 +160,25 @@ export default function CalendarView({
     return view as View;
   };
 
+  // Responsive height calculation
+  const calendarHeight = useMemo(() => {
+    if (compactMode) return '100%';
+    // Use smaller height on mobile
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return '500px';
+    }
+    return '700px';
+  }, [compactMode]);
+
   return (
-    <div className="calendar-container bg-white rounded-lg border border-[var(--border)] shadow-sm p-4">
+    <div className="calendar-container bg-white rounded-lg border border-[var(--border)] shadow-sm p-2 sm:p-4">
       <Calendar
         localizer={localizer}
         events={calendarEvents}
         startAccessor="start"
         endAccessor="end"
         titleAccessor="title"
-        style={{ height: compactMode ? '100%' : '700px' }}
+        style={{ height: calendarHeight }}
         view={mapViewType(viewType)}
         onView={onViewChange}
         onNavigate={onNavigate}

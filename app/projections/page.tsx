@@ -101,10 +101,10 @@ export default function ProjectionsPage() {
       />
 
       {/* Main Content */}
-      <main className="max-w-[1800px] mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-6">
-            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
+      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
               {granularity === 'weekly' ? '5-Week' : granularity === 'monthly' ? '3-Month' : '4-Quarter'} Projections
             </h2>
             <FacilityToggle
@@ -119,10 +119,10 @@ export default function ProjectionsPage() {
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--border)]">
+        <div className="flex gap-2 mb-6 border-b border-[var(--border)] overflow-x-auto">
           <button
             onClick={() => setViewMode('table')}
-            className={`px-6 py-3 font-medium transition-colors relative ${
+            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
               viewMode === 'table'
                 ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
                 : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
@@ -132,7 +132,7 @@ export default function ProjectionsPage() {
           </button>
           <button
             onClick={() => setViewMode('calendar')}
-            className={`px-6 py-3 font-medium transition-colors relative ${
+            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
               viewMode === 'calendar'
                 ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
                 : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'

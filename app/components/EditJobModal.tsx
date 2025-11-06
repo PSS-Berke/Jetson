@@ -633,7 +633,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           {/* Step 1: Job Details */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Client <span className="text-red-500">*</span>
@@ -660,7 +660,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Job # <span className="text-red-500">*</span>
@@ -687,7 +687,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     CSR
@@ -719,7 +719,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Start Date
@@ -746,7 +746,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Quantity <span className="text-red-500">*</span>
@@ -783,7 +783,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {formData.weekly_split.map((amount, index) => (
                       <div key={index}>
                         <label className="block text-xs font-medium text-[var(--text-light)] mb-1">
@@ -806,7 +806,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Description
@@ -844,7 +844,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Process Type <span className="text-red-500">*</span>
@@ -887,7 +887,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Number of Pockets/Inserts
@@ -920,7 +920,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   </div>
 
                   {/* Price per M */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Price (per/m) <span className="text-red-500">*</span>

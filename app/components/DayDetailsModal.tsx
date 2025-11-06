@@ -20,19 +20,19 @@ export default function DayDetailsModal({
   if (!isOpen || !dayBreakdown) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
       <div
         className="absolute inset-0 bg-black/30"
         onClick={onClose}
       />
-      <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
+      <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
           <div>
-            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
+            <h2 className="text-lg sm:text-2xl font-bold text-[var(--dark-blue)]">
               {formatDateObject(dayBreakdown.date, 'EEEE, MMMM dd, yyyy')}
             </h2>
-            <p className="text-sm text-[var(--text-light)] mt-1">
+            <p className="text-xs sm:text-sm text-[var(--text-light)] mt-1">
               Daily Summary & Breakdown
             </p>
           </div>
@@ -45,9 +45,9 @@ export default function DayDetailsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Daily Totals */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-[var(--text-light)] mb-1">Total Pieces</p>
               <p className="text-2xl font-bold text-[var(--dark-blue)]">
@@ -69,11 +69,11 @@ export default function DayDetailsModal({
           </div>
 
           {/* Shift Breakdown */}
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+          <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-6">
             <h3 className="text-sm font-semibold text-[var(--text-dark)] mb-3">
               Shift Utilization
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-xs text-[var(--text-light)] mb-2">1st Shift (8am-4pm)</p>
                 <CapacityIndicator

@@ -199,42 +199,42 @@ export default function ProjectionFilters({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4 mb-6">
-      <div className="flex flex-wrap gap-4 items-center">
+    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-3 sm:p-4 mb-6">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
         {/* Date Range Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--text-dark)]">{getPeriodLabel()}:</span>
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+          <span className="text-xs sm:text-sm font-medium text-[var(--text-dark)] whitespace-nowrap">{getPeriodLabel()}:</span>
           <button
             onClick={handlePrevious}
-            className="px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
             aria-label={`Previous ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
           >
-            <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <div className="px-3 py-1 bg-gray-50 rounded text-sm font-medium text-[var(--text-dark)] min-w-[240px] text-center">
+          <div className="px-2 sm:px-3 py-1 bg-gray-50 rounded text-xs sm:text-sm font-medium text-[var(--text-dark)] min-w-[180px] sm:min-w-[240px] text-center">
             {formatDateRange()}
           </div>
           <button
             onClick={handleNext}
-            className="px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
             aria-label={`Next ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
           >
-            <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
           <button
             onClick={handleToday}
-            className="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
+            className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
           >
             {getTodayButtonLabel()}
           </button>
         </div>
 
         {/* Search */}
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-full sm:min-w-[200px]">
           <input
             type="text"
             placeholder="Search jobs..."

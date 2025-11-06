@@ -41,7 +41,7 @@ export const useAuth = (): UseAuthReturn => {
 
     try {
       const user = await apiLogin(credentials);
-      router.push('/machines'); // Redirect to machines after successful login
+      router.push('/projections'); // Redirect to projections after successful login
       router.refresh(); // Refresh to update server components
       return user;
     } catch (err) {

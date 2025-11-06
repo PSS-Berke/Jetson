@@ -10,8 +10,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      // Redirect authenticated users to machines page
-      router.push('/machines');
+      // Redirect authenticated users to projections page
+      router.push('/projections');
     }
   }, [user, isLoading, router]);
 

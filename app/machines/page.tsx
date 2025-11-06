@@ -72,10 +72,10 @@ export default function Machines() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6 pb-6 border-b border-[var(--border)]">
-          <div className="flex items-center gap-6">
-            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 pb-6 border-b border-[var(--border)] gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
               {filterFacility === null ? 'Machine Types' : 'Production Lines'}
             </h2>
             <FacilityToggle
@@ -115,8 +115,8 @@ export default function Machines() {
           // Table View - shown when a specific facility is selected
           <>
             {/* Status Filters */}
-            <div className="flex gap-2 mb-6 justify-between items-center">
-              <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 mb-6 justify-between items-center">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => handleFilterChange('')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -174,7 +174,9 @@ export default function Machines() {
                 <div className="text-[var(--text-light)] text-lg">No machines found</div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                 <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
                   <thead className="bg-gray-50">
                     <tr>
@@ -260,6 +262,90 @@ export default function Machines() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {machines.map(machine => {
+                  const statusColors = {
+                    running: 'bg-blue-100 text-blue-800 border-blue-200',
+                    available: 'bg-green-100 text-green-800 border-green-200',
+                    avalible: 'bg-green-100 text-green-800 border-green-200',
+                    maintenance: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                  };
+
+                  const statusLabels = {
+                    running: 'Running',
+                    available: 'Available',
+                    avalible: 'Available',
+                    maintenance: 'Maintenance'
+                  };
+
+                  return (
+                    <div
+                      key={machine.id}
+                      className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4"
+                    >
+                      {/* Machine Header */}
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="text-base font-semibold text-[var(--text-dark)]">
+                            Line {machine.line}
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {machine.type}
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
+                          {statusLabels[machine.status]}
+                        </span>
+                      </div>
+
+                      {/* Machine Details Grid */}
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                        <div>
+                          <div className="text-xs text-[var(--text-light)]">Max Size</div>
+                          <div className="font-medium text-[var(--text-dark)]">
+                            {machine.max_size || 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-[var(--text-light)]">Pockets</div>
+                          <div className="font-medium text-[var(--text-dark)]">
+                            {machine.pockets || 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-[var(--text-light)]">Speed/hr</div>
+                          <div className="font-medium text-[var(--text-dark)]">
+                            {machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-[var(--text-light)]">Shift Capacity</div>
+                          <div className="font-medium text-[var(--text-dark)]">
+                            {machine.shiftCapacity ? machine.shiftCapacity.toLocaleString() : 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Current Job */}
+                      <div className="border-t border-[var(--border)] pt-3">
+                        <div className="text-xs text-[var(--text-light)] mb-1">Current Job</div>
+                        <div className="text-sm text-[var(--text-dark)]">
+                          {machine.currentJob ? (
+                            <span>Job #{machine.currentJob.number} - {machine.currentJob.name}</span>
+                          ) : (machine.status === 'available' || machine.status === 'avalible') ? (
+                            <span className="text-[var(--success)]">Ready for next job</span>
+                          ) : (
+                            <span className="text-[var(--text-light)]">No active job</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              </>
             )}
           </>
         )}

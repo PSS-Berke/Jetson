@@ -38,7 +38,8 @@ export default function ProjectionsTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
           <thead>
             {/* Column Headers */}
@@ -142,6 +143,111 @@ export default function ProjectionsTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {jobProjections.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6 text-center text-[var(--text-light)]">
+            No jobs found for the selected criteria
+          </div>
+        ) : (
+          jobProjections.map((projection) => {
+            const job = projection.job;
+
+            return (
+              <div
+                key={job.id}
+                className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleJobClick(job)}
+              >
+                {/* Job Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--text-dark)]">
+                      Job #{job.job_number}
+                    </div>
+                    <div className="text-xs text-[var(--text-light)] mt-1">
+                      {job.client?.name || 'Unknown'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-[var(--text-light)]">Total Quantity</div>
+                    <div className="text-sm font-bold text-[var(--text-dark)]">
+                      {formatQuantity(projection.totalQuantity)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Job Description */}
+                <div className="mb-3">
+                  <div className="text-sm text-[var(--text-dark)] line-clamp-2">
+                    {job.description || 'N/A'}
+                  </div>
+                </div>
+
+                {/* Process Types */}
+                <div className="mb-3">
+                  <div className="text-xs text-[var(--text-light)] mb-1">Process Types</div>
+                  <div className="flex flex-wrap gap-1">
+                    {job.requirements && job.requirements.length > 0 ? (
+                      [...new Set(job.requirements.map(req => req.process_type).filter(Boolean))].map((processType, idx) => (
+                        <ProcessTypeBadge key={idx} processType={processType as string} />
+                      ))
+                    ) : (
+                      <span className="text-gray-400 text-xs">No processes</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Job Details Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                  <div>
+                    <div className="text-xs text-[var(--text-light)]">Quantity</div>
+                    <div className="font-medium text-[var(--text-dark)]">
+                      {job.quantity.toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-[var(--text-light)]">Start Date</div>
+                    <div className="text-[var(--text-dark)]">
+                      {job.start_date ? new Date(job.start_date).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-[var(--text-light)]">End Date</div>
+                    <div className="text-[var(--text-dark)]">
+                      {job.due_date ? new Date(job.due_date).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Range Breakdown (collapsed by default, shown on tap) */}
+                {timeRanges.length > 0 && (
+                  <div className="border-t border-[var(--border)] pt-3">
+                    <div className="text-xs text-[var(--text-light)] mb-2">Weekly Breakdown</div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      {timeRanges.slice(0, 6).map(range => {
+                        const quantity = projection.weeklyQuantities.get(range.label) || 0;
+                        return quantity > 0 ? (
+                          <div key={range.label} className="text-center">
+                            <div className="text-[var(--text-light)] text-[10px]">{range.label}</div>
+                            <div className="font-medium text-[var(--text-dark)]">{formatQuantity(quantity)}</div>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                    {timeRanges.length > 6 && (
+                      <div className="text-xs text-center text-[var(--text-light)] mt-2">
+                        Tap for full details
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Job Details Modal */}

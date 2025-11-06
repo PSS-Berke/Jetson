@@ -8,6 +8,7 @@ import { timestampToDate, isDateInRange } from '@/lib/dateUtils';
 
 interface UseCalendarJobsProps {
   machines: Machine[];
+  facilityId?: number | null;
   startDate?: Date;
   endDate?: Date;
   selectedMachines?: number[];
@@ -29,13 +30,14 @@ interface UseCalendarJobsReturn {
  */
 export const useCalendarJobs = ({
   machines,
+  facilityId,
   startDate,
   endDate,
   selectedMachines = [],
   selectedClients = [],
   selectedServiceTypes = []
 }: UseCalendarJobsProps): UseCalendarJobsReturn => {
-  const { jobs, isLoading, error, refetch } = useJobs();
+  const { jobs, isLoading, error, refetch } = useJobs(facilityId);
 
   // Filter jobs based on date range and other filters
   const filteredJobs = useMemo(() => {

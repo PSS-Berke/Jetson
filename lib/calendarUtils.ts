@@ -147,6 +147,8 @@ export const calculateDailySummaries = (
       }
     });
 
+    console.log(`[CalendarUtils] Job ${job.job_number}: quantity=${job.quantity}, dailyPieces=${dailyPieces}, processTypes=`, Array.from(processTypes));
+
     jobDays.forEach(day => {
       const dateKey = getDateKey(day);
       const summary = summaries.get(dateKey);
@@ -188,6 +190,12 @@ export const calculateDailySummaries = (
       }
     });
   });
+
+  console.log('[CalendarUtils] Final daily summaries:', Array.from(summaries.entries()).map(([key, val]) => ({
+    date: key,
+    totalPieces: val.totalPieces,
+    processTypeCounts: val.processTypeCounts
+  })));
 
   return summaries;
 };

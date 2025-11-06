@@ -466,15 +466,15 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
       <div
         className="absolute inset-0 bg-black/30"
         onClick={handleClose}
       />
-      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
+      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-          <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Add New Job</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
+          <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">Add New Job</h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
@@ -517,11 +517,11 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         </div>
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Step 1: Job Details */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Client <span className="text-red-500">*</span>
@@ -547,7 +547,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Job # <span className="text-red-500">*</span>
@@ -574,7 +574,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     CSR
@@ -606,7 +606,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Start Date
@@ -633,7 +633,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Quantity <span className="text-red-500">*</span>
@@ -670,7 +670,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {formData.weekly_split.map((amount, index) => (
                       <div key={index}>
                         <label className="block text-xs font-medium text-[var(--text-light)] mb-1">
@@ -693,7 +693,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Description
@@ -733,7 +733,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   </div>
 
                   {/* Process Type & Paper Size */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Process Type <span className="text-red-500">*</span>
@@ -777,7 +777,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   </div>
 
                   {/* Pockets & Shift */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Number of Pockets/Inserts
@@ -810,7 +810,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   </div>
 
                   {/* Price per M */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                         Price (per/m) <span className="text-red-500">*</span>

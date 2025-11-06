@@ -221,9 +221,78 @@ body {
   }
 }
 
+@media (max-width: 768px) {
+  .calendar-container .rbc-toolbar {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .calendar-container .rbc-toolbar button {
+    font-size: 0.875rem;
+    padding: 8px 12px;
+  }
+
+  .calendar-container .rbc-toolbar-label {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .calendar-date-header .date-summary {
+    font-size: 0.65rem;
+  }
+
+  .calendar-date-header .process-type-badges {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .calendar-date-header .process-badge {
+    font-size: 0.65rem;
+    padding: 1px 3px;
+  }
+
+  .rbc-month-view {
+    font-size: 0.875rem;
+  }
+
+  .rbc-event {
+    font-size: 0.75rem !important;
+    padding: 1px 3px !important;
+  }
+
+  .rbc-date-cell {
+    padding: 2px !important;
+  }
+}
+
 /* Smooth transitions */
 .calendar-container * {
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Mobile touch improvements */
+@media (max-width: 768px) {
+  /* Ensure all interactive elements have adequate touch targets (44x44px minimum) */
+  button, a, input[type="button"], input[type="submit"] {
+    min-height: 44px;
+  }
+
+  /* Improve tap highlight color for better feedback */
+  * {
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
+  }
+
+  /* Prevent text selection on interactive elements for better mobile UX */
+  button, a {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Toast Animation */

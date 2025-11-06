@@ -18,6 +18,7 @@ interface EmbeddedCalendarProps {
 
 export default function EmbeddedCalendar({
   startDate,
+  selectedFacility,
   selectedClients = [],
   selectedServiceTypes = [],
   height = 500,
@@ -42,6 +43,7 @@ export default function EmbeddedCalendar({
 
   const { filteredJobs, events, isLoading: jobsLoading } = useCalendarJobs({
     machines,
+    facilityId: selectedFacility,
     startDate: dateRange.start,
     endDate: dateRange.end,
     selectedMachines: [], // Use all machines for embedded view
