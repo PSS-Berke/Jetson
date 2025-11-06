@@ -140,6 +140,35 @@ body {
   font-weight: 600;
 }
 
+.calendar-date-header .process-type-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.calendar-date-header .process-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-date-header .process-badge .badge-label {
+  opacity: 0.9;
+}
+
+.calendar-date-header .process-badge .badge-count {
+  font-weight: 700;
+}
+
 /* Month view cell height */
 .calendar-container .rbc-month-row {
   min-height: 100px;

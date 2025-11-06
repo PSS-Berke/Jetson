@@ -6,7 +6,7 @@ import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { CalendarEvent, CalendarViewType, DailySummary, CapacityDisplayMode } from '@/types/calendar';
-import { formatCurrency, formatNumber } from '@/lib/calendarUtils';
+import { formatCurrency, formatNumber, getProcessTypeColor } from '@/lib/calendarUtils';
 import { getDateKey } from '@/lib/dateUtils';
 
 const locales = {
@@ -102,6 +102,17 @@ export default function CalendarView({
     const dateKey = getDateKey(date);
     const summary = dailySummaries.get(dateKey);
 
+    // Process type badges data
+    const processTypeBadges = summary ? [
+      { key: 'insert', label: 'I', count: summary.processTypeCounts.insert, color: getProcessTypeColor('insert') },
+      { key: 'sort', label: 'S', count: summary.processTypeCounts.sort, color: getProcessTypeColor('sort') },
+      { key: 'inkjet', label: 'IJ', count: summary.processTypeCounts.inkjet, color: getProcessTypeColor('inkjet') },
+      { key: 'labelApply', label: 'L/A', count: summary.processTypeCounts.labelApply, color: getProcessTypeColor('labelApply') },
+      { key: 'fold', label: 'F', count: summary.processTypeCounts.fold, color: getProcessTypeColor('fold') },
+      { key: 'laser', label: 'L', count: summary.processTypeCounts.laser, color: getProcessTypeColor('laser') },
+      { key: 'hpPress', label: 'HP', count: summary.processTypeCounts.hpPress, color: getProcessTypeColor('hpPress') }
+    ].filter(badge => badge.count > 0) : [];
+
     return (
       <div className="calendar-date-header">
         <div className="date-label">{label}</div>
@@ -109,6 +120,21 @@ export default function CalendarView({
           <div className="date-summary">
             <div className="pieces">{formatNumber(summary.totalPieces)} pcs</div>
             <div className="revenue">{formatCurrency(summary.totalRevenue)}</div>
+            {processTypeBadges.length > 0 && (
+              <div className="process-type-badges">
+                {processTypeBadges.map(badge => (
+                  <div
+                    key={badge.key}
+                    className="process-badge"
+                    style={{ backgroundColor: badge.color }}
+                    title={`${badge.label}: ${formatNumber(badge.count)} pieces`}
+                  >
+                    <span className="badge-label">{badge.label}</span>
+                    <span className="badge-count">{formatNumber(badge.count)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

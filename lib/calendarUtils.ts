@@ -117,7 +117,16 @@ export const calculateDailySummaries = (
       totalRevenue: 0,
       utilizationPercent: 0,
       jobCount: 0,
-      machineCount: 0
+      machineCount: 0,
+      processTypeCounts: {
+        insert: 0,
+        sort: 0,
+        inkjet: 0,
+        labelApply: 0,
+        fold: 0,
+        laser: 0,
+        hpPress: 0
+      }
     });
   });
 
@@ -130,6 +139,14 @@ export const calculateDailySummaries = (
     const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
     const dailyRevenue = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
 
+    // Get process types from requirements
+    const processTypes = new Set<string>();
+    job.requirements?.forEach((req) => {
+      if (req.process_type) {
+        processTypes.add(req.process_type.toLowerCase());
+      }
+    });
+
     jobDays.forEach(day => {
       const dateKey = getDateKey(day);
       const summary = summaries.get(dateKey);
@@ -137,6 +154,37 @@ export const calculateDailySummaries = (
         summary.totalPieces += dailyPieces;
         summary.totalRevenue += dailyRevenue;
         summary.jobCount += 1;
+
+        // Add daily pieces to each process type this job uses
+        processTypes.forEach(processType => {
+          switch (processType) {
+            case 'insert':
+              summary.processTypeCounts.insert += dailyPieces;
+              break;
+            case 'sort':
+              summary.processTypeCounts.sort += dailyPieces;
+              break;
+            case 'inkjet':
+            case 'ij':
+            case 'ink jet':
+              summary.processTypeCounts.inkjet += dailyPieces;
+              break;
+            case 'label/apply':
+            case 'l/a':
+            case 'label/affix':
+              summary.processTypeCounts.labelApply += dailyPieces;
+              break;
+            case 'fold':
+              summary.processTypeCounts.fold += dailyPieces;
+              break;
+            case 'laser':
+              summary.processTypeCounts.laser += dailyPieces;
+              break;
+            case 'hp press':
+              summary.processTypeCounts.hpPress += dailyPieces;
+              break;
+          }
+        });
       }
     });
   });
@@ -397,6 +445,23 @@ export const getServiceTypeColor = (serviceType: string): string => {
   };
 
   return colors[serviceType] || '#6366F1'; // Default to indigo if not found
+};
+
+/**
+ * Get a color for a process type
+ */
+export const getProcessTypeColor = (processType: string): string => {
+  const colors: { [key: string]: string } = {
+    'insert': '#3B82F6',        // Blue
+    'sort': '#10B981',          // Green
+    'inkjet': '#F59E0B',        // Orange
+    'labelApply': '#8B5CF6',    // Purple
+    'fold': '#EC4899',          // Pink
+    'laser': '#EF4444',         // Red
+    'hpPress': '#14B8A6'        // Teal
+  };
+
+  return colors[processType] || '#6B7280'; // Default to gray if not found
 };
 
 /**

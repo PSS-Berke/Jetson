@@ -113,6 +113,19 @@ export interface CalendarFilters {
 }
 
 /**
+ * Process type counts for a specific period
+ */
+export interface ProcessTypeCounts {
+  insert: number;
+  sort: number;
+  inkjet: number;
+  labelApply: number;
+  fold: number;
+  laser: number;
+  hpPress: number;
+}
+
+/**
  * Daily summary for calendar display
  */
 export interface DailySummary {
@@ -123,6 +136,7 @@ export interface DailySummary {
   utilizationPercent: number;
   jobCount: number;
   machineCount: number;
+  processTypeCounts: ProcessTypeCounts;
 }
 
 /**

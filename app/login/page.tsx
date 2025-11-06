@@ -2,7 +2,6 @@
 
 import { useState, FormEvent } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -24,13 +23,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
         <div className="flex flex-col items-center">
-          <Image
+          <img
             src="/logo.png"
             alt="Jetson Marketing Solutions"
-            width={300}
-            height={100}
             className="mb-6 w-auto h-auto max-w-[300px]"
-            priority
           />
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
             Sign in to your account
