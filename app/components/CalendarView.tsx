@@ -135,11 +135,26 @@ const MemoizedDateHeader = memo(({
                               <div className="job-name">{job.job_name || job.description}</div>
                               <div className="job-details">
                                 <span>{formatNumber(job.quantity)} pcs</span>
-                                {job.total_billing && (
-                                  <span className="job-revenue">
-                                    ${parseFloat(job.total_billing).toLocaleString()}
-                                  </span>
-                                )}
+                                {(() => {
+                                  // Calculate revenue from requirements.price_per_m
+                                  if (job.requirements && job.requirements.length > 0) {
+                                    const revenue = job.requirements.reduce((total, req) => {
+                                      const pricePerMStr = req.price_per_m;
+                                      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+                                      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+                                      return total + ((job.quantity / 1000) * pricePerM);
+                                    }, 0);
+                                    
+                                    if (revenue > 0) {
+                                      return (
+                                        <span className="job-revenue">
+                                          ${revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                      );
+                                    }
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </div>
                           );

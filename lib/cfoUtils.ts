@@ -16,6 +16,30 @@ function getClientName(client: any): string {
   return 'Unknown';
 }
 
+/**
+ * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
+ * This ensures we use the most accurate pricing data from the API
+ */
+function getJobRevenue(job: Job | ParsedJob): number {
+  // Check if job has parsed requirements with price_per_m
+  if ('requirements' in job && Array.isArray(job.requirements) && job.requirements.length > 0) {
+    const parsedJob = job as ParsedJob;
+    const revenue = parsedJob.requirements.reduce((total, req) => {
+      const pricePerMStr = req.price_per_m;
+      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+      return total + ((parsedJob.quantity / 1000) * pricePerM);
+    }, 0);
+    
+    // Add add-on charges if available
+    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    return revenue + addOnCharges;
+  }
+  
+  // Fallback to total_billing
+  return parseFloat(job.total_billing || '0');
+}
+
 // ----------------------------------------------------------------------------
 // TYPES & INTERFACES
 // ----------------------------------------------------------------------------
@@ -99,7 +123,7 @@ export interface CFOSummaryMetrics {
  */
 export function calculateTotalRevenue(jobs: (Job | ParsedJob)[]): number {
   return jobs.reduce((sum, job) => {
-    const billing = parseFloat(job.total_billing || '0');
+    const billing = getJobRevenue(job);
     return sum + billing;
   }, 0);
 }
@@ -133,7 +157,7 @@ export function calculateRevenueByPeriod(
     jobs.forEach(job => {
       const jobStart = new Date(job.start_date);
       const jobEnd = new Date(job.due_date);
-      const jobRevenue = parseFloat(job.total_billing || '0');
+      const jobRevenue = getJobRevenue(job);
       const jobQuantity = job.quantity;
       // Calculate profit (simplified: revenue - ext_price)
       const extPrice = parseFloat(job.ext_price || '0');
@@ -188,9 +212,9 @@ export function calculateRevenueByClient(jobs: (Job | ParsedJob)[]): ClientReven
   jobs.forEach(job => {
     const clientId = job.clients_id;
     const clientName = getClientName(job.client);
-    const revenue = parseFloat(job.total_billing || '0');
+    const revenue = getJobRevenue(job);
     // Calculate estimated cost based on ext_price (base price before add-ons)
-    // Profit = total_billing - ext_price - add_on_charges (simplified estimation)
+    // Profit = revenue - ext_price - add_on_charges (simplified estimation)
     const extPrice = parseFloat(job.ext_price || '0');
     // const addOnCharges = parseFloat(job.add_on_charges || '0');
     // Simplified profit estimate: total billing minus costs (rough approximation)
@@ -241,7 +265,7 @@ export function calculateRevenueByServiceType(jobs: (Job | ParsedJob)[]): Servic
 
   jobs.forEach(job => {
     const serviceType = job.service_type || 'Unknown';
-    const revenue = parseFloat(job.total_billing || '0');
+    const revenue = getJobRevenue(job);
     const extPrice = parseFloat(job.ext_price || '0');
     const profit = revenue - extPrice;
     const quantity = job.quantity;
@@ -287,7 +311,7 @@ export function calculateRevenueByProcessType(jobs: (Job | ParsedJob)[]): Servic
   const processMap = new Map<string, { revenue: number; jobCount: Set<number>; quantity: number; profit: number }>();
 
   jobs.forEach(job => {
-    const revenue = parseFloat(job.total_billing || '0');
+    const revenue = getJobRevenue(job);
     const extPrice = parseFloat(job.ext_price || '0');
     const profit = revenue - extPrice;
     const quantity = job.quantity;
@@ -653,7 +677,7 @@ export function calculateCFOSummaryMetrics(
 
   // Calculate total profit (simplified: revenue - ext_price)
   const totalProfit = jobs.reduce((sum, job) => {
-    const revenue = parseFloat(job.total_billing || '0');
+    const revenue = getJobRevenue(job);
     const extPrice = parseFloat(job.ext_price || '0');
     return sum + (revenue - extPrice);
   }, 0);
@@ -661,7 +685,7 @@ export function calculateCFOSummaryMetrics(
 
   // Get top 3 most profitable jobs
   const jobsWithProfit = jobs.map(job => {
-    const revenue = parseFloat(job.total_billing || '0');
+    const revenue = getJobRevenue(job);
     const extPrice = parseFloat(job.ext_price || '0');
     const profit = revenue - extPrice;
     return {

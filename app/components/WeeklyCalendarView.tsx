@@ -76,7 +76,13 @@ export default function WeeklyCalendarView({ jobs, startDate }: WeeklyCalendarVi
           (jobStart <= weekData.weekStart && jobEnd >= weekData.weekEnd);
 
         if (jobOverlaps) {
-          const revenue = parseFloat(job.total_billing) || 0;
+          // Calculate revenue from requirements.price_per_m
+          const revenue = job.requirements?.reduce((total, req) => {
+            const pricePerMStr = req.price_per_m;
+            const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+            const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+            return total + ((job.quantity / 1000) * pricePerM);
+          }, 0) || 0;
           const pieces = job.quantity || 0;
 
           // Get process types from requirements

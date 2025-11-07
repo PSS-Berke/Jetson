@@ -1,6 +1,7 @@
 import { TOTAL_HOURS_PER_DAY, calculateDaysDifference, timestampToDate } from './dateUtils';
 import { getCapacityColor } from './theme';
 import type { Machine } from '@/types';
+import type { ParsedJob } from '@/hooks/useJobs';
 
 // Re-export types for backwards compatibility
 export type { Machine };
@@ -14,6 +15,30 @@ export interface Job {
   time_estimate: number | null;
   machines: { id: number; line: number }[];
   total_billing: string;
+  requirements?: any;
+  add_on_charges?: string;
+}
+
+/**
+ * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
+ */
+function getJobRevenue(job: Job | ParsedJob): number {
+  // Check if job has parsed requirements with price_per_m
+  if ('requirements' in job && Array.isArray(job.requirements) && job.requirements.length > 0) {
+    const revenue = job.requirements.reduce((total: number, req: any) => {
+      const pricePerMStr = req.price_per_m;
+      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+      return total + ((job.quantity / 1000) * pricePerM);
+    }, 0);
+    
+    // Add add-on charges if available
+    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    return revenue + addOnCharges;
+  }
+  
+  // Fallback to total_billing
+  return parseFloat(job.total_billing || '0');
 }
 
 /**
@@ -163,13 +188,26 @@ export const getUtilizationColorVar = (utilizationPercent: number): string => {
  * Calculate revenue per day for a job
  */
 export const calculateDailyRevenue = (
-  totalBilling: string,
-  startDate: number,
-  dueDate: number
+  job: Job | ParsedJob | string,
+  startDate?: number,
+  dueDate?: number
 ): number => {
-  const billing = parseFloat(totalBilling) || 0;
-  const start = timestampToDate(startDate);
-  const end = timestampToDate(dueDate);
+  let billing: number;
+  let start: Date;
+  let end: Date;
+  
+  // Handle legacy string signature for backwards compatibility
+  if (typeof job === 'string') {
+    billing = parseFloat(job) || 0;
+    start = timestampToDate(startDate!);
+    end = timestampToDate(dueDate!);
+  } else {
+    // New signature: calculate from job object
+    billing = getJobRevenue(job);
+    start = timestampToDate(job.start_date);
+    end = timestampToDate(job.due_date);
+  }
+  
   const numDays = calculateDaysDifference(start, end);
 
   if (numDays <= 0) return billing;

@@ -1,5 +1,6 @@
 import { ClientRevenue, ServiceTypeRevenue, PeriodComparison } from '@/lib/cfoUtils';
 import { Job } from '@/types';
+import { ParsedJob } from '@/hooks/useJobs';
 
 interface JobWithCost extends Job {
   costPer1000?: number;
@@ -305,7 +306,20 @@ export default function FinancialsPDFTables({
                     {typeof job.client === 'object' && job.client ? (job.client as any).name : job.client || 'Unknown'}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-right text-gray-900 font-semibold">
-                    {formatCurrency(parseFloat(job.total_billing || '0'))}
+                    {(() => {
+                      // Calculate revenue from requirements.price_per_m if available
+                      if (Array.isArray(job.requirements) && job.requirements.length > 0) {
+                        const revenue = job.requirements.reduce((total: number, req: any) => {
+                          const pricePerMStr = req.price_per_m;
+                          const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+                          const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+                          return total + ((job.quantity / 1000) * pricePerM);
+                        }, 0);
+                        return formatCurrency(revenue);
+                      }
+                      // Fallback to total_billing
+                      return formatCurrency(parseFloat(job.total_billing || '0'));
+                    })()}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-right text-gray-900">
                     {job.actualCost ? formatCurrency(job.actualCost) : '-'}

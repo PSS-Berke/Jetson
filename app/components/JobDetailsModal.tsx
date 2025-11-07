@@ -344,9 +344,9 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                   // Get the process type configuration
                   const processConfig = getProcessTypeConfig(req.process_type);
 
-                  // Get all fields for this process type, excluding price_per_m (shown in Pricing section)
+                  // Get all fields for this process type, excluding process_type (shown in header)
                   const fieldsToDisplay = processConfig?.fields.filter(
-                    field => field.name !== 'price_per_m' && field.name !== 'process_type'
+                    field => field.name !== 'process_type'
                   ) || [];
 
                   return (
