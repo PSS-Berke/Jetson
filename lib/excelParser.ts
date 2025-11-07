@@ -27,7 +27,7 @@ export interface ExcelParseError {
   rowIndex: number;
   field: string;
   message: string;
-  value?: any;
+  value?: unknown;
 }
 
 /**
@@ -37,7 +37,7 @@ export interface ExcelParseWarning {
   rowIndex: number;
   field: string;
   message: string;
-  value?: any;
+  value?: unknown;
 }
 
 /**
@@ -88,7 +88,7 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     const worksheet = workbook.Sheets[sheetName];
 
     // Convert to JSON with header row
-    const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, {
+    const rawData: unknown[][] = XLSX.utils.sheet_to_json(worksheet, {
       header: 1, // Get raw array data first
       defval: null,
       blankrows: false,
@@ -104,7 +104,7 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     }
 
     // Find header row (first non-empty row)
-    const headerRow = rawData[0] as any[];
+    const headerRow = rawData[0] as unknown[];
     if (!headerRow || headerRow.length === 0) {
       result.errors.push({
         rowIndex: 1,
@@ -141,7 +141,7 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
 
     // Parse data rows (skip header)
     for (let i = 1; i < rawData.length; i++) {
-      const row = rawData[i] as any[];
+      const row = rawData[i] as unknown[];
       const excelRowNumber = i + 1; // Excel rows are 1-indexed
 
       // Skip completely empty rows
@@ -184,7 +184,7 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
 /**
  * Maps column headers to indices
  */
-function mapColumns(headerRow: any[]): {
+function mapColumns(headerRow: unknown[]): {
   jobNumber: number;
   quantity: number;
   date: number;
@@ -230,7 +230,7 @@ function mapColumns(headerRow: any[]): {
  * Parses a single data row
  */
 function parseRow(
-  row: any[],
+  row: unknown[],
   columnMap: { jobNumber: number; quantity: number; date: number; notes: number },
   rowIndex: number
 ): ParsedExcelRow {
@@ -284,7 +284,7 @@ function parseRow(
         if (parsedDate) {
           parsedRow.date = parsedDate;
         }
-      } catch (error) {
+      } catch {
         throw new Error(`Invalid date format: "${dateValue}". Expected: YYYY-MM-DD or MM/DD/YYYY`);
       }
     }
@@ -305,7 +305,7 @@ function parseRow(
  * Parses a date value from Excel
  * Handles both Date objects and various string formats
  */
-function parseExcelDate(value: any): Date | number | null {
+function parseExcelDate(value: unknown): Date | number | null {
   // If it's already a Date object (from cellDates: true)
   if (value instanceof Date) {
     return value;

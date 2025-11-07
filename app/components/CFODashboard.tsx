@@ -193,7 +193,7 @@ export default function CFODashboard({
       const parsedJob = job as ParsedJob;
       const requirements = parsedJob.requirements;
       if (typeof requirements === 'string' || !Array.isArray(requirements)) return false;
-      const primaryProcess = requirements.find((req: any) => req.process_type);
+      const primaryProcess = requirements.find((req: { process_type?: string }) => req.process_type);
       return primaryProcess?.process_type === processType;
     }) as ParsedJob[];
   };

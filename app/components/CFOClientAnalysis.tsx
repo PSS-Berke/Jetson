@@ -121,8 +121,6 @@ export default function CFOClientAnalysis({
   };
 
   // Calculate risk assessment
-  const highRiskClients = topClients.filter(c => c.percentageOfTotal >= 20).length;
-  const moderateRiskClients = topClients.filter(c => c.percentageOfTotal >= 10 && c.percentageOfTotal < 20).length;
   const top3Concentration = topClients.slice(0, 3).reduce((sum, c) => sum + c.percentageOfTotal, 0);
 
   return (

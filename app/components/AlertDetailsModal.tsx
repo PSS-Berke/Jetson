@@ -33,17 +33,19 @@ export default function AlertDetailsModal({
   if (!isOpen) return null;
 
   const calculateJobProfit = (job: ParsedJob): number => {
-    // Calculate billing rate and cost from job data
-    const billingRate = job.billing_rate || 0;
-    const estimatedCost = job.estimated_cost || 0;
-    return billingRate - estimatedCost;
+    // Calculate billing and cost from job data
+    // Use total_billing as revenue and price_per_m * quantity as cost estimate
+    const totalBilling = parseFloat(job.total_billing) || 0;
+    const pricePerM = parseFloat(job.price_per_m) || 0;
+    const estimatedCost = (pricePerM * job.quantity) / 1000;
+    return totalBilling - estimatedCost;
   };
 
   const calculateProfitPercentage = (job: ParsedJob): number => {
-    const billingRate = job.billing_rate || 0;
-    if (billingRate === 0) return 0;
+    const totalBilling = parseFloat(job.total_billing) || 0;
+    if (totalBilling === 0) return 0;
     const profit = calculateJobProfit(job);
-    return (profit / billingRate) * 100;
+    return (profit / totalBilling) * 100;
   };
 
   return (
@@ -104,7 +106,7 @@ export default function AlertDetailsModal({
               <div className="bg-gray-50 rounded-lg p-3">
                 <div className="text-xs text-gray-500 font-medium">Total Revenue</div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(jobs.reduce((sum, job) => sum + (job.billing_rate || 0), 0), true)}
+                  {formatCurrency(jobs.reduce((sum, job) => sum + (parseFloat(job.total_billing) || 0), 0), true)}
                 </div>
               </div>
             </div>
@@ -156,7 +158,7 @@ export default function AlertDetailsModal({
                           {job.quantity.toLocaleString()}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                          {formatCurrency(job.billing_rate || 0, true)}
+                          {formatCurrency(parseFloat(job.total_billing) || 0, true)}
                         </td>
                         {type === 'jobs-at-risk' && (
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right">

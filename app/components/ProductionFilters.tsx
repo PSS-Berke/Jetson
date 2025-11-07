@@ -37,7 +37,8 @@ export default function ProductionFilters({
   filterMode,
   onFilterModeChange,
   granularity,
-  dateRangeDisplay,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dateRangeDisplay: _dateRangeDisplay,
   onPreviousPeriod,
   onNextPeriod,
   onToday,

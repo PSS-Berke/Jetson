@@ -143,7 +143,7 @@ export default function CFOServiceMix({
     const { payload } = props;
     return (
       <div className="flex flex-col gap-1 text-xs">
-        {payload.map((entry: any, index: number) => (
+        {payload.map((entry: { color: string; value: string }, index: number) => (
           <div key={`legend-${index}`} className="flex items-center gap-2">
             <div
               className="w-3 h-3 rounded-sm"

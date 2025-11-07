@@ -164,25 +164,6 @@ export default function ProjectionFilters({
     }
   };
 
-  const formatDateRange = () => {
-    const endDate = new Date(startDate);
-    let days = 0;
-    switch (granularity) {
-      case 'monthly':
-        days = 90; // ~3 months
-        break;
-      case 'quarterly':
-        days = 365; // ~4 quarters
-        break;
-      case 'weekly':
-      default:
-        days = 34; // 5 weeks
-        break;
-    }
-    endDate.setDate(endDate.getDate() + days);
-    return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-  };
-
   // Calculate the end date for the date range picker
   const getEndDate = () => {
     const endDate = new Date(startDate);

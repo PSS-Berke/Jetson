@@ -15,7 +15,7 @@ export interface Job {
   time_estimate: number | null;
   machines: { id: number; line: number }[];
   total_billing: string;
-  requirements?: any;
+  requirements?: { price_per_m?: string }[];
   add_on_charges?: string;
 }
 
@@ -25,7 +25,7 @@ export interface Job {
 function getJobRevenue(job: Job | ParsedJob): number {
   // Check if job has parsed requirements with price_per_m
   if ('requirements' in job && Array.isArray(job.requirements) && job.requirements.length > 0) {
-    const revenue = job.requirements.reduce((total: number, req: any) => {
+    const revenue = job.requirements.reduce((total: number, req: { price_per_m?: string }) => {
       const pricePerMStr = req.price_per_m;
       const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
       const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;

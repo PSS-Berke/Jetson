@@ -9,21 +9,21 @@ describe('Excel Parser', () => {
   // Test parseExcelDate logic
   describe('Date Parsing', () => {
     it('should handle ISO format dates (YYYY-MM-DD)', () => {
-      const testDate = '2025-01-15';
-      const expected = new Date(2025, 0, 15); // Month is 0-indexed
+      const _testDate = '2025-01-15';
+      const _expected = new Date(2025, 0, 15); // Month is 0-indexed
 
       // This would be tested with actual parser function
-      // const result = parseExcelDate(testDate);
-      // expect(result.getTime()).toBe(expected.getTime());
+      // const result = parseExcelDate(_testDate);
+      // expect(result.getTime()).toBe(_expected.getTime());
     });
 
     it('should handle US format dates (MM/DD/YYYY)', () => {
-      const testDate = '01/15/2025';
-      const expected = new Date(2025, 0, 15);
+      const _testDate = '01/15/2025';
+      const _expected = new Date(2025, 0, 15);
 
       // This would be tested with actual parser function
-      // const result = parseExcelDate(testDate);
-      // expect(result.getTime()).toBe(expected.getTime());
+      // const result = parseExcelDate(_testDate);
+      // expect(result.getTime()).toBe(_expected.getTime());
     });
   });
 

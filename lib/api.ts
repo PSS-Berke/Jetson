@@ -480,7 +480,7 @@ export const syncJobCostEntryFromRequirements = async (
         console.log('[syncJobCostEntryFromRequirements] Entry updated successfully');
         return updated;
       }
-    } catch (error) {
+    } catch {
       // If fetching existing entries fails, continue to create new one
       console.log('[syncJobCostEntryFromRequirements] Could not fetch existing entries, will create new');
     }
