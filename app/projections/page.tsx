@@ -84,8 +84,11 @@ export default function ProjectionsPage() {
     refetch,
   } = useProjections(startDate, filters);
 
+  console.log('[DEBUG] ProjectionsPage - startDate:', startDate);
+  console.log('[DEBUG] ProjectionsPage - timeRanges:', timeRanges);
   console.log('[DEBUG] ProjectionsPage - processTypeCounts received:', processTypeCounts);
   console.log('[DEBUG] ProjectionsPage - filteredJobProjections count:', filteredJobProjections.length);
+  console.log('[DEBUG] ProjectionsPage - totalRevenue:', totalRevenue);
 
   // Calculate paginated job projections
   const indexOfLastJob = currentPage * itemsPerPage;
@@ -240,17 +243,20 @@ export default function ProjectionsPage() {
 
       {/* Main Content */}
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Page Title */}
+        <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)] mb-4 no-print">
+          {granularity === 'weekly' ? '5-Week' : granularity === 'monthly' ? '3-Month' : '4-Quarter'} Projections
+        </h2>
+
+        {/* Toggles */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4 no-print">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
-              {granularity === 'weekly' ? '5-Week' : granularity === 'monthly' ? '3-Month' : '4-Quarter'} Projections
-            </h2>
+          <div className="flex items-center gap-3 order-2 sm:order-1">
             <FacilityToggle
               currentFacility={selectedFacility}
               onFacilityChange={setSelectedFacility}
             />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 order-1 sm:order-2">
             <GranularityToggle
               currentGranularity={granularity}
               onGranularityChange={handleGranularityChange}

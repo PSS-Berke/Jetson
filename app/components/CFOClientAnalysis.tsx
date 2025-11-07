@@ -137,35 +137,6 @@ export default function CFOClientAnalysis({
         </div>
       </div>
 
-      {/* Risk Assessment Banner */}
-      {highRiskClients > 0 && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <div>
-            <p className="text-sm font-semibold text-red-900">
-              High Client Concentration Risk
-            </p>
-            <p className="text-xs text-red-700 mt-1">
-              {highRiskClients} client{highRiskClients > 1 ? 's' : ''} represent{highRiskClients === 1 ? 's' : ''} ≥20% of revenue each.
-              Top 3 clients = {formatPercentage(top3Concentration)} of total revenue.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {moderateRiskClients > 0 && highRiskClients === 0 && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div>
-            <p className="text-sm font-semibold text-yellow-900">
-              Moderate Client Concentration
-            </p>
-            <p className="text-xs text-yellow-700 mt-1">
-              {moderateRiskClients} client{moderateRiskClients > 1 ? 's' : ''} represent{moderateRiskClients === 1 ? 's' : ''} 10-20% of revenue.
-              Monitor and consider diversification.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Horizontal Bar Chart */}
       <div style={{ height: Math.max(300, topClients.length * 45) }}>
         <ResponsiveContainer width="100%" height="100%">

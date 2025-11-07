@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getJobsInTimeRange } from '@/lib/productionUtils';
 import { calculateBillingRatePerM, formatCurrency, formatPercentage, getProfitTextColor } from '@/lib/jobCostUtils';
 import { getJobCostEntries, batchCreateJobCostEntries, deleteJobCostEntry } from '@/lib/api';
 import Toast from './Toast';
+import Pagination from './Pagination';
 import type { ParsedJob } from '@/hooks/useJobs';
 import type { JobCostEntry } from '@/lib/jobCostUtils';
+
+type SortField = 'job_number' | 'job_name' | 'client_name' | 'quantity' | 'billing_rate_per_m' | 'current_cost_per_m' | 'profit_percentage';
+type SortDirection = 'asc' | 'desc';
 
 interface InlineJobCostEntryProps {
   jobs: ParsedJob[];
@@ -43,6 +47,10 @@ export default function InlineJobCostEntry({
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [sortField, setSortField] = useState<SortField>('job_number');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Initialize job entries when date range changes OR when refreshTrigger changes
   useEffect(() => {
@@ -91,6 +99,8 @@ export default function InlineJobCostEntry({
 
             console.log('[InlineJobCostEntry] Setting job entries:', entries.length);
             setJobEntries(entries);
+            // Reset to page 1 when entries change
+            setCurrentPage(1);
           } catch (error) {
             console.error('[InlineJobCostEntry] Error loading cost entries:', error);
             // Set entries with zero costs if fetch fails
@@ -112,6 +122,8 @@ export default function InlineJobCostEntry({
             });
             console.log('[InlineJobCostEntry] Setting job entries (after error):', entries.length);
             setJobEntries(entries);
+            // Reset to page 1 when entries change
+            setCurrentPage(1);
           }
         };
 
@@ -263,7 +275,97 @@ export default function InlineJobCostEntry({
     setIsBatchMode(false);
   };
 
+  // Sort handler
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction if clicking the same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new field and reset to ascending
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort entries
+  const sortedEntries = useMemo(() => {
+    return [...jobEntries].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      switch (sortField) {
+        case 'job_number':
+          aValue = a.job_number;
+          bValue = b.job_number;
+          break;
+        case 'job_name':
+          aValue = a.job_name.toLowerCase();
+          bValue = b.job_name.toLowerCase();
+          break;
+        case 'client_name':
+          aValue = a.client_name.toLowerCase();
+          bValue = b.client_name.toLowerCase();
+          break;
+        case 'quantity':
+          aValue = a.quantity;
+          bValue = b.quantity;
+          break;
+        case 'billing_rate_per_m':
+          aValue = a.billing_rate_per_m;
+          bValue = b.billing_rate_per_m;
+          break;
+        case 'current_cost_per_m':
+          aValue = a.current_cost_per_m;
+          bValue = b.current_cost_per_m;
+          break;
+        case 'profit_percentage':
+          // Calculate profit percentage for sorting
+          aValue = a.billing_rate_per_m > 0 && a.current_cost_per_m > 0
+            ? ((a.billing_rate_per_m - a.current_cost_per_m) / a.billing_rate_per_m) * 100
+            : 0;
+          bValue = b.billing_rate_per_m > 0 && b.current_cost_per_m > 0
+            ? ((b.billing_rate_per_m - b.current_cost_per_m) / b.billing_rate_per_m) * 100
+            : 0;
+          break;
+        default:
+          aValue = a.job_number;
+          bValue = b.job_number;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [jobEntries, sortField, sortDirection]);
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (items: number) => {
+    setItemsPerPage(items);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  // Calculate paginated entries from sorted entries
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedEntries = sortedEntries.slice(startIndex, endIndex);
+
   console.log('[InlineJobCostEntry] Rendering, jobEntries.length:', jobEntries.length);
+
+  // Sort icon component
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <span className="text-gray-400 ml-1">↕</span>;
+    }
+    return (
+      <span className="text-blue-600 ml-1">
+        {sortDirection === 'asc' ? '↑' : '↓'}
+      </span>
+    );
+  };
 
   if (jobEntries.length === 0) {
     return (
@@ -329,23 +431,59 @@ export default function InlineJobCostEntry({
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Job #
+              <th
+                onClick={() => handleSort('job_number')}
+                className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-1">
+                  Job #
+                  <SortIcon field="job_number" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Job Name
+              <th
+                onClick={() => handleSort('job_name')}
+                className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-1">
+                  Job Name
+                  <SortIcon field="job_name" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Client
+              <th
+                onClick={() => handleSort('client_name')}
+                className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-1">
+                  Client
+                  <SortIcon field="client_name" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Qty
+              <th
+                onClick={() => handleSort('quantity')}
+                className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Qty
+                  <SortIcon field="quantity" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Billing Rate (per/M)
+              <th
+                onClick={() => handleSort('billing_rate_per_m')}
+                className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Billing Rate (per/M)
+                  <SortIcon field="billing_rate_per_m" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                {isBatchMode ? 'Current Cost (per/M)' : 'Current Cost (per/M)'}
+              <th
+                onClick={() => handleSort('current_cost_per_m')}
+                className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-end gap-1">
+                  {isBatchMode ? 'Current Cost (per/M)' : 'Current Cost (per/M)'}
+                  <SortIcon field="current_cost_per_m" />
+                </div>
               </th>
               {isBatchMode ? (
                 <>
@@ -355,22 +493,36 @@ export default function InlineJobCostEntry({
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Set Total Cost
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px]">
-                    Profit %
+                  <th
+                    onClick={() => handleSort('profit_percentage')}
+                    className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px] cursor-pointer hover:bg-gray-100"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Profit %
+                      <SortIcon field="profit_percentage" />
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Notes
                   </th>
                 </>
               ) : (
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px]">
-                  Profit %
+                <th
+                  onClick={() => handleSort('profit_percentage')}
+                  className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px] cursor-pointer hover:bg-gray-100"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Profit %
+                    <SortIcon field="profit_percentage" />
+                  </div>
                 </th>
               )}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {jobEntries.map((entry, index) => {
+            {paginatedEntries.map((entry, index) => {
+              // Calculate the actual index in the full jobEntries array
+              const actualIndex = startIndex + index;
               const hasInput = entry.add_to_cost || entry.set_total_cost;
               const { profitPercentage } = getProfitPreview(entry);
               const currentProfitPercentage = entry.billing_rate_per_m > 0 && entry.current_cost_per_m > 0
@@ -420,7 +572,7 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.add_to_cost}
-                          onChange={(e) => handleAddToCostChange(index, e.target.value)}
+                          onChange={(e) => handleAddToCostChange(actualIndex, e.target.value)}
                           placeholder="Add..."
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -431,7 +583,7 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.set_total_cost}
-                          onChange={(e) => handleSetTotalCostChange(index, e.target.value)}
+                          onChange={(e) => handleSetTotalCostChange(actualIndex, e.target.value)}
                           placeholder="Set..."
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -449,7 +601,7 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.notes}
-                          onChange={(e) => handleNotesChange(index, e.target.value)}
+                          onChange={(e) => handleNotesChange(actualIndex, e.target.value)}
                           placeholder="Optional notes"
                           className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -468,6 +620,19 @@ export default function InlineJobCostEntry({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {jobEntries.length > 0 && (
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={jobEntries.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+          />
+        </div>
+      )}
 
       {/* Success Toast */}
       {showSuccessToast && (

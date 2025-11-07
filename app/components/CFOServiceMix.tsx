@@ -291,18 +291,6 @@ export default function CFOServiceMix({
         </div>
       </div>
 
-      {/* Insight */}
-      {sortedData.length > 0 && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="text-sm">
-            <p className="font-semibold text-blue-900 mb-1">Key Insight</p>
-            <p className="text-blue-700">
-              {sortedData[0].serviceType} represents {formatPercentage(sortedData[0].percentageOfTotal)} of {sortBy === 'revenue' ? 'revenue' : sortBy === 'volume' ? 'volume' : 'profit'}.
-              {sortedData[0].percentageOfTotal > 50 && ` Consider process diversification to reduce dependency.`}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

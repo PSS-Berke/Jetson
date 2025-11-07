@@ -4,6 +4,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import SmartClientSelect from './SmartClientSelect';
 import FacilityToggle from './FacilityToggle';
+import ScheduleToggle from './ScheduleToggle';
 import DynamicRequirementFields from './DynamicRequirementFields';
 import { getToken } from '@/lib/api';
 import { getProcessTypeConfig } from '@/lib/processTypeConfig';
@@ -949,32 +950,12 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
               <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
                 <h4 className="font-semibold text-[var(--text-dark)] mb-3">Schedule Type</h4>
-                <div className="flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsConfirmed(false)}
-                    className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-                      !isConfirmed
-                        ? 'bg-[#2E3192] text-white shadow-md'
-                        : 'bg-white text-[var(--text-dark)] border-2 border-gray-300 hover:border-[#2E3192]'
-                    }`}
-                  >
-                    Soft Schedule
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsConfirmed(true)}
-                    className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-                      isConfirmed
-                        ? 'bg-[#EF3340] text-white shadow-md'
-                        : 'bg-white text-[var(--text-dark)] border-2 border-gray-300 hover:border-[#EF3340]'
-                    }`}
-                  >
-                    Schedule
-                  </button>
-                </div>
+                <ScheduleToggle
+                  isConfirmed={isConfirmed}
+                  onScheduleChange={setIsConfirmed}
+                />
                 <p className="text-sm text-[var(--text-light)] mt-3">
-                  {isConfirmed 
+                  {isConfirmed
                     ? '✓ This job will be confirmed and scheduled immediately.'
                     : 'ℹ This job will be added as a soft schedule and can be confirmed later.'}
                 </p>

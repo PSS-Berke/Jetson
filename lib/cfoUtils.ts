@@ -817,3 +817,116 @@ export function getChangeColor(percentChange: number, inverse: boolean = false):
   if (Math.abs(percentChange) < 1) return 'text-gray-500';
   return isPositive ? 'text-green-600' : 'text-red-600';
 }
+
+// ----------------------------------------------------------------------------
+// PROFIT MARGIN ANALYSIS
+// ----------------------------------------------------------------------------
+
+/**
+ * Calculate overall profit margin percentage
+ */
+export function calculateProfitMargin(jobs: (Job | ParsedJob)[]): number {
+  if (jobs.length === 0) return 0;
+
+  const totalRevenue = calculateTotalRevenue(jobs);
+  if (totalRevenue === 0) return 0;
+
+  const totalProfit = jobs.reduce((sum, job) => {
+    const revenue = getJobRevenue(job);
+    const extPrice = parseFloat(job.ext_price || '0');
+    return sum + (revenue - extPrice);
+  }, 0);
+
+  return (totalProfit / totalRevenue) * 100;
+}
+
+/**
+ * Get jobs with low profit margins (below threshold)
+ */
+export function getLowMarginJobs(
+  jobs: (Job | ParsedJob)[],
+  threshold: number = 10
+): { jobs: (Job | ParsedJob)[]; averageMargin: number; totalRevenue: number } {
+  const lowMarginJobs = jobs.filter(job => {
+    const revenue = getJobRevenue(job);
+    if (revenue === 0) return false;
+
+    const extPrice = parseFloat(job.ext_price || '0');
+    const profit = revenue - extPrice;
+    const margin = (profit / revenue) * 100;
+
+    return margin < threshold;
+  });
+
+  const totalRevenue = calculateTotalRevenue(lowMarginJobs);
+  const averageMargin = lowMarginJobs.length > 0
+    ? lowMarginJobs.reduce((sum, job) => {
+        const revenue = getJobRevenue(job);
+        const extPrice = parseFloat(job.ext_price || '0');
+        const margin = revenue > 0 ? ((revenue - extPrice) / revenue) * 100 : 0;
+        return sum + margin;
+      }, 0) / lowMarginJobs.length
+    : 0;
+
+  return { jobs: lowMarginJobs, averageMargin, totalRevenue };
+}
+
+/**
+ * Calculate profit margin for a specific job
+ */
+export function calculateJobProfitMargin(job: Job | ParsedJob): number {
+  const revenue = getJobRevenue(job);
+  if (revenue === 0) return 0;
+
+  const extPrice = parseFloat(job.ext_price || '0');
+  const profit = revenue - extPrice;
+
+  return (profit / revenue) * 100;
+}
+
+// ----------------------------------------------------------------------------
+// JOB CLUSTERING ANALYSIS
+// ----------------------------------------------------------------------------
+
+/**
+ * Detect job clustering in time periods
+ * Returns periods where >30% of jobs are clustered
+ */
+export function detectJobClustering(
+  jobs: (Job | ParsedJob)[],
+  periods: TimeRange[],
+  clusterThreshold: number = 0.3
+): {
+  clusteredPeriods: Array<{
+    period: TimeRange;
+    jobCount: number;
+    percentageOfTotal: number;
+    jobs: (Job | ParsedJob)[];
+  }>;
+  totalJobs: number;
+} {
+  const totalJobs = jobs.length;
+  if (totalJobs === 0) return { clusteredPeriods: [], totalJobs: 0 };
+
+  const clusteredPeriods = periods
+    .map(period => {
+      // Find jobs that are due in this period
+      const jobsInPeriod = jobs.filter(job => {
+        const dueDate = new Date(job.due_date);
+        return dueDate >= period.startDate && dueDate <= period.endDate;
+      });
+
+      const percentageOfTotal = jobsInPeriod.length / totalJobs;
+
+      return {
+        period,
+        jobCount: jobsInPeriod.length,
+        percentageOfTotal,
+        jobs: jobsInPeriod,
+      };
+    })
+    .filter(item => item.percentageOfTotal >= clusterThreshold)
+    .sort((a, b) => b.percentageOfTotal - a.percentageOfTotal);
+
+  return { clusteredPeriods, totalJobs };
+}

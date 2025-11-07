@@ -1,23 +1,17 @@
 'use client';
 
-import { useRef, useLayoutEffect, useState } from 'react';
+import { useRef, useLayoutEffect, useState, useMemo } from 'react';
 
-type GranularityType = 'day' | 'week' | 'month';
-
-interface ProductionGranularityToggleProps {
-  currentGranularity: GranularityType;
-  onGranularityChange: (granularity: GranularityType) => void;
+interface ScheduleToggleProps {
+  isConfirmed: boolean;
+  onScheduleChange: (isConfirmed: boolean) => void;
 }
 
-export default function ProductionGranularityToggle({
-  currentGranularity,
-  onGranularityChange
-}: ProductionGranularityToggleProps) {
-  const granularities: { value: GranularityType; label: string }[] = [
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' }
-  ];
+export default function ScheduleToggle({ isConfirmed, onScheduleChange }: ScheduleToggleProps) {
+  const scheduleOptions = useMemo(() => [
+    { value: false, label: 'Soft Schedule', color: '#2E3192' },
+    { value: true, label: 'Schedule', color: '#EF3340' }
+  ], []);
 
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,9 +19,8 @@ export default function ProductionGranularityToggle({
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = granularities.findIndex(g => g.value === currentGranularity);
+      const selectedIndex = scheduleOptions.findIndex(opt => opt.value === isConfirmed);
 
-      // Reset bubble if no valid selection
       if (selectedIndex === -1) {
         setBubbleStyle({ width: 0, left: 0 });
         return;
@@ -50,44 +43,52 @@ export default function ProductionGranularityToggle({
       }
     };
 
-    updateBubblePosition();
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    requestAnimationFrame(() => {
+      updateBubblePosition();
+    });
 
     // Update on window resize to handle responsive changes
     window.addEventListener('resize', updateBubblePosition);
     return () => window.removeEventListener('resize', updateBubblePosition);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentGranularity]);
+  }, [isConfirmed, scheduleOptions]);
+
+  // Determine the current color based on selection
+  const currentColor = scheduleOptions.find(opt => opt.value === isConfirmed)?.color || '#2E3192';
 
   return (
     <div className="flex flex-col gap-2">
       <div
         ref={containerRef}
-        className="relative inline-flex w-full sm:w-auto rounded-full border-2 border-[var(--primary-blue)] bg-gray-50 p-1"
+        className="relative inline-flex w-full sm:w-auto rounded-full border-2 bg-gray-50 p-1 transition-colors duration-300"
+        style={{ borderColor: currentColor }}
       >
         {/* Sliding bubble indicator */}
         {bubbleStyle.width > 0 && (
           <div
-            className="absolute top-1 bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
+            className="absolute top-1 bottom-1 rounded-full transition-all duration-300 ease-in-out"
             style={{
               width: `${bubbleStyle.width}px`,
-              transform: `translateX(${bubbleStyle.left}px)`
+              transform: `translateX(${bubbleStyle.left}px)`,
+              backgroundColor: currentColor
             }}
           />
         )}
 
         {/* Buttons */}
-        {granularities.map((granularity, index) => (
+        {scheduleOptions.map((option, index) => (
           <button
-            key={granularity.value}
+            key={option.label}
             ref={el => { buttonRefs.current[index] = el; }}
-            onClick={() => onGranularityChange(granularity.value)}
+            type="button"
+            onClick={() => onScheduleChange(option.value)}
             className={`relative z-10 flex-1 sm:flex-initial px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
-              currentGranularity === granularity.value
+              isConfirmed === option.value
                 ? 'text-white'
-                : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
+                : 'text-[var(--text-dark)] hover:opacity-70'
             }`}
           >
-            {granularity.label}
+            {option.label}
           </button>
         ))}
       </div>

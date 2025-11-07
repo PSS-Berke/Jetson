@@ -28,7 +28,8 @@ export default function PageHeader({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   // Close profile menu when clicking outside
@@ -37,7 +38,13 @@ export default function PageHeader({
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setIsProfileMenuOpen(false);
       }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+      // Check if click is outside both mobile menu button and dropdown
+      if (
+        mobileMenuButtonRef.current &&
+        mobileMenuDropdownRef.current &&
+        !mobileMenuButtonRef.current.contains(event.target as Node) &&
+        !mobileMenuDropdownRef.current.contains(event.target as Node)
+      ) {
         setIsMobileMenuOpen(false);
       }
     };
@@ -175,8 +182,9 @@ export default function PageHeader({
           </div>
 
           {/* Mobile Hamburger Menu */}
-          <div className="md:hidden flex items-center gap-2" ref={mobileMenuRef}>
+          <div className="md:hidden flex items-center gap-2">
             <button
+              ref={mobileMenuButtonRef}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
               aria-label="Toggle menu"
@@ -194,7 +202,7 @@ export default function PageHeader({
 
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-[var(--border)] pt-4">
+          <div className="md:hidden mt-4 pb-4 border-t border-[var(--border)] pt-4" ref={mobileMenuDropdownRef}>
             <nav className="flex flex-col gap-2 mb-4">
               <Link
                 href="/machines"

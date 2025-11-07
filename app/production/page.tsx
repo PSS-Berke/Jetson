@@ -221,6 +221,12 @@ export default function ProductionPage() {
     setCurrentDate(new Date());
   };
 
+  // Handle custom date range selection
+  const handleDateRangeChange = (range: { start: Date; end: Date }) => {
+    // Set the current date to the start of the selected range
+    setCurrentDate(range.start);
+  };
+
   // Format date range for display
   const dateRangeDisplay = useMemo(() => {
     if (granularity === 'week') {
@@ -377,6 +383,9 @@ export default function ProductionPage() {
           onPreviousPeriod={handlePreviousPeriod}
           onNextPeriod={handleNextPeriod}
           onToday={handleToday}
+          startDate={new Date(startDate)}
+          endDate={new Date(endDate)}
+          onDateRangeChange={handleDateRangeChange}
         />
 
         {/* Loading State */}

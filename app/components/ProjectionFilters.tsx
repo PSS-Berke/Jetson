@@ -5,6 +5,7 @@ import { ParsedJob } from '@/hooks/useJobs';
 import { getStartOfWeek } from '@/lib/projectionUtils';
 import { startOfMonth, startOfQuarter } from 'date-fns';
 import type { Granularity } from './GranularityToggle';
+import DateRangePicker, { type DateRange } from './DateRangePicker';
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -182,6 +183,34 @@ export default function ProjectionFilters({
     return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
   };
 
+  // Calculate the end date for the date range picker
+  const getEndDate = () => {
+    const endDate = new Date(startDate);
+    let days = 0;
+    switch (granularity) {
+      case 'monthly':
+        days = 90; // ~3 months
+        break;
+      case 'quarterly':
+        days = 365; // ~4 quarters
+        break;
+      case 'weekly':
+      default:
+        days = 34; // 5 weeks
+        break;
+    }
+    endDate.setDate(endDate.getDate() + days);
+    return endDate;
+  };
+
+  // Handle date range change from picker
+  const handleDateRangeChange = (range: DateRange) => {
+    console.log('Date range changed:', range);
+    console.log('Setting start date to:', range.start);
+    console.log('End date selected (but not currently used):', range.end);
+    onStartDateChange(range.start);
+  };
+
   const getPeriodLabel = () => {
     switch (granularity) {
       case 'monthly':
@@ -247,9 +276,10 @@ export default function ProjectionFilters({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <div className="px-2 sm:px-3 py-1 bg-gray-50 rounded text-xs sm:text-sm font-medium text-[var(--text-dark)] min-w-[180px] sm:min-w-[240px] text-center">
-            {formatDateRange()}
-          </div>
+          <DateRangePicker
+            dateRange={{ start: startDate, end: getEndDate() }}
+            onDateRangeChange={handleDateRangeChange}
+          />
           <button
             onClick={handleNext}
             className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"

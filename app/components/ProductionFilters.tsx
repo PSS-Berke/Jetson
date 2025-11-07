@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { ParsedJob } from '@/hooks/useJobs';
+import DateRangePicker, { type DateRange } from './DateRangePicker';
 
 type GranularityType = 'day' | 'week' | 'month';
 
@@ -20,6 +21,9 @@ interface ProductionFiltersProps {
   onPreviousPeriod: () => void;
   onNextPeriod: () => void;
   onToday: () => void;
+  startDate: Date;
+  endDate: Date;
+  onDateRangeChange?: (range: DateRange) => void;
 }
 
 export default function ProductionFilters({
@@ -37,6 +41,9 @@ export default function ProductionFilters({
   onPreviousPeriod,
   onNextPeriod,
   onToday,
+  startDate,
+  endDate,
+  onDateRangeChange,
 }: ProductionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -166,9 +173,10 @@ export default function ProductionFilters({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <div className="px-2 sm:px-3 py-1 bg-gray-50 rounded text-xs sm:text-sm font-medium text-[var(--text-dark)] min-w-[180px] sm:min-w-[240px] text-center">
-            {dateRangeDisplay}
-          </div>
+          <DateRangePicker
+            dateRange={{ start: startDate, end: endDate }}
+            onDateRangeChange={onDateRangeChange || (() => {})}
+          />
           <button
             onClick={onNextPeriod}
             className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"

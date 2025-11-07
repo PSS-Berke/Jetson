@@ -82,13 +82,13 @@ export default function SmartClientSelect({ value, onChange, required = false, i
       if (initialClientName) {
         return;
       }
-      
+
       if (value && value > 0) {
         // Don't fetch if we already have the correct client selected
         if (selectedClient && selectedClient.id === value) {
           return;
         }
-        
+
         try {
           const token = getToken();
           const response = await fetch(`https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients/${value}`, {
@@ -114,7 +114,8 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     };
 
     fetchSelectedClient();
-  }, [value, initialClientName, selectedClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, initialClientName]);
 
   // Fetch clients on mount and when search changes
   useEffect(() => {

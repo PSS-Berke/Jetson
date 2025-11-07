@@ -17,12 +17,8 @@ interface CFOSummaryCardsProps {
 }
 
 export default function CFOSummaryCards({ metrics, revenueTrend }: CFOSummaryCardsProps) {
-  // Helper function to get concentration risk color
-  const getConcentrationColor = (concentration: number): string => {
-    if (concentration >= 30) return 'text-red-600';
-    if (concentration >= 20) return 'text-yellow-600';
-    return 'text-green-600';
-  };
+  console.log('[CFOSummaryCards] Rendering with metrics:', metrics);
+  console.log('[CFOSummaryCards] Revenue trend:', revenueTrend);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -96,36 +92,6 @@ export default function CFOSummaryCards({ metrics, revenueTrend }: CFOSummaryCar
           ) : (
             <div className="text-gray-400 text-sm">No jobs available</div>
           )}
-        </div>
-      </div>
-
-      {/* Top Client Concentration Card */}
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 border-l-4 border-l-orange-500">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-gray-600">Top Client Risk</h3>
-        </div>
-        <div className="mt-2">
-          <div className={`text-3xl font-bold ${getConcentrationColor(metrics.topClientConcentration)}`}>
-            {formatPercentage(metrics.topClientConcentration)}
-          </div>
-          <div className="text-sm text-gray-500 mt-1 truncate" title={metrics.topClientName}>
-            {metrics.topClientName}
-          </div>
-        </div>
-      </div>
-
-      {/* Jobs at Risk Card */}
-      <div className="bg-white rounded-lg shadow p-6 border border-gray-200 border-l-4 border-l-red-500">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-gray-600">Jobs At Risk</h3>
-        </div>
-        <div className="mt-2">
-          <div className={`text-3xl font-bold ${metrics.jobsAtRisk && metrics.jobsAtRisk > 0 ? 'text-red-600' : 'text-green-600'}`}>
-            {metrics.jobsAtRisk || 0}
-          </div>
-          <div className="text-sm text-gray-500 mt-1">
-            {metrics.revenueAtRisk ? formatCurrency(metrics.revenueAtRisk, true) : '$0'} at risk
-          </div>
         </div>
       </div>
 
