@@ -1,18 +1,32 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjections, type ProjectionFilters } from '@/hooks/useProjections';
 import { getStartOfWeek } from '@/lib/projectionUtils';
 import { startOfMonth, startOfQuarter, format } from 'date-fns';
+import {
+  calculateCFOSummaryMetrics,
+  calculateRevenueByClient,
+  calculateRevenueByServiceType,
+  comparePeriods,
+} from '@/lib/cfoUtils';
+import { useReactToPrint } from 'react-to-print';
 import ProjectionFiltersComponent from '../components/ProjectionFilters';
 import ProjectionsTable from '../components/ProjectionsTable';
 import FacilityToggle from '../components/FacilityToggle';
 import GranularityToggle, { type Granularity } from '../components/GranularityToggle';
 import PageHeader from '../components/PageHeader';
 import Pagination from '../components/Pagination';
+import ProjectionsPDFHeader from '../components/ProjectionsPDFHeader';
+import ProjectionsPDFSummary from '../components/ProjectionsPDFSummary';
+import ProjectionsPDFTable from '../components/ProjectionsPDFTable';
+import FinancialsPDFHeader from '../components/FinancialsPDFHeader';
+import FinancialsPDFSummary from '../components/FinancialsPDFSummary';
+import FinancialsPDFTables from '../components/FinancialsPDFTables';
+import CFODashboard from '../components/CFODashboard';
 
 // Dynamically import calendar and modals - only loaded when needed
 const EmbeddedCalendar = dynamic(() => import('../components/EmbeddedCalendar'), {
@@ -24,7 +38,7 @@ const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
   ssr: false,
 });
 
-type ViewMode = 'table' | 'calendar';
+type ViewMode = 'table' | 'calendar' | 'financials';
 
 export default function ProjectionsPage() {
   const [granularity, setGranularity] = useState<Granularity>('weekly');
@@ -43,8 +57,9 @@ export default function ProjectionsPage() {
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
 
-  // PDF export ref - targets the main content area
-  const contentRef = useRef<HTMLDivElement>(null);
+  // PDF export refs
+  const printRef = useRef<HTMLDivElement>(null);
+  const financialsPrintRef = useRef<HTMLDivElement>(null);
 
   const filters: ProjectionFilters = {
     facility: selectedFacility,
@@ -112,35 +127,99 @@ export default function ProjectionsPage() {
     }
   };
 
-  // PDF export handler - dynamically loads react-to-print only when needed
-  const handleExportPDF = async () => {
-    const { useReactToPrint } = await import('react-to-print');
-    const handlePrint = useReactToPrint({
-      contentRef: contentRef,
-      documentTitle: `Projections_${viewMode}_${granularity}_${format(startDate, 'yyyy-MM-dd')}`,
-      pageStyle: `
-        @page {
-          size: landscape;
-          margin: 0.5in;
+  // Get client names for PDF header
+  const selectedClientNames = useMemo(() => {
+    return jobProjections
+      .filter(proj => proj.job.client && selectedClients.includes(proj.job.client.id))
+      .map(proj => proj.job.client?.name || 'Unknown')
+      .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
+  }, [jobProjections, selectedClients]);
+
+  // PDF print handler for projections
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Projections_Report_${format(startDate, 'yyyy-MM-dd')}`,
+    onBeforePrint: () => {
+      return new Promise((resolve) => {
+        // Give content time to render
+        setTimeout(resolve, 100);
+      });
+    },
+    pageStyle: `
+      @page {
+        size: landscape;
+        margin: 20mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
-        @media print {
-          body {
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-          }
-          /* Hide elements not needed in PDF */
-          .no-print {
-            display: none !important;
-          }
-          /* Hide pagination in PDF */
-          nav {
-            display: none !important;
-          }
+        .no-print {
+          display: none !important;
         }
-      `,
-    });
-    handlePrint();
-  };
+        .pdf-header,
+        .pdf-summary,
+        .pdf-table {
+          page-break-inside: avoid;
+        }
+      }
+    `,
+  });
+
+  // PDF print handler for financials
+  const handleFinancialsPrint = useReactToPrint({
+    contentRef: financialsPrintRef,
+    documentTitle: `Financial_Analysis_${format(startDate, 'yyyy-MM-dd')}`,
+    onBeforePrint: () => {
+      return new Promise((resolve) => {
+        // Give content time to render
+        setTimeout(resolve, 100);
+      });
+    },
+    pageStyle: `
+      @page {
+        size: landscape;
+        margin: 20mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .pdf-header,
+        .pdf-summary,
+        .pdf-tables {
+          page-break-inside: avoid;
+        }
+      }
+    `,
+  });
+
+  // Calculate data for financials PDF export
+  const financialsData = useMemo(() => {
+    const jobs = filteredJobProjections.map(p => p.job);
+    const summary = calculateCFOSummaryMetrics(jobs);
+    const topClients = calculateRevenueByClient(jobs).slice(0, 10);
+    const serviceTypes = calculateRevenueByServiceType(jobs);
+
+    // Calculate additional metrics
+    const totalClients = new Set(jobs.map(j => j.clients_id)).size;
+    const primaryProcessType = serviceTypes[0]?.serviceType || 'N/A';
+    const revenuePerJob = jobs.length > 0 ? totalRevenue / jobs.length : 0;
+
+    return {
+      summary,
+      topClients,
+      serviceTypes,
+      totalClients,
+      primaryProcessType,
+      revenuePerJob,
+    };
+  }, [filteredJobProjections, totalRevenue]);
 
   if (userLoading) {
     return (
@@ -173,25 +252,6 @@ export default function ProjectionsPage() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleExportPDF}
-              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-[var(--dark-blue)] transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Export PDF
-            </button>
             <GranularityToggle
               currentGranularity={granularity}
               onGranularityChange={handleGranularityChange}
@@ -200,7 +260,8 @@ export default function ProjectionsPage() {
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--border)] overflow-x-auto no-print">
+        <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] no-print">
+          <div className="flex gap-2 overflow-x-auto">
           <button
             onClick={() => setViewMode('table')}
             className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
@@ -220,6 +281,23 @@ export default function ProjectionsPage() {
             }`}
           >
             Calendar View
+          </button>
+          <button
+            onClick={() => setViewMode('financials')}
+            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+              viewMode === 'financials'
+                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+            }`}
+          >
+            Financials
+          </button>
+          </div>
+          <button
+            onClick={viewMode === 'financials' ? handleFinancialsPrint : handlePrint}
+            className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap ml-4"
+          >
+            Export PDF
           </button>
         </div>
 
@@ -243,8 +321,8 @@ export default function ProjectionsPage() {
           />
         </div>
 
-        {/* Content - This is what gets printed */}
-        <div ref={contentRef}>
+        {/* Content */}
+        <div>
         {error ? (
           <div className="text-center py-12">
             <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl mx-auto">
@@ -423,10 +501,90 @@ export default function ProjectionsPage() {
                 />
               </div>
             )}
+
+            {/* Financials View */}
+            {viewMode === 'financials' && (
+              <CFODashboard
+                jobs={filteredJobProjections.map(p => p.job)}
+                timeRanges={timeRanges}
+                totalRevenue={totalRevenue}
+                periodLabel={`Current ${granularity === 'weekly' ? '6 Weeks' : granularity === 'monthly' ? '6 Months' : '6 Quarters'}`}
+                previousPeriodLabel={`Previous ${granularity === 'weekly' ? '6 Weeks' : granularity === 'monthly' ? '6 Months' : '6 Quarters'}`}
+                startDate={startDate.getTime()}
+                endDate={timeRanges.length > 0 ? timeRanges[timeRanges.length - 1].endDate.getTime() : startDate.getTime()}
+                facilitiesId={selectedFacility || undefined}
+                granularity={granularity}
+                selectedClients={selectedClientNames}
+                selectedServiceTypes={selectedServiceTypes}
+                searchQuery={searchQuery}
+                filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
+                printRef={financialsPrintRef}
+              />
+            )}
           </>
         )}
         </div>
       </main>
+
+      {/* Hidden PDF Export Content - Projections */}
+      <div className="hidden">
+        <div ref={printRef} className="p-8 bg-white">
+          <ProjectionsPDFHeader
+            startDate={startDate}
+            granularity={granularity}
+            facility={selectedFacility}
+            selectedClients={selectedClientNames}
+            selectedServiceTypes={selectedServiceTypes}
+            searchQuery={searchQuery}
+            scheduleFilter={scheduleFilter}
+            filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
+          />
+          <ProjectionsPDFSummary
+            totalJobs={totalJobsInTimeframe}
+            totalRevenue={totalRevenue}
+            totalQuantity={grandTotals.grandTotal}
+            serviceTypeCount={serviceSummaries.length}
+            averagePerPeriod={Math.round(grandTotals.grandTotal / timeRanges.length)}
+            granularity={granularity}
+            processTypeCounts={processTypeCounts}
+            serviceSummaries={serviceSummaries}
+          />
+          <ProjectionsPDFTable
+            timeRanges={timeRanges}
+            jobProjections={filteredJobProjections}
+            serviceSummaries={serviceSummaries}
+            grandTotals={grandTotals}
+          />
+        </div>
+      </div>
+
+      {/* Hidden PDF Export Content - Financials */}
+      <div className="hidden">
+        <div ref={financialsPrintRef} className="p-8 bg-white">
+          <FinancialsPDFHeader
+            dateRange={{
+              start: startDate,
+              end: timeRanges.length > 0 ? timeRanges[timeRanges.length - 1].endDate : startDate
+            }}
+            granularity={granularity}
+            facility={selectedFacility}
+            selectedClients={selectedClientNames}
+            selectedServiceTypes={selectedServiceTypes}
+            searchQuery={searchQuery}
+            filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
+          />
+          <FinancialsPDFSummary
+            summary={financialsData.summary}
+            totalClients={financialsData.totalClients}
+            primaryProcessType={financialsData.primaryProcessType}
+            revenuePerJob={financialsData.revenuePerJob}
+          />
+          <FinancialsPDFTables
+            topClients={financialsData.topClients}
+            serviceTypes={financialsData.serviceTypes}
+          />
+        </div>
+      </div>
 
       {/* Add Job Modal */}
       <AddJobModal

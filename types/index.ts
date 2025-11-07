@@ -187,4 +187,6 @@ export interface ProductionComparison {
   actual_quantity: number;
   variance: number; // actual - projected
   variance_percentage: number; // (variance / projected) * 100
+  entry_ids: number[]; // Array of production entry IDs for this job in the period
+  last_updated_at?: number; // Timestamp of most recent production entry for this job
 }

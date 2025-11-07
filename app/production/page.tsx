@@ -1,24 +1,27 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useJobs } from '@/hooks/useJobs';
 import { useProduction } from '@/hooks/useProduction';
-import { startOfWeek, endOfWeek, startOfDay, endOfDay, addWeeks, addDays, format } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth, addWeeks, addDays, addMonths, format } from 'date-fns';
+import { useReactToPrint } from 'react-to-print';
 import PageHeader from '../components/PageHeader';
 import FacilityToggle from '../components/FacilityToggle';
+import ProductionGranularityToggle from '../components/ProductionGranularityToggle';
 import ProductionComparisonTable from '../components/ProductionComparisonTable';
 import ProductionCharts from '../components/ProductionCharts';
 import ProductionSummaryCards from '../components/ProductionSummaryCards';
+import ProductionFilters from '../components/ProductionFilters';
+import ProductionPDFHeader from '../components/ProductionPDFHeader';
+import ProductionPDFSummary from '../components/ProductionPDFSummary';
+import ProductionPDFTable from '../components/ProductionPDFTable';
+import { calculateProductionSummary } from '@/lib/productionUtils';
 import type { ProductionComparison } from '@/types';
 
 // Dynamically import modals - only loaded when opened
-const BatchProductionEntryModal = dynamic(() => import('../components/BatchProductionEntryModal'), {
-  ssr: false,
-});
-
 const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
   ssr: false,
 });
@@ -27,17 +30,26 @@ const EditProductionEntryModal = dynamic(() => import('../components/EditProduct
   ssr: false,
 });
 
-type GranularityType = 'day' | 'week';
+type GranularityType = 'day' | 'week' | 'month';
 
 export default function ProductionPage() {
   const [granularity, setGranularity] = useState<GranularityType>('week');
   const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isBatchMode, setIsBatchMode] = useState(false);
   const [isAddJobModalOpen, setIsAddJobModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedComparison, setSelectedComparison] = useState<ProductionComparison | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [activeView, setActiveView] = useState<'table' | 'analytics'>('table');
+
+  // Filter states
+  const [selectedClients, setSelectedClients] = useState<number[]>([]);
+  const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<'and' | 'or'>('and');
+
+  // PDF export ref
+  const printRef = useRef<HTMLDivElement>(null);
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -51,6 +63,14 @@ export default function ProductionPage() {
       return {
         startDate: weekStart.getTime(),
         endDate: weekEnd.getTime(),
+      };
+    } else if (granularity === 'month') {
+      // Get the month for the current date
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(currentDate);
+      return {
+        startDate: monthStart.getTime(),
+        endDate: monthEnd.getTime(),
       };
     } else {
       // Get current day
@@ -77,6 +97,72 @@ export default function ProductionPage() {
 
   const isLoading = jobsLoading || productionLoading;
 
+  // Map legacy process type names to new full names for filtering
+  const normalizeProcessType = (processType: string): string => {
+    const mapping: Record<string, string> = {
+      'IJ': 'Inkjet',
+      'L/A': 'Label/Apply',
+    };
+    return mapping[processType] || processType;
+  };
+
+  // Filter comparisons based on selected filters
+  const filteredComparisons = useMemo(() => {
+    return comparisons.filter(comparison => {
+      const job = comparison.job;
+
+      // Search query filter
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        const matchesSearch =
+          job.job_name?.toLowerCase().includes(searchLower) ||
+          job.client?.name?.toLowerCase().includes(searchLower) ||
+          job.job_number?.toString().includes(searchLower);
+
+        if (!matchesSearch) return false;
+      }
+
+      // Client filter
+      const clientMatch = selectedClients.length === 0 ||
+        (job.client && selectedClients.includes(job.client.id));
+
+      // Process type filter
+      const processTypeMatch = selectedServiceTypes.length === 0 ||
+        (job.requirements && job.requirements.some(req =>
+          req.process_type && selectedServiceTypes.includes(normalizeProcessType(req.process_type))
+        ));
+
+      // Apply filter mode (AND/OR)
+      if (filterMode === 'and') {
+        // For AND mode: must match all active filters
+        const activeFilters = [
+          selectedClients.length > 0,
+          selectedServiceTypes.length > 0,
+        ];
+
+        // If no filters are active, show all (after search)
+        if (!activeFilters.some(f => f)) return true;
+
+        // Must match all active filters
+        return (!activeFilters[0] || clientMatch) &&
+               (!activeFilters[1] || processTypeMatch);
+      } else {
+        // For OR mode: must match at least one active filter
+        const activeFilters = [
+          selectedClients.length > 0,
+          selectedServiceTypes.length > 0,
+        ];
+
+        // If no filters are active, show all (after search)
+        if (!activeFilters.some(f => f)) return true;
+
+        // Must match at least one active filter
+        return (activeFilters[0] && clientMatch) ||
+               (activeFilters[1] && processTypeMatch);
+      }
+    });
+  }, [comparisons, selectedClients, selectedServiceTypes, searchQuery, filterMode]);
+
   // Handle successful batch entry
   const handleBatchEntrySuccess = async () => {
     await refetchProduction();
@@ -102,6 +188,8 @@ export default function ProductionPage() {
   const handlePreviousPeriod = () => {
     if (granularity === 'week') {
       setCurrentDate((prev) => addWeeks(prev, -1));
+    } else if (granularity === 'month') {
+      setCurrentDate((prev) => addMonths(prev, -1));
     } else {
       setCurrentDate((prev) => addDays(prev, -1));
     }
@@ -110,6 +198,8 @@ export default function ProductionPage() {
   const handleNextPeriod = () => {
     if (granularity === 'week') {
       setCurrentDate((prev) => addWeeks(prev, 1));
+    } else if (granularity === 'month') {
+      setCurrentDate((prev) => addMonths(prev, 1));
     } else {
       setCurrentDate((prev) => addDays(prev, 1));
     }
@@ -123,10 +213,57 @@ export default function ProductionPage() {
   const dateRangeDisplay = useMemo(() => {
     if (granularity === 'week') {
       return `${format(new Date(startDate), 'MMM d, yyyy')} - ${format(new Date(endDate), 'MMM d, yyyy')}`;
+    } else if (granularity === 'month') {
+      return format(new Date(startDate), 'MMMM yyyy');
     } else {
       return format(new Date(startDate), 'EEEE, MMMM d, yyyy');
     }
   }, [granularity, startDate, endDate]);
+
+  // Calculate summary for PDF export
+  const summary = useMemo(() => {
+    return calculateProductionSummary(filteredComparisons);
+  }, [filteredComparisons]);
+
+  // Get client names for PDF header
+  const selectedClientNames = useMemo(() => {
+    return jobs
+      .filter(job => job.client && selectedClients.includes(job.client.id))
+      .map(job => job.client?.name || 'Unknown')
+      .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
+  }, [jobs, selectedClients]);
+
+  // PDF print handler
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Production_Report_${format(new Date(startDate), 'yyyy-MM-dd')}`,
+    onBeforePrint: () => {
+      return new Promise((resolve) => {
+        // Give content time to render
+        setTimeout(resolve, 100);
+      });
+    },
+    pageStyle: `
+      @page {
+        size: landscape;
+        margin: 20mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .pdf-header,
+        .pdf-summary,
+        .pdf-table {
+          page-break-inside: avoid;
+        }
+      }
+    `,
+  });
 
   if (userLoading) {
     return (
@@ -146,115 +283,77 @@ export default function ProductionPage() {
         showAddJobButton={true}
       />
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Header Section */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Production Tracking</h1>
-          <p className="text-gray-600">
-            Track actual production against projections and analyze performance
-          </p>
-        </div>
-
-        {/* Controls Section */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            {/* Left side - Facility & Granularity */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <FacilityToggle
-                currentFacility={selectedFacility}
-                onFacilityChange={setSelectedFacility}
-              />
-
-              {/* Granularity Toggle */}
-              <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setGranularity('day')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    granularity === 'day'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Day
-                </button>
-                <button
-                  onClick={() => setGranularity('week')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    granularity === 'week'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Week
-                </button>
-              </div>
-            </div>
-
-            {/* Right side - Date Navigation & Batch Entry */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center w-full lg:w-auto">
-              {/* Date Navigation */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePreviousPeriod}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium"
-                >
-                  ← Previous
-                </button>
-                <button
-                  onClick={handleToday}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium"
-                >
-                  Today
-                </button>
-                <button
-                  onClick={handleNextPeriod}
-                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium"
-                >
-                  Next →
-                </button>
-              </div>
-
-              {/* Batch Entry Button */}
-              <button
-                onClick={() => setIsBatchModalOpen(true)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium text-sm w-full sm:w-auto"
-              >
-                + Batch Entry
-              </button>
-            </div>
+      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Header Section with Toggles */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
+              Production Tracking
+            </h2>
+            <FacilityToggle
+              currentFacility={selectedFacility}
+              onFacilityChange={setSelectedFacility}
+            />
           </div>
-
-          {/* Date Range Display */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Viewing: <span className="font-semibold text-gray-900">{dateRangeDisplay}</span>
-            </p>
+          <div className="flex items-center gap-3">
+            <ProductionGranularityToggle
+              currentGranularity={granularity}
+              onGranularityChange={setGranularity}
+            />
           </div>
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--border)] overflow-x-auto no-print">
-          <button
-            onClick={() => setActiveView('table')}
-            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-              activeView === 'table'
-                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-            }`}
-          >
-            Table View
-          </button>
-          <button
-            onClick={() => setActiveView('analytics')}
-            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-              activeView === 'analytics'
-                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-            }`}
-          >
-            Analytics
-          </button>
+        <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] no-print">
+          <div className="flex gap-2 overflow-x-auto">
+            <button
+              onClick={() => setActiveView('table')}
+              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+                activeView === 'table'
+                  ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                  : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+              }`}
+            >
+              Table View
+            </button>
+            <button
+              onClick={() => setActiveView('analytics')}
+              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+                activeView === 'analytics'
+                  ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                  : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+              }`}
+            >
+              Analytics
+            </button>
+          </div>
+          {filteredComparisons.length > 0 && (
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap ml-4"
+            >
+              Export PDF
+            </button>
+          )}
         </div>
+
+        {/* Filters */}
+        <ProductionFilters
+          jobs={jobs}
+          selectedClients={selectedClients}
+          onClientsChange={setSelectedClients}
+          selectedServiceTypes={selectedServiceTypes}
+          onServiceTypesChange={setSelectedServiceTypes}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          granularity={granularity}
+          dateRangeDisplay={dateRangeDisplay}
+          onPreviousPeriod={handlePreviousPeriod}
+          onNextPeriod={handleNextPeriod}
+          onToday={handleToday}
+        />
 
         {/* Loading State */}
         {isLoading && (
@@ -287,30 +386,49 @@ export default function ProductionPage() {
               </div>
             )}
 
+            {/* Show message when filters result in no data */}
+            {comparisons.length > 0 && filteredComparisons.length === 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                  No Results Found
+                </h3>
+                <p className="text-yellow-800">
+                  No production data matches your current filters. Try adjusting your search criteria or clearing some filters.
+                </p>
+              </div>
+            )}
+
             {/* Table View */}
-            {activeView === 'table' && comparisons.length > 0 && (
+            {activeView === 'table' && filteredComparisons.length > 0 && (
               <>
                 {/* Summary Cards */}
                 <div className="mb-6">
-                  <ProductionSummaryCards comparisons={comparisons} />
+                  <ProductionSummaryCards comparisons={filteredComparisons} />
                 </div>
 
                 {/* Comparison Table */}
                 <div className="mb-6">
                   <ProductionComparisonTable
-                    comparisons={comparisons}
+                    comparisons={filteredComparisons}
                     onEdit={handleEditComparison}
+                    isBatchMode={isBatchMode}
+                    onToggleBatchMode={() => setIsBatchMode(!isBatchMode)}
+                    onBatchSave={handleBatchEntrySuccess}
+                    startDate={startDate}
+                    endDate={endDate}
+                    facilitiesId={selectedFacility || undefined}
+                    granularity={granularity}
                   />
                 </div>
               </>
             )}
 
             {/* Analytics View */}
-            {activeView === 'analytics' && comparisons.length > 0 && (
+            {activeView === 'analytics' && filteredComparisons.length > 0 && (
               <>
                 {/* Charts */}
                 <div className="mb-6">
-                  <ProductionCharts comparisons={comparisons} />
+                  <ProductionCharts comparisons={filteredComparisons} />
                 </div>
               </>
             )}
@@ -318,17 +436,22 @@ export default function ProductionPage() {
         )}
       </main>
 
-      {/* Batch Production Entry Modal */}
-      <BatchProductionEntryModal
-        isOpen={isBatchModalOpen}
-        onClose={() => setIsBatchModalOpen(false)}
-        onSuccess={handleBatchEntrySuccess}
-        jobs={jobs}
-        startDate={startDate}
-        endDate={endDate}
-        facilitiesId={selectedFacility || undefined}
-        granularity={granularity}
-      />
+      {/* Hidden PDF Export Content */}
+      <div className="hidden">
+        <div ref={printRef} className="p-8 bg-white">
+          <ProductionPDFHeader
+            dateRange={{ start: new Date(startDate), end: new Date(endDate) }}
+            granularity={granularity}
+            facility={selectedFacility}
+            selectedClients={selectedClientNames}
+            selectedProcessTypes={selectedServiceTypes}
+            searchQuery={searchQuery}
+            filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
+          />
+          <ProductionPDFSummary summary={summary} />
+          <ProductionPDFTable comparisons={filteredComparisons} />
+        </div>
+      </div>
 
       {/* Add Job Modal */}
       <AddJobModal

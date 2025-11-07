@@ -268,8 +268,9 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
                     Facility <span className="text-red-500">*</span>
                   </label>
                   <FacilityToggle
-                    value={formData.facilities_id}
-                    onChange={(facilityId) => setFormData({ ...formData, facilities_id: facilityId })}
+                    currentFacility={formData.facilities_id}
+                    onFacilityChange={(facilityId) => setFormData({ ...formData, facilities_id: facilityId })}
+                    showAll={false}
                   />
                   {errors.facilities_id && <p className="mt-1 text-sm text-red-600">{errors.facilities_id}</p>}
                 </div>

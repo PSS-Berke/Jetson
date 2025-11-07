@@ -171,19 +171,19 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
             </div>
 
             {/* Weekly Quantity Distribution */}
-            {job.weekly_split && job.weekly_split.length > 0 && (
+            {(job as any).weekly_split && (job as any).weekly_split.length > 0 && (
               <div className="mt-6">
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-sm font-semibold text-[var(--dark-blue)]">
-                      Weekly Quantity Distribution ({job.weekly_split.length} {job.weekly_split.length === 1 ? 'week' : 'weeks'})
+                      Weekly Quantity Distribution ({(job as any).weekly_split.length} {(job as any).weekly_split.length === 1 ? 'week' : 'weeks'})
                     </h4>
                     <div className="text-sm font-semibold text-[var(--text-dark)]">
-                      Total: {job.weekly_split.reduce((sum, qty) => sum + qty, 0).toLocaleString()}
+                      Total: {(job as any).weekly_split.reduce((sum: number, qty: number) => sum + qty, 0).toLocaleString()}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {job.weekly_split.map((qty, index) => (
+                    {(job as any).weekly_split.map((qty: number, index: number) => (
                       <div key={index} className="bg-white rounded-md p-3 border border-gray-200">
                         <div className="text-xs font-medium text-[var(--text-light)] mb-1">
                           Week {index + 1}
@@ -214,120 +214,119 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
             </div>
           </div>
 
-          {/* Machines Section */}
-          <div className="border-t border-[var(--border)] pt-6">
-            <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Assigned Machines</h3>
-            {job.machines && job.machines.length > 0 ? (
-              <div className="space-y-2">
-                {job.machines.map((machine, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="w-2 h-2 rounded-full bg-[var(--primary-blue)]"></div>
-                    <span className="text-base text-[var(--text-dark)]">Line {machine.line}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-base text-[var(--text-light)]">No machines assigned</p>
-            )}
-          </div>
-
           {/* Pricing Section */}
           <div className="border-t border-[var(--border)] pt-6">
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Pricing</h3>
-            {job.requirements && job.requirements.length > 0 && job.requirements.some(req => req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== '') ? (
-              <div className="space-y-4">
-                {/* Requirements Pricing */}
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-light)] mb-3">Requirements Pricing:</p>
-                  <div className="space-y-2">
-                    {job.requirements.map((req, index) => {
-                      const pricePerM = parseFloat(req.price_per_m || '0');
-                      const requirementTotal = (job.quantity / 1000) * pricePerM;
+            {job.requirements && job.requirements.length > 0 ? (
+              <div className="space-y-3">
+                {/* Revenue per Process */}
+                {(() => {
+                  // Debug logging
+                  console.log('[JobDetailsModal] Job data:', {
+                    jobNumber: job.job_number,
+                    quantity: job.quantity,
+                    total_billing: job.total_billing,
+                    add_on_charges: job.add_on_charges,
+                    requirements: job.requirements
+                  });
 
-                      // Skip rendering if no price_per_m for this requirement
-                      if (req.price_per_m === undefined || req.price_per_m === null || req.price_per_m === '') {
-                        return null;
+                  // Calculate total revenue from requirements
+                  const requirementsTotal = job.requirements.reduce((total, req) => {
+                    // Handle "undefined" string, null, undefined, and empty string
+                    const pricePerMStr = req.price_per_m;
+                    const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+                    const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+                    console.log(`[JobDetailsModal] Requirement ${req.process_type}: price_per_m="${req.price_per_m}", parsed=${pricePerM}`);
+                    return total + ((job.quantity / 1000) * pricePerM);
+                  }, 0);
+
+                  // Get the actual total billing
+                  const totalBilling = parseFloat(job.total_billing || '0');
+                  const addOnCharges = parseFloat(job.add_on_charges || '0');
+                  const revenueWithoutAddOns = totalBilling - addOnCharges;
+
+                  console.log('[JobDetailsModal] Calculations:', {
+                    requirementsTotal,
+                    totalBilling,
+                    addOnCharges,
+                    revenueWithoutAddOns
+                  });
+
+                  // If requirements don't have price_per_m but we have total_billing, distribute it
+                  const shouldDistribute = revenueWithoutAddOns > 0 && requirementsTotal === 0;
+
+                  return job.requirements.map((req, index) => {
+                    // Handle "undefined" string, null, undefined, and empty string
+                    const pricePerMStr = req.price_per_m;
+                    const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+                    const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+                    let processRevenue = (job.quantity / 1000) * pricePerM;
+
+                    // Distribute revenue if price_per_m is missing
+                    if (shouldDistribute) {
+                      // If only one requirement, give it all the revenue
+                      if (job.requirements.length === 1) {
+                        processRevenue = revenueWithoutAddOns;
+                      } else {
+                        // Distribute evenly across all requirements
+                        processRevenue = revenueWithoutAddOns / job.requirements.length;
                       }
+                    }
 
-                      return (
-                        <div key={index} className="bg-gray-50 rounded-lg p-4">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm font-semibold text-[var(--text-dark)]">Requirement {index + 1}</p>
-                              <p className="text-xs text-[var(--text-light)] mt-1">
-                                {req.process_type} | {req.paper_size}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-[var(--text-light)]">${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</p>
-                              <p className="text-base font-semibold text-[var(--text-dark)]">${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Requirements Subtotal */}
-                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-300">
-                    <span className="text-sm font-semibold text-[var(--text-dark)]">Requirements Subtotal:</span>
-                    <span className="text-base font-semibold text-[var(--text-dark)]">
-                      ${job.requirements.reduce((total, req) => {
-                        const pricePerM = parseFloat(req.price_per_m || '0');
-                        return total + ((job.quantity / 1000) * pricePerM);
-                      }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
+                    return (
+                      <div key={index} className="flex justify-between items-center py-2">
+                        <span className="text-sm text-[var(--text-dark)]">
+                          Revenue from {req.process_type}:
+                        </span>
+                        <span className="text-base font-semibold text-[var(--text-dark)]">
+                          ${processRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
 
                 {/* Add-On Charges */}
                 {job.add_on_charges && parseFloat(job.add_on_charges) > 0 && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="text-sm font-semibold text-[var(--text-dark)]">Additional Charges:</span>
-                        <p className="text-xs text-[var(--text-light)] mt-1">
-                          (Setup fees, rush charges, etc.)
-                        </p>
-                      </div>
-                      <span className="text-base font-semibold text-[var(--text-dark)]">
-                        ${parseFloat(job.add_on_charges).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Extended Price (only if different from total_billing) */}
-                {job.ext_price && parseFloat(job.ext_price) > 0 && job.total_billing && parseFloat(job.ext_price) !== parseFloat(job.total_billing) && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="text-sm font-semibold text-[var(--text-dark)]">Extended Price:</span>
-                        <p className="text-xs text-[var(--text-light)] mt-1">
-                          (External/Override pricing)
-                        </p>
-                      </div>
-                      <span className="text-base font-semibold text-[var(--text-dark)]">
-                        ${parseFloat(job.ext_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Total Billing */}
-                <div className="pt-4 mt-4 border-t-2 border-[var(--primary-blue)]">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-[var(--text-dark)]">TOTAL BILLING:</span>
-                    <span className="text-2xl font-bold text-[var(--primary-blue)]">
-                      ${job.total_billing ? parseFloat(job.total_billing).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-[var(--text-dark)]">Add-on Charges:</span>
+                    <span className="text-base font-semibold text-[var(--text-dark)]">
+                      ${parseFloat(job.add_on_charges).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
+                )}
+
+                {/* Total Revenue */}
+                <div className="flex justify-between items-center py-3 border-t-2 border-[var(--primary-blue)] mt-3">
+                  <span className="text-base font-bold text-[var(--text-dark)]">Total Revenue:</span>
+                  <span className="text-xl font-bold text-[var(--primary-blue)]">
+                    ${job.total_billing ? parseFloat(job.total_billing).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                      (job.requirements.reduce((total, req) => {
+                        const pricePerM = parseFloat(req.price_per_m || '0');
+                        return total + ((job.quantity / 1000) * pricePerM);
+                      }, 0) + parseFloat(job.add_on_charges || '0')).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    }
+                  </span>
+                </div>
+
+                {/* Revenue per Unit */}
+                <div className="flex justify-between items-center py-2 bg-gray-50 rounded-lg px-4">
+                  <span className="text-sm text-[var(--text-dark)]">Revenue per Unit:</span>
+                  <span className="text-base font-semibold text-[var(--text-dark)]">
+                    ${job.quantity > 0 ? (
+                      (parseFloat(job.total_billing || '0') ||
+                        (job.requirements.reduce((total, req) => {
+                          const pricePerM = parseFloat(req.price_per_m || '0');
+                          return total + ((job.quantity / 1000) * pricePerM);
+                        }, 0) + parseFloat(job.add_on_charges || '0'))
+                      ) / job.quantity
+                    ).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '0.0000'}
+                  </span>
                 </div>
               </div>
             ) : (
               <div className="text-base text-[var(--text-light)]">
-                <p>No pricing information available for this job.</p>
-                <p className="text-xs mt-2">(This job may have been created before the new pricing structure)</p>
+                <p>No requirements found for this job.</p>
               </div>
             )}
           </div>

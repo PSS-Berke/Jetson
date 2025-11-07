@@ -145,7 +145,7 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess }
         line: parseInt(formData.line),
         type: formData.type,
         process_type_key: formData.process_type_key,
-        facilities_id: formData.facilities_id,
+        facilities_id: formData.facilities_id || undefined,
         status: formData.status,
         speed_hr: parseFloat(formData.speed_hr),
         shiftCapacity: parseFloat(formData.shiftCapacity),
@@ -305,8 +305,9 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess }
                     Facility <span className="text-red-500">*</span>
                   </label>
                   <FacilityToggle
-                    value={formData.facilities_id}
-                    onChange={(facilityId) => setFormData({ ...formData, facilities_id: facilityId })}
+                    currentFacility={formData.facilities_id}
+                    onFacilityChange={(facilityId) => setFormData({ ...formData, facilities_id: facilityId })}
+                    showAll={false}
                   />
                   {errors.facilities_id && <p className="mt-1 text-sm text-red-600">{errors.facilities_id}</p>}
                 </div>

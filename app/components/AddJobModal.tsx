@@ -443,6 +443,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         payload.facilities_id = formData.facilities_id;
       }
 
+      console.log('[AddJobModal] Requirements before stringify:', formData.requirements);
+      console.log('[AddJobModal] Requirements after stringify:', JSON.stringify(formData.requirements));
       console.log('[AddJobModal] facilities_id in formData:', formData.facilities_id);
       console.log('[AddJobModal] facilities_id in payload:', payload.facilities_id);
       console.log('[AddJobModal] Full payload being sent to Xano:', payload);
@@ -865,20 +867,49 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   const quantity = parseInt(formData.quantity || '0');
                   const pricePerM = parseFloat(req.price_per_m || '0');
                   const requirementTotal = (quantity / 1000) * pricePerM;
+                  const processConfig = getProcessTypeConfig(req.process_type);
 
                   return (
-                    <div key={index} className="mb-3 pb-3 border-b border-[var(--border)] last:border-b-0">
+                    <div key={index} className="mb-4 pb-4 border-b border-[var(--border)] last:border-b-0">
                       <div className="text-sm">
-                        <div className="mb-1">
+                        <div className="mb-2">
                           <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            {req.process_type} | {req.paper_size} | Pockets: {req.pockets} | Shift: {req.shifts_id}
+                            {processConfig?.label || req.process_type}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</span>
+
+                        {/* Display all fields for this requirement */}
+                        <div className="grid grid-cols-2 gap-2 mb-2 ml-4">
+                          {processConfig?.fields.map((fieldConfig) => {
+                            const fieldValue = req[fieldConfig.name as keyof typeof req];
+
+                            // Skip if field has no value
+                            if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+                              return null;
+                            }
+
+                            // Format the value based on field type
+                            let displayValue: string;
+                            if (fieldConfig.type === 'currency') {
+                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            } else {
+                              displayValue = String(fieldValue);
+                            }
+
+                            return (
+                              <div key={fieldConfig.name} className="text-xs">
+                                <span className="text-[var(--text-light)]">{fieldConfig.label}: </span>
+                                <span className="text-[var(--text-dark)] font-medium">{displayValue}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-[var(--text-light)]">Subtotal for this requirement:</span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            Subtotal: ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>

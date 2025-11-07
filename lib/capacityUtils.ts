@@ -46,7 +46,7 @@ export const calculateMultiMachineTimeEstimate = (
 
   // Calculate total speed across all machines
   const totalSpeed = machines.reduce((sum, machine) => {
-    return sum + parseSpeedPerHour(machine.speed_hr);
+    return sum + parseSpeedPerHour(String(machine.speed_hr));
   }, 0);
 
   if (totalSpeed === 0) return 0;
@@ -68,7 +68,7 @@ export const distributeHoursAcrossMachines = (
 
   // Calculate total speed
   const totalSpeed = machines.reduce((sum, machine) => {
-    return sum + parseSpeedPerHour(machine.speed_hr);
+    return sum + parseSpeedPerHour(String(machine.speed_hr));
   }, 0);
 
   if (totalSpeed === 0) {
@@ -82,7 +82,7 @@ export const distributeHoursAcrossMachines = (
 
   // Distribute hours proportionally based on speed
   machines.forEach(machine => {
-    const machineSpeed = parseSpeedPerHour(machine.speed_hr);
+    const machineSpeed = parseSpeedPerHour(String(machine.speed_hr));
     const proportion = machineSpeed / totalSpeed;
     hoursPerMachine.set(machine.id, totalHours * proportion);
   });

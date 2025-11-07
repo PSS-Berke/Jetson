@@ -71,16 +71,38 @@ export const aggregateProductionByWeek = (
 /**
  * Aggregate production entries by job
  * @param entries - Array of production entries
- * @returns Map of job IDs to total quantities
+ * @param startDate - Optional start date filter (timestamp)
+ * @param endDate - Optional end date filter (timestamp)
+ * @returns Map of job IDs to { total quantity, entry IDs, last updated timestamp }
  */
 export const aggregateProductionByJob = (
-  entries: ProductionEntry[]
-): Map<number, number> => {
-  const jobTotals = new Map<number, number>();
+  entries: ProductionEntry[],
+  startDate?: number,
+  endDate?: number
+): Map<number, { total: number; entryIds: number[]; lastUpdatedAt?: number }> => {
+  const jobTotals = new Map<number, { total: number; entryIds: number[]; lastUpdatedAt?: number }>();
 
   entries.forEach((entry) => {
-    const currentTotal = jobTotals.get(entry.job) || 0;
-    jobTotals.set(entry.job, currentTotal + entry.actual_quantity);
+    // Filter by date range if provided
+    if (startDate !== undefined && entry.date < startDate) {
+      return; // Skip entries before start date
+    }
+    if (endDate !== undefined && entry.date > endDate) {
+      return; // Skip entries after end date
+    }
+
+    const current = jobTotals.get(entry.job) || { total: 0, entryIds: [], lastUpdatedAt: undefined };
+
+    // Track the most recent created_at timestamp
+    const newLastUpdated = current.lastUpdatedAt
+      ? Math.max(current.lastUpdatedAt, entry.created_at)
+      : entry.created_at;
+
+    jobTotals.set(entry.job, {
+      total: current.total + entry.actual_quantity,
+      entryIds: [...current.entryIds, entry.id],
+      lastUpdatedAt: newLastUpdated,
+    });
   });
 
   return jobTotals;
@@ -100,8 +122,8 @@ export const mergeProjectionsWithActuals = (
   startDate: number,
   endDate: number
 ): ProductionComparison[] => {
-  // Aggregate actual production by job
-  const actualByJob = aggregateProductionByJob(productionEntries);
+  // Aggregate actual production by job, filtering by date range
+  const actualByJob = aggregateProductionByJob(productionEntries, startDate, endDate);
 
   // Filter jobs to those in the time range
   const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
@@ -120,8 +142,9 @@ export const mergeProjectionsWithActuals = (
         ? Math.round((job.quantity * periodDuration) / totalDuration)
         : job.quantity;
 
-    // Get actual quantity from production entries
-    const actual_quantity = actualByJob.get(job.id) || 0;
+    // Get actual quantity and entry IDs from production entries
+    const jobData = actualByJob.get(job.id) || { total: 0, entryIds: [], lastUpdatedAt: undefined };
+    const actual_quantity = jobData.total;
 
     // Calculate variance
     const { variance, variance_percentage } = calculateVariance(
@@ -135,6 +158,8 @@ export const mergeProjectionsWithActuals = (
       actual_quantity,
       variance,
       variance_percentage,
+      entry_ids: jobData.entryIds,
+      last_updated_at: jobData.lastUpdatedAt,
     };
   });
 };

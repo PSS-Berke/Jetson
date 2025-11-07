@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, FormEvent } from 'react';
-import { batchCreateProductionEntries } from '@/lib/api';
+import { batchCreateProductionEntries, getProductionEntries } from '@/lib/api';
 import { getJobsInTimeRange } from '@/lib/productionUtils';
 import Toast from './Toast';
 import type { ParsedJob } from '@/hooks/useJobs';
@@ -15,7 +15,7 @@ interface BatchProductionEntryModalProps {
   startDate: number;
   endDate: number;
   facilitiesId?: number;
-  granularity: 'day' | 'week';
+  granularity: 'day' | 'week' | 'month';
 }
 
 interface JobEntryData {
@@ -24,7 +24,9 @@ interface JobEntryData {
   job_name: string;
   client_name: string;
   projected_quantity: number;
-  actual_quantity: string;
+  current_actual: number; // Existing actual quantity from database
+  add_amount: string; // Amount to add to current actual
+  actual_quantity: string; // Total actual quantity (can be set directly)
   notes: string;
 }
 
@@ -47,43 +49,73 @@ export default function BatchProductionEntryModal({
   // Initialize job entries when modal opens or date range changes
   useEffect(() => {
     if (isOpen && jobs.length > 0) {
-      const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
+      const loadEntriesWithActuals = async () => {
+        const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
 
-      const entries: JobEntryData[] = relevantJobs.map((job) => {
-        // Calculate projected quantity for this period
-        const totalDuration = job.due_date - job.start_date;
-        const periodStart = Math.max(job.start_date, startDate);
-        const periodEnd = Math.min(job.due_date, endDate);
-        const periodDuration = periodEnd - periodStart;
+        // Fetch existing production entries for this period
+        const existingEntries = await getProductionEntries(facilitiesId, startDate, endDate);
 
-        const projected_quantity =
-          totalDuration > 0
-            ? Math.round((job.quantity * periodDuration) / totalDuration)
-            : job.quantity;
+        // Create a map of job_id to current actual quantity
+        const actualsMap = new Map<number, number>();
+        existingEntries.forEach(entry => {
+          const currentActual = actualsMap.get(entry.job) || 0;
+          actualsMap.set(entry.job, currentActual + entry.actual_quantity);
+        });
 
-        return {
-          job_id: job.id,
-          job_number: job.job_number,
-          job_name: job.job_name,
-          client_name: job.client?.name || 'Unknown',
-          projected_quantity,
-          actual_quantity: '',
-          notes: '',
-        };
-      });
+        const entries: JobEntryData[] = relevantJobs.map((job) => {
+          // Calculate projected quantity for this period
+          const totalDuration = job.due_date - job.start_date;
+          const periodStart = Math.max(job.start_date, startDate);
+          const periodEnd = Math.min(job.due_date, endDate);
+          const periodDuration = periodEnd - periodStart;
 
-      setJobEntries(entries);
+          const projected_quantity =
+            totalDuration > 0
+              ? Math.round((job.quantity * periodDuration) / totalDuration)
+              : job.quantity;
+
+          const current_actual = actualsMap.get(job.id) || 0;
+
+          return {
+            job_id: job.id,
+            job_number: job.job_number,
+            job_name: job.job_name,
+            client_name: job.client?.name || 'Unknown',
+            projected_quantity,
+            current_actual,
+            add_amount: '',
+            actual_quantity: '',
+            notes: '',
+          };
+        });
+
+        setJobEntries(entries);
+      };
+
+      loadEntriesWithActuals();
     }
-  }, [isOpen, jobs, startDate, endDate]);
+  }, [isOpen, jobs, startDate, endDate, facilitiesId]);
 
   // Handle input changes
-  const handleQuantityChange = (index: number, value: string) => {
+  const handleAddAmountChange = (index: number, value: string) => {
     // Remove any non-digit characters (including commas)
     const digitsOnly = value.replace(/\D/g, '');
 
-    // Store the formatted value with commas
+    const newEntries = [...jobEntries];
+    newEntries[index].add_amount = digitsOnly;
+    // Clear actual_quantity when using add_amount
+    newEntries[index].actual_quantity = '';
+    setJobEntries(newEntries);
+  };
+
+  const handleActualQuantityChange = (index: number, value: string) => {
+    // Remove any non-digit characters (including commas)
+    const digitsOnly = value.replace(/\D/g, '');
+
     const newEntries = [...jobEntries];
     newEntries[index].actual_quantity = digitsOnly;
+    // Clear add_amount when using actual_quantity
+    newEntries[index].add_amount = '';
     setJobEntries(newEntries);
   };
 
@@ -93,6 +125,16 @@ export default function BatchProductionEntryModal({
     setJobEntries(newEntries);
   };
 
+  // Calculate the new total for display
+  const getNewTotal = (entry: JobEntryData): number => {
+    if (entry.add_amount) {
+      return entry.current_actual + parseInt(entry.add_amount);
+    } else if (entry.actual_quantity) {
+      return parseInt(entry.actual_quantity);
+    }
+    return entry.current_actual;
+  };
+
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -100,21 +142,32 @@ export default function BatchProductionEntryModal({
     setErrorMessage('');
 
     try {
-      // Filter entries with actual quantities entered
+      // Filter entries with either add_amount or actual_quantity entered
       const entriesToSubmit = jobEntries
-        .filter((entry) => entry.actual_quantity.trim() !== '')
+        .filter((entry) => entry.add_amount.trim() !== '' || entry.actual_quantity.trim() !== '')
         .map((entry) => {
-          // Parse the quantity (already stored as digits only)
-          const actual_quantity = parseInt(entry.actual_quantity);
+          // Calculate the final actual quantity
+          let final_actual_quantity: number;
 
-          if (isNaN(actual_quantity) || actual_quantity < 0) {
-            throw new Error(`Invalid quantity for job ${entry.job_number}`);
+          if (entry.add_amount.trim() !== '') {
+            // Add mode: add to current actual
+            const addAmount = parseInt(entry.add_amount);
+            if (isNaN(addAmount) || addAmount < 0) {
+              throw new Error(`Invalid add amount for job ${entry.job_number}`);
+            }
+            final_actual_quantity = entry.current_actual + addAmount;
+          } else {
+            // Set mode: use the actual_quantity directly
+            final_actual_quantity = parseInt(entry.actual_quantity);
+            if (isNaN(final_actual_quantity) || final_actual_quantity < 0) {
+              throw new Error(`Invalid quantity for job ${entry.job_number}`);
+            }
           }
 
           const productionEntry: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'> = {
             job: entry.job_id, // Xano uses 'job' field name
             date: granularity === 'week' ? startDate : Date.now(), // Use start of week or current date
-            actual_quantity,
+            actual_quantity: final_actual_quantity,
             notes: entry.notes || undefined,
             facilities_id: facilitiesId,
           };
@@ -193,69 +246,95 @@ export default function BatchProductionEntryModal({
               ) : (
                 <div className="space-y-4">
                   {/* Table Header */}
-                  <div className="hidden md:grid md:grid-cols-12 gap-4 pb-2 border-b border-gray-200 font-semibold text-sm text-gray-700">
-                    <div className="col-span-1">Job #</div>
-                    <div className="col-span-3">Job Name</div>
-                    <div className="col-span-2">Client</div>
-                    <div className="col-span-1 text-right">Projected</div>
-                    <div className="col-span-2">Actual Qty</div>
-                    <div className="col-span-3">Notes</div>
+                  <div className="hidden md:grid md:grid-cols-[auto_1fr_1fr_100px_100px_120px_120px_1fr] gap-3 pb-2 border-b border-gray-200 font-semibold text-sm text-gray-700">
+                    <div>Job #</div>
+                    <div>Job Name</div>
+                    <div>Client</div>
+                    <div className="text-right">Projected</div>
+                    <div className="text-right">Current</div>
+                    <div>Add Amount</div>
+                    <div>New Total</div>
+                    <div>Notes</div>
                   </div>
 
                   {/* Job Entries */}
-                  {jobEntries.map((entry, index) => (
-                    <div
-                      key={entry.job_id}
-                      className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-4 md:p-0 bg-gray-50 md:bg-transparent rounded-lg md:rounded-none"
-                    >
-                      {/* Mobile Labels */}
-                      <div className="md:col-span-1">
-                        <span className="md:hidden font-semibold text-sm text-gray-600">Job #: </span>
-                        <span className="text-sm">{entry.job_number}</span>
-                      </div>
+                  {jobEntries.map((entry, index) => {
+                    const newTotal = getNewTotal(entry);
+                    const hasInput = entry.add_amount || entry.actual_quantity;
 
-                      <div className="md:col-span-3">
-                        <span className="md:hidden font-semibold text-sm text-gray-600">Job: </span>
-                        <span className="text-sm">{entry.job_name}</span>
-                      </div>
+                    return (
+                      <div
+                        key={entry.job_id}
+                        className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_100px_100px_120px_120px_1fr] gap-3 items-center p-4 md:p-0 bg-gray-50 md:bg-transparent rounded-lg md:rounded-none"
+                      >
+                        {/* Job # */}
+                        <div>
+                          <span className="md:hidden font-semibold text-sm text-gray-600">Job #: </span>
+                          <span className="text-sm">{entry.job_number}</span>
+                        </div>
 
-                      <div className="md:col-span-2">
-                        <span className="md:hidden font-semibold text-sm text-gray-600">Client: </span>
-                        <span className="text-sm text-gray-600">{entry.client_name}</span>
-                      </div>
+                        {/* Job Name */}
+                        <div>
+                          <span className="md:hidden font-semibold text-sm text-gray-600">Job: </span>
+                          <span className="text-sm">{entry.job_name}</span>
+                        </div>
 
-                      <div className="md:col-span-1 md:text-right">
-                        <span className="md:hidden font-semibold text-sm text-gray-600">Projected: </span>
-                        <span className="text-sm text-gray-500">{entry.projected_quantity.toLocaleString()}</span>
-                      </div>
+                        {/* Client */}
+                        <div>
+                          <span className="md:hidden font-semibold text-sm text-gray-600">Client: </span>
+                          <span className="text-sm text-gray-600">{entry.client_name}</span>
+                        </div>
 
-                      <div className="md:col-span-2">
-                        <label className="md:hidden font-semibold text-sm text-gray-600 block mb-1">
-                          Actual Quantity
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.actual_quantity ? parseInt(entry.actual_quantity).toLocaleString() : ''}
-                          onChange={(e) => handleQuantityChange(index, e.target.value)}
-                          placeholder="Enter actual"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+                        {/* Projected */}
+                        <div className="md:text-right">
+                          <span className="md:hidden font-semibold text-sm text-gray-600">Projected: </span>
+                          <span className="text-sm text-gray-500">{entry.projected_quantity.toLocaleString()}</span>
+                        </div>
 
-                      <div className="md:col-span-3">
-                        <label className="md:hidden font-semibold text-sm text-gray-600 block mb-1">
-                          Notes (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.notes}
-                          onChange={(e) => handleNotesChange(index, e.target.value)}
-                          placeholder="Optional notes"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        {/* Current Actual (read-only) */}
+                        <div className="md:text-right">
+                          <span className="md:hidden font-semibold text-sm text-gray-600">Current Actual: </span>
+                          <span className="text-sm font-medium text-gray-700">{entry.current_actual.toLocaleString()}</span>
+                        </div>
+
+                        {/* Add Amount */}
+                        <div>
+                          <label className="md:hidden font-semibold text-sm text-gray-600 block mb-1">
+                            Add Amount
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.add_amount ? parseInt(entry.add_amount).toLocaleString() : ''}
+                            onChange={(e) => handleAddAmountChange(index, e.target.value)}
+                            placeholder="Add..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        {/* New Total (calculated) */}
+                        <div className="md:text-right">
+                          <span className="md:hidden font-semibold text-sm text-gray-600">New Total: </span>
+                          <span className={`text-sm font-semibold ${hasInput ? 'text-blue-600' : 'text-gray-400'}`}>
+                            {newTotal.toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <label className="md:hidden font-semibold text-sm text-gray-600 block mb-1">
+                            Notes (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.notes}
+                            onChange={(e) => handleNotesChange(index, e.target.value)}
+                            placeholder="Optional notes"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

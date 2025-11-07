@@ -171,9 +171,9 @@ export function useProjections(
   const timeRanges = useMemo<TimeRange[]>(() => {
     switch (granularity) {
       case 'monthly':
-        return generateMonthRanges(startDate, 3);
+        return generateMonthRanges(startDate, 6);
       case 'quarterly':
-        return generateQuarterRanges(startDate, 4);
+        return generateQuarterRanges(startDate, 6);
       case 'weekly':
       default:
         return generateWeekRanges(startDate);
@@ -198,13 +198,14 @@ export function useProjections(
 
     // Adjust projections based on actual production
     return jobProjections.map((projection) => {
-      const actualQuantity = actualQuantitiesByJob.get(projection.job.id) || 0;
+      const actualData = actualQuantitiesByJob.get(projection.job.id);
+      const actualQuantity = actualData?.total || 0;
 
       if (actualQuantity === 0) {
         return projection;
       }
 
-      const remainingQuantity = Math.max(0, projection.job.quantity - actualQuantity);
+      const remainingQuantity = Math.max(0, (projection.job.quantity || 0) - actualQuantity);
 
       if (remainingQuantity === 0) {
         const zeroedQuantities = new Map<string, number>();

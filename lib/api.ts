@@ -8,6 +8,7 @@ import type {
   AuthResponse,
   ProductionEntry
 } from '@/types';
+import type { JobCostEntry } from '@/lib/jobCostUtils';
 
 const AUTH_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:spcRzPtb';
 const API_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb';
@@ -69,11 +70,12 @@ const apiFetch = async <T = unknown>(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
 
-    // Suppress error logging for production_entry endpoint (backend may not be configured yet)
+    // Suppress error logging for endpoints that may not be configured yet
     const isProductionEndpoint = endpoint.includes('/production_entry');
+    const isJobCostEndpoint = endpoint.includes('/job_cost_entry');
 
-    // Log error details for debugging (unless it's expected production endpoint error)
-    if (!isProductionEndpoint) {
+    // Log error details for debugging (unless it's an expected endpoint error)
+    if (!isProductionEndpoint && !isJobCostEndpoint) {
       console.error('[API Error]', {
         endpoint,
         status: response.status,
@@ -313,5 +315,90 @@ export const batchCreateProductionEntries = async (
     entries.map(entry => addProductionEntry(entry))
   );
 
+  return createdEntries;
+};
+
+// ============================================================================
+// Job Cost Entry API Functions
+// ============================================================================
+
+// Get job cost entries with optional filters
+export const getJobCostEntries = async (
+  facilitiesId?: number,
+  startDate?: number,
+  endDate?: number
+): Promise<JobCostEntry[]> => {
+  const params = new URLSearchParams();
+
+  if (facilitiesId !== undefined && facilitiesId !== null) {
+    params.append('facilities_id', facilitiesId.toString());
+  }
+
+  if (startDate !== undefined && startDate !== null) {
+    params.append('start_date', startDate.toString());
+  }
+
+  if (endDate !== undefined && endDate !== null) {
+    params.append('end_date', endDate.toString());
+  }
+
+  const queryString = params.toString();
+  const endpoint = queryString ? `/job_cost_entry?${queryString}` : '/job_cost_entry';
+
+  console.log('[getJobCostEntries] Fetching from:', endpoint);
+  const result = await apiFetch<JobCostEntry[]>(endpoint, {
+    method: 'GET',
+  }, 'jobs');
+  console.log('[getJobCostEntries] Received', result.length, 'entries:', result);
+  return result;
+};
+
+// Add a new job cost entry
+export const addJobCostEntry = async (
+  data: Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'>
+): Promise<JobCostEntry> => {
+  console.log('[addJobCostEntry] Submitting entry:', data);
+  const result = await apiFetch<JobCostEntry>('/job_cost_entry', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, 'jobs');
+  console.log('[addJobCostEntry] Response:', result);
+  return result;
+};
+
+// Update an existing job cost entry
+export const updateJobCostEntry = async (
+  id: number,
+  data: Partial<Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'>>
+): Promise<JobCostEntry> => {
+  console.log('[updateJobCostEntry] Updating entry:', id, 'with data:', data);
+  const result = await apiFetch<JobCostEntry>(`/job_cost_entry/${id}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, 'jobs');
+  console.log('[updateJobCostEntry] Response:', result);
+  return result;
+};
+
+// Delete a job cost entry
+export const deleteJobCostEntry = async (id: number): Promise<void> => {
+  console.log('[deleteJobCostEntry] Deleting entry:', id);
+  await apiFetch<void>(`/job_cost_entry/${id}`, {
+    method: 'DELETE',
+  }, 'jobs');
+  console.log('[deleteJobCostEntry] Entry deleted successfully');
+};
+
+// Batch create multiple job cost entries
+// Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in parallel
+export const batchCreateJobCostEntries = async (
+  entries: Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<JobCostEntry[]> => {
+  console.log('[batchCreateJobCostEntries] Creating', entries.length, 'entries in parallel');
+  // Create all entries in parallel for much faster performance
+  const createdEntries = await Promise.all(
+    entries.map(entry => addJobCostEntry(entry))
+  );
+  console.log('[batchCreateJobCostEntries] Successfully created', createdEntries.length, 'entries');
   return createdEntries;
 };

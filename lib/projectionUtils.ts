@@ -25,7 +25,7 @@ export interface ServiceTypeSummary {
 }
 
 /**
- * Generate 5 consecutive week ranges starting from a given date
+ * Generate 6 consecutive week ranges starting from a given date
  */
 export function generateWeekRanges(startDate: Date): WeekRange[] {
   const weeks: WeekRange[] = [];
@@ -34,7 +34,7 @@ export function generateWeekRanges(startDate: Date): WeekRange[] {
   // Normalize to start of day
   baseDate.setHours(0, 0, 0, 0);
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const weekStart = new Date(baseDate);
     weekStart.setDate(baseDate.getDate() + (i * 7));
 

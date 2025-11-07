@@ -881,20 +881,49 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   const quantity = parseInt(formData.quantity || '0');
                   const pricePerM = parseFloat(req.price_per_m || '0');
                   const requirementTotal = (quantity / 1000) * pricePerM;
+                  const processConfig = getProcessTypeConfig(req.process_type);
 
                   return (
-                    <div key={index} className="mb-3 pb-3 border-b border-[var(--border)] last:border-b-0">
+                    <div key={index} className="mb-4 pb-4 border-b border-[var(--border)] last:border-b-0">
                       <div className="text-sm">
-                        <div className="mb-1">
+                        <div className="mb-2">
                           <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            {req.process_type} | {req.paper_size} | Pockets: {req.pockets} | Shift: {req.shifts_id}
+                            {processConfig?.label || req.process_type}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-[var(--text-light)]">Price: ${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</span>
+
+                        {/* Display all fields for this requirement */}
+                        <div className="grid grid-cols-2 gap-2 mb-2 ml-4">
+                          {processConfig?.fields.map((fieldConfig) => {
+                            const fieldValue = req[fieldConfig.name as keyof typeof req];
+
+                            // Skip if field has no value
+                            if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+                              return null;
+                            }
+
+                            // Format the value based on field type
+                            let displayValue: string;
+                            if (fieldConfig.type === 'currency') {
+                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            } else {
+                              displayValue = String(fieldValue);
+                            }
+
+                            return (
+                              <div key={fieldConfig.name} className="text-xs">
+                                <span className="text-[var(--text-light)]">{fieldConfig.label}: </span>
+                                <span className="text-[var(--text-dark)] font-medium">{displayValue}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-[var(--text-light)]">Subtotal for this requirement:</span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            Subtotal: ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>
@@ -973,7 +1002,16 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   onClick={handleNext}
                   disabled={
                     (currentStep === 1 && (!formData.job_number || !formData.clients_id || !formData.quantity)) ||
-                    (currentStep === 2 && formData.requirements.some(r => !r.process_type || !r.paper_size || !r.shifts_id))
+                    (currentStep === 2 && formData.requirements.some(r => {
+                      if (!r.process_type) return true;
+                      const config = getProcessTypeConfig(r.process_type);
+                      if (!config) return true;
+                      return config.fields.some(field => {
+                        if (!field.required) return false;
+                        const value = r[field.name];
+                        return value === undefined || value === null || value === '';
+                      });
+                    }))
                   }
                   className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
