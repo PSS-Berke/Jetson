@@ -102,8 +102,6 @@ const parseJob = (job: Job): ParsedJob => {
     }
   };
 
-};
-
 // SWR fetcher function
 const fetcher = async (facilityId?: number | null) => {
   const facilityParam = facilityId !== undefined && facilityId !== null ? facilityId : undefined;
