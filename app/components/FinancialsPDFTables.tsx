@@ -7,7 +7,6 @@ interface JobWithCost extends Job {
   actualCost?: number;
   profit?: number;
   profitMargin?: number;
-  requirements?: any; // Can be string (Job) or parsed array (ParsedJob)
 }
 
 interface FinancialsPDFTablesProps {
