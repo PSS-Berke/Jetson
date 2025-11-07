@@ -20,6 +20,8 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
         { value: 2, label: 'Lemont' }
       ], [showAll]);
 
+  console.log('FacilityToggle - currentFacility:', currentFacility, 'type:', typeof currentFacility);
+
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [bubbleStyle, setBubbleStyle] = useState({ width: 0, left: 0 });
@@ -51,7 +53,10 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
       }
     };
 
-    updateBubblePosition();
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    requestAnimationFrame(() => {
+      updateBubblePosition();
+    });
 
     // Update on window resize to handle responsive changes
     window.addEventListener('resize', updateBubblePosition);

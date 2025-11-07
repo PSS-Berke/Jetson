@@ -151,6 +151,17 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         total_billing?: string | number;
       };
 
+      // Ensure facilities_id is a proper number or null
+      let facilitiesId: number | null = null;
+      if (job.facilities_id !== undefined && job.facilities_id !== null) {
+        // Convert to number if it's a string
+        facilitiesId = typeof job.facilities_id === 'string' 
+          ? parseInt(job.facilities_id, 10) 
+          : job.facilities_id;
+      }
+
+      console.log('EditJobModal - facilities_id from job:', job.facilities_id, 'parsed to:', facilitiesId);
+
       setFormData({
         job_number: toStringValue(job.job_number),
         clients_id: clientId,
@@ -160,7 +171,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         quantity: toStringValue(job.quantity),
         csr: toStringValue(job.csr),
         prgm: toStringValue(job.prgm),
-        facilities_id: job.facilities_id || null,
+        facilities_id: facilitiesId,
         start_date: formatDate(job.start_date),
         due_date: formatDate(job.due_date),
         service_type: job.service_type || 'insert',
@@ -664,6 +675,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                     Facility <span className="text-red-500">*</span>
                   </label>
                   <FacilityToggle
+                    key={`facility-${job.id}-${formData.facilities_id}`}
                     currentFacility={formData.facilities_id}
                     onFacilityChange={(facility) => setFormData({ ...formData, facilities_id: facility })}
                     showAll={false}
