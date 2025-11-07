@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import useSWR from 'swr';
 import { getJobs } from '@/lib/api';
 
 // Re-export Job from api for consistency
@@ -9,11 +10,12 @@ import type { Job } from '@/lib/api';
 export type { Job };
 
 export interface ParsedRequirement {
-  pockets?: number;
-  shifts_id?: number;
-  paper_size?: string;
-  process_type?: string;
+  process_type: string; // Required
   price_per_m?: string;
+  // Legacy field - kept for backward compatibility
+  shifts_id?: number;
+  // All other fields are dynamic based on process type
+  [key: string]: string | number | undefined;
 }
 
 export interface ParsedJob extends Omit<Job, 'client' | 'machines' | 'requirements'> {
@@ -30,35 +32,26 @@ interface UseJobsReturn {
   refetch: () => Promise<void>;
 }
 
-export const useJobs = (facilityId?: number | null): UseJobsReturn => {
-  const [jobs, setJobs] = useState<ParsedJob[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const parseJob = (job: Job): ParsedJob => {
+// Job parsing logic extracted for reuse
+const parseJob = (job: Job): ParsedJob => {
     try {
       // Parse requirements - handle multiple formats
       let parsedRequirements: ParsedRequirement[] = [];
-      console.log(`[DEBUG] Job ${job.job_number} - Raw requirements:`, job.requirements);
 
       if (job.requirements && job.requirements !== '{}' && job.requirements !== '') {
         try {
           // Check if it's already an array (newer format)
           if (Array.isArray(job.requirements)) {
-            console.log(`[DEBUG] Job ${job.job_number} - Requirements is already an array`);
             parsedRequirements = job.requirements;
           }
           // Try parsing as a simple JSON array string
           else if (typeof job.requirements === 'string' && job.requirements.trim().startsWith('[')) {
-            console.log(`[DEBUG] Job ${job.job_number} - Parsing as JSON array`);
             parsedRequirements = JSON.parse(job.requirements);
           }
           // Handle the old nested format with escaped JSON strings
           else if (typeof job.requirements === 'string') {
-            console.log(`[DEBUG] Job ${job.job_number} - Parsing as old nested format`);
             const reqString = job.requirements.slice(1, -1); // Remove { and }
             const matches = reqString.match(/"\{[^}]+\}"/g);
-            console.log(`[DEBUG] Job ${job.job_number} - Regex matches:`, matches);
 
             if (matches) {
               parsedRequirements = matches.map((match: string) => {
@@ -66,7 +59,6 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
                   // Remove the outer quotes and parse the JSON
                   const cleaned = match.slice(1, -1).replace(/\\/g, '');
                   const parsed = JSON.parse(cleaned);
-                  console.log(`[DEBUG] Job ${job.job_number} - Parsed requirement:`, parsed);
                   return parsed;
                 } catch {
                   return null;
@@ -75,12 +67,9 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
             }
           }
         } catch (error) {
-          console.error('Failed to parse requirements:', error, job.requirements);
           parsedRequirements = [];
         }
       }
-      console.log(`[DEBUG] Job ${job.job_number} - Final parsedRequirements:`, parsedRequirements);
-      console.log(`[DEBUG] Job ${job.job_number} - total_billing:`, job.total_billing);
 
       // Parse daily_split if it exists
       let parsedDailySplit: number[][] | undefined = undefined;
@@ -88,12 +77,11 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
         try {
           if (typeof (job as any).daily_split === 'string') {
             parsedDailySplit = JSON.parse((job as any).daily_split);
-            console.log(`[DEBUG] Job ${job.job_number} - Parsed daily_split:`, parsedDailySplit);
           } else if (Array.isArray((job as any).daily_split)) {
             parsedDailySplit = (job as any).daily_split;
           }
         } catch (error) {
-          console.error(`[DEBUG] Job ${job.job_number} - Failed to parse daily_split:`, error);
+          // Silently fail
         }
       }
 
@@ -105,7 +93,6 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
         daily_split: parsedDailySplit,
       };
     } catch (e) {
-      console.error('Failed to parse job data:', e);
       return {
         ...job,
         client: { id: 0, name: 'Unknown' },
@@ -115,40 +102,43 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
     }
   };
 
-  const fetchJobs = async () => {
-    setIsLoading(true);
-    setError(null);
+};
 
-    try {
-      // Pass facilities_id directly to the API
-      const facilityParam = facilityId !== undefined && facilityId !== null ? facilityId : undefined;
-      console.log('[useJobs] Fetching jobs for facility:', facilityParam || 'all');
-      
-      const data = await getJobs(facilityParam);
-      console.log('[useJobs] Response received:', { count: data.length, jobs: data });
-      
-      const parsedJobs = data.map(parseJob);
-      console.log('[useJobs] Parsed jobs:', { count: parsedJobs.length, jobs: parsedJobs });
+// SWR fetcher function
+const fetcher = async (facilityId?: number | null) => {
+  const facilityParam = facilityId !== undefined && facilityId !== null ? facilityId : undefined;
+  const data = await getJobs(facilityParam);
+  return data.map(parseJob);
+};
 
-      setJobs(parsedJobs);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch jobs';
-      console.error('[useJobs] Error:', err);
-      setError(errorMessage);
-      setJobs([]);
-    } finally {
-      setIsLoading(false);
+export const useJobs = (facilityId?: number | null): UseJobsReturn => {
+  // Create a unique key for SWR caching based on facilityId
+  const key = facilityId !== null && facilityId !== undefined
+    ? ['jobs', facilityId]
+    : ['jobs', 'all'];
+
+  // Use SWR for data fetching with caching
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    () => fetcher(facilityId),
+    {
+      revalidateOnFocus: false, // Don't refetch on window focus
+      dedupingInterval: 10000, // Dedupe requests within 10 seconds
+      revalidateOnReconnect: true, // Refetch when reconnecting
+      shouldRetryOnError: true,
+      errorRetryCount: 3,
     }
-  };
+  );
 
-  useEffect(() => {
-    fetchJobs();
-  }, [facilityId]);
+  // Parse jobs data with memoization
+  const jobs = useMemo(() => data ?? [], [data]);
 
   return {
     jobs,
     isLoading,
-    error,
-    refetch: fetchJobs,
+    error: error?.message ?? null,
+    refetch: async () => {
+      await mutate();
+    },
   };
 };

@@ -11,11 +11,15 @@
   "dependencies": {
     "@types/js-cookie": "^3.0.6",
     "date-fns": "^4.1.0",
+    "html2canvas": "^1.4.1",
     "js-cookie": "^3.0.5",
+    "jspdf": "^3.0.3",
     "next": "15.5.6",
     "react": "19.1.0",
     "react-big-calendar": "^1.19.4",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-to-print": "^3.2.0",
+    "swr": "^2.3.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

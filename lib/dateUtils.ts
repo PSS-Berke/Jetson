@@ -54,6 +54,18 @@ export const getWeekRange = (date: Date = new Date()): { start: Date; end: Date 
 };
 
 /**
+ * Get a 30-day range starting from the Sunday of the week containing the given date
+ */
+export const get30DayRange = (date: Date = new Date()): { start: Date; end: Date } => {
+  const start = startOfWeek(date, { weekStartsOn: 0 }); // 0 = Sunday
+  const end = addDays(start, 29); // 30 days total (0-29)
+  return {
+    start,
+    end
+  };
+};
+
+/**
  * Get start and end of day for a given date
  */
 export const getDayRange = (date: Date = new Date()): { start: Date; end: Date } => {
@@ -244,4 +256,30 @@ export const generateQuarterRanges = (startDate: Date, count: number = 4): Quart
   }
 
   return ranges;
+};
+
+/**
+ * Get full range spanning 4 quarters starting from a given date
+ * This is useful for fetching all jobs needed for quarterly view
+ */
+export const getQuarterlyViewRange = (date: Date = new Date()): { start: Date; end: Date } => {
+  const firstQuarterStart = startOfQuarter(date);
+  const lastQuarterEnd = endOfQuarter(addMonths(firstQuarterStart, 9)); // 3 months * 3 = 9 months ahead
+  return {
+    start: firstQuarterStart,
+    end: lastQuarterEnd
+  };
+};
+
+/**
+ * Get full range spanning 5 weeks starting from a given date
+ * This is useful for fetching all jobs needed for weekly view
+ */
+export const getWeeklyViewRange = (date: Date = new Date()): { start: Date; end: Date } => {
+  const firstWeekStart = startOfWeek(date);
+  const lastWeekEnd = endOfWeek(addDays(firstWeekStart, 28)); // 7 days * 4 = 28 days ahead (5 weeks total)
+  return {
+    start: firstWeekStart,
+    end: lastWeekEnd
+  };
 };

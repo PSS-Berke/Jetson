@@ -121,61 +121,191 @@ body {
   margin-bottom: 4px;
 }
 
-.calendar-date-header .date-summary {
+.calendar-date-header {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  width: 100%;
-}
-
-.calendar-date-header .pieces {
-  font-size: 0.75rem;
-  color: var(--primary-blue);
-  font-weight: 600;
-}
-
-.calendar-date-header .revenue {
-  font-size: 0.75rem;
-  color: var(--success);
-  font-weight: 600;
 }
 
 .calendar-date-header .process-type-badges {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 6px;
+  width: 100%;
+  padding-right: 4px;
+}
+
+.calendar-date-header .process-badge-container {
   width: 100%;
 }
 
 .calendar-date-header .process-badge {
-  display: inline-flex;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.65rem;
-  font-weight: 600;
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: white;
   white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.calendar-date-header .process-badge:hover {
+  transform: translateX(2px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+.calendar-date-header .process-badge .expand-icon {
+  font-size: 0.6rem;
+  opacity: 0.8;
+  margin-left: 6px;
+}
+
+.calendar-date-header .job-list {
+  margin-top: 4px;
+  margin-left: 8px;
+  padding: 8px;
+  padding-right: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 4px;
+}
+
+.calendar-date-header .job-item {
+  padding: 6px 8px;
+  margin: 4px 0;
+  background: white;
+  border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  font-size: 0.7rem;
+  transition: background-color 0.2s, box-shadow 0.2s;
 }
 
-.calendar-date-header .process-badge .badge-label {
-  opacity: 0.9;
+.calendar-date-header .job-item.clickable:hover {
+  background-color: #f3f4f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-.calendar-date-header .process-badge .badge-count {
+.calendar-date-header .job-number {
   font-weight: 700;
+  color: var(--primary-blue);
+  margin-bottom: 2px;
 }
 
-/* Month view cell height */
+.calendar-date-header .job-name {
+  color: var(--text-dark);
+  font-weight: 600;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-date-header .job-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-light);
+  font-size: 0.65rem;
+}
+
+.calendar-date-header .job-revenue {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Calendar container - allow dynamic height */
+.calendar-container {
+  height: auto !important;
+  min-height: 100%;
+}
+
+/* Month view - ensure all weeks are shown */
+.calendar-container .rbc-month-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.calendar-container .rbc-month-view .rbc-month-header {
+  flex-shrink: 0;
+}
+
+.calendar-container .rbc-month-view .rbc-month-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: visible;
+}
+
+/* Force each week row to take equal space and show all rows */
 .calendar-container .rbc-month-row {
-  min-height: 100px;
+  flex: 1 1 0% !important;
+  min-height: 120px !important;
+  display: flex !important;
+}
+
+.calendar-container .rbc-row-content {
+  overflow: visible !important;
+}
+
+.calendar-container .rbc-row {
+  overflow: visible !important;
+}
+
+/* Show all dates including those outside current month */
+.calendar-container .rbc-off-range {
+  opacity: 1 !important;
+}
+
+.calendar-container .rbc-off-range-bg {
+  background-color: #f8f9fa !important;
+}
+
+.calendar-container .rbc-off-range .date-label {
+  color: #999 !important;
+}
+
+.calendar-container .rbc-day-bg {
+  overflow: hidden;
+}
+
+.calendar-container .rbc-row-segment {
+  padding: 4px;
 }
 
 .calendar-container .rbc-date-cell {
   padding: 4px;
+  height: 100%;
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.05);
+}
+
+.calendar-container .rbc-date-cell::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-container .rbc-date-cell::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.calendar-container .rbc-date-cell::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.calendar-container .rbc-date-cell::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 /* Week and Day view styles */
@@ -309,4 +439,157 @@ body {
 
 .animate-slideIn {
   animation: slideIn 0.3s ease-out;
+}
+
+/* PDF Export Styles */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.3in;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Scale down the entire content to fit */
+  main {
+    transform: scale(0.9);
+    transform-origin: top left;
+    width: 111.11%; /* Compensate for 0.9 scale */
+  }
+
+  /* Force desktop layout in print */
+  .md\:hidden {
+    display: none !important;
+  }
+
+  .hidden.md\:block {
+    display: block !important;
+  }
+
+  .md\:grid {
+    display: grid !important;
+  }
+
+  .md\:flex {
+    display: flex !important;
+  }
+
+  /* Ensure proper grid layout for stats cards */
+  .grid-cols-1.md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-1.lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-1.xl\:grid-cols-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+
+  .pdf-export-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    font-size: 10pt;
+  }
+
+  .pdf-page-break {
+    page-break-before: always;
+  }
+
+  .pdf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7pt;
+  }
+
+  .pdf-table-cell {
+    padding: 3px 4px;
+    border: 1px solid #e2e8f0;
+    font-size: 7pt;
+  }
+
+  .pdf-table thead {
+    background-color: #f8fafc !important;
+  }
+
+  .pdf-table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 6pt;
+    letter-spacing: 0.3px;
+  }
+
+  /* Hide elements not needed in PDF */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Ensure colors print correctly */
+  .bg-gray-50 {
+    background-color: #f8fafc !important;
+  }
+
+  .bg-gray-100 {
+    background-color: #f1f5f9 !important;
+  }
+
+  /* Process badges */
+  .process-badge {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Make sure table is visible and properly sized */
+  table {
+    font-size: 7pt !important;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  th, td {
+    font-size: 7pt !important;
+    padding: 2px 3px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Reduce padding everywhere to fit more content */
+  .px-4 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .py-3 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .mb-6 {
+    margin-bottom: 1rem !important;
+  }
+
+  .gap-4 {
+    gap: 0.5rem !important;
+  }
+
+  /* Ensure the entire content fits on page */
+  * {
+    overflow: visible !important;
+  }
+}
+
+/* PDF container for screen display (hidden by default) */
+.pdf-export-container {
+  position: absolute;
+  left: -9999px;
+  top: 0;
 }

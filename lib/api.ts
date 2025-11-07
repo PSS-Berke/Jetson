@@ -5,7 +5,8 @@ import type {
   User,
   LoginCredentials,
   SignupData,
-  AuthResponse
+  AuthResponse,
+  ProductionEntry
 } from '@/types';
 
 const AUTH_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:spcRzPtb';
@@ -68,12 +69,17 @@ const apiFetch = async <T = unknown>(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
 
-    // Log error details for debugging
-    console.error('[API Error]', {
-      endpoint,
-      status: response.status,
-      error
-    });
+    // Suppress error logging for production_entry endpoint (backend may not be configured yet)
+    const isProductionEndpoint = endpoint.includes('/production_entry');
+
+    // Log error details for debugging (unless it's expected production endpoint error)
+    if (!isProductionEndpoint) {
+      console.error('[API Error]', {
+        endpoint,
+        status: response.status,
+        error
+      });
+    }
 
     // Handle unauthorized/expired token
     if (response.status === 401 || error.code === 'ERROR_CODE_UNAUTHORIZED') {
@@ -159,6 +165,40 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
   return data;
 };
 
+// Create a new machine
+export const createMachine = async (machineData: Omit<Machine, 'id' | 'created_at'>): Promise<Machine> => {
+  console.log('[createMachine] Creating machine:', machineData);
+  console.log('[createMachine] Capabilities object:', machineData.capabilities);
+  console.log('[createMachine] Request body:', JSON.stringify(machineData, null, 2));
+  const result = await apiFetch<Machine>('/machines', {
+    method: 'POST',
+    body: JSON.stringify(machineData),
+  });
+  console.log('[createMachine] Response:', result);
+  return result;
+};
+
+// Update an existing machine
+export const updateMachine = async (machineId: number, machineData: Partial<Machine>): Promise<Machine> => {
+  console.log('[updateMachine] Updating machine:', machineId, 'with data:', machineData);
+  console.log('[updateMachine] Capabilities object:', machineData.capabilities);
+  console.log('[updateMachine] Request body:', JSON.stringify(machineData, null, 2));
+  const result = await apiFetch<Machine>(`/machines/${machineId}`, {
+    method: 'PUT',
+    body: JSON.stringify(machineData),
+  });
+  console.log('[updateMachine] Response:', result);
+  return result;
+};
+
+// Delete a machine
+export const deleteMachine = async (machineId: number): Promise<void> => {
+  console.log('[deleteMachine] Deleting machine:', machineId);
+  await apiFetch<void>(`/machines/${machineId}`, {
+    method: 'DELETE',
+  });
+};
+
 // Get all jobs
 export const getJobs = async (facilitiesId?: number): Promise<Job[]> => {
   console.log('[getJobs] Called with facilitiesId:', facilitiesId, 'Type:', typeof facilitiesId);
@@ -197,4 +237,81 @@ export const deleteJob = async (jobId: number): Promise<void> => {
   await apiFetch<void>(`/jobs/${jobId}`, {
     method: 'DELETE',
   }, 'jobs');
+};
+
+// ============================================================================
+// Production Entry API Functions
+// ============================================================================
+
+// Get production entries with optional filters
+export const getProductionEntries = async (
+  facilitiesId?: number,
+  startDate?: number,
+  endDate?: number
+): Promise<ProductionEntry[]> => {
+  const params = new URLSearchParams();
+
+  if (facilitiesId !== undefined && facilitiesId !== null) {
+    params.append('facilities_id', facilitiesId.toString());
+  }
+
+  if (startDate !== undefined && startDate !== null) {
+    params.append('start_date', startDate.toString());
+  }
+
+  if (endDate !== undefined && endDate !== null) {
+    params.append('end_date', endDate.toString());
+  }
+
+  const queryString = params.toString();
+  const endpoint = queryString ? `/production_entry?${queryString}` : '/production_entry';
+
+  console.log('[getProductionEntries] Fetching from:', endpoint);
+  const result = await apiFetch<ProductionEntry[]>(endpoint, {
+    method: 'GET',
+  }, 'jobs');
+  console.log('[getProductionEntries] Received', result.length, 'entries:', result);
+  return result;
+};
+
+// Add a new production entry
+export const addProductionEntry = async (data: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'>): Promise<ProductionEntry> => {
+  console.log('[addProductionEntry] Submitting entry:', data);
+  const result = await apiFetch<ProductionEntry>('/production_entry', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, 'jobs');
+  console.log('[addProductionEntry] Response:', result);
+  return result;
+};
+
+// Update an existing production entry
+export const updateProductionEntry = async (production_entry_id: number, data: Partial<ProductionEntry>): Promise<ProductionEntry> => {
+  console.log('[updateProductionEntry] Updating entry:', production_entry_id, 'with data:', data);
+  const result = await apiFetch<ProductionEntry>(`/production_entry/${production_entry_id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, 'jobs');
+  console.log('[updateProductionEntry] Response:', result);
+  return result;
+};
+
+// Delete a production entry
+export const deleteProductionEntry = async (production_entry_id: number): Promise<void> => {
+  await apiFetch<void>(`/production_entry/${production_entry_id}`, {
+    method: 'DELETE',
+  }, 'jobs');
+};
+
+// Batch create multiple production entries
+// Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in parallel
+export const batchCreateProductionEntries = async (
+  entries: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<ProductionEntry[]> => {
+  // Create all entries in parallel for much faster performance
+  const createdEntries = await Promise.all(
+    entries.map(entry => addProductionEntry(entry))
+  );
+
+  return createdEntries;
 };

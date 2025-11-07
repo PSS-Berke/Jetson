@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import useSWR from 'swr';
 import { getMachines } from '@/lib/api';
 import type { Machine } from '@/types';
 
@@ -11,35 +12,45 @@ interface UseMachinesReturn {
   refetch: (status?: string, facilitiesId?: number) => Promise<void>;
 }
 
+// SWR fetcher for machines
+const machinesFetcher = async (status?: string, facilitiesId?: number) => {
+  return await getMachines(status, facilitiesId);
+};
+
 export const useMachines = (initialStatus?: string, initialFacilityId?: number): UseMachinesReturn => {
-  const [machines, setMachines] = useState<Machine[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Create unique SWR key
+  const key = useMemo(
+    () => ['machines', initialStatus, initialFacilityId],
+    [initialStatus, initialFacilityId]
+  );
 
-  const fetchMachines = async (status?: string, facilitiesId?: number) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const data = await getMachines(status, facilitiesId);
-      setMachines(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch machines';
-      setError(errorMessage);
-      setMachines([]);
-    } finally {
-      setIsLoading(false);
+  // Use SWR for data fetching with caching
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    () => machinesFetcher(initialStatus, initialFacilityId),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 10000,
+      revalidateOnReconnect: true,
+      shouldRetryOnError: true,
+      errorRetryCount: 3,
     }
-  };
+  );
 
-  useEffect(() => {
-    fetchMachines(initialStatus, initialFacilityId);
-  }, [initialStatus, initialFacilityId]);
+  const machines = useMemo(() => data ?? [], [data]);
 
   return {
     machines,
     isLoading,
-    error,
-    refetch: fetchMachines,
+    error: error?.message ?? null,
+    refetch: async (status?: string, facilitiesId?: number) => {
+      // If parameters are provided, use them; otherwise use initial values
+      const newStatus = status !== undefined ? status : initialStatus;
+      const newFacilityId = facilitiesId !== undefined ? facilitiesId : initialFacilityId;
+
+      await mutate(machinesFetcher(newStatus, newFacilityId), {
+        revalidate: true,
+      });
+    },
   };
 };

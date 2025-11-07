@@ -11,7 +11,7 @@ interface GranularityToggleProps {
 
 const granularities: { value: Granularity; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
+  { value: 'monthly', label: 'Month' },
   { value: 'quarterly', label: 'Quarterly' }
 ];
 

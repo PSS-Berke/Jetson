@@ -4,7 +4,9 @@
 import { useState, FormEvent, useEffect } from 'react';
 import SmartClientSelect from './SmartClientSelect';
 import FacilityToggle from './FacilityToggle';
+import DynamicRequirementFields from './DynamicRequirementFields';
 import { getToken } from '@/lib/api';
+import { getProcessTypeConfig } from '@/lib/processTypeConfig';
 import Toast from './Toast';
 
 interface AddJobModalProps {
@@ -15,10 +17,9 @@ interface AddJobModalProps {
 
 interface Requirement {
   process_type: string;
-  paper_size: string;
-  pockets: number;
-  shifts_id: number;
-  price_per_m: string;
+  price_per_m?: string;
+  // Dynamic fields based on process type
+  [key: string]: string | number | undefined;
 }
 
 interface JobFormData {
@@ -69,9 +70,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     requirements: [
       {
         process_type: '',
-        paper_size: '',
-        pockets: 0,
-        shifts_id: 0,
         price_per_m: ''
       }
     ],
@@ -158,9 +156,6 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       ...prev,
       requirements: [...prev.requirements, {
         process_type: '',
-        paper_size: '',
-        pockets: 0,
-        shifts_id: 0,
         price_per_m: ''
       }]
     }));
@@ -181,10 +176,44 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     const newValue = parseInt(cleanedValue) || 0;
 
     setFormData(prev => {
-      // Simply update the specific week without affecting others
+      const totalQuantity = parseInt(prev.quantity) || 0;
       const newSplit = [...prev.weekly_split];
+
+      // Update the changed week
       newSplit[weekIndex] = newValue;
-      
+
+      // Calculate how much quantity is left to distribute
+      const currentTotal = newSplit.reduce((sum, val) => sum + val, 0);
+      const difference = totalQuantity - currentTotal;
+
+      // If there's a difference, redistribute it across other weeks
+      if (difference !== 0) {
+        // Get indices of all other weeks (excluding the one being changed)
+        const otherWeekIndices = newSplit
+          .map((_, idx) => idx)
+          .filter(idx => idx !== weekIndex);
+
+        if (otherWeekIndices.length > 0) {
+          // Calculate base adjustment per week
+          const baseAdjustment = Math.floor(difference / otherWeekIndices.length);
+          const remainder = difference % otherWeekIndices.length;
+
+          // Apply adjustments to other weeks
+          otherWeekIndices.forEach((idx, position) => {
+            // Add base adjustment
+            let adjustment = baseAdjustment;
+
+            // Distribute remainder across first few weeks
+            if (position < Math.abs(remainder)) {
+              adjustment += remainder > 0 ? 1 : -1;
+            }
+
+            // Apply adjustment, ensuring non-negative values
+            newSplit[idx] = Math.max(0, newSplit[idx] + adjustment);
+          });
+        }
+      }
+
       return { ...prev, weekly_split: newSplit };
     });
   };
@@ -213,13 +242,42 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       }
     }
 
-    // Validate step 2 - all requirements must have required fields
+    // Validate step 2 - all requirements must have required fields based on their process type
     if (currentStep === 2) {
-      const allRequirementsValid = formData.requirements.every(r =>
-        r.process_type && r.paper_size && r.shifts_id > 0 && r.price_per_m
-      );
+      const allRequirementsValid = formData.requirements.every((r, reqIndex) => {
+        if (!r.process_type) {
+          console.log(`[AddJobModal] Requirement ${reqIndex + 1}: Missing process_type`);
+          return false;
+        }
+
+        const config = getProcessTypeConfig(r.process_type);
+        if (!config) {
+          console.log(`[AddJobModal] Requirement ${reqIndex + 1}: Invalid process type config`);
+          return false;
+        }
+
+        // Check all required fields for this process type
+        const isValid = config.fields.every(field => {
+          if (!field.required) return true;
+          const value = r[field.name];
+          const isValueValid = value !== undefined && value !== null && value !== '';
+
+          if (!isValueValid) {
+            console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): Missing required field "${field.name}" (${field.label}). Current value:`, value);
+          }
+
+          return isValueValid;
+        });
+
+        console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): ${isValid ? 'Valid' : 'Invalid'}`, r);
+        return isValid;
+      });
+
+      console.log(`[AddJobModal] All requirements valid:`, allRequirementsValid);
+      console.log(`[AddJobModal] Requirements data:`, formData.requirements);
+
       if (!allRequirementsValid) {
-        alert('Please fill in all required requirement fields including price');
+        alert('Please fill in all required fields for each requirement');
         return;
       }
     }
@@ -735,100 +793,11 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     )}
                   </div>
 
-                  {/* Process Type & Paper Size */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Process Type <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={requirement.process_type}
-                        onChange={(e) => handleRequirementChange(index, 'process_type', e.target.value)}
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        required
-                      >
-                        <option value="">Select process...</option>
-                        <option value="Insert">Insert</option>
-                        <option value="Sort">Sort</option>
-                        <option value="Inkjet">Inkjet</option>
-                        <option value="Label/Apply">Label/Apply</option>
-                        <option value="Fold">Fold</option>
-                        <option value="Laser">Laser</option>
-                        <option value="HP Press">HP Press</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Paper Size <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={requirement.paper_size}
-                        onChange={(e) => handleRequirementChange(index, 'paper_size', e.target.value)}
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        required
-                      >
-                        <option value="">Select size...</option>
-                        <option value="6x9">6x9</option>
-                        <option value="6x12">6x12</option>
-                        <option value="9x12">9x12</option>
-                        <option value="10x13">10x13</option>
-                        <option value="12x15">12x15</option>
-                        <option value="#10">10 Regular</option>
-                        <option value="11x17">11x17</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Pockets & Shift */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Number of Pockets/Inserts
-                      </label>
-                      <input
-                        type="number"
-                        value={requirement.pockets}
-                        onChange={(e) => handleRequirementChange(index, 'pockets', parseInt(e.target.value) || 0)}
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        placeholder="e.g., 2"
-                        min="0"
-                        max="12"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Shift <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={requirement.shifts_id}
-                        onChange={(e) => handleRequirementChange(index, 'shifts_id', parseInt(e.target.value))}
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        required
-                      >
-                        <option value={0}>Select shift...</option>
-                        <option value={1}>Shift One</option>
-                        <option value={2}>Shift Two</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Price per M */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                        Price (per/m) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={requirement.price_per_m}
-                        onChange={(e) => handleRequirementChange(index, 'price_per_m', e.target.value)}
-                        className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        placeholder="0.00"
-                        required
-                      />
-                    </div>
-                  </div>
+                  {/* Dynamic Requirement Fields */}
+                  <DynamicRequirementFields
+                    requirement={requirement}
+                    onChange={(field, value) => handleRequirementChange(index, field, value)}
+                  />
                 </div>
               ))}
 
@@ -988,7 +957,16 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   onClick={handleNext}
                   disabled={
                     (currentStep === 1 && (!formData.job_number || !formData.clients_id || !formData.quantity)) ||
-                    (currentStep === 2 && formData.requirements.some(r => !r.process_type || !r.paper_size || !r.shifts_id))
+                    (currentStep === 2 && formData.requirements.some(r => {
+                      if (!r.process_type) return true;
+                      const config = getProcessTypeConfig(r.process_type);
+                      if (!config) return true;
+                      return config.fields.some(field => {
+                        if (!field.required) return false;
+                        const value = r[field.name];
+                        return value === undefined || value === null || value === '';
+                      });
+                    }))
                   }
                   className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >

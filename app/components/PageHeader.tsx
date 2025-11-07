@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface User {
   email: string;
@@ -10,7 +11,7 @@ interface User {
 }
 
 interface PageHeaderProps {
-  currentPage: 'machines' | 'projections';
+  currentPage?: 'machines' | 'production' | 'projections';
   user?: User | null;
   onAddJobClick?: () => void;
   showAddJobButton?: boolean;
@@ -55,10 +56,13 @@ export default function PageHeader({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           <Link href="/projections" className="flex items-center cursor-pointer">
-            <img
+            <Image
               src="/logo.png"
               alt="Jetson Marketing Solutions"
+              width={200}
+              height={56}
               className="h-10 sm:h-14 w-auto"
+              priority
             />
           </Link>
 
@@ -74,6 +78,17 @@ export default function PageHeader({
               }`}
             >
               Machines
+            </Link>
+            <Link
+              href="/production"
+              onClick={() => console.log('Production link clicked')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                currentPage === 'production'
+                  ? 'bg-[var(--primary-blue)] text-white'
+                  : 'text-[var(--text-dark)] hover:bg-gray-100'
+              }`}
+            >
+              Production
             </Link>
             <Link
               href="/projections"
@@ -193,6 +208,20 @@ export default function PageHeader({
                 }`}
               >
                 Machines
+              </Link>
+              <Link
+                href="/production"
+                onClick={() => {
+                  console.log('Production link clicked');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`px-4 py-3 rounded-lg font-medium transition-colors cursor-pointer ${
+                  currentPage === 'production'
+                    ? 'bg-[var(--primary-blue)] text-white'
+                    : 'text-[var(--text-dark)] hover:bg-gray-100'
+                }`}
+              >
+                Production
               </Link>
               <Link
                 href="/projections"

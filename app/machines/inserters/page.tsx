@@ -1,20 +1,32 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useMachines } from '@/hooks/useMachines';
-import AddJobModal from '../../components/AddJobModal';
 import FacilityToggle from '../../components/FacilityToggle';
 import PageHeader from '../../components/PageHeader';
 import Link from 'next/link';
+import type { Machine } from '@/types';
+import { getProcessTypeConfig } from '@/lib/processTypeConfig';
+
+// Dynamically import modals - only loaded when opened
+const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {
+  ssr: false,
+});
+
+const EditMachineModal = dynamic(() => import('../../components/EditMachineModal'), {
+  ssr: false,
+});
 
 export default function Inserters() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const { user, isLoading: userLoading } = useUser();
-  const { machines, isLoading: machinesLoading, error: machinesError } = useMachines(filterStatus, filterFacility || undefined);
+  const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
 
   const handleFacilityChange = (facility: number | null) => {
@@ -23,6 +35,30 @@ export default function Inserters() {
 
   const handleFilterChange = (status: string) => {
     setFilterStatus(status);
+  };
+
+  const handleMachineClick = (machine: Machine) => {
+    setSelectedMachine(machine);
+  };
+
+  const handleMachineModalClose = () => {
+    setSelectedMachine(null);
+    refetch(filterStatus, filterFacility || undefined);
+  };
+
+  // Helper to render capability values
+  const renderCapabilityValue = (machine: Machine, capabilityKey: string): string => {
+    if (!machine.capabilities || !machine.capabilities[capabilityKey]) {
+      return 'N/A';
+    }
+
+    const value = machine.capabilities[capabilityKey];
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : 'N/A';
+    }
+
+    return String(value);
   };
 
   if (userLoading) {
@@ -57,7 +93,7 @@ export default function Inserters() {
       <PageHeader
         currentPage="machines"
         user={user}
-        onAddJobClick={() => setIsModalOpen(true)}
+        onAddJobClick={() => setIsJobModalOpen(true)}
         showAddJobButton={true}
         onLogout={logout}
       />
@@ -161,10 +197,10 @@ export default function Inserters() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                    Max Size
+                    Paper Sizes
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                    Pockets
+                    Max Pockets
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
                     Speed/hr
@@ -186,9 +222,13 @@ export default function Inserters() {
                   </tr>
                 ) : (
                   inserters.map(machine => (
-                    <tr key={machine.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={machine.id}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => handleMachineClick(machine)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {machine.facility === 1 ? 'Bolingbrook' : machine.facility === 2 ? 'Lemont' : 'N/A'}
+                        {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
                         Line {machine.line}
@@ -201,11 +241,11 @@ export default function Inserters() {
                           {statusLabels[machine.status]}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {machine.max_size || 'N/A'}
+                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                        {renderCapabilityValue(machine, 'supported_paper_sizes')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {machine.pockets || 'N/A'}
+                        {renderCapabilityValue(machine, 'max_pockets')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
                         {machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}
@@ -231,7 +271,15 @@ export default function Inserters() {
         )}
       </main>
 
-      <AddJobModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddJobModal isOpen={isJobModalOpen} onClose={() => setIsJobModalOpen(false)} />
+
+      {/* Edit Machine Modal */}
+      <EditMachineModal
+        isOpen={selectedMachine !== null}
+        machine={selectedMachine}
+        onClose={handleMachineModalClose}
+        onSuccess={handleMachineModalClose}
+      />
     </>
   );
 }

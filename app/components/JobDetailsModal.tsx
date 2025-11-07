@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { type ParsedJob } from '@/hooks/useJobs';
 import { deleteJob } from '@/lib/api';
+import { getProcessTypeConfig } from '@/lib/processTypeConfig';
 import EditJobModal from './EditJobModal';
 import Toast from './Toast';
 
@@ -168,6 +169,34 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                 </p>
               </div>
             </div>
+
+            {/* Weekly Quantity Distribution */}
+            {job.weekly_split && job.weekly_split.length > 0 && (
+              <div className="mt-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-semibold text-[var(--dark-blue)]">
+                      Weekly Quantity Distribution ({job.weekly_split.length} {job.weekly_split.length === 1 ? 'week' : 'weeks'})
+                    </h4>
+                    <div className="text-sm font-semibold text-[var(--text-dark)]">
+                      Total: {job.weekly_split.reduce((sum, qty) => sum + qty, 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {job.weekly_split.map((qty, index) => (
+                      <div key={index} className="bg-white rounded-md p-3 border border-gray-200">
+                        <div className="text-xs font-medium text-[var(--text-light)] mb-1">
+                          Week {index + 1}
+                        </div>
+                        <div className="text-base font-semibold text-[var(--text-dark)]">
+                          {qty.toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Staff Section */}
@@ -205,37 +234,92 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
           {/* Pricing Section */}
           <div className="border-t border-[var(--border)] pt-6">
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Pricing</h3>
-            {job.requirements && job.requirements.length > 0 && job.requirements.some(req => req.price_per_m) ? (
+            {job.requirements && job.requirements.length > 0 && job.requirements.some(req => req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== '') ? (
               <div className="space-y-4">
-                {job.requirements.map((req, index) => {
-                  const pricePerM = parseFloat(req.price_per_m || '0');
-                  const requirementTotal = (job.quantity / 1000) * pricePerM;
+                {/* Requirements Pricing */}
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-light)] mb-3">Requirements Pricing:</p>
+                  <div className="space-y-2">
+                    {job.requirements.map((req, index) => {
+                      const pricePerM = parseFloat(req.price_per_m || '0');
+                      const requirementTotal = (job.quantity / 1000) * pricePerM;
 
-                  return (
-                    <div key={index} className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-sm font-semibold text-[var(--text-dark)]">Requirement {index + 1}</p>
-                          <p className="text-xs text-[var(--text-light)] mt-1">
-                            {req.process_type} | {req.paper_size}
-                          </p>
+                      // Skip rendering if no price_per_m for this requirement
+                      if (req.price_per_m === undefined || req.price_per_m === null || req.price_per_m === '') {
+                        return null;
+                      }
+
+                      return (
+                        <div key={index} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--text-dark)]">Requirement {index + 1}</p>
+                              <p className="text-xs text-[var(--text-light)] mt-1">
+                                {req.process_type} | {req.paper_size}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-[var(--text-light)]">${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</p>
+                              <p className="text-base font-semibold text-[var(--text-dark)]">${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-[var(--text-light)]">${pricePerM.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m</p>
-                          <p className="text-base font-semibold text-[var(--text-dark)]">${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="border-t-2 border-[var(--primary-blue)] pt-4 mt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-[var(--text-dark)]">Total Job Price:</span>
-                    <span className="text-2xl font-bold text-[var(--primary-blue)]">
+                      );
+                    })}
+                  </div>
+
+                  {/* Requirements Subtotal */}
+                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-300">
+                    <span className="text-sm font-semibold text-[var(--text-dark)]">Requirements Subtotal:</span>
+                    <span className="text-base font-semibold text-[var(--text-dark)]">
                       ${job.requirements.reduce((total, req) => {
                         const pricePerM = parseFloat(req.price_per_m || '0');
                         return total + ((job.quantity / 1000) * pricePerM);
                       }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Add-On Charges */}
+                {job.add_on_charges && parseFloat(job.add_on_charges) > 0 && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-sm font-semibold text-[var(--text-dark)]">Additional Charges:</span>
+                        <p className="text-xs text-[var(--text-light)] mt-1">
+                          (Setup fees, rush charges, etc.)
+                        </p>
+                      </div>
+                      <span className="text-base font-semibold text-[var(--text-dark)]">
+                        ${parseFloat(job.add_on_charges).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Extended Price (only if different from total_billing) */}
+                {job.ext_price && parseFloat(job.ext_price) > 0 && job.total_billing && parseFloat(job.ext_price) !== parseFloat(job.total_billing) && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-sm font-semibold text-[var(--text-dark)]">Extended Price:</span>
+                        <p className="text-xs text-[var(--text-light)] mt-1">
+                          (External/Override pricing)
+                        </p>
+                      </div>
+                      <span className="text-base font-semibold text-[var(--text-dark)]">
+                        ${parseFloat(job.ext_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Total Billing */}
+                <div className="pt-4 mt-4 border-t-2 border-[var(--primary-blue)]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-[var(--text-dark)]">TOTAL BILLING:</span>
+                    <span className="text-2xl font-bold text-[var(--primary-blue)]">
+                      ${job.total_billing ? parseFloat(job.total_billing).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                     </span>
                   </div>
                 </div>
@@ -253,37 +337,57 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">Requirements Details</h3>
             {job.requirements && job.requirements.length > 0 ? (
               <div className="space-y-4">
-                {job.requirements.map((req, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">Requirement {index + 1}</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Process Type</label>
-                        <p className="text-base text-[var(--text-dark)]">{req.process_type || 'N/A'}</p>
+                {job.requirements.map((req, index) => {
+                  // Get the process type configuration
+                  const processConfig = getProcessTypeConfig(req.process_type);
+
+                  // Get all fields for this process type, excluding price_per_m (shown in Pricing section)
+                  const fieldsToDisplay = processConfig?.fields.filter(
+                    field => field.name !== 'price_per_m' && field.name !== 'process_type'
+                  ) || [];
+
+                  return (
+                    <div key={index} className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">
+                        Requirement {index + 1}: {processConfig?.label || req.process_type}
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {fieldsToDisplay.map((fieldConfig) => {
+                          const fieldValue = req[fieldConfig.name as keyof typeof req];
+
+                          // Skip if field has no value
+                          if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+                            return null;
+                          }
+
+                          // Format the value based on field type
+                          let displayValue: string;
+                          if (fieldConfig.type === 'currency') {
+                            displayValue = `$${parseFloat(String(fieldValue)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                          } else {
+                            displayValue = String(fieldValue);
+                          }
+
+                          return (
+                            <div key={fieldConfig.name}>
+                              <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
+                                {fieldConfig.label}
+                              </label>
+                              <p className="text-base text-[var(--text-dark)]">{displayValue}</p>
+                            </div>
+                          );
+                        })}
+
+                        {/* Show "No additional details" if no fields to display */}
+                        {fieldsToDisplay.length === 0 && (
+                          <div className="col-span-2 text-sm text-[var(--text-light)] italic">
+                            No additional requirement details
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Paper Size</label>
-                        <p className="text-base text-[var(--text-dark)]">{req.paper_size || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Pockets</label>
-                        <p className="text-base text-[var(--text-dark)]">{req.pockets ?? 'N/A'}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Shift</label>
-                        <p className="text-base text-[var(--text-dark)]">
-                          {req.shifts_id === 1 ? 'Shift One' : req.shifts_id === 2 ? 'Shift Two' : 'N/A'}
-                        </p>
-                      </div>
-                      {req.price_per_m && (
-                        <div>
-                          <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Price (per/m)</label>
-                          <p className="text-base text-[var(--text-dark)]">${parseFloat(req.price_per_m).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-base text-[var(--text-light)]">No specific requirements</p>

@@ -1,21 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
-import { useJobs } from '@/hooks/useJobs';
 import { useProjections, type ProjectionFilters } from '@/hooks/useProjections';
 import { getStartOfWeek } from '@/lib/projectionUtils';
-import { startOfMonth, startOfQuarter } from 'date-fns';
+import { startOfMonth, startOfQuarter, format } from 'date-fns';
 import ProjectionFiltersComponent from '../components/ProjectionFilters';
 import ProjectionsTable from '../components/ProjectionsTable';
 import FacilityToggle from '../components/FacilityToggle';
 import GranularityToggle, { type Granularity } from '../components/GranularityToggle';
-import EmbeddedCalendar from '../components/EmbeddedCalendar';
 import PageHeader from '../components/PageHeader';
-import AddJobModal from '../components/AddJobModal';
 import Pagination from '../components/Pagination';
-import ProjectionsCalendar from '../components/ProjectionsCalendar';
+
+// Dynamically import calendar and modals - only loaded when needed
+const EmbeddedCalendar = dynamic(() => import('../components/EmbeddedCalendar'), {
+  loading: () => <div className="text-center py-12 text-[var(--text-light)]">Loading calendar...</div>,
+  ssr: false,
+});
+
+const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
+  ssr: false,
+});
 
 type ViewMode = 'table' | 'calendar';
 
@@ -26,6 +33,8 @@ export default function ProjectionsPage() {
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [scheduleFilter, setScheduleFilter] = useState<'all' | 'confirmed' | 'soft'>('all');
+  const [filterMode, setFilterMode] = useState<'and' | 'or'>('and');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,12 +43,17 @@ export default function ProjectionsPage() {
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
 
+  // PDF export ref - targets the main content area
+  const contentRef = useRef<HTMLDivElement>(null);
+
   const filters: ProjectionFilters = {
     facility: selectedFacility,
     clients: selectedClients,
     serviceTypes: selectedServiceTypes,
     searchQuery,
     granularity,
+    scheduleFilter,
+    filterMode,
   };
 
   const {
@@ -55,9 +69,6 @@ export default function ProjectionsPage() {
     error,
     refetch,
   } = useProjections(startDate, filters);
-
-  // Fetch all jobs for the calendar (not filtered by projection timeframe)
-  const { jobs: allJobs } = useJobs(selectedFacility);
 
   console.log('[DEBUG] ProjectionsPage - processTypeCounts received:', processTypeCounts);
   console.log('[DEBUG] ProjectionsPage - filteredJobProjections count:', filteredJobProjections.length);
@@ -87,6 +98,50 @@ export default function ProjectionsPage() {
     }
   };
 
+  // Map granularity to calendar view type
+  const mapGranularityToViewType = (gran: Granularity): 'month' | 'week' | 'day' | 'quarterly' => {
+    switch (gran) {
+      case 'weekly':
+        return 'week';
+      case 'monthly':
+        return 'month';
+      case 'quarterly':
+        return 'quarterly'; // Show custom quarterly view
+      default:
+        return 'month';
+    }
+  };
+
+  // PDF export handler - dynamically loads react-to-print only when needed
+  const handleExportPDF = async () => {
+    const { useReactToPrint } = await import('react-to-print');
+    const handlePrint = useReactToPrint({
+      contentRef: contentRef,
+      documentTitle: `Projections_${viewMode}_${granularity}_${format(startDate, 'yyyy-MM-dd')}`,
+      pageStyle: `
+        @page {
+          size: landscape;
+          margin: 0.5in;
+        }
+        @media print {
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          /* Hide elements not needed in PDF */
+          .no-print {
+            display: none !important;
+          }
+          /* Hide pagination in PDF */
+          nav {
+            display: none !important;
+          }
+        }
+      `,
+    });
+    handlePrint();
+  };
+
   if (userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -107,7 +162,7 @@ export default function ProjectionsPage() {
 
       {/* Main Content */}
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4 no-print">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
             <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
               {granularity === 'weekly' ? '5-Week' : granularity === 'monthly' ? '3-Month' : '4-Quarter'} Projections
@@ -117,14 +172,35 @@ export default function ProjectionsPage() {
               onFacilityChange={setSelectedFacility}
             />
           </div>
-          <GranularityToggle
-            currentGranularity={granularity}
-            onGranularityChange={handleGranularityChange}
-          />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-[var(--dark-blue)] transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Export PDF
+            </button>
+            <GranularityToggle
+              currentGranularity={granularity}
+              onGranularityChange={handleGranularityChange}
+            />
+          </div>
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--border)] overflow-x-auto">
+        <div className="flex gap-2 mb-6 border-b border-[var(--border)] overflow-x-auto no-print">
           <button
             onClick={() => setViewMode('table')}
             className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
@@ -148,20 +224,27 @@ export default function ProjectionsPage() {
         </div>
 
         {/* Filters */}
-        <ProjectionFiltersComponent
-          jobs={jobProjections.map(p => p.job)}
-          startDate={startDate}
-          onStartDateChange={setStartDate}
-          selectedClients={selectedClients}
-          onClientsChange={setSelectedClients}
-          selectedServiceTypes={selectedServiceTypes}
-          onServiceTypesChange={setSelectedServiceTypes}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          granularity={granularity}
-        />
+        <div className="no-print">
+          <ProjectionFiltersComponent
+            jobs={jobProjections.map(p => p.job)}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
+            selectedClients={selectedClients}
+            onClientsChange={setSelectedClients}
+            selectedServiceTypes={selectedServiceTypes}
+            onServiceTypesChange={setSelectedServiceTypes}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            granularity={granularity}
+            scheduleFilter={scheduleFilter}
+            onScheduleFilterChange={setScheduleFilter}
+            filterMode={filterMode}
+            onFilterModeChange={setFilterMode}
+          />
+        </div>
 
-        {/* Content */}
+        {/* Content - This is what gets printed */}
+        <div ref={contentRef}>
         {error ? (
           <div className="text-center py-12">
             <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl mx-auto">
@@ -312,19 +395,13 @@ export default function ProjectionsPage() {
                 />
 
                 {/* Pagination */}
-                <Pagination
-                  currentPage={currentPage}
-                  totalItems={filteredJobProjections.length}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={setCurrentPage}
-                  onItemsPerPageChange={setItemsPerPage}
-                />
-
-                {/* Jobs Calendar */}
-                <div className="mt-8">
-                  <ProjectionsCalendar
-                    jobs={allJobs}
-                    startDate={new Date()}
+                <div className="no-print">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredJobProjections.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
                   />
                 </div>
               </>
@@ -332,56 +409,23 @@ export default function ProjectionsPage() {
 
             {/* Calendar View */}
             {viewMode === 'calendar' && (
-              <div className="space-y-4">
-                {/* Process Type Legend */}
-                <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                  <h3 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">Process Type Colors</h3>
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#3B82F6' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">Insert</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#10B981' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">Sort</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#F59E0B' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">Inkjet</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#8B5CF6' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">Label/Apply</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#EC4899' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">Fold</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#EF4444' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">Laser</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: '#14B8A6' }}></div>
-                      <span className="text-sm text-[var(--text-light)]">HP Press</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Calendar */}
-                <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6">
-                  <EmbeddedCalendar
-                    startDate={startDate}
-                    selectedFacility={selectedFacility}
-                    selectedClients={selectedClients}
-                    selectedServiceTypes={selectedServiceTypes}
-                    height={800}
-                  />
-                </div>
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6">
+                <EmbeddedCalendar
+                  startDate={startDate}
+                  selectedFacility={selectedFacility}
+                  selectedClients={selectedClients}
+                  selectedServiceTypes={selectedServiceTypes}
+                  searchQuery={searchQuery}
+                  scheduleFilter={scheduleFilter}
+                  filterMode={filterMode}
+                  height={800}
+                  viewType={mapGranularityToViewType(granularity)}
+                />
               </div>
             )}
           </>
         )}
+        </div>
       </main>
 
       {/* Add Job Modal */}

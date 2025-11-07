@@ -1,13 +1,28 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useMachines } from '@/hooks/useMachines';
-import AddJobModal from '../components/AddJobModal';
 import FacilityToggle from '../components/FacilityToggle';
 import PageHeader from '../components/PageHeader';
 import Link from 'next/link';
+import type { Machine } from '@/types';
+import { getProcessTypeConfig } from '@/lib/processTypeConfig';
+
+// Dynamically import modals - only loaded when opened
+const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
+  ssr: false,
+});
+
+const AddMachineModal = dynamic(() => import('../components/AddMachineModal'), {
+  ssr: false,
+});
+
+const EditMachineModal = dynamic(() => import('../components/EditMachineModal'), {
+  ssr: false,
+});
 
 const machineTypes = [
   {
@@ -38,11 +53,13 @@ const machineTypes = [
 ];
 
 export default function Machines() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [isAddMachineModalOpen, setIsAddMachineModalOpen] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const { user, isLoading: userLoading } = useUser();
-  const { machines, isLoading: machinesLoading, error: machinesError } = useMachines(filterStatus, filterFacility || undefined);
+  const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
 
   const handleFacilityChange = (facility: number | null) => {
@@ -51,6 +68,46 @@ export default function Machines() {
 
   const handleFilterChange = (status: string) => {
     setFilterStatus(status);
+  };
+
+  const handleMachineClick = (machine: Machine) => {
+    setSelectedMachine(machine);
+  };
+
+  const handleMachineModalClose = () => {
+    setSelectedMachine(null);
+    refetch(filterStatus, filterFacility || undefined);
+  };
+
+  const handleAddMachineSuccess = () => {
+    refetch(filterStatus, filterFacility || undefined);
+  };
+
+  // Helper to render capability values
+  const renderCapabilityValue = (machine: Machine, capabilityKey: string): string => {
+    if (!machine.capabilities || !machine.capabilities[capabilityKey]) {
+      return 'N/A';
+    }
+
+    const value = machine.capabilities[capabilityKey];
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : 'N/A';
+    }
+
+    return String(value);
+  };
+
+  // Get relevant capability columns for a machine
+  const getCapabilityColumns = (machine: Machine): string[] => {
+    const processConfig = machine.process_type_key ? getProcessTypeConfig(machine.process_type_key) : null;
+    if (!processConfig) return [];
+
+    // Get the first 2-3 most important fields (skip price_per_m)
+    return processConfig.fields
+      .filter(field => field.name !== 'price_per_m')
+      .slice(0, 2)
+      .map(field => field.name);
   };
 
   if (userLoading) {
@@ -66,7 +123,7 @@ export default function Machines() {
       <PageHeader
         currentPage="machines"
         user={user}
-        onAddJobClick={() => setIsModalOpen(true)}
+        onAddJobClick={() => setIsJobModalOpen(true)}
         showAddJobButton={true}
         onLogout={logout}
       />
@@ -84,6 +141,14 @@ export default function Machines() {
               showAll={true}
             />
           </div>
+          {filterFacility !== null && (
+            <button
+              onClick={() => setIsAddMachineModalOpen(true)}
+              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+            >
+              + Add Machine
+            </button>
+          )}
         </div>
 
         {filterFacility === null ? (
@@ -187,13 +252,16 @@ export default function Machines() {
                         Type
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                        Process
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                        Max Size
+                        Cap 1
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                        Pockets
+                        Cap 2
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
                         Speed/hr
@@ -222,8 +290,15 @@ export default function Machines() {
                         maintenance: 'Maintenance'
                       };
 
+                      const capabilityKeys = getCapabilityColumns(machine);
+                      const processConfig = machine.process_type_key ? getProcessTypeConfig(machine.process_type_key) : null;
+
                       return (
-                        <tr key={machine.id} className="hover:bg-gray-50 transition-colors">
+                        <tr
+                          key={machine.id}
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => handleMachineClick(machine)}
+                        >
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
                             Line {machine.line}
                           </td>
@@ -231,16 +306,23 @@ export default function Machines() {
                             {machine.type}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                            {processConfig ? processConfig.label : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
                               {statusLabels[machine.status]}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                            {machine.max_size || 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                            {machine.pockets || 'N/A'}
-                          </td>
+                          {capabilityKeys.map((key, idx) => {
+                            const field = processConfig?.fields.find(f => f.name === key);
+                            const capKey = field?.type === 'dropdown' ? `supported_${key}s` :
+                                         field?.type === 'number' ? `max_${key}` : key;
+                            return (
+                              <td key={idx} className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                                {renderCapabilityValue(machine, capKey)}
+                              </td>
+                            );
+                          })}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
                             {machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}
                           </td>
@@ -280,10 +362,13 @@ export default function Machines() {
                     maintenance: 'Maintenance'
                   };
 
+                  const processConfig = machine.process_type_key ? getProcessTypeConfig(machine.process_type_key) : null;
+
                   return (
                     <div
                       key={machine.id}
-                      className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4"
+                      className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleMachineClick(machine)}
                     >
                       {/* Machine Header */}
                       <div className="flex justify-between items-start mb-3">
@@ -292,7 +377,7 @@ export default function Machines() {
                             Line {machine.line}
                           </div>
                           <div className="text-sm text-[var(--text-light)] mt-1">
-                            {machine.type}
+                            {machine.type} {processConfig ? `(${processConfig.label})` : ''}
                           </div>
                         </div>
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
@@ -352,7 +437,22 @@ export default function Machines() {
       </main>
 
       {/* Add Job Modal */}
-      <AddJobModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddJobModal isOpen={isJobModalOpen} onClose={() => setIsJobModalOpen(false)} />
+
+      {/* Add Machine Modal */}
+      <AddMachineModal
+        isOpen={isAddMachineModalOpen}
+        onClose={() => setIsAddMachineModalOpen(false)}
+        onSuccess={handleAddMachineSuccess}
+      />
+
+      {/* Edit Machine Modal */}
+      <EditMachineModal
+        isOpen={selectedMachine !== null}
+        machine={selectedMachine}
+        onClose={handleMachineModalClose}
+        onSuccess={handleMachineModalClose}
+      />
     </>
   );
 }

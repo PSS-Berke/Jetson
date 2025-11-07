@@ -17,6 +17,10 @@ interface ProjectionFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   granularity: Granularity;
+  scheduleFilter: 'all' | 'confirmed' | 'soft';
+  onScheduleFilterChange: (filter: 'all' | 'confirmed' | 'soft') => void;
+  filterMode: 'and' | 'or';
+  onFilterModeChange: (mode: 'and' | 'or') => void;
 }
 
 export default function ProjectionFilters({
@@ -30,6 +34,10 @@ export default function ProjectionFilters({
   searchQuery,
   onSearchChange,
   granularity,
+  scheduleFilter,
+  onScheduleFilterChange,
+  filterMode,
+  onFilterModeChange,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -201,6 +209,32 @@ export default function ProjectionFilters({
   return (
     <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-3 sm:p-4 mb-6">
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+        {/* Filter Mode Toggle */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => onFilterModeChange('and')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+              filterMode === 'and'
+                ? 'bg-white text-[var(--dark-blue)] shadow-sm'
+                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+            }`}
+            title="Jobs must match ALL active filters"
+          >
+            Match All
+          </button>
+          <button
+            onClick={() => onFilterModeChange('or')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+              filterMode === 'or'
+                ? 'bg-white text-[var(--primary-blue)] shadow-sm'
+                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+            }`}
+            title="Jobs can match ANY active filter"
+          >
+            Match Any
+          </button>
+        </div>
+
         {/* Date Range Selector */}
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
           <span className="text-xs sm:text-sm font-medium text-[var(--text-dark)] whitespace-nowrap">{getPeriodLabel()}:</span>
@@ -242,6 +276,40 @@ export default function ProjectionFilters({
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+        </div>
+
+        {/* Schedule Filter Toggle */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => onScheduleFilterChange('all')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              scheduleFilter === 'all'
+                ? 'bg-white text-[var(--dark-blue)] shadow-sm'
+                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => onScheduleFilterChange('confirmed')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+              scheduleFilter === 'confirmed'
+                ? 'bg-white text-[#EF3340] shadow-sm'
+                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+            }`}
+          >
+            Hard
+          </button>
+          <button
+            onClick={() => onScheduleFilterChange('soft')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+              scheduleFilter === 'soft'
+                ? 'bg-white text-[#2E3192] shadow-sm'
+                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+            }`}
+          >
+            Soft
+          </button>
         </div>
 
         {/* Client Filter */}
