@@ -71,7 +71,18 @@ export interface CFOSummaryMetrics {
   totalJobs: number;
   totalQuantity: number;
   averageJobValue: number;
+  averageJobProfit: number;
   capacityUtilization: number;
+  topProfitableJobs: Array<{
+    jobNumber: string;
+    client: string;
+    profit: number;
+  }>;
+  topCostPerPieceByProcess: Array<{
+    processType: string;
+    costPerPiece: number;
+    totalPieces: number;
+  }>;
   topClientConcentration: number;
   topClientName: string;
   jobsAtRisk?: number;
@@ -640,6 +651,71 @@ export function calculateCFOSummaryMetrics(
   const totalQuantity = jobs.reduce((sum, job) => sum + job.quantity, 0);
   const averageJobValue = calculateAverageJobValue(jobs);
 
+  // Calculate total profit (simplified: revenue - ext_price)
+  const totalProfit = jobs.reduce((sum, job) => {
+    const revenue = parseFloat(job.total_billing || '0');
+    const extPrice = parseFloat(job.ext_price || '0');
+    return sum + (revenue - extPrice);
+  }, 0);
+  const averageJobProfit = totalJobs > 0 ? totalProfit / totalJobs : 0;
+
+  // Get top 3 most profitable jobs
+  const jobsWithProfit = jobs.map(job => {
+    const revenue = parseFloat(job.total_billing || '0');
+    const extPrice = parseFloat(job.ext_price || '0');
+    const profit = revenue - extPrice;
+    return {
+      jobNumber: String(job.job_number || 'N/A'),
+      client: getClientName(job.client),
+      profit,
+    };
+  });
+  
+  const topProfitableJobs = jobsWithProfit
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, 3);
+
+  // Calculate average cost per piece by process type
+  const processTypeMap = new Map<string, { totalCost: number; totalPieces: number }>();
+  
+  jobs.forEach(job => {
+    const quantity = job.quantity || 0;
+    
+    // Get requirements/process types for this job
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const requirements = (job as any).requirements;
+    
+    if (Array.isArray(requirements) && requirements.length > 0 && quantity > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      requirements.forEach((req: any) => {
+        const processType = req.process_type || 'Unknown';
+        const pricePerM = parseFloat(req.price_per_m || '0');
+        
+        if (pricePerM > 0) {
+          if (!processTypeMap.has(processType)) {
+            processTypeMap.set(processType, { totalCost: 0, totalPieces: 0 });
+          }
+          
+          const existing = processTypeMap.get(processType)!;
+          // Calculate total cost for this process: (price_per_m / 1000) * quantity
+          const costForJob = (pricePerM / 1000) * quantity;
+          existing.totalCost += costForJob;
+          existing.totalPieces += quantity;
+        }
+      });
+    }
+  });
+  
+  // Convert to array and calculate cost per M (per 1000 pieces)
+  const topCostPerPieceByProcess = Array.from(processTypeMap.entries())
+    .map(([processType, data]) => ({
+      processType,
+      costPerPiece: data.totalPieces > 0 ? (data.totalCost / data.totalPieces) * 1000 : 0,
+      totalPieces: data.totalPieces,
+    }))
+    .sort((a, b) => b.costPerPiece - a.costPerPiece)
+    .slice(0, 4);
+
   const clientRevenues = calculateRevenueByClient(jobs);
   const topClient = clientRevenues[0];
   const topClientConcentration = topClient ? topClient.percentageOfTotal : 0;
@@ -652,7 +728,10 @@ export function calculateCFOSummaryMetrics(
     totalJobs,
     totalQuantity,
     averageJobValue,
+    averageJobProfit,
     capacityUtilization: capacityUtilization || 0,
+    topProfitableJobs,
+    topCostPerPieceByProcess,
     topClientConcentration,
     topClientName,
     jobsAtRisk: atRiskJobs.length,
