@@ -59,10 +59,11 @@ export default function PageHeader({
             <Image
               src="/logo.png"
               alt="Jetson Marketing Solutions"
-              width={200}
-              height={56}
+              width={500}
+              height={250}
               className="h-10 sm:h-14 w-auto"
               priority
+              unoptimized
             />
           </Link>
 

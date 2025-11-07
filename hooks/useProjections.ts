@@ -18,6 +18,7 @@ import { getProductionEntries } from '@/lib/api';
 import { aggregateProductionByJob } from '@/lib/productionUtils';
 import type { Granularity } from '@/app/components/GranularityToggle';
 import type { ProductionEntry } from '@/types';
+import { normalizeProcessType } from '@/lib/processTypeConfig';
 
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
@@ -102,7 +103,9 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
     job.requirements?.forEach((req) => {
       console.log(`[DEBUG] Job ${job.job_number} - Requirement:`, req, '| process_type:', req.process_type);
       if (req.process_type) {
-        processTypesInJob.add(req.process_type.toLowerCase());
+        // Normalize the process type to ensure consistent matching
+        const normalized = normalizeProcessType(req.process_type);
+        processTypesInJob.add(normalized);
       }
     });
 
@@ -115,7 +118,7 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
         countedJobs.add(key);
         const jobQuantity = projection.totalQuantity;
 
-        // Increment the appropriate counter
+        // Increment the appropriate counter based on normalized process type
         switch (processType) {
           case 'insert':
             counts.insert.jobs++;
@@ -126,14 +129,10 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
             counts.sort.pieces += jobQuantity;
             break;
           case 'inkjet':
-          case 'ij': // Support legacy value
-          case 'ink jet':
             counts.inkjet.jobs++;
             counts.inkjet.pieces += jobQuantity;
             break;
-          case 'label/apply':
-          case 'l/a': // Support legacy value
-          case 'label/affix':
+          case 'labelApply':
             counts.labelApply.jobs++;
             counts.labelApply.pieces += jobQuantity;
             break;
@@ -145,7 +144,7 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
             counts.laser.jobs++;
             counts.laser.pieces += jobQuantity;
             break;
-          case 'hp press':
+          case 'hpPress':
             counts.hpPress.jobs++;
             counts.hpPress.pieces += jobQuantity;
             break;
