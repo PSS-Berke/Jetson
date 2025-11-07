@@ -8,9 +8,15 @@ import {
 
 interface CFOSummaryCardsProps {
   metrics: CFOSummaryMetrics;
+  revenueTrend?: {
+    current: number;
+    previous: number;
+    change: number;
+    percentChange: number;
+  };
 }
 
-export default function CFOSummaryCards({ metrics }: CFOSummaryCardsProps) {
+export default function CFOSummaryCards({ metrics, revenueTrend }: CFOSummaryCardsProps) {
   // Helper function to get concentration risk color
   const getConcentrationColor = (concentration: number): string => {
     if (concentration >= 30) return 'text-red-600';
