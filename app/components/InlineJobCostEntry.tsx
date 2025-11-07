@@ -355,7 +355,7 @@ export default function InlineJobCostEntry({
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Set Total Cost
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px]">
                     Profit %
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -363,7 +363,7 @@ export default function InlineJobCostEntry({
                   </th>
                 </>
               ) : (
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px]">
                   Profit %
                 </th>
               )}
@@ -373,9 +373,13 @@ export default function InlineJobCostEntry({
             {jobEntries.map((entry, index) => {
               const hasInput = entry.add_to_cost || entry.set_total_cost;
               const { profitPercentage } = getProfitPreview(entry);
-              const currentProfitPercentage = entry.billing_rate_per_m > 0
+              const currentProfitPercentage = entry.billing_rate_per_m > 0 && entry.current_cost_per_m > 0
                 ? ((entry.billing_rate_per_m - entry.current_cost_per_m) / entry.billing_rate_per_m) * 100
                 : 0;
+
+              // Determine which profit % to display in batch mode
+              const displayProfitPercentage = hasInput ? profitPercentage : currentProfitPercentage;
+              const showProfit = hasInput || entry.current_cost_per_m > 0;
 
               return (
                 <tr key={entry.job_id} className="hover:bg-gray-50">
@@ -435,8 +439,8 @@ export default function InlineJobCostEntry({
 
                       {/* Profit Preview */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right">
-                        <span className={hasInput ? getProfitTextColor(profitPercentage) : 'text-gray-400'}>
-                          {hasInput ? formatPercentage(profitPercentage) : '—'}
+                        <span className={showProfit ? getProfitTextColor(displayProfitPercentage) : 'text-gray-400'}>
+                          {showProfit ? formatPercentage(displayProfitPercentage) : '—'}
                         </span>
                       </td>
 

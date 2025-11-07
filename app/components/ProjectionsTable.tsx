@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { ParsedJob } from '@/hooks/useJobs';
 import { JobProjection, ServiceTypeSummary } from '@/hooks/useProjections';
 import { formatQuantity, TimeRange } from '@/lib/projectionUtils';
 import JobDetailsModal from './JobDetailsModal';
 import ProcessTypeBadge from './ProcessTypeBadge';
+
+type SortField = 'job_number' | 'client' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
+type SortDirection = 'asc' | 'desc';
 
 interface ProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
@@ -202,6 +205,8 @@ export default function ProjectionsTable({
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('job_number');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const handleJobClick = (job: ParsedJob) => {
     setSelectedJob(job);
@@ -213,6 +218,68 @@ export default function ProjectionsTable({
     setSelectedJob(null);
   };
 
+  // Handle sorting
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort job projections
+  const sortedJobProjections = useMemo(() => {
+    return [...jobProjections].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      switch (sortField) {
+        case 'job_number':
+          aValue = a.job.job_number;
+          bValue = b.job.job_number;
+          break;
+        case 'client':
+          aValue = a.job.client?.name.toLowerCase() || '';
+          bValue = b.job.client?.name.toLowerCase() || '';
+          break;
+        case 'description':
+          aValue = a.job.description?.toLowerCase() || '';
+          bValue = b.job.description?.toLowerCase() || '';
+          break;
+        case 'quantity':
+          aValue = a.job.quantity;
+          bValue = b.job.quantity;
+          break;
+        case 'start_date':
+          aValue = a.job.start_date || 0;
+          bValue = b.job.start_date || 0;
+          break;
+        case 'due_date':
+          aValue = a.job.due_date || 0;
+          bValue = b.job.due_date || 0;
+          break;
+        case 'total':
+          aValue = a.totalQuantity;
+          bValue = b.totalQuantity;
+          break;
+        default:
+          aValue = a.job.job_number;
+          bValue = b.job.job_number;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [jobProjections, sortField, sortDirection]);
+
+  // Render sort icon
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <span className="text-gray-400">⇅</span>;
+    return <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   return (
     <>
       {/* Desktop Table View */}
@@ -221,26 +288,56 @@ export default function ProjectionsTable({
           <thead>
             {/* Column Headers */}
             <tr className="bg-gray-50 border-y border-gray-200">
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Job #
+              <th
+                onClick={() => handleSort('job_number')}
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-2">
+                  Job # <SortIcon field="job_number" />
+                </div>
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Sub Client
+              <th
+                onClick={() => handleSort('client')}
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-2">
+                  Sub Client <SortIcon field="client" />
+                </div>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
                 Process Types
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Job Name / Description
+              <th
+                onClick={() => handleSort('description')}
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-2">
+                  Job Name / Description <SortIcon field="description" />
+                </div>
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Quantity
+              <th
+                onClick={() => handleSort('quantity')}
+                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Quantity <SortIcon field="quantity" />
+                </div>
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Start Date
+              <th
+                onClick={() => handleSort('start_date')}
+                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Start Date <SortIcon field="start_date" />
+                </div>
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                End Date
+              <th
+                onClick={() => handleSort('due_date')}
+                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  End Date <SortIcon field="due_date" />
+                </div>
               </th>
               {timeRanges.map((range, index) => (
                 <th
@@ -252,21 +349,26 @@ export default function ProjectionsTable({
                   {range.label}
                 </th>
               ))}
-              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Total
+              <th
+                onClick={() => handleSort('total')}
+                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Total <SortIcon field="total" />
+                </div>
               </th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-[var(--border)]">
-            {jobProjections.length === 0 ? (
+            {sortedJobProjections.length === 0 ? (
               <tr>
                 <td colSpan={8 + timeRanges.length} className="px-4 py-8 text-center text-[var(--text-light)]">
                   No jobs found for the selected criteria
                 </td>
               </tr>
             ) : (
-              jobProjections.map((projection) => (
+              sortedJobProjections.map((projection) => (
                 <ProjectionTableRow
                   key={projection.job.id}
                   projection={projection}
@@ -281,12 +383,12 @@ export default function ProjectionsTable({
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
-        {jobProjections.length === 0 ? (
+        {sortedJobProjections.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6 text-center text-[var(--text-light)]">
             No jobs found for the selected criteria
           </div>
         ) : (
-          jobProjections.map((projection) => (
+          sortedJobProjections.map((projection) => (
             <ProjectionMobileCard
               key={projection.job.id}
               projection={projection}

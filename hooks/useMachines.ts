@@ -32,8 +32,11 @@ export const useMachines = (initialStatus?: string, initialFacilityId?: number):
       revalidateOnFocus: false,
       dedupingInterval: 10000,
       revalidateOnReconnect: true,
-      shouldRetryOnError: true,
-      errorRetryCount: 3,
+      shouldRetryOnError: false, // Disable retries to avoid flooding console
+      errorRetryCount: 0,
+      onError: (err) => {
+        console.error('[useMachines] Error fetching machines:', err?.message || err);
+      }
     }
   );
 

@@ -44,9 +44,15 @@ export default function CFOClientAnalysis({
     return sorted.slice(0, topN);
   }, [clientData, sortBy, topN]);
 
-  // Get the current metric display name
-  const metricName = sortBy === 'revenue' ? 'Revenue' : sortBy === 'volume' ? 'Volume' : 'Profit';
+  // Map sortBy to the actual data key in ClientRevenue interface
   const chartDataKey = sortBy === 'volume' ? 'quantity' : sortBy;
+
+  // Dynamic subtitle based on active metric
+  const subtitle = sortBy === 'revenue'
+    ? 'Client concentration and distribution by revenue'
+    : sortBy === 'volume'
+    ? 'Client concentration and distribution by volume (pieces)'
+    : 'Client concentration and distribution by profitability';
 
   // Calculate concentration risk color for each client
   const getClientColor = (percentage: number): string => {
@@ -124,8 +130,8 @@ export default function CFOClientAnalysis({
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Top Clients by {metricName}</h3>
-            <p className="text-sm text-gray-500">Client concentration and distribution analysis</p>
+            <h3 className="text-lg font-semibold text-gray-900">Top Clients</h3>
+            <p className="text-sm text-gray-500">{subtitle}</p>
           </div>
           <CFOClientSortToggle currentSort={sortBy} onSortChange={setSortBy} />
         </div>
@@ -134,34 +140,28 @@ export default function CFOClientAnalysis({
       {/* Risk Assessment Banner */}
       {highRiskClients > 0 && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start">
-            <span className="text-red-600 text-xl mr-2">⚠️</span>
-            <div>
-              <p className="text-sm font-semibold text-red-900">
-                High Client Concentration Risk
-              </p>
-              <p className="text-xs text-red-700 mt-1">
-                {highRiskClients} client{highRiskClients > 1 ? 's' : ''} represent{highRiskClients === 1 ? 's' : ''} ≥20% of revenue each.
-                Top 3 clients = {formatPercentage(top3Concentration)} of total revenue.
-              </p>
-            </div>
+          <div>
+            <p className="text-sm font-semibold text-red-900">
+              High Client Concentration Risk
+            </p>
+            <p className="text-xs text-red-700 mt-1">
+              {highRiskClients} client{highRiskClients > 1 ? 's' : ''} represent{highRiskClients === 1 ? 's' : ''} ≥20% of revenue each.
+              Top 3 clients = {formatPercentage(top3Concentration)} of total revenue.
+            </p>
           </div>
         </div>
       )}
 
       {moderateRiskClients > 0 && highRiskClients === 0 && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-start">
-            <span className="text-yellow-600 text-xl mr-2">⚡</span>
-            <div>
-              <p className="text-sm font-semibold text-yellow-900">
-                Moderate Client Concentration
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                {moderateRiskClients} client{moderateRiskClients > 1 ? 's' : ''} represent{moderateRiskClients === 1 ? 's' : ''} 10-20% of revenue.
-                Monitor and consider diversification.
-              </p>
-            </div>
+          <div>
+            <p className="text-sm font-semibold text-yellow-900">
+              Moderate Client Concentration
+            </p>
+            <p className="text-xs text-yellow-700 mt-1">
+              {moderateRiskClients} client{moderateRiskClients > 1 ? 's' : ''} represent{moderateRiskClients === 1 ? 's' : ''} 10-20% of revenue.
+              Monitor and consider diversification.
+            </p>
           </div>
         </div>
       )}

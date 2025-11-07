@@ -152,7 +152,7 @@ export default function CFODashboard({
         <CFORevenueChart
           currentPeriodData={revenueByPeriod}
           previousPeriodData={previousRevenueByPeriod}
-          title="Revenue Trend"
+          title="Trends Over Time"
         />
       </section>
 
@@ -271,7 +271,7 @@ export default function CFODashboard({
 
       {/* Print-friendly Note */}
       <div className="text-center text-sm text-gray-500 no-print">
-        💡 Tip: Use your browser&apos;s print function to generate a PDF report of this financial analysis
+        Tip: Use your browser&apos;s print function to generate a PDF report of this financial analysis
       </div>
     </div>
   );

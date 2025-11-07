@@ -12,7 +12,7 @@ import {
   Cell,
   PieChart,
   Pie,
-  // Legend,
+  Legend,
 } from 'recharts';
 import { ServiceTypeRevenue, formatCurrency, formatPercentage, formatNumber } from '@/lib/cfoUtils';
 import { getProcessTypeColor, normalizeProcessType } from '@/lib/processTypeConfig';
@@ -137,10 +137,23 @@ export default function CFOServiceMix({
     }
   };
 
-  // Custom label for pie chart
+  // Custom legend formatter
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderCustomLabel = (entry: any) => {
-    return `${entry.name}: ${formatPercentage(entry.percentage)}`;
+  const renderLegend = (props: any) => {
+    const { payload } = props;
+    return (
+      <div className="flex flex-col gap-1 text-xs">
+        {payload.map((entry: any, index: number) => (
+          <div key={`legend-${index}`} className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-sm"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-gray-700">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -223,7 +236,7 @@ export default function CFOServiceMix({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={renderCustomLabel}
+                label={false}
                 outerRadius={120}
                 fill="#8884d8"
                 dataKey="value"
@@ -233,6 +246,13 @@ export default function CFOServiceMix({
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
+              <Legend
+                content={renderLegend}
+                layout="vertical"
+                align="right"
+                verticalAlign="bottom"
+                wrapperStyle={{ paddingLeft: '20px' }}
+              />
             </PieChart>
           </ResponsiveContainer>
         )}
@@ -253,7 +273,7 @@ export default function CFOServiceMix({
           </div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">Top % of Revenue</div>
+          <div className="text-xs text-gray-500">Top % of {metricName}</div>
           <div className="text-sm font-semibold text-gray-900">
             {sortedData[0] ? formatPercentage(sortedData[0].percentageOfTotal) : 'N/A'}
           </div>
@@ -274,15 +294,12 @@ export default function CFOServiceMix({
       {/* Insight */}
       {sortedData.length > 0 && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-start">
-            <span className="text-blue-600 text-xl mr-2">💡</span>
-            <div className="text-sm">
-              <p className="font-semibold text-blue-900 mb-1">Key Insight</p>
-              <p className="text-blue-700">
-                {sortedData[0].serviceType} represents {formatPercentage(sortedData[0].percentageOfTotal)} of revenue.
-                {sortedData[0].percentageOfTotal > 50 && ` Consider process diversification to reduce dependency.`}
-              </p>
-            </div>
+          <div className="text-sm">
+            <p className="font-semibold text-blue-900 mb-1">Key Insight</p>
+            <p className="text-blue-700">
+              {sortedData[0].serviceType} represents {formatPercentage(sortedData[0].percentageOfTotal)} of {sortBy === 'revenue' ? 'revenue' : sortBy === 'volume' ? 'volume' : 'profit'}.
+              {sortedData[0].percentageOfTotal > 50 && ` Consider process diversification to reduce dependency.`}
+            </p>
           </div>
         </div>
       )}

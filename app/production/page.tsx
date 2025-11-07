@@ -30,6 +30,10 @@ const EditProductionEntryModal = dynamic(() => import('../components/EditProduct
   ssr: false,
 });
 
+const ExcelProductionUploadModal = dynamic(() => import('../components/ExcelProductionUploadModal'), {
+  ssr: false,
+});
+
 type GranularityType = 'day' | 'week' | 'month';
 
 export default function ProductionPage() {
@@ -38,6 +42,7 @@ export default function ProductionPage() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [isAddJobModalOpen, setIsAddJobModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
   const [selectedComparison, setSelectedComparison] = useState<ProductionComparison | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [activeView, setActiveView] = useState<'table' | 'analytics'>('table');
@@ -87,6 +92,7 @@ export default function ProductionPage() {
   const { jobs, isLoading: jobsLoading, refetch: refetchJobs } = useJobs(selectedFacility);
   const {
     comparisons,
+    productionEntries,
     isLoading: productionLoading,
     refetch: refetchProduction,
   } = useProduction({
@@ -176,6 +182,12 @@ export default function ProductionPage() {
   // Handle successful production entry edit
   const handleProductionEntryEdited = async () => {
     await refetchProduction();
+  };
+
+  // Handle successful Excel upload
+  const handleExcelUploadSuccess = async () => {
+    await refetchProduction();
+    setIsExcelUploadModalOpen(false);
   };
 
   // Handle clicking on a comparison row to edit
@@ -327,14 +339,26 @@ export default function ProductionPage() {
               Analytics
             </button>
           </div>
-          {filteredComparisons.length > 0 && (
+          <div className="flex items-center gap-2">
+            {filteredComparisons.length > 0 && (
+              <button
+                onClick={handlePrint}
+                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap"
+              >
+                Export PDF
+              </button>
+            )}
             <button
-              onClick={handlePrint}
-              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap ml-4"
+              onClick={() => setIsExcelUploadModalOpen(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
+              title="Import production data from Excel"
             >
-              Export PDF
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Import from Excel
             </button>
-          )}
+          </div>
         </div>
 
         {/* Filters */}
@@ -469,6 +493,16 @@ export default function ProductionPage() {
         startDate={startDate}
         endDate={endDate}
         facilitiesId={selectedFacility || undefined}
+      />
+
+      {/* Excel Upload Modal */}
+      <ExcelProductionUploadModal
+        isOpen={isExcelUploadModalOpen}
+        onClose={() => setIsExcelUploadModalOpen(false)}
+        onSuccess={handleExcelUploadSuccess}
+        jobs={jobs}
+        facilitiesId={selectedFacility || undefined}
+        existingEntries={productionEntries}
       />
     </div>
   );

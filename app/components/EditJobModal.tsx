@@ -475,6 +475,23 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       await updateJob(job.id, payload);
       console.log('Job updated successfully');
 
+      // Auto-sync job_cost_entry from updated requirements
+      try {
+        const { syncJobCostEntryFromRequirements } = await import('@/lib/api');
+        // Use start_date from payload (timestamp) or fall back to existing job start_date
+        const startDateForSync = payload.start_date || new Date(job.start_date).getTime();
+        await syncJobCostEntryFromRequirements(
+          job.id,
+          payload.requirements as string,
+          startDateForSync,
+          payload.facilities_id
+        );
+        console.log('[EditJobModal] Job cost entry synced successfully');
+      } catch (costError) {
+        console.error('[EditJobModal] Failed to sync job cost entry (non-blocking):', costError);
+        // Don't fail job update if cost entry sync fails
+      }
+
       setCurrentStep(1);
       setShowSuccessToast(true);
 

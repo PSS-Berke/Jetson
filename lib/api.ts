@@ -9,6 +9,7 @@ import type {
   ProductionEntry
 } from '@/types';
 import type { JobCostEntry } from '@/lib/jobCostUtils';
+import { calculateAverageCostFromRequirements } from '@/lib/jobCostUtils';
 
 const AUTH_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:spcRzPtb';
 const API_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb';
@@ -78,7 +79,10 @@ const apiFetch = async <T = unknown>(
     if (!isProductionEndpoint && !isJobCostEndpoint) {
       console.error('[API Error]', {
         endpoint,
+        baseType,
+        fullUrl: `${baseType === 'auth' ? AUTH_BASE_URL : baseType === 'jobs' ? JOBS_BASE_URL : API_BASE_URL}${endpoint}`,
         status: response.status,
+        statusText: response.statusText,
         error
       });
     }
@@ -401,4 +405,100 @@ export const batchCreateJobCostEntries = async (
   );
   console.log('[batchCreateJobCostEntries] Successfully created', createdEntries.length, 'entries');
   return createdEntries;
+};
+
+// ============================================================================
+// Job Cost Entry Sync Functions (Auto-populate from Requirements)
+// ============================================================================
+
+/**
+ * Automatically sync job_cost_entry record from job requirements
+ * Called after job creation or update to populate actual_cost_per_m from price_per_m
+ *
+ * @param jobId - The job ID
+ * @param requirements - Array of job requirements (can be JSON string or array)
+ * @param startDate - Job start date (used as entry date)
+ * @param facilitiesId - Facility ID
+ * @returns Created/updated JobCostEntry or null if no valid pricing
+ */
+export const syncJobCostEntryFromRequirements = async (
+  jobId: number,
+  requirements: string | any[], // eslint-disable-line @typescript-eslint/no-explicit-any
+  startDate: string | number,
+  facilitiesId?: number
+): Promise<JobCostEntry | null> => {
+  try {
+    console.log('[syncJobCostEntryFromRequirements] Starting sync for job:', jobId);
+
+    // Parse requirements if it's a string
+    let requirementsArray: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (typeof requirements === 'string') {
+      try {
+        requirementsArray = JSON.parse(requirements);
+      } catch (e) {
+        console.error('[syncJobCostEntryFromRequirements] Failed to parse requirements:', e);
+        return null;
+      }
+    } else {
+      requirementsArray = requirements;
+    }
+
+    // Calculate average cost from requirements
+    const averageCost = calculateAverageCostFromRequirements(requirementsArray);
+
+    if (averageCost === 0) {
+      console.log('[syncJobCostEntryFromRequirements] No valid price_per_m found in requirements');
+      return null;
+    }
+
+    // Convert start date to timestamp if it's a string
+    let dateTimestamp: number;
+    if (typeof startDate === 'string') {
+      dateTimestamp = new Date(startDate).getTime();
+    } else {
+      dateTimestamp = startDate;
+    }
+
+    console.log('[syncJobCostEntryFromRequirements] Calculated average cost:', averageCost);
+
+    // Check if a job_cost_entry already exists for this job and date range
+    // We'll look for entries within a day of the start date to avoid duplicates
+    const dayStart = dateTimestamp;
+    const dayEnd = dateTimestamp + (24 * 60 * 60 * 1000);
+
+    try {
+      const existingEntries = await getJobCostEntries(facilitiesId, dayStart, dayEnd);
+      const existingEntry = existingEntries.find(entry => entry.job === jobId);
+
+      if (existingEntry) {
+        // Update existing entry
+        console.log('[syncJobCostEntryFromRequirements] Updating existing entry:', existingEntry.id);
+        const updated = await updateJobCostEntry(existingEntry.id, {
+          actual_cost_per_m: averageCost,
+          notes: existingEntry.notes || 'Auto-synced from requirements',
+        });
+        console.log('[syncJobCostEntryFromRequirements] Entry updated successfully');
+        return updated;
+      }
+    } catch (error) {
+      // If fetching existing entries fails, continue to create new one
+      console.log('[syncJobCostEntryFromRequirements] Could not fetch existing entries, will create new');
+    }
+
+    // Create new entry
+    const newEntry = await addJobCostEntry({
+      job: jobId,
+      date: dateTimestamp,
+      actual_cost_per_m: averageCost,
+      notes: 'Auto-synced from requirements',
+      facilities_id: facilitiesId,
+    });
+
+    console.log('[syncJobCostEntryFromRequirements] New entry created:', newEntry.id);
+    return newEntry;
+  } catch (error) {
+    console.error('[syncJobCostEntryFromRequirements] Error syncing job cost entry:', error);
+    // Don't throw - we don't want to fail job creation/update if cost entry sync fails
+    return null;
+  }
 };

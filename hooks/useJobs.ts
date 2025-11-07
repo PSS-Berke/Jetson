@@ -123,8 +123,11 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
       revalidateOnFocus: false, // Don't refetch on window focus
       dedupingInterval: 10000, // Dedupe requests within 10 seconds
       revalidateOnReconnect: true, // Refetch when reconnecting
-      shouldRetryOnError: true,
-      errorRetryCount: 3,
+      shouldRetryOnError: false, // Disable retries to avoid flooding console
+      errorRetryCount: 0,
+      onError: (err) => {
+        console.error('[useJobs] Error fetching jobs:', err?.message || err);
+      }
     }
   );
 

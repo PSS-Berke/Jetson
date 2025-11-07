@@ -282,7 +282,7 @@ export default function BatchJobCostEntryModal({
             ) : (
               <div className="space-y-4">
                 {/* Table Header */}
-                <div className="hidden lg:grid lg:grid-cols-[auto_1fr_1fr_80px_110px_110px_110px_110px_110px_1fr] gap-3 pb-2 border-b border-gray-200 font-semibold text-xs text-gray-700">
+                <div className="hidden lg:grid lg:grid-cols-[auto_1fr_1fr_80px_110px_110px_110px_110px_130px_1fr] gap-3 pb-2 border-b border-gray-200 font-semibold text-xs text-gray-700">
                   <div>Job #</div>
                   <div>Job Name</div>
                   <div>Client</div>
@@ -301,10 +301,19 @@ export default function BatchJobCostEntryModal({
                   const hasInput = entry.add_to_cost || entry.set_total_cost;
                   const { profitPercentage } = getProfitPreview(entry);
 
+                  // Calculate current profit % for existing costs
+                  const currentProfitPercentage = entry.current_cost_per_m > 0 && entry.billing_rate_per_m > 0
+                    ? ((entry.billing_rate_per_m - entry.current_cost_per_m) / entry.billing_rate_per_m) * 100
+                    : 0;
+
+                  // Determine which profit % to display
+                  const displayProfitPercentage = hasInput ? profitPercentage : currentProfitPercentage;
+                  const showProfit = hasInput || entry.current_cost_per_m > 0;
+
                   return (
                     <div
                       key={entry.job_id}
-                      className="grid grid-cols-1 lg:grid-cols-[auto_1fr_1fr_80px_110px_110px_110px_110px_110px_1fr] gap-3 items-center p-4 lg:p-0 bg-gray-50 lg:bg-transparent rounded-lg lg:rounded-none border-b border-gray-100"
+                      className="grid grid-cols-1 lg:grid-cols-[auto_1fr_1fr_80px_110px_110px_110px_110px_130px_1fr] gap-3 items-center p-4 lg:p-0 bg-gray-50 lg:bg-transparent rounded-lg lg:rounded-none border-b border-gray-100"
                     >
                       {/* Job # */}
                       <div>
@@ -375,8 +384,8 @@ export default function BatchJobCostEntryModal({
                       {/* Profit Preview */}
                       <div className="lg:text-right">
                         <span className="lg:hidden font-semibold text-sm text-gray-600">Profit %: </span>
-                        <span className={`text-sm font-semibold ${hasInput ? getProfitTextColor(profitPercentage) : 'text-gray-400'}`}>
-                          {hasInput ? formatPercentage(profitPercentage) : '—'}
+                        <span className={`text-sm font-semibold ${showProfit ? getProfitTextColor(displayProfitPercentage) : 'text-gray-400'}`}>
+                          {showProfit ? formatPercentage(displayProfitPercentage) : '—'}
                         </span>
                       </div>
 

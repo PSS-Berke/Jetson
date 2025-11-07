@@ -52,6 +52,40 @@ export interface JobCostComparison {
 // ============================================================================
 
 /**
+ * Calculate weighted average cost per M from job requirements
+ * Used to initialize job_cost_entry records when jobs are created/edited
+ *
+ * @param requirements - Array of job requirements with price_per_m fields
+ * @returns Average price_per_m across all requirements, or 0 if none exist
+ */
+export function calculateAverageCostFromRequirements(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  requirements: any[]
+): number {
+  if (!requirements || requirements.length === 0) {
+    return 0;
+  }
+
+  // Filter requirements that have valid price_per_m values
+  const validPrices = requirements
+    .map(req => {
+      const priceStr = req.price_per_m;
+      // Handle "undefined" string, null, undefined, and empty string
+      const isValid = priceStr && priceStr !== 'undefined' && priceStr !== 'null' && priceStr !== '';
+      return isValid ? parseFloat(priceStr) : 0;
+    })
+    .filter(price => price > 0);
+
+  if (validPrices.length === 0) {
+    return 0;
+  }
+
+  // Calculate average (simple average - all requirements weighted equally)
+  const sum = validPrices.reduce((total, price) => total + price, 0);
+  return sum / validPrices.length;
+}
+
+/**
  * Calculate billing rate per thousand from total_billing field
  * This reflects the ACTUAL amount billed to the client, including add-on charges
  */

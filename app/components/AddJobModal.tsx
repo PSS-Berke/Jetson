@@ -469,6 +469,21 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       console.log('Xano API Response:', responseData);
       console.log('[AddJobModal] facilities_id in API response:', responseData.facilities_id);
 
+      // Auto-sync job_cost_entry from requirements
+      try {
+        const { syncJobCostEntryFromRequirements } = await import('@/lib/api');
+        await syncJobCostEntryFromRequirements(
+          responseData.id,
+          formData.requirements,
+          formData.start_date,
+          formData.facilities_id || undefined
+        );
+        console.log('[AddJobModal] Job cost entry synced successfully');
+      } catch (costError) {
+        console.error('[AddJobModal] Failed to sync job cost entry (non-blocking):', costError);
+        // Don't fail job creation if cost entry sync fails
+      }
+
       const jobNum = parseInt(formData.job_number);
       setCreatedJobNumber(jobNum);
       setShowSuccessToast(true);

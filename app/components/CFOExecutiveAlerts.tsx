@@ -10,17 +10,6 @@ export default function CFOExecutiveAlerts({
   alerts,
   title = 'Executive Alerts',
 }: CFOExecutiveAlertsProps) {
-  // Get icon for severity
-  const getSeverityIcon = (severity: 'critical' | 'warning' | 'info'): string => {
-    switch (severity) {
-      case 'critical':
-        return '🔴';
-      case 'warning':
-        return '🟡';
-      case 'info':
-        return '🟢';
-    }
-  };
 
   // Get color classes for severity
   const getSeverityColors = (severity: 'critical' | 'warning' | 'info') => {
@@ -72,7 +61,6 @@ export default function CFOExecutiveAlerts({
           <p className="text-sm text-gray-500">Risk indicators and notifications</p>
         </div>
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">✓</div>
           <p className="text-lg font-medium text-gray-900">All Clear</p>
           <p className="text-sm text-gray-500 mt-2">No critical alerts or warnings at this time</p>
         </div>
@@ -123,11 +111,6 @@ export default function CFOExecutiveAlerts({
               className={`border ${colors.border} ${colors.bg} rounded-lg p-4 transition-all hover:shadow-md`}
             >
               <div className="flex items-start gap-3">
-                {/* Icon */}
-                <div className="flex-shrink-0 text-2xl">
-                  {getSeverityIcon(alert.severity)}
-                </div>
-
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   {/* Header */}
@@ -181,15 +164,15 @@ export default function CFOExecutiveAlerts({
         <div className="text-sm text-gray-600">
           {criticalAlerts.length > 0 ? (
             <p className="font-medium text-red-700">
-              ⚠️ {criticalAlerts.length} critical issue{criticalAlerts.length > 1 ? 's' : ''} requiring immediate attention
+              {criticalAlerts.length} critical issue{criticalAlerts.length > 1 ? 's' : ''} requiring immediate attention
             </p>
           ) : warningAlerts.length > 0 ? (
             <p className="font-medium text-yellow-700">
-              ⚡ {warningAlerts.length} warning{warningAlerts.length > 1 ? 's' : ''} to monitor
+              {warningAlerts.length} warning{warningAlerts.length > 1 ? 's' : ''} to monitor
             </p>
           ) : (
             <p className="font-medium text-green-700">
-              ✓ No critical issues. {infoAlerts.length} informational update{infoAlerts.length > 1 ? 's' : ''}
+              No critical issues. {infoAlerts.length} informational update{infoAlerts.length > 1 ? 's' : ''}
             </p>
           )}
         </div>
