@@ -2,6 +2,28 @@ import type { ParsedJob } from '@/hooks/useJobs';
 import type { ProductionEntry, ProductionComparison } from '@/types';
 
 /**
+ * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
+ */
+function getJobRevenue(job: ParsedJob): number {
+  // Check if job has parsed requirements with price_per_m
+  if (job.requirements && Array.isArray(job.requirements) && job.requirements.length > 0) {
+    const revenue = job.requirements.reduce((total, req) => {
+      const pricePerMStr = req.price_per_m;
+      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+      return total + ((job.quantity / 1000) * pricePerM);
+    }, 0);
+    
+    // Add add-on charges if available
+    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    return revenue + addOnCharges;
+  }
+  
+  // Fallback to total_billing
+  return parseFloat(job.total_billing || '0');
+}
+
+/**
  * Calculate variance between projected and actual quantities
  * @param projected - Projected quantity
  * @param actual - Actual quantity produced
@@ -218,7 +240,7 @@ export const calculateProductionSummary = (
 
   // Calculate total revenue based on actual production
   const total_revenue = comparisons.reduce((sum, c) => {
-    const jobTotalBilling = parseFloat(c.job.total_billing || '0');
+    const jobTotalBilling = getJobRevenue(c.job);
     const jobQuantity = c.job.quantity || 0;
 
     if (jobQuantity === 0) return sum;

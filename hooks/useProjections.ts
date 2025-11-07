@@ -19,6 +19,28 @@ import { aggregateProductionByJob } from '@/lib/productionUtils';
 import type { Granularity } from '@/app/components/GranularityToggle';
 import type { ProductionEntry } from '@/types';
 
+/**
+ * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
+ */
+function getJobRevenue(job: ParsedJob): number {
+  // Check if job has parsed requirements with price_per_m
+  if (job.requirements && Array.isArray(job.requirements) && job.requirements.length > 0) {
+    const revenue = job.requirements.reduce((total, req) => {
+      const pricePerMStr = req.price_per_m;
+      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+      return total + ((job.quantity / 1000) * pricePerM);
+    }, 0);
+    
+    // Add add-on charges if available
+    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    return revenue + addOnCharges;
+  }
+  
+  // Fallback to total_billing
+  return parseFloat(job.total_billing || '0');
+}
+
 export interface ProcessTypeCounts {
   insert: { jobs: number; pieces: number };
   sort: { jobs: number; pieces: number };
@@ -350,7 +372,7 @@ export function useProjections(
     console.log(`[Total Revenue] Starting calculation for ${filteredProjections.length} filtered jobs`);
     const revenue = filteredProjections.reduce((total, projection) => {
       const job = projection.job;
-      const jobBilling = parseFloat(job.total_billing || '0');
+      const jobBilling = getJobRevenue(job);
       const totalJobQuantity = job.quantity || 0;
 
       if (totalJobQuantity === 0) {
@@ -361,7 +383,7 @@ export function useProjections(
       const portionInTimeframe = projection.totalQuantity / totalJobQuantity;
       const proportionalRevenue = jobBilling * portionInTimeframe;
 
-      console.log(`[Total Revenue] Job ${job.job_number}: total_billing=$${jobBilling.toFixed(2)}, portion=${(portionInTimeframe * 100).toFixed(1)}%, proportional_revenue=$${proportionalRevenue.toFixed(2)}`);
+      console.log(`[Total Revenue] Job ${job.job_number}: revenue=$${jobBilling.toFixed(2)}, portion=${(portionInTimeframe * 100).toFixed(1)}%, proportional_revenue=$${proportionalRevenue.toFixed(2)}`);
       return total + proportionalRevenue;
     }, 0);
     console.log(`[Total Revenue] Final total: $${revenue.toFixed(2)} from ${filteredProjections.length} jobs`);

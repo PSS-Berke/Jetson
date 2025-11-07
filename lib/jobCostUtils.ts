@@ -52,21 +52,24 @@ export interface JobCostComparison {
 // ============================================================================
 
 /**
- * Calculate billing rate per thousand from total_billing field
- * This reflects the ACTUAL amount billed to the client, including add-on charges
+ * Calculate billing rate per thousand from requirements.price_per_m
+ * This reflects the sum of all price_per_m values from job requirements
  */
 export function calculateBillingRatePerM(job: ParsedJob): number {
-  // Use total_billing as the authoritative billing amount
-  // This includes all requirements + add-on charges
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalBilling = parseFloat((job as any).total_billing || '0');
-  const quantity = job.quantity || 0;
+  // Sum up all price_per_m values from requirements
+  if (!job.requirements || job.requirements.length === 0) {
+    return 0;
+  }
 
-  if (quantity === 0) return 0;
+  const totalPricePerM = job.requirements.reduce((total, req) => {
+    // Handle "undefined" string, null, undefined, and empty string
+    const pricePerMStr = req.price_per_m;
+    const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+    const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+    return total + pricePerM;
+  }, 0);
 
-  // Convert total billing to per-thousand rate
-  // Formula: (total_billing / quantity) * 1000
-  return (totalBilling / quantity) * 1000;
+  return totalPricePerM;
 }
 
 /**

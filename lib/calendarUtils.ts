@@ -71,7 +71,7 @@ export const transformJobsToEvents = (
 
       jobs.forEach(job => {
         const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
-        const dailyRevenue = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
+        const dailyRevenue = calculateDailyRevenue(job);
         totalPieces += dailyPieces;
         totalRevenue += dailyRevenue;
       });
@@ -137,7 +137,7 @@ export const calculateDailySummaries = (
     const jobDays = getDaysBetween(jobStart, jobEnd);
 
     const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
-    const dailyRevenue = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
+    const dailyRevenue = calculateDailyRevenue(job);
 
     // Get process types from requirements
     const processTypes = new Set<string>();
@@ -356,7 +356,7 @@ export const getDayBreakdown = (
     const hoursThisDay = hoursPerDay.get(dateKey) || 0;
 
     const piecesThisDay = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
-    const revenueThisDay = calculateDailyRevenue(job.total_billing, job.start_date, job.due_date);
+    const revenueThisDay = calculateDailyRevenue(job);
 
     totalPieces += piecesThisDay;
     totalRevenue += revenueThisDay;
