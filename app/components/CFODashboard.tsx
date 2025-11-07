@@ -58,12 +58,12 @@ export default function CFODashboard({
   startDate,
   endDate,
   facilitiesId,
-  granularity = 'monthly',
-  selectedClients = [],
-  selectedServiceTypes = [],
-  searchQuery = '',
-  filterMode = 'AND',
-  printRef,
+  // granularity = 'monthly',
+  // selectedClients = [],
+  // selectedServiceTypes = [],
+  // searchQuery = '',
+  // filterMode = 'AND',
+  // printRef,
 }: CFODashboardProps) {
   // Calculate all metrics
   const metrics = useMemo(() => {
@@ -271,7 +271,7 @@ export default function CFODashboard({
 
       {/* Print-friendly Note */}
       <div className="text-center text-sm text-gray-500 no-print">
-        💡 Tip: Use your browser's print function to generate a PDF report of this financial analysis
+        💡 Tip: Use your browser&apos;s print function to generate a PDF report of this financial analysis
       </div>
     </div>
   );

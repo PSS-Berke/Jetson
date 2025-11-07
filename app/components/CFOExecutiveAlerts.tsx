@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExecutiveAlert, formatCurrency } from '@/lib/cfoUtils';
+import { ExecutiveAlert } from '@/lib/cfoUtils';
 
 interface CFOExecutiveAlertsProps {
   alerts: ExecutiveAlert[];

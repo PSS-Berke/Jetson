@@ -171,18 +171,22 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
             </div>
 
             {/* Weekly Quantity Distribution */}
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {(job as any).weekly_split && (job as any).weekly_split.length > 0 && (
               <div className="mt-6">
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-sm font-semibold text-[var(--dark-blue)]">
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       Weekly Quantity Distribution ({(job as any).weekly_split.length} {(job as any).weekly_split.length === 1 ? 'week' : 'weeks'})
                     </h4>
                     <div className="text-sm font-semibold text-[var(--text-dark)]">
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       Total: {(job as any).weekly_split.reduce((sum: number, qty: number) => sum + qty, 0).toLocaleString()}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {(job as any).weekly_split.map((qty: number, index: number) => (
                       <div key={index} className="bg-white rounded-md p-3 border border-gray-200">
                         <div className="text-xs font-medium text-[var(--text-light)] mb-1">

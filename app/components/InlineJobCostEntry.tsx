@@ -132,6 +132,7 @@ export default function InlineJobCostEntry({
       }));
       setJobEntries(newEntries);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBatchMode]);
 
   // Handle input changes
@@ -371,7 +372,7 @@ export default function InlineJobCostEntry({
           <tbody className="bg-white divide-y divide-gray-200">
             {jobEntries.map((entry, index) => {
               const hasInput = entry.add_to_cost || entry.set_total_cost;
-              const { profit, profitPercentage } = getProfitPreview(entry);
+              const { profitPercentage } = getProfitPreview(entry);
               const currentProfitPercentage = entry.billing_rate_per_m > 0
                 ? ((entry.billing_rate_per_m - entry.current_cost_per_m) / entry.billing_rate_per_m) * 100
                 : 0;

@@ -9,7 +9,6 @@ import FacilityToggle from '../../components/FacilityToggle';
 import PageHeader from '../../components/PageHeader';
 import Link from 'next/link';
 import type { Machine } from '@/types';
-import { getProcessTypeConfig } from '@/lib/processTypeConfig';
 
 // Dynamically import modals - only loaded when opened
 const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {

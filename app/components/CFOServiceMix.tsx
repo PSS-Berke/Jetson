@@ -12,7 +12,7 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend,
+  // Legend,
 } from 'recharts';
 import { ServiceTypeRevenue, formatCurrency, formatPercentage, formatNumber } from '@/lib/cfoUtils';
 import { getProcessTypeColor, normalizeProcessType } from '@/lib/processTypeConfig';
@@ -53,7 +53,7 @@ const getProcessColor = (processType: string): string => {
 
 export default function CFOServiceMix({
   serviceData,
-  title = 'Process Mix Analysis',
+  // title = 'Process Mix Analysis',
 }: CFOServiceMixProps) {
   const [sortBy, setSortBy] = useState<ClientSortType>('revenue');
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
@@ -87,6 +87,7 @@ export default function CFOServiceMix({
   }));
 
   // Custom tooltip
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -137,6 +138,7 @@ export default function CFOServiceMix({
   };
 
   // Custom label for pie chart
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderCustomLabel = (entry: any) => {
     return `${entry.name}: ${formatPercentage(entry.percentage)}`;
   };

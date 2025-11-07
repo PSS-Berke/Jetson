@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { getVarianceStatus } from '@/lib/productionUtils';
-import { addProductionEntry, updateProductionEntry, deleteProductionEntry, batchCreateProductionEntries, getProductionEntries } from '@/lib/api';
+import { addProductionEntry, deleteProductionEntry, getProductionEntries } from '@/lib/api';
 import type { ProductionComparison } from '@/types';
 import type { ProductionEntry } from '@/types';
 

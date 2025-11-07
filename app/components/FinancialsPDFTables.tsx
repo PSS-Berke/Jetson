@@ -1,6 +1,5 @@
 import { ClientRevenue, ServiceTypeRevenue, PeriodComparison } from '@/lib/cfoUtils';
 import { Job } from '@/types';
-import { ParsedJob } from '@/hooks/useJobs';
 
 interface JobWithCost extends Job {
   costPer1000?: number;
@@ -302,6 +301,7 @@ export default function FinancialsPDFTables({
                     {job.job_number || 'N/A'}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {typeof job.client === 'object' && job.client ? (job.client as any).name : job.client || 'Unknown'}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-right text-gray-900 font-semibold">

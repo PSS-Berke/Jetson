@@ -8,6 +8,7 @@ import { TimeRange } from './projectionUtils';
 // ============================================================================
 
 // Type guard to check if client is an object or string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getClientName(client: any): string {
   if (!client) return 'Unknown';
   if (typeof client === 'string') return client;
@@ -180,7 +181,7 @@ export function calculateRevenueByClient(jobs: (Job | ParsedJob)[]): ClientReven
     // Calculate estimated cost based on ext_price (base price before add-ons)
     // Profit = total_billing - ext_price - add_on_charges (simplified estimation)
     const extPrice = parseFloat(job.ext_price || '0');
-    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    // const addOnCharges = parseFloat(job.add_on_charges || '0');
     // Simplified profit estimate: total billing minus costs (rough approximation)
     // For more accurate profit, use JobCostEntry data from jobCostUtils
     const profit = revenue - extPrice;
@@ -296,6 +297,7 @@ export function calculateRevenueByProcessType(jobs: (Job | ParsedJob)[]): Servic
       existing.quantity += quantity;
     } else {
       // Add revenue to each process type this job requires
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       requirements.forEach((req: any) => {
         const processType = req.process_type || 'Unknown';
 

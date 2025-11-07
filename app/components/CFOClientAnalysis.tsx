@@ -22,7 +22,7 @@ interface CFOClientAnalysisProps {
 
 export default function CFOClientAnalysis({
   clientData,
-  title = 'Top Clients by Revenue',
+  // title = 'Top Clients by Revenue',
   topN = 10,
 }: CFOClientAnalysisProps) {
   const [sortBy, setSortBy] = useState<ClientSortType>('revenue');
@@ -56,6 +56,7 @@ export default function CFOClientAnalysis({
   };
 
   // Custom tooltip
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;

@@ -135,6 +135,7 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
       console.log('[AddMachineModal] Creating machine with data:', machineData);
       console.log('[AddMachineModal] Capabilities:', JSON.stringify(formData.capabilities, null, 2));
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const createdMachine = await createMachine(machineData as any);
       console.log('[AddMachineModal] Machine created successfully:', createdMachine);
 

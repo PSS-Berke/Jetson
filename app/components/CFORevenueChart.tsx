@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  AreaChart,
+  // AreaChart,
   Area,
   XAxis,
   YAxis,
@@ -50,6 +50,7 @@ export default function CFORevenueChart({
   }, [currentPeriodData, previousPeriodData]);
 
   // Get current values based on view mode
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getCurrentValue = (data: any) => {
     switch (viewMode) {
       case 'revenue':
@@ -63,6 +64,7 @@ export default function CFORevenueChart({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getPreviousValue = (data: any) => {
     switch (viewMode) {
       case 'revenue':
@@ -77,11 +79,13 @@ export default function CFORevenueChart({
   };
 
   // Custom tooltip
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-4 rounded-lg shadow-lg border border-gray-200">
           <p className="font-semibold text-gray-900 mb-2">{label}</p>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {payload.map((entry: any, index: number) => {
             const data = entry.payload;
             const isCurrent = entry.name === 'current';

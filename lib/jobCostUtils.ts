@@ -58,6 +58,7 @@ export interface JobCostComparison {
 export function calculateBillingRatePerM(job: ParsedJob): number {
   // Use total_billing as the authoritative billing amount
   // This includes all requirements + add-on charges
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalBilling = parseFloat((job as any).total_billing || '0');
   const quantity = job.quantity || 0;
 

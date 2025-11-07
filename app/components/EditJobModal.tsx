@@ -97,6 +97,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           // Map ParsedRequirement[] to Requirement[] - copy all fields dynamically
           parsedRequirements = job.requirements.map(req => {
             // Create a copy with all fields, removing legacy shifts_id
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { shifts_id, ...rest } = req as any;
             return {
               process_type: req.process_type || '',

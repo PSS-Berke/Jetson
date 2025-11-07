@@ -76,7 +76,7 @@ export default function EmbeddedCalendar({
     filterMode: filterMode,
   });
 
-  const { dailySummaries, overallUtilization } = useMachineCapacity({
+  const { dailySummaries } = useMachineCapacity({
     jobs: filteredJobs,
     machines,
     startDate: dateRange.start,
@@ -89,40 +89,38 @@ export default function EmbeddedCalendar({
     setCurrentDate(date);
   };
 
-  const handlePreviousPeriod = () => {
-    const newDate = new Date(currentDate);
-    if (viewType === 'month') {
-      // Move back one month
-      newDate.setMonth(currentDate.getMonth() - 1);
-    } else {
-      newDate.setDate(currentDate.getDate() - 7);
-    }
-    setCurrentDate(newDate);
-  };
+  // Removed - navigation handlers not currently used
+  // const handlePreviousPeriod = () => {
+  //   const newDate = new Date(currentDate);
+  //   if (viewType === 'month') {
+  //     newDate.setMonth(currentDate.getMonth() - 1);
+  //   } else {
+  //     newDate.setDate(currentDate.getDate() - 7);
+  //   }
+  //   setCurrentDate(newDate);
+  // };
 
-  const handleNextPeriod = () => {
-    const newDate = new Date(currentDate);
-    if (viewType === 'month') {
-      // Move forward one month
-      newDate.setMonth(currentDate.getMonth() + 1);
-    } else {
-      newDate.setDate(currentDate.getDate() + 7);
-    }
-    setCurrentDate(newDate);
-  };
+  // const handleNextPeriod = () => {
+  //   const newDate = new Date(currentDate);
+  //   if (viewType === 'month') {
+  //     newDate.setMonth(currentDate.getMonth() + 1);
+  //   } else {
+  //     newDate.setDate(currentDate.getDate() + 7);
+  //   }
+  //   setCurrentDate(newDate);
+  // };
 
-  const handleToday = () => {
-    setCurrentDate(new Date());
-  };
+  // const handleToday = () => {
+  //   setCurrentDate(new Date());
+  // };
 
-  const formatCurrentPeriod = () => {
-    if (viewType === 'month') {
-      // Show the month and year
-      return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    } else {
-      return `Week of ${currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    }
-  };
+  // const formatCurrentPeriod = () => {
+  //   if (viewType === 'month') {
+  //     return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  //   } else {
+  //     return `Week of ${currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  //   }
+  // };
 
   const handleJobClick = (job: ParsedJob) => {
     setSelectedJob(job);

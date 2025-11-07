@@ -28,9 +28,9 @@ export default function JobCostComparisonTable({
   onEdit,
   isBatchMode = false,
   onToggleBatchMode,
-  startDate,
-  endDate,
-  facilitiesId,
+  // startDate,
+  // endDate,
+  // facilitiesId,
 }: JobCostComparisonTableProps) {
   const [sortField, setSortField] = useState<SortField>('job_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');

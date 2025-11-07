@@ -2,14 +2,14 @@
 
 import { useMemo, useCallback, useState, memo } from 'react';
 import { Calendar, dateFnsLocalizer, View } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay, addDays, endOfWeek } from 'date-fns';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { CalendarEvent, CalendarViewType, DailySummary, CapacityDisplayMode } from '@/types/calendar';
 import { formatNumber } from '@/lib/calendarUtils';
 import { getDateKey } from '@/lib/dateUtils';
 import { ParsedJob } from '@/hooks/useJobs';
-import { PROCESS_TYPE_CONFIGS, getProcessTypeColor } from '@/lib/processTypeConfig';
+import { getProcessTypeColor } from '@/lib/processTypeConfig';
 
 const locales = {
   'en-US': enUS
@@ -23,11 +23,11 @@ const localizer = dateFnsLocalizer({
   locales
 });
 
-// Use config for process types
-const PROCESS_TYPES = PROCESS_TYPE_CONFIGS.map(config => ({
-  key: config.key,
-  label: config.label
-}));
+// Use config for process types - not currently used directly
+// const PROCESS_TYPES = PROCESS_TYPE_CONFIGS.map(config => ({
+//   key: config.key,
+//   label: config.label
+// }));
 
 interface CalendarViewProps {
   events: CalendarEvent[];
@@ -268,6 +268,7 @@ export default function CalendarView({
     // Log all jobs to see their structure
     if (jobs.length > 0) {
       console.log(`[CalendarView] Sample job:`, jobs[0]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       console.log(`[CalendarView] Sample requirements:`, (jobs[0] as any).requirements);
     }
 
@@ -283,9 +284,11 @@ export default function CalendarView({
       }
 
       // Check if job uses this process type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const jobRequirements = (job as any).requirements;
       console.log(`[CalendarView] Checking job ${job.job_number}, requirements:`, jobRequirements);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hasProcessType = Array.isArray(jobRequirements) && jobRequirements.some((req: any) => {
         console.log(`[CalendarView]   - Checking requirement:`, req, `looking for process_type: ${processType}`);
         if (!req.process_type) {
@@ -322,56 +325,6 @@ export default function CalendarView({
     }
     console.log(`[CalendarView] ========================================`);
     return filteredJobs;
-  }, [jobs]);
-
-  // Get pieces and revenue for a specific date and process type
-  const getDataForDateAndProcess = useCallback((date: Date, processType: string) => {
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    let pieces = 0;
-    let revenue = 0;
-
-    jobs.forEach(job => {
-      const jobStart = new Date(job.start_date);
-      const jobEnd = new Date(job.due_date);
-
-      // Check if job overlaps with this day
-      const jobOverlapsDay = jobStart <= dayEnd && jobEnd >= dayStart;
-
-      if (!jobOverlapsDay) {
-        return;
-      }
-
-      // Check if job uses this process type
-      const jobRequirements = (job as any).requirements;
-      const hasProcessType = Array.isArray(jobRequirements) && jobRequirements.some((req: any) => {
-        if (!req.process_type) {
-          return false;
-        }
-        const normalized = req.process_type.toLowerCase();
-
-        // Normalize process type variations (matching calendarUtils.ts logic)
-        if (processType === 'insert' && normalized === 'insert') return true;
-        if (processType === 'sort' && normalized === 'sort') return true;
-        if (processType === 'inkjet' && (normalized === 'inkjet' || normalized === 'ij' || normalized === 'ink jet')) return true;
-        if (processType === 'labelApply' && (normalized === 'label/apply' || normalized === 'l/a' || normalized === 'label/affix')) return true;
-        if (processType === 'fold' && normalized === 'fold') return true;
-        if (processType === 'laser' && normalized === 'laser') return true;
-        if (processType === 'hpPress' && normalized === 'hp press') return true;
-
-        return false;
-      });
-
-      if (hasProcessType) {
-        pieces += job.quantity || 0;
-        revenue += parseFloat(job.total_billing || '0');
-      }
-    });
-
-    return { pieces, revenue };
   }, [jobs]);
 
   // Wrapper for memoized DateHeader component

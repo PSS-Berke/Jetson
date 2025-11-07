@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { getJobsInTimeRange } from '@/lib/productionUtils';
-import { calculateBillingRatePerM, calculateJobProfitMetrics, formatCurrency, formatPercentage, getProfitTextColor } from '@/lib/jobCostUtils';
+import { calculateBillingRatePerM, formatCurrency, formatPercentage, getProfitTextColor } from '@/lib/jobCostUtils';
 import { getJobCostEntries, batchCreateJobCostEntries, deleteJobCostEntry } from '@/lib/api';
 import Toast from './Toast';
 import type { ParsedJob } from '@/hooks/useJobs';
@@ -297,9 +297,9 @@ export default function BatchJobCostEntryModal({
 
                 {/* Job Entries */}
                 {jobEntries.map((entry, index) => {
-                  const newCost = getNewCost(entry);
+                  // const newCost = getNewCost(entry);
                   const hasInput = entry.add_to_cost || entry.set_total_cost;
-                  const { profit, profitPercentage } = getProfitPreview(entry);
+                  const { profitPercentage } = getProfitPreview(entry);
 
                   return (
                     <div

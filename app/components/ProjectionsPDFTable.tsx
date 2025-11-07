@@ -13,8 +13,8 @@ interface ProjectionsPDFTableProps {
 export default function ProjectionsPDFTable({
   timeRanges,
   jobProjections,
-  serviceSummaries,
-  grandTotals,
+  // serviceSummaries,
+  // grandTotals,
 }: ProjectionsPDFTableProps) {
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('en-US').format(value);
@@ -185,7 +185,7 @@ export default function ProjectionsPDFTable({
             });
 
             return Object.entries(processTypeData)
-              .filter(([_, data]) => data.total > 0)
+              .filter(([, data]) => data.total > 0)
               .map(([processType, data], index) => (
                 <tr key={processType} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="border border-gray-300 px-3 py-2 font-medium text-gray-900">

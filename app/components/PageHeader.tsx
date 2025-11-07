@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface User {
   email: string;
@@ -55,10 +56,13 @@ export default function PageHeader({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           <Link href="/projections" className="flex items-center cursor-pointer">
-            <img
+            <Image
               src="/logo.png"
               alt="Jetson Marketing Solutions"
+              width={200}
+              height={56}
               className="h-10 sm:h-14 w-auto"
+              priority
             />
           </Link>
 

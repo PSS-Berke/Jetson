@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { getProductionEntries, updateProductionEntry, addProductionEntry } from '@/lib/api';
 import Toast from './Toast';
-import type { ProductionComparison, ProductionEntry } from '@/types';
+import type { ProductionComparison } from '@/types';
 
 interface EditProductionEntryModalProps {
   isOpen: boolean;

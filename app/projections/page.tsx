@@ -11,7 +11,6 @@ import {
   calculateCFOSummaryMetrics,
   calculateRevenueByClient,
   calculateRevenueByServiceType,
-  comparePeriods,
 } from '@/lib/cfoUtils';
 import { useReactToPrint } from 'react-to-print';
 import ProjectionFiltersComponent from '../components/ProjectionFilters';

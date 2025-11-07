@@ -108,16 +108,14 @@ export default function BatchProductionEntryModal({
     setJobEntries(newEntries);
   };
 
-  const handleActualQuantityChange = (index: number, value: string) => {
-    // Remove any non-digit characters (including commas)
-    const digitsOnly = value.replace(/\D/g, '');
-
-    const newEntries = [...jobEntries];
-    newEntries[index].actual_quantity = digitsOnly;
-    // Clear add_amount when using actual_quantity
-    newEntries[index].add_amount = '';
-    setJobEntries(newEntries);
-  };
+  // Removed - handleActualQuantityChange is not used
+  // const handleActualQuantityChange = (index: number, value: string) => {
+  //   const digitsOnly = value.replace(/\D/g, '');
+  //   const newEntries = [...jobEntries];
+  //   newEntries[index].actual_quantity = digitsOnly;
+  //   newEntries[index].add_amount = '';
+  //   setJobEntries(newEntries);
+  // };
 
   const handleNotesChange = (index: number, value: string) => {
     const newEntries = [...jobEntries];

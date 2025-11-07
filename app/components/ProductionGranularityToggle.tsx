@@ -55,6 +55,7 @@ export default function ProductionGranularityToggle({
     // Update on window resize to handle responsive changes
     window.addEventListener('resize', updateBubblePosition);
     return () => window.removeEventListener('resize', updateBubblePosition);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGranularity]);
 
   return (
