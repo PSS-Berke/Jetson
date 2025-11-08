@@ -39,13 +39,13 @@ const ProjectionTableRow = memo(({
       className="cursor-pointer"
       onClick={() => onJobClick(job)}
     >
-      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
+      <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
         {job.job_number}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-dark)]">
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
         {job.client?.name || 'Unknown'}
       </td>
-      <td className="px-4 py-3 text-sm text-[var(--text-dark)]">
+      <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
         <div className="flex flex-wrap gap-1">
           {job.requirements && job.requirements.length > 0 ? (
             // Get unique process types from requirements
@@ -57,24 +57,24 @@ const ProjectionTableRow = memo(({
           )}
         </div>
       </td>
-      <td className="px-4 py-3 text-sm text-[var(--text-dark)] max-w-xs truncate">
+      <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
         {job.description || 'N/A'}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-medium text-[var(--text-dark)]">
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
         {job.quantity.toLocaleString()}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-[var(--text-dark)]">
-        {job.start_date ? new Date(job.start_date).toLocaleDateString() : 'N/A'}
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        {job.start_date ? new Date(job.start_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' }) : 'N/A'}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-[var(--text-dark)]">
-        {job.due_date ? new Date(job.due_date).toLocaleDateString() : 'N/A'}
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        {job.due_date ? new Date(job.due_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' }) : 'N/A'}
       </td>
       {timeRanges.map((range, index) => {
         const quantity = projection.weeklyQuantities.get(range.label) || 0;
         return (
           <td
             key={range.label}
-            className={`px-4 py-3 whitespace-nowrap text-sm text-center font-medium text-[var(--text-dark)] ${
+            className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
               index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
             }`}
           >
@@ -82,7 +82,7 @@ const ProjectionTableRow = memo(({
           </td>
         );
       })}
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-[var(--text-dark)]">
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
         {formatQuantity(projection.totalQuantity)}
       </td>
     </tr>
@@ -290,59 +290,59 @@ export default function ProjectionsTable({
             <tr className="bg-gray-50 border-y border-gray-200">
               <th
                 onClick={() => handleSort('job_number')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   Job # <SortIcon field="job_number" />
                 </div>
               </th>
               <th
                 onClick={() => handleSort('client')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center gap-2">
-                  Sub Client <SortIcon field="client" />
+                <div className="flex items-center gap-1">
+                  Client <SortIcon field="client" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Process Types
+              <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider">
+                Processes
               </th>
               <th
                 onClick={() => handleSort('description')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center gap-2">
-                  Job Name / Description <SortIcon field="description" />
+                <div className="flex items-center gap-1">
+                  Description <SortIcon field="description" />
                 </div>
               </th>
               <th
                 onClick={() => handleSort('quantity')}
-                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center justify-center gap-2">
-                  Quantity <SortIcon field="quantity" />
+                <div className="flex items-center justify-center gap-1">
+                  Qty <SortIcon field="quantity" />
                 </div>
               </th>
               <th
                 onClick={() => handleSort('start_date')}
-                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center justify-center gap-2">
-                  Start Date <SortIcon field="start_date" />
+                <div className="flex items-center justify-center gap-1">
+                  Start <SortIcon field="start_date" />
                 </div>
               </th>
               <th
                 onClick={() => handleSort('due_date')}
-                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center justify-center gap-2">
-                  End Date <SortIcon field="due_date" />
+                <div className="flex items-center justify-center gap-1">
+                  End <SortIcon field="due_date" />
                 </div>
               </th>
               {timeRanges.map((range, index) => (
                 <th
                   key={range.label}
-                  className={`px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider ${
+                  className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
                     index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
                   }`}
                 >
@@ -351,9 +351,9 @@ export default function ProjectionsTable({
               ))}
               <th
                 onClick={() => handleSort('total')}
-                className="px-4 py-3 text-center text-xs font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-1">
                   Total <SortIcon field="total" />
                 </div>
               </th>
