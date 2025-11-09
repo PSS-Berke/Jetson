@@ -14,7 +14,9 @@ export type TimeRange = WeekRange | MonthRange | QuarterRange;
 export interface JobProjection {
   job: ParsedJob;
   weeklyQuantities: Map<string, number>; // weekLabel -> quantity (kept for backwards compatibility, but will hold any period)
+  weeklyRevenues: Map<string, number>; // weekLabel -> revenue
   totalQuantity: number;
+  totalRevenue: number;
 }
 
 export interface ServiceTypeSummary {
@@ -22,6 +24,28 @@ export interface ServiceTypeSummary {
   weeklyTotals: Map<string, number>; // weekLabel -> total quantity (kept for backwards compatibility, but will hold any period)
   grandTotal: number;
   jobCount: number;
+}
+
+/**
+ * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
+ */
+export function getJobRevenue(job: ParsedJob): number {
+  // Check if job has parsed requirements with price_per_m
+  if (job.requirements && Array.isArray(job.requirements) && job.requirements.length > 0) {
+    const revenue = job.requirements.reduce((total, req) => {
+      const pricePerMStr = req.price_per_m;
+      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+      return total + ((job.quantity / 1000) * pricePerM);
+    }, 0);
+
+    // Add add-on charges if available
+    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    return revenue + addOnCharges;
+  }
+
+  // Fallback to total_billing
+  return parseFloat(job.total_billing || '0');
 }
 
 /**
@@ -126,10 +150,31 @@ export function calculateJobProjections(
       totalQuantity += qty;
     });
 
+    // Calculate revenue per period
+    const jobRevenue = getJobRevenue(job);
+    const weeklyRevenues = new Map<string, number>();
+    let totalRevenue = 0;
+
+    // Revenue is proportional to quantity in each period
+    if (job.quantity > 0) {
+      weeklyQuantities.forEach((quantity, label) => {
+        const periodRevenue = (quantity / job.quantity) * jobRevenue;
+        weeklyRevenues.set(label, periodRevenue);
+        totalRevenue += periodRevenue;
+      });
+    } else {
+      // If no quantity, set all revenues to 0
+      weekRanges.forEach(range => {
+        weeklyRevenues.set(range.label, 0);
+      });
+    }
+
     return {
       job,
       weeklyQuantities,
+      weeklyRevenues,
       totalQuantity,
+      totalRevenue,
     };
   });
 }
@@ -295,10 +340,31 @@ export function calculateGenericJobProjections(
       totalQuantity += qty;
     });
 
+    // Calculate revenue per period
+    const jobRevenue = getJobRevenue(job);
+    const weeklyRevenues = new Map<string, number>();
+    let totalRevenue = 0;
+
+    // Revenue is proportional to quantity in each period
+    if (job.quantity > 0) {
+      weeklyQuantities.forEach((quantity, label) => {
+        const periodRevenue = (quantity / job.quantity) * jobRevenue;
+        weeklyRevenues.set(label, periodRevenue);
+        totalRevenue += periodRevenue;
+      });
+    } else {
+      // If no quantity, set all revenues to 0
+      timeRanges.forEach(range => {
+        weeklyRevenues.set(range.label, 0);
+      });
+    }
+
     return {
       job,
       weeklyQuantities,
+      weeklyRevenues,
       totalQuantity,
+      totalRevenue,
     };
   });
 }

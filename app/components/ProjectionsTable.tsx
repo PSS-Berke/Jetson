@@ -19,17 +19,23 @@ interface ProjectionsTableProps {
     grandTotal: number;
   };
   onRefresh: () => void;
+  mobileViewMode?: 'cards' | 'table';
+  globalTimeScrollIndex?: number;
+  onGlobalTimeScrollIndexChange?: (index: number) => void;
+  dataDisplayMode?: 'pieces' | 'revenue';
 }
 
 // Memoized desktop table row component
 const ProjectionTableRow = memo(({
   projection,
   timeRanges,
-  onJobClick
+  onJobClick,
+  dataDisplayMode
 }: {
   projection: JobProjection;
   timeRanges: TimeRange[];
   onJobClick: (job: ParsedJob) => void;
+  dataDisplayMode: 'pieces' | 'revenue';
 }) => {
   const job = projection.job;
 
@@ -71,6 +77,11 @@ const ProjectionTableRow = memo(({
       </td>
       {timeRanges.map((range, index) => {
         const quantity = projection.weeklyQuantities.get(range.label) || 0;
+        const revenue = projection.weeklyRevenues.get(range.label) || 0;
+        const displayValue = dataDisplayMode === 'revenue'
+          ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          : formatQuantity(quantity);
+
         return (
           <td
             key={range.label}
@@ -78,12 +89,14 @@ const ProjectionTableRow = memo(({
               index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
             }`}
           >
-            {formatQuantity(quantity)}
+            {displayValue}
           </td>
         );
       })}
       <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-        {formatQuantity(projection.totalQuantity)}
+        {dataDisplayMode === 'revenue'
+          ? projection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          : formatQuantity(projection.totalQuantity)}
       </td>
     </tr>
   );
@@ -95,13 +108,70 @@ ProjectionTableRow.displayName = 'ProjectionTableRow';
 const ProjectionMobileCard = memo(({
   projection,
   timeRanges,
-  onJobClick
+  onJobClick,
+  scrollPositions,
+  onScrollPositionChange,
+  dataDisplayMode
 }: {
   projection: JobProjection;
   timeRanges: TimeRange[];
   onJobClick: (job: ParsedJob) => void;
+  scrollPositions: Map<number, number>;
+  onScrollPositionChange: (jobId: number, index: number) => void;
+  dataDisplayMode: 'pieces' | 'revenue';
 }) => {
   const job = projection.job;
+  const [localScrollIndex, setLocalScrollIndex] = useState(scrollPositions.get(job.id) || 0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const VISIBLE_PERIODS = 6;
+  const MIN_SWIPE_DISTANCE = 50;
+
+  const handleScrollPrevious = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newIndex = Math.max(0, localScrollIndex - 1);
+    setLocalScrollIndex(newIndex);
+    onScrollPositionChange(job.id, newIndex);
+  };
+
+  const handleScrollNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newIndex = Math.min(timeRanges.length - VISIBLE_PERIODS, localScrollIndex + 1);
+    setLocalScrollIndex(newIndex);
+    onScrollPositionChange(job.id, newIndex);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > MIN_SWIPE_DISTANCE;
+    const isRightSwipe = distance < -MIN_SWIPE_DISTANCE;
+
+    if (isLeftSwipe && localScrollIndex < timeRanges.length - VISIBLE_PERIODS) {
+      const newIndex = localScrollIndex + 1;
+      setLocalScrollIndex(newIndex);
+      onScrollPositionChange(job.id, newIndex);
+    }
+
+    if (isRightSwipe && localScrollIndex > 0) {
+      const newIndex = localScrollIndex - 1;
+      setLocalScrollIndex(newIndex);
+      onScrollPositionChange(job.id, newIndex);
+    }
+  };
+
+  const visibleTimeRanges = timeRanges.slice(localScrollIndex, localScrollIndex + VISIBLE_PERIODS);
 
   return (
     <div
@@ -120,9 +190,13 @@ const ProjectionMobileCard = memo(({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-[var(--text-light)]">Total Quantity</div>
+          <div className="text-xs text-[var(--text-light)]">
+            {dataDisplayMode === 'revenue' ? 'Total Revenue' : 'Total Quantity'}
+          </div>
           <div className="text-sm font-bold text-[var(--text-dark)]">
-            {formatQuantity(projection.totalQuantity)}
+            {dataDisplayMode === 'revenue'
+              ? projection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+              : formatQuantity(projection.totalQuantity)}
           </div>
         </div>
       </div>
@@ -170,26 +244,59 @@ const ProjectionMobileCard = memo(({
         </div>
       </div>
 
-      {/* Time Range Breakdown (collapsed by default, shown on tap) */}
+      {/* Time Range Breakdown with navigation */}
       {timeRanges.length > 0 && (
-        <div className="border-t border-[var(--border)] pt-3">
-          <div className="text-xs text-[var(--text-light)] mb-2">Weekly Breakdown</div>
+        <div
+          className="border-t border-[var(--border)] pt-3"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-[var(--text-light)]">Period Breakdown</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleScrollPrevious}
+                disabled={localScrollIndex === 0}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous periods"
+              >
+                <svg className="w-4 h-4 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-xs text-[var(--text-light)] min-w-[60px] text-center">
+                {localScrollIndex + 1}-{Math.min(localScrollIndex + VISIBLE_PERIODS, timeRanges.length)} of {timeRanges.length}
+              </span>
+              <button
+                onClick={handleScrollNext}
+                disabled={localScrollIndex + VISIBLE_PERIODS >= timeRanges.length}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next periods"
+              >
+                <svg className="w-4 h-4 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
-            {timeRanges.slice(0, 6).map(range => {
+            {visibleTimeRanges.map(range => {
               const quantity = projection.weeklyQuantities.get(range.label) || 0;
-              return quantity > 0 ? (
+              const revenue = projection.weeklyRevenues.get(range.label) || 0;
+              const hasValue = dataDisplayMode === 'revenue' ? revenue > 0 : quantity > 0;
+              const displayValue = dataDisplayMode === 'revenue'
+                ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                : formatQuantity(quantity);
+
+              return hasValue ? (
                 <div key={range.label} className="text-center">
                   <div className="text-[var(--text-light)] text-[10px]">{range.label}</div>
-                  <div className="font-medium text-[var(--text-dark)]">{formatQuantity(quantity)}</div>
+                  <div className="font-medium text-[var(--text-dark)]">{displayValue}</div>
                 </div>
               ) : null;
             })}
           </div>
-          {timeRanges.length > 6 && (
-            <div className="text-xs text-center text-[var(--text-light)] mt-2">
-              Tap for full details
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -198,15 +305,76 @@ const ProjectionMobileCard = memo(({
 
 ProjectionMobileCard.displayName = 'ProjectionMobileCard';
 
+// Memoized mobile table row component
+const MobileTableRow = memo(({
+  projection,
+  visibleTimeRanges,
+  onJobClick,
+  dataDisplayMode
+}: {
+  projection: JobProjection;
+  visibleTimeRanges: TimeRange[];
+  onJobClick: (job: ParsedJob) => void;
+  dataDisplayMode: 'pieces' | 'revenue';
+}) => {
+  const job = projection.job;
+
+  return (
+    <tr
+      className="cursor-pointer border-b border-[var(--border)] hover:bg-gray-50"
+      onClick={() => onJobClick(job)}
+    >
+      <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)] sticky left-0 bg-white">
+        {job.job_number}
+      </td>
+      <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
+        {job.client?.name || 'Unknown'}
+      </td>
+      {visibleTimeRanges.map((range, index) => {
+        const quantity = projection.weeklyQuantities.get(range.label) || 0;
+        const revenue = projection.weeklyRevenues.get(range.label) || 0;
+        const displayValue = dataDisplayMode === 'revenue'
+          ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          : formatQuantity(quantity);
+
+        return (
+          <td
+            key={range.label}
+            className={`px-2 py-2 text-xs text-center font-medium text-[var(--text-dark)] ${
+              index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
+            }`}
+          >
+            {displayValue}
+          </td>
+        );
+      })}
+      <td className="px-2 py-2 text-xs text-center font-bold text-[var(--text-dark)] sticky right-0 bg-white">
+        {dataDisplayMode === 'revenue'
+          ? projection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          : formatQuantity(projection.totalQuantity)}
+      </td>
+    </tr>
+  );
+});
+
+MobileTableRow.displayName = 'MobileTableRow';
+
 export default function ProjectionsTable({
   timeRanges,
   jobProjections,
   onRefresh,
+  mobileViewMode = 'cards',
+  globalTimeScrollIndex = 0,
+  onGlobalTimeScrollIndexChange,
+  dataDisplayMode = 'pieces',
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>('job_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [cardScrollPositions, setCardScrollPositions] = useState<Map<number, number>>(new Map());
+
+  const VISIBLE_PERIODS = 3; // For mobile table view
 
   const handleJobClick = (job: ParsedJob) => {
     setSelectedJob(job);
@@ -217,6 +385,29 @@ export default function ProjectionsTable({
     setIsJobDetailsOpen(false);
     setSelectedJob(null);
   };
+
+  const handleCardScrollPositionChange = (jobId: number, index: number) => {
+    setCardScrollPositions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(jobId, index);
+      return newMap;
+    });
+  };
+
+  const handleGlobalScrollPrevious = () => {
+    if (onGlobalTimeScrollIndexChange && globalTimeScrollIndex > 0) {
+      onGlobalTimeScrollIndexChange(globalTimeScrollIndex - 1);
+    }
+  };
+
+  const handleGlobalScrollNext = () => {
+    if (onGlobalTimeScrollIndexChange && globalTimeScrollIndex < timeRanges.length - VISIBLE_PERIODS) {
+      onGlobalTimeScrollIndexChange(globalTimeScrollIndex + 1);
+    }
+  };
+
+  // Calculate visible time ranges for mobile table view
+  const mobileTableVisibleRanges = timeRanges.slice(globalTimeScrollIndex, globalTimeScrollIndex + VISIBLE_PERIODS);
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -374,6 +565,7 @@ export default function ProjectionsTable({
                   projection={projection}
                   timeRanges={timeRanges}
                   onJobClick={handleJobClick}
+                  dataDisplayMode={dataDisplayMode}
                 />
               ))
             )}
@@ -381,21 +573,111 @@ export default function ProjectionsTable({
         </table>
       </div>
 
-      {/* Mobile Card View */}
-      <div className="md:hidden space-y-4">
-        {sortedJobProjections.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6 text-center text-[var(--text-light)]">
-            No jobs found for the selected criteria
+      {/* Mobile View */}
+      <div className="md:hidden">
+        {/* Global Time Navigation for Mobile */}
+        {mobileViewMode === 'table' && timeRanges.length > VISIBLE_PERIODS && (
+          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-[var(--text-light)]">Showing Periods</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGlobalScrollPrevious}
+                  disabled={globalTimeScrollIndex === 0}
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous periods"
+                >
+                  <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-sm font-medium text-[var(--text-dark)] min-w-[80px] text-center">
+                  {globalTimeScrollIndex + 1}-{Math.min(globalTimeScrollIndex + VISIBLE_PERIODS, timeRanges.length)} of {timeRanges.length}
+                </span>
+                <button
+                  onClick={handleGlobalScrollNext}
+                  disabled={globalTimeScrollIndex + VISIBLE_PERIODS >= timeRanges.length}
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next periods"
+                >
+                  <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Table View */}
+        {mobileViewMode === 'table' ? (
+          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-[var(--border)]">
+                <tr>
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase sticky left-0 bg-gray-50">
+                    Job #
+                  </th>
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
+                    Client
+                  </th>
+                  {mobileTableVisibleRanges.map((range, index) => (
+                    <th
+                      key={range.label}
+                      className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase ${
+                        index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
+                      }`}
+                    >
+                      {range.label}
+                    </th>
+                  ))}
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase sticky right-0 bg-gray-50">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedJobProjections.length === 0 ? (
+                  <tr>
+                    <td colSpan={5 + VISIBLE_PERIODS} className="px-4 py-8 text-center text-[var(--text-light)]">
+                      No jobs found for the selected criteria
+                    </td>
+                  </tr>
+                ) : (
+                  sortedJobProjections.map((projection) => (
+                    <MobileTableRow
+                      key={projection.job.id}
+                      projection={projection}
+                      visibleTimeRanges={mobileTableVisibleRanges}
+                      onJobClick={handleJobClick}
+                      dataDisplayMode={dataDisplayMode}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         ) : (
-          sortedJobProjections.map((projection) => (
-            <ProjectionMobileCard
-              key={projection.job.id}
-              projection={projection}
-              timeRanges={timeRanges}
-              onJobClick={handleJobClick}
-            />
-          ))
+          /* Mobile Card View */
+          <div className="space-y-4">
+            {sortedJobProjections.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6 text-center text-[var(--text-light)]">
+                No jobs found for the selected criteria
+              </div>
+            ) : (
+              sortedJobProjections.map((projection) => (
+                <ProjectionMobileCard
+                  key={projection.job.id}
+                  projection={projection}
+                  timeRanges={timeRanges}
+                  onJobClick={handleJobClick}
+                  scrollPositions={cardScrollPositions}
+                  onScrollPositionChange={handleCardScrollPositionChange}
+                  dataDisplayMode={dataDisplayMode}
+                />
+              ))
+            )}
+          </div>
         )}
       </div>
 

@@ -6,6 +6,7 @@ import { getStartOfWeek } from '@/lib/projectionUtils';
 import { startOfMonth, startOfQuarter } from 'date-fns';
 import type { Granularity } from './GranularityToggle';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
+import { Filter, SlidersHorizontal, LayoutGrid, Table2 } from 'lucide-react';
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -22,6 +23,12 @@ interface ProjectionFiltersProps {
   onScheduleFilterChange: (filter: 'all' | 'confirmed' | 'soft') => void;
   filterMode: 'and' | 'or';
   onFilterModeChange: (mode: 'and' | 'or') => void;
+  filterViewMode: 'simple' | 'advanced';
+  onFilterViewModeChange: (mode: 'simple' | 'advanced') => void;
+  dataDisplayMode: 'pieces' | 'revenue';
+  onDataDisplayModeChange: (mode: 'pieces' | 'revenue') => void;
+  mobileViewMode?: 'cards' | 'table';
+  onMobileViewModeChange?: (mode: 'cards' | 'table') => void;
 }
 
 export default function ProjectionFilters({
@@ -39,6 +46,12 @@ export default function ProjectionFilters({
   onScheduleFilterChange,
   filterMode,
   onFilterModeChange,
+  filterViewMode,
+  onFilterViewModeChange,
+  dataDisplayMode,
+  onDataDisplayModeChange,
+  mobileViewMode = 'cards',
+  onMobileViewModeChange,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -218,113 +231,147 @@ export default function ProjectionFilters({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-3 sm:p-4 mb-6">
-      <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
-        {/* Filter Mode Toggle */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => onFilterModeChange('and')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-              filterMode === 'and'
-                ? 'bg-white text-[var(--dark-blue)] shadow-sm'
-                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
-            }`}
-            title="Jobs must match ALL active filters"
-          >
-            Match All
-          </button>
-          <button
-            onClick={() => onFilterModeChange('or')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-              filterMode === 'or'
-                ? 'bg-white text-[var(--primary-blue)] shadow-sm'
-                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
-            }`}
-            title="Jobs can match ANY active filter"
-          >
-            Match Any
-          </button>
+      <div className="flex flex-col gap-3">
+        {/* First Row */}
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+          {/* Simple/Advanced View Toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => onFilterViewModeChange('simple')}
+              className={`p-2 rounded-md transition-all ${
+                filterViewMode === 'simple'
+                  ? 'bg-white text-[var(--dark-blue)] shadow-sm'
+                  : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+              }`}
+              title="Simple filtering view"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onFilterViewModeChange('advanced')}
+              className={`p-2 rounded-md transition-all ${
+                filterViewMode === 'advanced'
+                  ? 'bg-white text-[var(--primary-blue)] shadow-sm'
+                  : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+              }`}
+              title="Advanced filtering view"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Match All/Any Toggle - Only visible in advanced mode */}
+          {filterViewMode === 'advanced' && (
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => onFilterModeChange('and')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  filterMode === 'and'
+                    ? 'bg-white text-[var(--dark-blue)] shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+                title="Jobs must match ALL active filters"
+              >
+                Match All
+              </button>
+              <button
+                onClick={() => onFilterModeChange('or')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  filterMode === 'or'
+                    ? 'bg-white text-[var(--primary-blue)] shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+                title="Jobs can match ANY active filter"
+              >
+                Match Any
+              </button>
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="text"
+              placeholder="Search jobs..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Date Range Selector - Only on first row in simple mode */}
+          {filterViewMode === 'simple' && (
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+              <button
+                onClick={handleToday}
+                className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                {getTodayButtonLabel()}
+              </button>
+              <button
+                onClick={handlePrevious}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Previous ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <DateRangePicker
+                dateRange={{ start: startDate, end: getEndDate() }}
+                onDateRangeChange={handleDateRangeChange}
+              />
+              <button
+                onClick={handleNext}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Next ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Date Range Selector */}
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-          <span className="text-xs sm:text-sm font-medium text-[var(--text-dark)] whitespace-nowrap">{getPeriodLabel()}:</span>
-          <button
-            onClick={handlePrevious}
-            className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-            aria-label={`Previous ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
-          >
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <DateRangePicker
-            dateRange={{ start: startDate, end: getEndDate() }}
-            onDateRangeChange={handleDateRangeChange}
-          />
-          <button
-            onClick={handleNext}
-            className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-            aria-label={`Next ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
-          >
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-          <button
-            onClick={handleToday}
-            className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
-          >
-            {getTodayButtonLabel()}
-          </button>
-        </div>
+        {/* Second Row - Shows in simple mode OR advanced mode */}
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+          {/* Date Range Selector - On second row in advanced mode */}
+          {filterViewMode === 'advanced' && (
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+              <button
+                onClick={handleToday}
+                className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                {getTodayButtonLabel()}
+              </button>
+              <button
+                onClick={handlePrevious}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Previous ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <DateRangePicker
+                dateRange={{ start: startDate, end: getEndDate() }}
+                onDateRangeChange={handleDateRangeChange}
+              />
+              <button
+                onClick={handleNext}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Next ${granularity === 'weekly' ? 'week' : granularity === 'monthly' ? 'month' : 'quarter'}`}
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
 
-        {/* Search */}
-        <div className="flex-1 min-w-full sm:min-w-[200px]">
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Schedule Filter Toggle */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => onScheduleFilterChange('all')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              scheduleFilter === 'all'
-                ? 'bg-white text-[var(--dark-blue)] shadow-sm'
-                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => onScheduleFilterChange('confirmed')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-              scheduleFilter === 'confirmed'
-                ? 'bg-white text-[#EF3340] shadow-sm'
-                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
-            }`}
-          >
-            Hard
-          </button>
-          <button
-            onClick={() => onScheduleFilterChange('soft')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-              scheduleFilter === 'soft'
-                ? 'bg-white text-[#2E3192] shadow-sm'
-                : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
-            }`}
-          >
-            Soft
-          </button>
-        </div>
-
-        {/* Client Filter */}
-        <div className="relative" ref={clientDropdownRef}>
+          {/* Clients Filter - Always visible */}
+          <div className="relative" ref={clientDropdownRef}>
           <button
             onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
             className="px-4 py-2 bg-white border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--text-dark)] hover:bg-gray-50 transition-colors flex items-center gap-2"
@@ -373,7 +420,7 @@ export default function ProjectionFilters({
           )}
         </div>
 
-        {/* Process Type Filter */}
+        {/* Process Type Filter - Always visible */}
         <div className="relative" ref={serviceDropdownRef}>
           <button
             onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
@@ -422,6 +469,103 @@ export default function ProjectionFilters({
             </div>
           )}
         </div>
+
+        {/* Third Row - Advanced Filters Only */}
+        {filterViewMode === 'advanced' && (
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+            {/* Schedule Filter Toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => onScheduleFilterChange('all')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  scheduleFilter === 'all'
+                    ? 'bg-white text-[var(--dark-blue)] shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => onScheduleFilterChange('confirmed')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  scheduleFilter === 'confirmed'
+                    ? 'bg-white text-[#EF3340] shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+              >
+                Hard
+              </button>
+              <button
+                onClick={() => onScheduleFilterChange('soft')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  scheduleFilter === 'soft'
+                    ? 'bg-white text-[#2E3192] shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+              >
+                Soft
+              </button>
+            </div>
+
+            {/* Pieces vs Revenue Toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => onDataDisplayModeChange('pieces')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  dataDisplayMode === 'pieces'
+                    ? 'bg-white text-[var(--primary-blue)] shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+              >
+                Pieces
+              </button>
+              <button
+                onClick={() => onDataDisplayModeChange('revenue')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  dataDisplayMode === 'revenue'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                }`}
+              >
+                Revenue
+              </button>
+            </div>
+
+            {/* Mobile View Toggle (Cards vs Table) */}
+            {onMobileViewModeChange && (
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => {
+                    console.log('Switching to cards view');
+                    onMobileViewModeChange('cards');
+                  }}
+                  className={`p-2 rounded-md transition-all ${
+                    mobileViewMode === 'cards'
+                      ? 'bg-white text-[var(--dark-blue)] shadow-sm'
+                      : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  }`}
+                  title="Card view (mobile)"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('Switching to table view');
+                    onMobileViewModeChange('table');
+                  }}
+                  className={`p-2 rounded-md transition-all ${
+                    mobileViewMode === 'table'
+                      ? 'bg-white text-[var(--primary-blue)] shadow-sm'
+                      : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  }`}
+                  title="Table view (mobile)"
+                >
+                  <Table2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
