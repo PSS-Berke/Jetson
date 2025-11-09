@@ -199,9 +199,6 @@ export default function ProjectionFilters({
 
   // Handle date range change from picker
   const handleDateRangeChange = (range: DateRange) => {
-    console.log('Date range changed:', range);
-    console.log('Setting start date to:', range.start);
-    console.log('End date selected (but not currently used):', range.end);
     onStartDateChange(range.start);
   };
 
@@ -469,6 +466,7 @@ export default function ProjectionFilters({
             </div>
           )}
         </div>
+        </div>
 
         {/* Third Row - Advanced Filters Only */}
         {filterViewMode === 'advanced' && (
@@ -535,10 +533,7 @@ export default function ProjectionFilters({
             {onMobileViewModeChange && (
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => {
-                    console.log('Switching to cards view');
-                    onMobileViewModeChange('cards');
-                  }}
+                  onClick={() => onMobileViewModeChange('cards')}
                   className={`p-2 rounded-md transition-all ${
                     mobileViewMode === 'cards'
                       ? 'bg-white text-[var(--dark-blue)] shadow-sm'
@@ -549,10 +544,7 @@ export default function ProjectionFilters({
                   <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {
-                    console.log('Switching to table view');
-                    onMobileViewModeChange('table');
-                  }}
+                  onClick={() => onMobileViewModeChange('table')}
                   className={`p-2 rounded-md transition-all ${
                     mobileViewMode === 'table'
                       ? 'bg-white text-[var(--primary-blue)] shadow-sm'
