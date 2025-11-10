@@ -114,6 +114,7 @@ export default function DayDetailsModal({
                         </h4>
                         <p className="text-sm text-[var(--text-light)]">
                           {jobDetail.job.client.name}
+                          {jobDetail.job.sub_client && ` / ${jobDetail.job.sub_client.name}`}
                         </p>
                       </div>
                       <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">

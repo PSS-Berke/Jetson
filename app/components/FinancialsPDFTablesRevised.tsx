@@ -388,6 +388,8 @@ export default function FinancialsPDFTablesRevised({
                     <td className="px-3 py-2 text-gray-700 border-r border-gray-200 text-xs">
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       {typeof job.client === 'object' && job.client ? (job.client as any).name : job.client || 'Unknown'}
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(job as any).sub_client && ` / ${(job as any).sub_client.name}`}
                     </td>
                     <td className="px-3 py-2 text-right text-gray-900 font-bold border-r border-gray-200">
                       {formatCurrency(parseFloat(job.total_billing || '0'))}

@@ -544,6 +544,7 @@ export default function ProductionComparisonTable({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {comparison.job.client?.name || 'Unknown'}
+                    {comparison.job.sub_client && <span className="text-gray-400"> / {comparison.job.sub_client.name}</span>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {comparison.last_updated_at

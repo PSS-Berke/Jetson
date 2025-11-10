@@ -153,6 +153,7 @@ export default function AlertDetailsModal({
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {job.client?.name || 'Unknown'}
+                          {job.sub_client && <span className="text-gray-400"> / {job.sub_client.name}</span>}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
                           {job.quantity.toLocaleString()}

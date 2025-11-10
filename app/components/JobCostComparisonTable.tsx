@@ -309,6 +309,7 @@ export default function JobCostComparisonTable({
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {comparison.job.client?.name || 'Unknown'}
+                      {comparison.job.sub_client && <span className="text-gray-400"> / {comparison.job.sub_client.name}</span>}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-gray-900">
                       {formatNumber(comparison.job.quantity)}

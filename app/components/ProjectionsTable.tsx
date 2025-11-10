@@ -50,6 +50,9 @@ const ProjectionTableRow = memo(({
       </td>
       <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
         {job.client?.name || 'Unknown'}
+        {job.sub_client && (
+          <span className="text-[var(--text-light)]"> / {job.sub_client.name}</span>
+        )}
       </td>
       <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
         <div className="flex flex-wrap gap-1">

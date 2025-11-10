@@ -18,8 +18,9 @@ export interface ParsedRequirement {
   [key: string]: string | number | undefined;
 }
 
-export interface ParsedJob extends Omit<Job, 'client' | 'machines' | 'requirements'> {
+export interface ParsedJob extends Omit<Job, 'client' | 'sub_client' | 'machines' | 'requirements'> {
   client: { id: number; name: string };
+  sub_client?: { id: number; name: string } | null;
   machines: { id: number; line: number }[];
   requirements: ParsedRequirement[];
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
@@ -85,9 +86,24 @@ const parseJob = (job: Job): ParsedJob => {
         }
       }
 
+      // Parse sub_client if it exists
+      let parsedSubClient: { id: number; name: string } | null = null;
+      if (job.sub_client) {
+        try {
+          if (typeof job.sub_client === 'string') {
+            parsedSubClient = JSON.parse(job.sub_client);
+          } else if (typeof job.sub_client === 'object') {
+            parsedSubClient = job.sub_client as { id: number; name: string };
+          }
+        } catch {
+          // Silently fail
+        }
+      }
+
       return {
         ...job,
         client: JSON.parse(job.client),
+        sub_client: parsedSubClient,
         machines: JSON.parse(job.machines),
         requirements: parsedRequirements,
         daily_split: parsedDailySplit,
@@ -96,6 +112,7 @@ const parseJob = (job: Job): ParsedJob => {
       return {
         ...job,
         client: { id: 0, name: 'Unknown' },
+        sub_client: null,
         machines: [],
         requirements: [],
       };

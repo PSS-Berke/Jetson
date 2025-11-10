@@ -82,12 +82,16 @@ export default function InlineJobCostEntry({
             const entries: JobCostEntryData[] = relevantJobs.map((job) => {
               const billingRate = calculateBillingRatePerM(job);
               const currentCost = costsMap.get(job.id) || 0;
+              const clientName = job.client?.name || 'Unknown';
+              const fullClientName = job.sub_client 
+                ? `${clientName} / ${job.sub_client.name}`
+                : clientName;
 
               return {
                 job_id: job.id,
                 job_number: job.job_number,
                 job_name: job.job_name,
-                client_name: job.client?.name || 'Unknown',
+                client_name: fullClientName,
                 quantity: job.quantity,
                 billing_rate_per_m: billingRate,
                 current_cost_per_m: currentCost,
