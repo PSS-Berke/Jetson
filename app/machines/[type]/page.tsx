@@ -442,13 +442,27 @@ export default function MachineTypePage() {
               showAll={true}
             />
           </div>
-          <button
-            onClick={() => setIsFormBuilderOpen(true)}
-            className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
-          >
-            <span className="text-lg">+</span>
-            Form
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setIsFormBuilderOpen(true)}
+              className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
+            >
+              <span className="text-lg">+</span>
+              Form
+            </button>
+            
+              <button
+                onClick={() => {
+                  setShowNewMachineRow(true);
+                  setNewMachineFormData(getNewMachineInitialState());
+                }}
+                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2 border-2 border-[var(--primary-blue)]"
+              >
+                <span className="text-lg">+</span>
+                Add Machine
+              </button>
+            
+          </div>
         </div>
 
         {/* Status Filters */}
