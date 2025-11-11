@@ -15,7 +15,7 @@ import { createMachine, updateMachine, deleteMachine } from '@/lib/api';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
 import { FaPen, FaTrash } from 'react-icons/fa6';
 import { FaTimes, FaSave } from 'react-icons/fa';
-import {
+/* import {
   ArrowPathIcon,
   CalendarIcon,
   CheckIcon,
@@ -47,7 +47,7 @@ import {
   MachineBulkUpdatePayload,
 } from '@/lib/machineUtils';
 import { ConfirmationModal } from '@/app/components/ConfirmationModal';
-import { JobProductionEntry, ProcessType } from '@/types/production';
+import { JobProductionEntry, ProcessType } from '@/types/production'; */
 
 // Dynamically import modals - only loaded when opened
 const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {
