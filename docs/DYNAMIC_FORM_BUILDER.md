@@ -20,12 +20,13 @@ A comprehensive form builder that allows users to dynamically create input forms
 Users can add fields with the following properties:
 
 #### Required Properties:
-- **Field ID**: Unique identifier for the field (e.g., `max_speed`, `paper_size`)
+- **Label**: Display name for the field (e.g., "Maximum Speed", "Paper Size")
+  - The Field ID is automatically generated from the label in snake_case format
+  - Example: "Maximum Speed" → `maximum_speed`, "Paper Size" → `paper_size`
 - **Field Type**: Choose from:
   - `text` - Single-line text input
   - `number` - Numeric input
   - `select` - Dropdown selection
-- **Label**: Display name for the field (e.g., "Maximum Speed", "Paper Size")
 
 #### Optional Properties:
 - **Placeholder**: Helper text shown when field is empty
@@ -127,19 +128,22 @@ POST https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb/machine_variables
 
 **Fields**:
 1. **Max Speed**
-   - ID: `max_speed`
+   - Label: "Max Speed"
+   - ID: `max_speed` (auto-generated)
    - Type: `number`
    - Required: Yes
    - Placeholder: "Enter speed in units/hour"
 
 2. **Supported Formats**
-   - ID: `supported_formats`
+   - Label: "Supported Formats"
+   - ID: `supported_formats` (auto-generated)
    - Type: `select`
    - Required: Yes
    - Options: "Letter, Legal, Tabloid, A4"
 
 3. **Notes**
-   - ID: `notes`
+   - Label: "Notes"
+   - ID: `notes` (auto-generated)
    - Type: `text`
    - Required: No
    - Placeholder: "Additional information"
@@ -150,17 +154,20 @@ POST https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb/machine_variables
 
 **Fields**:
 1. **Client Name**
-   - ID: `client_name`
+   - Label: "Client Name"
+   - ID: `client_name` (auto-generated)
    - Type: `text`
    - Required: Yes
 
 2. **Quantity**
-   - ID: `quantity`
+   - Label: "Quantity"
+   - ID: `quantity` (auto-generated)
    - Type: `number`
    - Required: Yes
 
 3. **Priority Level**
-   - ID: `priority`
+   - Label: "Priority Level"
+   - ID: `priority_level` (auto-generated)
    - Type: `select`
    - Options: "Low, Medium, High, Urgent"
    - Required: Yes
@@ -224,8 +231,8 @@ interface FormField {
 
 ### Client-Side Validation
 1. **Form Type**: Must not be empty
-2. **Field ID**: Required for each field
-3. **Field Label**: Required for each field
+2. **Field Label**: Required for each field (ID is auto-generated from label)
+3. **Valid Label**: Label must contain letters or numbers (for valid ID generation)
 4. **Select Options**: Required when field type is 'select'
 5. **At least one field**: Must have at least one field before saving
 
@@ -240,16 +247,13 @@ interface FormField {
 
 ## Best Practices
 
-### Field ID Naming
-- Use snake_case (e.g., `max_speed`, `paper_size`)
-- Be descriptive but concise
-- Avoid spaces and special characters
-- Keep consistent with backend expectations
-
 ### Field Labels
 - Use Title Case (e.g., "Maximum Speed", "Paper Size")
 - Be clear and user-friendly
 - Include units if applicable (e.g., "Speed (units/hour)")
+- Keep concise - the label is used to auto-generate the field ID in snake_case format
+- Use descriptive names as they become the backend field identifiers
+- Avoid special characters if possible (they're stripped during ID generation)
 
 ### Select Options
 - Separate with commas
@@ -290,9 +294,10 @@ interface FormField {
 - Check that field list shows your changes
 
 ### Duplicate Field IDs
-- Field IDs must be unique
-- System doesn't prevent duplicates (backend should validate)
-- Use descriptive, unique IDs
+- Field IDs are auto-generated from labels using snake_case conversion
+- If two fields have the same or very similar labels, they may generate duplicate IDs
+- Use unique, descriptive labels to avoid conflicts
+- Example: "Speed" and "Speed" will both generate `speed` - use "Max Speed" and "Min Speed" instead
 
 ## Integration with Machines Page
 

@@ -37,6 +37,16 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
 
   if (!isOpen) return null;
 
+  // Helper function to convert label to snake_case ID
+  const toSnakeCase = (str: string): string => {
+    return str
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '') // Remove special characters
+      .replace(/\s+/g, '_')     // Replace spaces with underscores
+      .replace(/_+/g, '_')      // Replace multiple underscores with single
+      .replace(/^_|_$/g, '');   // Remove leading/trailing underscores
+  };
+
   const resetFieldEditor = () => {
     setFieldId('');
     setFieldType('text');
@@ -48,13 +58,21 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
   };
 
   const handleAddField = () => {
-    if (!fieldId || !fieldLabel) {
-      alert('Please provide both an ID and a label for the field.');
+    if (!fieldLabel) {
+      alert('Please provide a label for the field.');
+      return;
+    }
+
+    // Auto-generate ID from label
+    const generatedId = toSnakeCase(fieldLabel);
+
+    if (!generatedId) {
+      alert('Please provide a valid label that contains letters or numbers.');
       return;
     }
 
     const newField: FormField = {
-      id: fieldId,
+      id: generatedId,
       type: fieldType,
       label: fieldLabel,
       placeholder: fieldPlaceholder || undefined,
@@ -92,10 +110,11 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
 
   const handleDuplicateField = (index: number) => {
     const field = fields[index];
+    const newLabel = `${field.label} (Copy)`;
     const duplicatedField: FormField = {
       ...field,
-      id: `${field.id}_copy`,
-      label: `${field.label} (Copy)`,
+      id: toSnakeCase(newLabel),
+      label: newLabel,
     };
     setFields([...fields, duplicatedField]);
   };
@@ -216,35 +235,6 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
                 </h3>
                 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Field ID *
-                      </label>
-                      <input
-                        type="text"
-                        value={fieldId}
-                        onChange={(e) => setFieldId(e.target.value)}
-                        placeholder="e.g., max_speed"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Field Type *
-                      </label>
-                      <select
-                        value={fieldType}
-                        onChange={(e) => setFieldType(e.target.value as 'text' | 'number' | 'select')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="text">Text</option>
-                        <option value="number">Number</option>
-                        <option value="select">Select</option>
-                      </select>
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Label *
@@ -256,6 +246,24 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
                       placeholder="e.g., Maximum Speed"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      ID will be auto-generated: {fieldLabel ? toSnakeCase(fieldLabel) : 'e.g., maximum_speed'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Field Type *
+                    </label>
+                    <select
+                      value={fieldType}
+                      onChange={(e) => setFieldType(e.target.value as 'text' | 'number' | 'select')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                      <option value="select">Select</option>
+                    </select>
                   </div>
 
                   <div>
