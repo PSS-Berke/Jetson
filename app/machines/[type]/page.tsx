@@ -178,15 +178,18 @@ export default function MachineTypePage() {
               showAll={true}
             />
           </div>
-          <button
-            onClick={() => setIsFormBuilderOpen(true)}
-            className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium flex items-center gap-2 border border-blue-200"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Form
-          </button>
+          {/* Only show Add Machine button for admin users */}
+          {user?.admin && (
+            <button
+              onClick={() => setIsFormBuilderOpen(true)}
+              className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium flex items-center gap-2 border border-blue-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Machine
+            </button>
+          )}
         </div>
 
         {/* Status Filters */}
@@ -425,12 +428,14 @@ export default function MachineTypePage() {
         machine={selectedMachine}
         onClose={handleMachineModalClose}
         onSuccess={handleMachineModalClose}
+        user={user}
       />
 
       {/* Dynamic Form Builder Modal */}
       <DynamicFormBuilderModal
         isOpen={isFormBuilderOpen}
         onClose={() => setIsFormBuilderOpen(false)}
+        user={user}
       />
     </>
   );
