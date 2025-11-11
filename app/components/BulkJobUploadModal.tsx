@@ -149,7 +149,7 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
         pockets: pj.requirements[0]?.pockets?.toString() || '2',
         csr: undefined,
         prgm: undefined,
-        machines_id: [],
+        machines_id: '',
         requirements: pj.requirements.length > 0 ? JSON.stringify(pj.requirements) : JSON.stringify([]), // Empty array if no requirements
         price_per_m: pj.requirements[0]?.price_per_m?.toString() || '0',
         add_on_charges: '0',
@@ -292,7 +292,6 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
 
               <ExcelUploadZone
                 onFileSelect={handleFileUpload}
-                acceptedFormats=".csv,.xlsx,.xls"
               />
 
               {errorMessage && (
