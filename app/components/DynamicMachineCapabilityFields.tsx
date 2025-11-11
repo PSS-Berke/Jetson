@@ -12,6 +12,7 @@ interface DynamicMachineCapabilityFieldsProps {
   onChange: (field: string, value: MachineCapabilityValue) => void;
   onProcessTypeChange: (processTypeKey: string) => void;
   errors?: Record<string, string>;
+  minimalMode?: boolean;
 }
 
 export default function DynamicMachineCapabilityFields({
@@ -20,6 +21,7 @@ export default function DynamicMachineCapabilityFields({
   onChange,
   onProcessTypeChange,
   errors = {},
+  minimalMode = false,
 }: DynamicMachineCapabilityFieldsProps) {
   const processConfig = getProcessTypeConfig(processTypeKey);
   const processTypeOptions = getProcessTypeOptions();
@@ -186,9 +188,9 @@ export default function DynamicMachineCapabilityFields({
           ))}
         </select>
         {errors.process_type_key && (
-          <p className="mt-1 text-sm text-red-600">{errors.process_type_key}</p>
+          <p className="mt-1 text-sm text-red-600 break-words">{errors.process_type_key}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-gray-500 break-words">
           This determines what capabilities this machine can support
         </p>
       </div>
@@ -202,7 +204,7 @@ export default function DynamicMachineCapabilityFields({
 
       {/* Help Text */}
       {!processTypeKey && (
-        <p className="text-sm text-gray-500 italic">
+        <p className="text-sm text-gray-500 italic break-words">
           Select a process type to configure machine capabilities
         </p>
       )}
