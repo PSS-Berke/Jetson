@@ -83,21 +83,27 @@ export default function Machines() {
           <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
             Machine Types
           </h2>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setIsAddMachineModalOpen(true)}
-              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-            >
-              + Add Machine
-            </button>
-            <button
-              onClick={() => setIsFormBuilderOpen(true)}
-              className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
-            >
-              <span className="text-lg">+</span>
-              Form
-            </button>
-          </div>
+          {/* Only show Add Machine buttons for admin users */}
+          {user?.admin && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsAddMachineModalOpen(true)}
+                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              >
+                + Add Machine
+              </button>
+              <button
+                onClick={() => setIsFormBuilderOpen(true)}
+                className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span className="hidden lg:inline">Build Form</span>
+                <span className="lg:hidden">Form</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Machine Type Tiles */}
@@ -134,12 +140,14 @@ export default function Machines() {
         isOpen={isAddMachineModalOpen}
         onClose={() => setIsAddMachineModalOpen(false)}
         onSuccess={handleAddMachineSuccess}
+        user={user}
       />
 
       {/* Dynamic Form Builder Modal */}
       <DynamicFormBuilderModal
         isOpen={isFormBuilderOpen}
         onClose={() => setIsFormBuilderOpen(false)}
+        user={user}
       />
     </>
   );

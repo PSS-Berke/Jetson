@@ -26,6 +26,18 @@ export interface ServiceTypeSummary {
   jobCount: number;
 }
 
+export interface ProcessProjection {
+  job: ParsedJob;
+  processType: string;
+  requirement: any; // JobRequirement type
+  weeklyQuantities: Map<string, number>; // Per-process quantities
+  weeklyRevenues: Map<string, number>; // Per-process revenues
+  totalQuantity: number;
+  totalRevenue: number;
+  jobId: number;
+  jobNumber: number;
+}
+
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
  */
@@ -437,4 +449,73 @@ export function calculateGenericGrandTotals(
   });
 
   return { weeklyTotals, grandTotal };
+}
+
+/**
+ * Calculate revenue for a single process requirement
+ */
+export function getProcessRevenue(job: ParsedJob, requirement: any): number {
+  const pricePerMStr = requirement.price_per_m;
+  const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+  const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+  return (job.quantity / 1000) * pricePerM;
+}
+
+/**
+ * Expand job projections into per-process projections
+ * Each job with multiple processes becomes multiple rows
+ */
+export function expandJobProjectionsToProcesses(
+  jobProjections: JobProjection[]
+): ProcessProjection[] {
+  const processProjections: ProcessProjection[] = [];
+
+  jobProjections.forEach(projection => {
+    const job = projection.job;
+    const numProcesses = job.requirements?.length || 0;
+
+    // Skip jobs with no processes
+    if (numProcesses === 0) {
+      return;
+    }
+
+    // Create a projection for each process
+    job.requirements.forEach(requirement => {
+      const processQuantities = new Map<string, number>();
+      const processRevenues = new Map<string, number>();
+      let totalProcessQuantity = 0;
+
+      // Calculate per-process quantities (equal distribution)
+      projection.weeklyQuantities.forEach((quantity, label) => {
+        const processQty = Math.round(quantity / numProcesses);
+        processQuantities.set(label, processQty);
+        totalProcessQuantity += processQty;
+      });
+
+      // Calculate per-process revenue
+      const processRevenue = getProcessRevenue(job, requirement);
+      let totalProcessRevenue = 0;
+
+      // Distribute revenue proportionally to quantity
+      projection.weeklyRevenues.forEach((revenue, label) => {
+        const processRev = revenue / numProcesses;
+        processRevenues.set(label, processRev);
+        totalProcessRevenue += processRev;
+      });
+
+      processProjections.push({
+        job,
+        processType: requirement.process_type || 'Unknown',
+        requirement,
+        weeklyQuantities: processQuantities,
+        weeklyRevenues: processRevenues,
+        totalQuantity: totalProcessQuantity,
+        totalRevenue: totalProcessRevenue,
+        jobId: job.id,
+        jobNumber: job.job_number,
+      });
+    });
+  });
+
+  return processProjections;
 }

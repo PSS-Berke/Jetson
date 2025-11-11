@@ -444,34 +444,30 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
           return false;
         }
 
-        const config = getProcessTypeConfig(r.process_type);
-        if (!config) {
-          console.log(`[AddJobModal] Requirement ${reqIndex + 1}: Invalid process type config`);
+        // For dynamic fields (fetched from API), we only validate that process_type is set
+        // The actual field validation is handled by the dynamic form component
+        // We check if there's at least one additional field filled besides process_type
+        const fieldCount = Object.keys(r).filter(key => 
+          key !== 'process_type' && 
+          r[key] !== undefined && 
+          r[key] !== null && 
+          r[key] !== ''
+        ).length;
+
+        if (fieldCount === 0) {
+          console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): No fields filled`);
           return false;
         }
 
-        // Check all required fields for this process type
-        const isValid = config.fields.every(field => {
-          if (!field.required) return true;
-          const value = r[field.name];
-          const isValueValid = value !== undefined && value !== null && value !== '';
-
-          if (!isValueValid) {
-            console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): Missing required field "${field.name}" (${field.label}). Current value:`, value);
-          }
-
-          return isValueValid;
-        });
-
-        console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): ${isValid ? 'Valid' : 'Invalid'}`, r);
-        return isValid;
+        console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): Valid with ${fieldCount} fields filled`, r);
+        return true;
       });
 
       console.log(`[AddJobModal] All requirements valid:`, allRequirementsValid);
       console.log(`[AddJobModal] Requirements data:`, formData.requirements);
 
       if (!allRequirementsValid) {
-        alert('Please fill in all required fields for each requirement');
+        alert('Please select a process type and fill in at least one field for each requirement');
         return;
       }
     }
@@ -1231,13 +1227,14 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     (currentStep === 1 && (!formData.job_number || !formData.clients_id || !formData.quantity)) ||
                     (currentStep === 2 && formData.requirements.some(r => {
                       if (!r.process_type) return true;
-                      const config = getProcessTypeConfig(r.process_type);
-                      if (!config) return true;
-                      return config.fields.some(field => {
-                        if (!field.required) return false;
-                        const value = r[field.name];
-                        return value === undefined || value === null || value === '';
-                      });
+                      // Check if at least one field besides process_type is filled
+                      const fieldCount = Object.keys(r).filter(key => 
+                        key !== 'process_type' && 
+                        r[key] !== undefined && 
+                        r[key] !== null && 
+                        r[key] !== ''
+                      ).length;
+                      return fieldCount === 0;
                     }))
                   }
                   className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"

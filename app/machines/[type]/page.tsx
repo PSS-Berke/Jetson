@@ -15,6 +15,39 @@ import { createMachine, updateMachine, deleteMachine } from '@/lib/api';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
 import { FaPen, FaTrash } from 'react-icons/fa6';
 import { FaTimes, FaSave } from 'react-icons/fa';
+import {
+  ArrowPathIcon,
+  CalendarIcon,
+  CheckIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+  XMarkIcon,
+  PlayIcon,
+} from '@heroicons/react/24/outline';
+import { formatInTimeZone } from 'date-fns-tz';
+import AddJobModal from '@/app/components/AddJobModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/app/components/DropdownMenu';
+import { AddMachineModal } from '@/app/components/AddMachineModal';
+import EditMachineModal from '@/app/components/EditMachineModal';
+import DeleteMachineModal from '@/app/components/DeleteMachineModal';
+import { toast } from 'react-toastify';
+import { Tooltip } from 'react-tooltip';
+import { LoadingSpinner } from '@/app/components/LoadingSpinner';
+import {
+  getBulkUpdateMachinePayload,
+  handleUpdateMachine,
+  MachineBulkUpdatePayload,
+} from '@/lib/machineUtils';
+import { ConfirmationModal } from '@/app/components/ConfirmationModal';
+import { JobProductionEntry, ProcessType } from '@/types/production';
 
 // Dynamically import modals - only loaded when opened
 const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {
@@ -409,25 +442,13 @@ export default function MachineTypePage() {
               showAll={true}
             />
           </div>
-          <div className="flex gap-4">
-            <button
-              onClick={() => setIsFormBuilderOpen(true)}
-              className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
-            >
-              <span className="text-lg">+</span>
-              Form
-            </button>
-            <button
-              onClick={() => {
-                setShowNewMachineRow(true);
-                setNewMachineFormData(getNewMachineInitialState());
-              }}
-              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2 border-2 border-[var(--primary-blue)]"
-            >
-              <span className="text-lg">+</span>
-              Add Machine
-            </button>
-          </div>
+          <button
+            onClick={() => setIsFormBuilderOpen(true)}
+            className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
+          >
+            <span className="text-lg">+</span>
+            Form
+          </button>
         </div>
 
         {/* Status Filters */}
@@ -947,12 +968,14 @@ export default function MachineTypePage() {
         machine={selectedMachine}
         onClose={handleMachineModalClose}
         onSuccess={handleMachineModalClose}
+        user={user}
       />
 
       {/* Dynamic Form Builder Modal */}
       <DynamicFormBuilderModal
         isOpen={isFormBuilderOpen}
         onClose={() => setIsFormBuilderOpen(false)}
+        user={user}
       />
     </>
   );
