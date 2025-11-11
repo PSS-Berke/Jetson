@@ -52,6 +52,10 @@ export default function ProductionPage() {
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'and' | 'or'>('and');
+  const [scheduleFilter, setScheduleFilter] = useState<'all' | 'confirmed' | 'soft'>('all');
+  const [filterViewMode, setFilterViewMode] = useState<'simple' | 'advanced'>('simple');
+  const [dataDisplayMode, setDataDisplayMode] = useState<'pieces' | 'revenue'>('pieces');
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('table');
 
   // PDF export ref
   const printRef = useRef<HTMLDivElement>(null);
@@ -128,6 +132,13 @@ export default function ProductionPage() {
         if (!matchesSearch) return false;
       }
 
+      // Schedule filter
+      if (scheduleFilter !== 'all') {
+        const isConfirmed = (job as any).confirmed === true || (job as any).confirmed === 1;
+        if (scheduleFilter === 'confirmed' && !isConfirmed) return false;
+        if (scheduleFilter === 'soft' && isConfirmed) return false;
+      }
+
       // Client filter
       const clientMatch = selectedClients.length === 0 ||
         (job.client && selectedClients.includes(job.client.id));
@@ -167,7 +178,7 @@ export default function ProductionPage() {
                (activeFilters[1] && processTypeMatch);
       }
     });
-  }, [comparisons, selectedClients, selectedServiceTypes, searchQuery, filterMode]);
+  }, [comparisons, selectedClients, selectedServiceTypes, searchQuery, filterMode, scheduleFilter]);
 
   // Handle successful batch entry
   const handleBatchEntrySuccess = async () => {
@@ -322,49 +333,27 @@ export default function ProductionPage() {
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] no-print">
-          <div className="flex gap-2 overflow-x-auto">
-            <button
-              onClick={() => setActiveView('table')}
-              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-                activeView === 'table'
-                  ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                  : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-              }`}
-            >
-              Table View
-            </button>
-            <button
-              onClick={() => setActiveView('analytics')}
-              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-                activeView === 'analytics'
-                  ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                  : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-              }`}
-            >
-              Analytics
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            {filteredComparisons.length > 0 && (
-              <button
-                onClick={handlePrint}
-                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap"
-              >
-                Export PDF
-              </button>
-            )}
-            <button
-              onClick={() => setIsExcelUploadModalOpen(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
-              title="Import production data from Excel"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Import from Excel
-            </button>
-          </div>
+        <div className="flex gap-2 mb-6 border-b border-[var(--border)] no-print overflow-x-auto">
+          <button
+            onClick={() => setActiveView('table')}
+            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+              activeView === 'table'
+                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+            }`}
+          >
+            Table View
+          </button>
+          <button
+            onClick={() => setActiveView('analytics')}
+            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+              activeView === 'analytics'
+                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
+                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
+            }`}
+          >
+            Analytics
+          </button>
         </div>
 
         {/* Filters */}
@@ -378,6 +367,14 @@ export default function ProductionPage() {
           onSearchChange={setSearchQuery}
           filterMode={filterMode}
           onFilterModeChange={setFilterMode}
+          scheduleFilter={scheduleFilter}
+          onScheduleFilterChange={setScheduleFilter}
+          filterViewMode={filterViewMode}
+          onFilterViewModeChange={setFilterViewMode}
+          dataDisplayMode={dataDisplayMode}
+          onDataDisplayModeChange={setDataDisplayMode}
+          mobileViewMode={mobileViewMode}
+          onMobileViewModeChange={setMobileViewMode}
           granularity={granularity}
           dateRangeDisplay={dateRangeDisplay}
           onPreviousPeriod={handlePreviousPeriod}
@@ -386,6 +383,8 @@ export default function ProductionPage() {
           startDate={new Date(startDate)}
           endDate={new Date(endDate)}
           onDateRangeChange={handleDateRangeChange}
+          onExportPDF={handlePrint}
+          onBulkUpload={() => setIsExcelUploadModalOpen(true)}
         />
 
         {/* Loading State */}
@@ -451,6 +450,7 @@ export default function ProductionPage() {
                     endDate={endDate}
                     facilitiesId={selectedFacility || undefined}
                     granularity={granularity}
+                    dataDisplayMode={dataDisplayMode}
                   />
                 </div>
               </>

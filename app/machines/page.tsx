@@ -147,20 +147,18 @@ export default function Machines() {
             />
           </div>
           <div className="flex gap-3">
-            {filterFacility !== null && (
-              <button
-                onClick={() => setIsAddMachineModalOpen(true)}
-                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-              >
-                + Add Machine
-              </button>
-            )}
+            <button
+              onClick={() => setIsAddMachineModalOpen(true)}
+              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+            >
+              + Add Machine
+            </button>
             <button
               onClick={() => setIsFormBuilderOpen(true)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
             >
-              <span>🔧</span>
-              Build Form
+              <span className="text-lg">+</span>
+              Form
             </button>
           </div>
         </div>

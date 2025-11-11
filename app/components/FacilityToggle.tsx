@@ -67,7 +67,7 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
     <div className="flex flex-col gap-2">
       <div
         ref={containerRef}
-        className="relative inline-flex w-full sm:w-auto rounded-full border-2 border-[var(--primary-blue)] bg-gray-50 p-1"
+        className="relative inline-flex w-auto rounded-full border-2 border-[var(--primary-blue)] bg-gray-50 p-1"
       >
         {/* Sliding bubble indicator - Show when facility is selected (including null for "All") */}
         {bubbleStyle.width > 0 && (
@@ -86,7 +86,7 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
             key={facility.value === null ? 'all' : facility.value}
             ref={el => { buttonRefs.current[index] = el; }}
             onClick={() => onFacilityChange(facility.value)}
-            className={`relative z-10 flex-1 sm:flex-initial px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+            className={`relative z-10 px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               currentFacility === facility.value
                 ? 'text-white'
                 : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'

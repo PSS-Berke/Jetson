@@ -85,6 +85,8 @@ export interface Job {
   sub_client?: string;
   machines: string;
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
+  weekly_split?: number[]; // Array of quantities per week (used in frontend forms)
+  locked_weeks?: boolean[]; // Array of booleans indicating which weeks are locked
 }
 
 /**

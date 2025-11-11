@@ -342,6 +342,51 @@ export const deleteJob = async (jobId: number): Promise<void> => {
   }, 'jobs');
 };
 
+// Batch create multiple jobs
+// Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in chunks
+export const batchCreateJobs = async (
+  jobs: Partial<Job>[],
+  onProgress?: (completed: number, total: number) => void
+): Promise<{ success: Job[]; failures: { job: Partial<Job>; error: string }[] }> => {
+  const CHUNK_SIZE = 25; // Process 25 jobs at a time to avoid overwhelming the API
+  const success: Job[] = [];
+  const failures: { job: Partial<Job>; error: string }[] = [];
+
+  for (let i = 0; i < jobs.length; i += CHUNK_SIZE) {
+    const chunk = jobs.slice(i, i + CHUNK_SIZE);
+
+    const chunkResults = await Promise.allSettled(
+      chunk.map(async (job) => {
+        try {
+          const createdJob = await apiFetch<Job>('/jobs', {
+            method: 'POST',
+            body: JSON.stringify(job),
+          }, 'jobs');
+          return createdJob;
+        } catch (error) {
+          throw { job, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+      })
+    );
+
+    chunkResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        success.push(result.value);
+      } else {
+        const failureData = result.reason as { job: Partial<Job>; error: string };
+        failures.push(failureData);
+      }
+    });
+
+    // Call progress callback if provided
+    if (onProgress) {
+      onProgress(Math.min(i + CHUNK_SIZE, jobs.length), jobs.length);
+    }
+  }
+
+  return { success, failures };
+};
+
 // ============================================================================
 // Production Entry API Functions
 // ============================================================================

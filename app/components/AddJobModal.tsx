@@ -42,6 +42,7 @@ interface JobFormData {
   machines_id: number[];
   requirements: Requirement[];
   weekly_split: number[];
+  locked_weeks: boolean[];
   price_per_m: string;
   add_on_charges: string;
   ext_price: string;
@@ -55,6 +56,12 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [canSubmit, setCanSubmit] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false); // true = Schedule, false = Soft Schedule
+  const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] = useState(false);
+  const [pendingRedistribution, setPendingRedistribution] = useState<{
+    weekIndex: number;
+    newValue: number;
+  } | null>(null);
+  const [tempWeekQuantity, setTempWeekQuantity] = useState<string>('');
   const [formData, setFormData] = useState<JobFormData>({
     job_number: '',
     clients_id: null,
@@ -79,6 +86,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       }
     ],
     weekly_split: [],
+    locked_weeks: [],
     price_per_m: '',
     add_on_charges: '',
     ext_price: '',
@@ -91,30 +99,81 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       const startDate = new Date(formData.start_date);
       const dueDate = new Date(formData.due_date);
       const quantity = parseInt(formData.quantity);
-      
+
       if (!isNaN(quantity) && quantity > 0 && dueDate >= startDate) {
         // Calculate number of weeks (ceiling to capture partial weeks)
         const daysDiff = Math.ceil((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         const weeks = Math.ceil(daysDiff / 7);
-        
+
         if (weeks > 0) {
-          // Split quantity evenly across weeks
-          const baseAmount = Math.floor(quantity / weeks);
-          const remainder = quantity % weeks;
-          
-          // Create array with base amounts
-          const newSplit = Array(weeks).fill(baseAmount);
-          
-          // Distribute remainder across first weeks
-          for (let i = 0; i < remainder; i++) {
-            newSplit[i]++;
+          // Only recalculate from scratch if weekly_split is empty or length changed
+          if (formData.weekly_split.length === 0 || formData.weekly_split.length !== weeks) {
+            // Split quantity evenly across weeks
+            const baseAmount = Math.floor(quantity / weeks);
+            const remainder = quantity % weeks;
+
+            // Create array with base amounts
+            const newSplit = Array(weeks).fill(baseAmount);
+
+            // Distribute remainder across first weeks
+            for (let i = 0; i < remainder; i++) {
+              newSplit[i]++;
+            }
+
+            // Initialize locked_weeks as all false
+            const newLockedWeeks = Array(weeks).fill(false);
+
+            setFormData(prev => ({ ...prev, weekly_split: newSplit, locked_weeks: newLockedWeeks }));
           }
-          
-          setFormData(prev => ({ ...prev, weekly_split: newSplit }));
         }
       }
     }
-  }, [formData.start_date, formData.due_date, formData.quantity]);
+  }, [formData.start_date, formData.due_date, formData.quantity, formData.weekly_split.length]);
+
+  // Handle quantity changes when weekly_split already exists - respect locked weeks
+  useEffect(() => {
+    if (formData.weekly_split.length > 0 && formData.quantity) {
+      const totalQuantity = parseInt(formData.quantity) || 0;
+      const currentTotal = formData.weekly_split.reduce((sum, val) => sum + val, 0);
+      const difference = totalQuantity - currentTotal;
+
+      // Only redistribute if there's a difference and we have unlocked weeks
+      if (difference !== 0) {
+        setFormData(prev => {
+          const newSplit = [...prev.weekly_split];
+          const lockedWeeks = prev.locked_weeks;
+
+          // Get indices of all unlocked weeks
+          const unlockedIndices = newSplit
+            .map((_, idx) => idx)
+            .filter(idx => !lockedWeeks[idx]);
+
+          if (unlockedIndices.length > 0) {
+            // Calculate base adjustment per unlocked week
+            const baseAdjustment = Math.floor(difference / unlockedIndices.length);
+            const remainder = difference % unlockedIndices.length;
+
+            // Apply adjustments to unlocked weeks
+            unlockedIndices.forEach((idx, position) => {
+              let adjustment = baseAdjustment;
+
+              // Distribute remainder across first few weeks
+              if (position < Math.abs(remainder)) {
+                adjustment += remainder > 0 ? 1 : -1;
+              }
+
+              // Apply adjustment, ensuring non-negative values
+              newSplit[idx] = Math.max(0, newSplit[idx] + adjustment);
+            });
+
+            return { ...prev, weekly_split: newSplit };
+          }
+
+          return prev;
+        });
+      }
+    }
+  }, [formData.quantity]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -136,6 +195,15 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
+    });
+  };
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Remove commas from the input value before storing
+    const cleanedValue = e.target.value.replace(/,/g, '');
+    setFormData({
+      ...formData,
+      quantity: cleanedValue
     });
   };
 
@@ -188,31 +256,55 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     const cleanedValue = value.replace(/,/g, '');
     const newValue = parseInt(cleanedValue) || 0;
 
+    performRedistribution(weekIndex, newValue, false);
+  };
+
+  const performRedistribution = (weekIndex: number, newValue: number, allowBackward: boolean) => {
     setFormData(prev => {
       const totalQuantity = parseInt(prev.quantity) || 0;
       const newSplit = [...prev.weekly_split];
+      const newLockedWeeks = [...prev.locked_weeks];
 
-      // Update the changed week
+      // Update the changed week and lock it
       newSplit[weekIndex] = newValue;
+      newLockedWeeks[weekIndex] = true;
 
       // Calculate how much quantity is left to distribute
       const currentTotal = newSplit.reduce((sum, val) => sum + val, 0);
       const difference = totalQuantity - currentTotal;
 
-      // If there's a difference, redistribute it across other weeks
+      // If there's a difference, redistribute it
       if (difference !== 0) {
-        // Get indices of all other weeks (excluding the one being changed)
-        const otherWeekIndices = newSplit
+        // Get indices of unlocked weeks AFTER the changed week
+        const unlockedWeeksAfter = newSplit
           .map((_, idx) => idx)
-          .filter(idx => idx !== weekIndex);
+          .filter(idx => idx > weekIndex && !newLockedWeeks[idx]);
 
-        if (otherWeekIndices.length > 0) {
+        // If no unlocked weeks after, check if we should redistribute backward
+        if (unlockedWeeksAfter.length === 0 && !allowBackward) {
+          // Show warning and store pending redistribution
+          setPendingRedistribution({ weekIndex, newValue });
+          setTempWeekQuantity(newValue.toString());
+          setShowBackwardRedistributeWarning(true);
+          return prev; // Don't update yet
+        }
+
+        // Determine which weeks to redistribute to
+        let targetWeekIndices = unlockedWeeksAfter;
+        if (unlockedWeeksAfter.length === 0 && allowBackward) {
+          // Get all unlocked weeks (forward and backward)
+          targetWeekIndices = newSplit
+            .map((_, idx) => idx)
+            .filter(idx => idx !== weekIndex && !newLockedWeeks[idx]);
+        }
+
+        if (targetWeekIndices.length > 0) {
           // Calculate base adjustment per week
-          const baseAdjustment = Math.floor(difference / otherWeekIndices.length);
-          const remainder = difference % otherWeekIndices.length;
+          const baseAdjustment = Math.floor(difference / targetWeekIndices.length);
+          const remainder = difference % targetWeekIndices.length;
 
-          // Apply adjustments to other weeks
-          otherWeekIndices.forEach((idx, position) => {
+          // Apply adjustments to target weeks
+          targetWeekIndices.forEach((idx, position) => {
             // Add base adjustment
             let adjustment = baseAdjustment;
 
@@ -227,8 +319,97 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         }
       }
 
-      return { ...prev, weekly_split: newSplit };
+      return { ...prev, weekly_split: newSplit, locked_weeks: newLockedWeeks };
     });
+  };
+
+  const handleBackwardRedistributeConfirm = () => {
+    if (pendingRedistribution) {
+      const cleanedValue = tempWeekQuantity.replace(/,/g, '');
+      const finalValue = parseInt(cleanedValue) || 0;
+      performRedistribution(pendingRedistribution.weekIndex, finalValue, true);
+      setPendingRedistribution(null);
+      setTempWeekQuantity('');
+    }
+    setShowBackwardRedistributeWarning(false);
+  };
+
+  const handleBackwardRedistributeCancel = () => {
+    setPendingRedistribution(null);
+    setTempWeekQuantity('');
+    setShowBackwardRedistributeWarning(false);
+  };
+
+  const handleUnlockWeek = (weekIndex: number) => {
+    setFormData(prev => {
+      const newLockedWeeks = [...prev.locked_weeks];
+      newLockedWeeks[weekIndex] = false;
+      return { ...prev, locked_weeks: newLockedWeeks };
+    });
+  };
+
+  const handleUnlockWeekInDialog = (weekIndex: number) => {
+    // Unlock week in the actual form data so it's available for redistribution
+    handleUnlockWeek(weekIndex);
+  };
+
+  const handleTempQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleanedValue = e.target.value.replace(/,/g, '');
+    setTempWeekQuantity(cleanedValue);
+  };
+
+  // Calculate redistribution preview for dialog
+  const calculateRedistributionPreview = () => {
+    if (!pendingRedistribution) return null;
+
+    const cleanedValue = tempWeekQuantity.replace(/,/g, '');
+    const proposedValue = parseInt(cleanedValue) || 0;
+    const totalQuantity = parseInt(formData.quantity) || 0;
+    const weekIndex = pendingRedistribution.weekIndex;
+
+    // Calculate what the split would look like
+    const tempSplit = [...formData.weekly_split];
+    tempSplit[weekIndex] = proposedValue;
+
+    const currentTotal = tempSplit.reduce((sum, val) => sum + val, 0);
+    const difference = totalQuantity - currentTotal;
+
+    // Get unlocked weeks before the adjusted week
+    const unlockedBefore = formData.weekly_split
+      .map((_, idx) => idx)
+      .filter(idx => idx < weekIndex && !formData.locked_weeks[idx]);
+
+    const lockedBefore = formData.weekly_split
+      .map((val, idx) => ({ idx, val }))
+      .filter(({ idx }) => idx < weekIndex && formData.locked_weeks[idx]);
+
+    const canRedistribute = unlockedBefore.length > 0;
+
+    // Calculate preview of changes
+    const preview: { weekIndex: number; oldValue: number; newValue: number; }[] = [];
+
+    if (canRedistribute) {
+      const baseAdjustment = Math.floor(difference / unlockedBefore.length);
+      const remainder = difference % unlockedBefore.length;
+
+      unlockedBefore.forEach((idx, position) => {
+        let adjustment = baseAdjustment;
+        if (position < Math.abs(remainder)) {
+          adjustment += remainder > 0 ? 1 : -1;
+        }
+        const newValue = Math.max(0, tempSplit[idx] + adjustment);
+        preview.push({ weekIndex: idx, oldValue: tempSplit[idx], newValue });
+      });
+    }
+
+    return {
+      difference,
+      unlockedBefore,
+      lockedBefore,
+      canRedistribute,
+      preview,
+      hasNegativeValues: preview.some(p => p.newValue < 0)
+    };
   };
 
   const getWeeklySplitSum = () => {
@@ -441,6 +622,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         total_billing: calculatedTotalBilling.toString(),
         requirements: JSON.stringify(formData.requirements),
         daily_split: dailyBreakdown,
+        weekly_split: formData.weekly_split,
+        locked_weeks: formData.locked_weeks,
         confirmed: isConfirmed
       };
 
@@ -746,10 +929,10 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     Quantity <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="quantity"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
+                    value={formData.quantity ? parseInt(formData.quantity).toLocaleString() : ''}
+                    onChange={handleQuantityChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 73"
                     required
@@ -778,19 +961,52 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {formData.weekly_split.map((amount, index) => (
-                      <div key={index}>
-                        <label className="block text-xs font-medium text-[var(--text-light)] mb-1">
-                          Week {index + 1}
-                        </label>
-                        <input
-                          type="text"
-                          value={amount.toLocaleString()}
-                          onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
-                          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm"
-                        />
-                      </div>
-                    ))}
+                    {formData.weekly_split.map((amount, index) => {
+                      const isLocked = formData.locked_weeks[index];
+                      return (
+                        <div key={index} className="relative">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-medium text-[var(--text-light)]">
+                              Week {index + 1}
+                            </label>
+                            {isLocked && (
+                              <button
+                                type="button"
+                                onClick={() => handleUnlockWeek(index)}
+                                className="text-xs hover:opacity-70 transition-opacity flex items-center gap-1"
+                                title="Unlock this week to allow auto-redistribution"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={amount.toLocaleString()}
+                              onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
+                                isLocked
+                                  ? 'bg-blue-50 border-blue-300 font-semibold pr-8'
+                                  : 'border-[var(--border)]'
+                              }`}
+                              title={isLocked ? 'This week is locked and won\'t be auto-adjusted' : 'Edit to lock this week'}
+                            />
+                            {isLocked && (
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                   {getWeeklySplitDifference() !== 0 && (
                     <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
@@ -1050,6 +1266,142 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
           </div>
         </form>
       </div>
+
+      {/* Backward Redistribution Warning Modal */}
+      {showBackwardRedistributeWarning && pendingRedistribution && (() => {
+        const preview = calculateRedistributionPreview();
+        if (!preview) return null;
+
+        return (
+          <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={handleBackwardRedistributeCancel}
+            />
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full relative z-10 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="p-6 border-b border-[var(--border)]">
+                <h3 className="text-xl font-bold text-[var(--dark-blue)]">
+                  Adjust Week {pendingRedistribution.weekIndex + 1} Quantity
+                </h3>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-4">
+                {/* Quantity Input */}
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Week {pendingRedistribution.weekIndex + 1} Quantity
+                  </label>
+                  <input
+                    type="text"
+                    value={tempWeekQuantity ? parseInt(tempWeekQuantity).toLocaleString() : ''}
+                    onChange={handleTempQuantityChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder="Enter quantity"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Redistribution Info */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="text-sm">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-[var(--text-light)]">Total Job Quantity:</span>
+                      <span className="font-semibold">{parseInt(formData.quantity || '0').toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[var(--text-light)]">Amount to redistribute:</span>
+                      <span className={`font-semibold ${preview.difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {preview.difference > 0 ? '+' : ''}{preview.difference.toLocaleString()} pieces
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview or Error Message */}
+                {preview.canRedistribute ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-[var(--text-dark)]">
+                      This will redistribute {Math.abs(preview.difference).toLocaleString()} pieces from:
+                    </p>
+                    <div className="space-y-2">
+                      {preview.preview.map(({ weekIndex, oldValue, newValue }) => (
+                        <div key={weekIndex} className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                          <span className="text-[var(--text-dark)]">Week {weekIndex + 1}:</span>
+                          <span className="font-semibold">
+                            {oldValue.toLocaleString()} → {newValue.toLocaleString()}
+                            <span className={`ml-2 ${newValue - oldValue < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              ({newValue - oldValue > 0 ? '+' : ''}{(newValue - oldValue).toLocaleString()})
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {preview.lockedBefore.length > 0 && (
+                      <p className="text-xs text-[var(--text-light)] italic">
+                        {preview.lockedBefore.length} week(s) before Week {pendingRedistribution.weekIndex + 1} remain locked
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <p className="text-sm text-red-800 font-semibold mb-2">
+                        ⚠️ Cannot redistribute - all previous weeks are locked
+                      </p>
+                      <p className="text-xs text-red-700">
+                        Unlock one or more weeks below to proceed with this adjustment.
+                      </p>
+                    </div>
+
+                    {preview.lockedBefore.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-[var(--text-dark)]">Locked weeks:</p>
+                        {preview.lockedBefore.map(({ idx, val }) => (
+                          <div key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2">
+                            <span className="text-sm text-[var(--text-dark)]">
+                              Week {idx + 1}: {val.toLocaleString()} pieces
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUnlockWeekInDialog(idx)}
+                              className="text-xs text-[var(--primary-blue)] hover:opacity-70 transition-opacity flex items-center gap-1 font-semibold"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                              </svg>
+                              Unlock
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
+                <button
+                  onClick={handleBackwardRedistributeCancel}
+                  className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBackwardRedistributeConfirm}
+                  disabled={!preview.canRedistribute}
+                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Success Toast */}
       {showSuccessToast && createdJobNumber && (

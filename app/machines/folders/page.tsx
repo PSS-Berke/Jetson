@@ -95,10 +95,10 @@ export default function Folders() {
           </div>
           <button
             onClick={() => setIsFormBuilderOpen(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+            className="px-4 py-2 bg-[#E31E24]/60 text-white rounded-lg hover:bg-[#C01A1F]/60 transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
           >
-            <span>🔧</span>
-            Build Form
+            <span className="text-lg">+</span>
+            Form
           </button>
         </div>
 

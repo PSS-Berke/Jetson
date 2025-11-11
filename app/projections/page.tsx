@@ -37,6 +37,10 @@ const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
   ssr: false,
 });
 
+const BulkJobUploadModal = dynamic(() => import('../components/BulkJobUploadModal'), {
+  ssr: false,
+});
+
 type ViewMode = 'table' | 'calendar' | 'financials';
 
 export default function ProjectionsPage() {
@@ -49,6 +53,7 @@ export default function ProjectionsPage() {
   const [scheduleFilter, setScheduleFilter] = useState<'all' | 'confirmed' | 'soft'>('all');
   const [filterMode, setFilterMode] = useState<'and' | 'or'>('and');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -302,14 +307,6 @@ export default function ProjectionsPage() {
             Financials
           </button>
           </div>
-          {filterViewMode === 'advanced' && (
-            <button
-              onClick={viewMode === 'financials' ? handleFinancialsPrint : handlePrint}
-              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap ml-4"
-            >
-              Export PDF
-            </button>
-          )}
         </div>
 
         {/* Filters */}
@@ -335,6 +332,8 @@ export default function ProjectionsPage() {
             onDataDisplayModeChange={setDataDisplayMode}
             mobileViewMode={mobileViewMode}
             onMobileViewModeChange={setMobileViewMode}
+            onExportPDF={viewMode === 'financials' ? handleFinancialsPrint : handlePrint}
+            onBulkUpload={() => setIsBulkUploadOpen(true)}
           />
         </div>
 
@@ -618,6 +617,13 @@ export default function ProjectionsPage() {
       <AddJobModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={refetch}
+      />
+
+      {/* Bulk Job Upload Modal */}
+      <BulkJobUploadModal
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
         onSuccess={refetch}
       />
     </>

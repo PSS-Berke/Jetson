@@ -6,7 +6,7 @@ import { getStartOfWeek } from '@/lib/projectionUtils';
 import { startOfMonth, startOfQuarter } from 'date-fns';
 import type { Granularity } from './GranularityToggle';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
-import { Filter, SlidersHorizontal, LayoutGrid, Table2 } from 'lucide-react';
+import { Filter, SlidersHorizontal, LayoutGrid, Table2, Upload } from 'lucide-react';
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -29,6 +29,8 @@ interface ProjectionFiltersProps {
   onDataDisplayModeChange: (mode: 'pieces' | 'revenue') => void;
   mobileViewMode?: 'cards' | 'table';
   onMobileViewModeChange?: (mode: 'cards' | 'table') => void;
+  onExportPDF?: () => void;
+  onBulkUpload?: () => void;
 }
 
 export default function ProjectionFilters({
@@ -52,6 +54,8 @@ export default function ProjectionFilters({
   onDataDisplayModeChange,
   mobileViewMode = 'cards',
   onMobileViewModeChange,
+  onExportPDF,
+  onBulkUpload,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -529,9 +533,9 @@ export default function ProjectionFilters({
               </button>
             </div>
 
-            {/* Mobile View Toggle (Cards vs Table) */}
+            {/* Mobile View Toggle (Cards vs Table) - Only visible on mobile */}
             {onMobileViewModeChange && (
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex md:hidden items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => onMobileViewModeChange('cards')}
                   className={`p-2 rounded-md transition-all ${
@@ -555,6 +559,29 @@ export default function ProjectionFilters({
                   <Table2 className="w-4 h-4" />
                 </button>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Fourth Row - Bulk Upload & Export PDF (Advanced Mode Only) */}
+        {filterViewMode === 'advanced' && (onBulkUpload || onExportPDF) && (
+          <div className="flex gap-3 justify-start">
+            {onBulkUpload && (
+              <button
+                onClick={onBulkUpload}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Add Bulk Jobs
+              </button>
+            )}
+            {onExportPDF && (
+              <button
+                onClick={onExportPDF}
+                className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm whitespace-nowrap"
+              >
+                Export PDF
+              </button>
             )}
           </div>
         )}

@@ -1,0 +1,10 @@
+,schedule type,,Job Number,Sub Client,Job description ,,Quantity ,Start date,End date
+,Hard Schedule,LAN,33579,INDEED-,Conv.,Indeed Oct '25 - ins 2 into 6x9 window-quote BB006000DM,"9,400,000",9/30/2025,10/20/2025
+,Cancelled,LAN,tbd,INDEED,Conv.,Indeed JAN '26 - ins 2 into 6x9 window-quote BB006000DM,"9,400,000",12/12/2025,1/5/2025
+,Lemont,GB,7006,CLEAN CHOICE,,INS 3 INTO #10,"3,572,000",10/24-10/31,"drop 1 - 11/3-11/6, drop 2 11/20-11/26"
+,Hard Schedule,GB,7262,CLEAN CHOICE,,ins 3-4 into #10,"194,000",10/29-10/31,11/3-11/6 11/20-11/26
+,Hard Schedule,EGV,30890,DELTA,,INSERT 4 INTO 6X9 WINDOW OE- QUOTE BB006915MU,"2,498,000",now 10/9 - last piece in 10/13,10/23/25
+,Hard Schedule,EGV,31014,CAPITAL ONE,,"CapOne, Wk 233, #77659, cell 1, #10 window, no card","2,095,000",,9/24/2025
+,Hard Schedule,HEB,60468,OPTUM,,"FOLD, INS #10, IJ INDICIA","91,000",rolls in 9/24 AM,10/7-11/7
+,Hard Schedule,HEB,60427,BDI,,"PINLESS, FOLD, INS 2 INTO 4X6 WINDOW, STAMP OE","1,646,000",9/19/2025,"10/2,10/9"
+,Hard Schedule,EGV,31040,HUNTINGTON BANK,,OCT ITA - AFFIX CARD/INSERT,"908,000",9/12/2025,"9/22, 10/2"

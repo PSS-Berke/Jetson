@@ -16,6 +16,7 @@ interface ProductionComparisonTableProps {
   endDate?: number;
   facilitiesId?: number;
   granularity?: 'day' | 'week' | 'month';
+  dataDisplayMode?: 'pieces' | 'revenue';
 }
 
 interface BatchEntryData {
@@ -39,6 +40,7 @@ export default function ProductionComparisonTable({
   endDate,
   facilitiesId,
   granularity = 'week',
+  dataDisplayMode = 'pieces',
 }: ProductionComparisonTableProps) {
   const [sortField, setSortField] = useState<SortField>('job_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -52,6 +54,33 @@ export default function ProductionComparisonTable({
   // Batch mode state
   const [batchData, setBatchData] = useState<Map<number, BatchEntryData>>(new Map());
   const [submitting, setSubmitting] = useState(false);
+
+  // Helper function to calculate revenue from pieces
+  const calculateRevenue = (pieces: number, job: ProductionComparison['job']): number => {
+    // Simple calculation: sum all requirements' pricing * pieces
+    if (!job.requirements || job.requirements.length === 0) return 0;
+
+    const totalPricePerPiece = job.requirements.reduce((sum, req) => {
+      const pricing = typeof req.pricing === 'number' ? req.pricing : parseFloat(req.pricing || '0');
+      return sum + (pricing || 0);
+    }, 0);
+
+    return pieces * totalPricePerPiece;
+  };
+
+  // Helper function to format display value based on mode
+  const formatDisplayValue = (pieces: number, job: ProductionComparison['job']): string => {
+    if (dataDisplayMode === 'revenue') {
+      const revenue = calculateRevenue(pieces, job);
+      return `$${revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    return pieces.toLocaleString();
+  };
+
+  // Helper function to get the display label
+  const getDisplayLabel = (): string => {
+    return dataDisplayMode === 'revenue' ? 'Revenue' : 'Pieces';
+  };
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -480,7 +509,7 @@ export default function ProductionComparisonTable({
                 className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
               >
                 <div className="flex items-center justify-end gap-2">
-                  Projected {!isBatchMode && <SortIcon field="projected" />}
+                  Projected {getDisplayLabel()} {!isBatchMode && <SortIcon field="projected" />}
                 </div>
               </th>
               <th
@@ -488,7 +517,7 @@ export default function ProductionComparisonTable({
                 className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
               >
                 <div className="flex items-center justify-end gap-2">
-                  {isBatchMode ? 'Current' : 'Actual'} {!isBatchMode && <SortIcon field="actual" />}
+                  {isBatchMode ? 'Current' : 'Actual'} {getDisplayLabel()} {!isBatchMode && <SortIcon field="actual" />}
                 </div>
               </th>
               {isBatchMode ? (
@@ -552,7 +581,7 @@ export default function ProductionComparisonTable({
                       : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {comparison.projected_quantity.toLocaleString()}
+                    {formatDisplayValue(comparison.projected_quantity, comparison.job)}
                   </td>
                   <td
                     className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
@@ -564,7 +593,7 @@ export default function ProductionComparisonTable({
                       <input
                         ref={inputRef}
                         type="text"
-                        value={editValue ? parseInt(editValue).toLocaleString() : ''}
+                        value={editValue ? (dataDisplayMode === 'revenue' ? `$${calculateRevenue(parseInt(editValue), comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : parseInt(editValue).toLocaleString()) : ''}
                         onChange={(e) => handleEditInputChange(e.target.value)}
                         onBlur={() => handleSaveEdit(comparison)}
                         onKeyDown={(e) => handleKeyDown(e, comparison)}
@@ -573,7 +602,7 @@ export default function ProductionComparisonTable({
                       />
                     ) : (
                       <span className={!isBatchMode ? "cursor-text hover:bg-blue-50 px-2 py-1 rounded" : ""}>
-                        {comparison.actual_quantity.toLocaleString()}
+                        {formatDisplayValue(comparison.actual_quantity, comparison.job)}
                       </span>
                     )}
                   </td>
@@ -617,7 +646,10 @@ export default function ProductionComparisonTable({
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                         <span className={comparison.variance >= 0 ? 'text-green-600' : 'text-red-600'}>
                           {comparison.variance >= 0 ? '+' : ''}
-                          {comparison.variance.toLocaleString()}
+                          {dataDisplayMode === 'revenue'
+                            ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : comparison.variance.toLocaleString()
+                          }
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
@@ -676,7 +708,7 @@ export default function ProductionComparisonTable({
               <div>
                 <span className="text-gray-500">Projected:</span>
                 <span className="ml-2 font-medium">
-                  {comparison.projected_quantity.toLocaleString()}
+                  {formatDisplayValue(comparison.projected_quantity, comparison.job)}
                 </span>
               </div>
               <div>
@@ -684,7 +716,7 @@ export default function ProductionComparisonTable({
                 <span className={`ml-2 font-semibold ${
                   comparison.actual_quantity > 0 ? 'text-blue-600' : 'text-gray-900'
                 }`}>
-                  {comparison.actual_quantity.toLocaleString()}
+                  {formatDisplayValue(comparison.actual_quantity, comparison.job)}
                 </span>
               </div>
               <div className="col-span-2">
@@ -695,7 +727,10 @@ export default function ProductionComparisonTable({
                   }`}
                 >
                   {comparison.variance >= 0 ? '+' : ''}
-                  {comparison.variance.toLocaleString()}
+                  {dataDisplayMode === 'revenue'
+                    ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : comparison.variance.toLocaleString()
+                  }
                 </span>
               </div>
             </div>

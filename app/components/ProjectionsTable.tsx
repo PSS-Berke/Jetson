@@ -7,7 +7,7 @@ import { formatQuantity, TimeRange } from '@/lib/projectionUtils';
 import JobDetailsModal from './JobDetailsModal';
 import ProcessTypeBadge from './ProcessTypeBadge';
 
-type SortField = 'job_number' | 'client' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
+type SortField = 'job_number' | 'client' | 'sub_client' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
 type SortDirection = 'asc' | 'desc';
 
 interface ProjectionsTableProps {
@@ -50,9 +50,9 @@ const ProjectionTableRow = memo(({
       </td>
       <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
         {job.client?.name || 'Unknown'}
-        {job.sub_client && (
-          <span className="text-[var(--text-light)]"> / {job.sub_client.name}</span>
-        )}
+      </td>
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
+        {job.sub_client?.name || '-'}
       </td>
       <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
         <div className="flex flex-wrap gap-1">
@@ -437,6 +437,10 @@ export default function ProjectionsTable({
           aValue = a.job.client?.name.toLowerCase() || '';
           bValue = b.job.client?.name.toLowerCase() || '';
           break;
+        case 'sub_client':
+          aValue = a.job.sub_client?.name.toLowerCase() || '';
+          bValue = b.job.sub_client?.name.toLowerCase() || '';
+          break;
         case 'description':
           aValue = a.job.description?.toLowerCase() || '';
           bValue = b.job.description?.toLowerCase() || '';
@@ -498,6 +502,14 @@ export default function ProjectionsTable({
                   Client <SortIcon field="client" />
                 </div>
               </th>
+              <th
+                onClick={() => handleSort('sub_client')}
+                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center gap-1">
+                  Sub Client <SortIcon field="sub_client" />
+                </div>
+              </th>
               <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider">
                 Processes
               </th>
@@ -557,7 +569,7 @@ export default function ProjectionsTable({
           <tbody className="divide-y divide-[var(--border)]">
             {sortedJobProjections.length === 0 ? (
               <tr>
-                <td colSpan={8 + timeRanges.length} className="px-4 py-8 text-center text-[var(--text-light)]">
+                <td colSpan={9 + timeRanges.length} className="px-4 py-8 text-center text-[var(--text-light)]">
                   No jobs found for the selected criteria
                 </td>
               </tr>
