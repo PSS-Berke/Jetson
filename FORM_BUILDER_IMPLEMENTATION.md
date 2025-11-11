@@ -15,7 +15,7 @@ All requested features have been successfully implemented and tested.
 
 ### 2. Integration
 **File**: `app/machines/page.tsx`
-- Added "🔧 Build Form" button (purple) in filter bar
+- Added "Build Form" button (light blue with plus icon) next to "Add Machine"
 - Dynamically imported modal for performance
 - Properly integrated with existing machine page UI
 
@@ -215,10 +215,9 @@ POST https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb/machine_variables
 
 ### For Users
 1. Navigate to `/machines`
-2. Select a facility (B2 or Shakopee)
-3. Click "🔧 Build Form" button
-4. Create your form
-5. Click "Save Form"
+2. Click the "Build Form" button (light blue with plus icon)
+3. Create your form
+4. Click "Save Form"
 
 ### For Developers
 ```typescript

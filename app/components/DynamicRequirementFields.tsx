@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { getProcessTypeConfig, getProcessTypeOptions, type FieldConfig } from '@/lib/processTypeConfig';
+import { getMachineVariables } from '@/lib/api';
 
 interface DynamicRequirementFieldsProps {
   requirement: {
@@ -17,13 +18,66 @@ export default function DynamicRequirementFields({
   onChange,
   errors = {},
 }: DynamicRequirementFieldsProps) {
+  const [dynamicFields, setDynamicFields] = useState<FieldConfig[]>([]);
+  const [isLoadingFields, setIsLoadingFields] = useState(false);
   const processConfig = getProcessTypeConfig(requirement.process_type);
   const processTypeOptions = getProcessTypeOptions();
 
-  const renderField = (field: FieldConfig) => {
+  // Fetch dynamic fields when process_type changes
+  useEffect(() => {
+    if (!requirement.process_type) {
+      setDynamicFields([]);
+      return;
+    }
+
+    const fetchFields = async () => {
+      setIsLoadingFields(true);
+      try {
+        console.log('[DynamicRequirementFields] Fetching fields for:', requirement.process_type);
+        const response = await getMachineVariables(requirement.process_type);
+        
+        // Extract fields from the API response
+        if (response && response.length > 0 && response[0].variables?.fields) {
+          const apiFields = response[0].variables.fields;
+          
+          // Map API fields to FieldConfig format
+          const mappedFields: FieldConfig[] = apiFields.map((field: any) => ({
+            name: field.id || field.name,
+            type: field.type === 'select' ? 'dropdown' : field.type,
+            label: field.label,
+            required: field.required || false,
+            placeholder: field.placeholder,
+            options: field.options,
+            validation: field.validation
+          }));
+          
+          console.log('[DynamicRequirementFields] Mapped fields:', mappedFields);
+          setDynamicFields(mappedFields);
+        } else {
+          // Fallback to static config if API returns no fields
+          console.log('[DynamicRequirementFields] No dynamic fields, using static config');
+          setDynamicFields([]);
+        }
+      } catch (error) {
+        console.error('[DynamicRequirementFields] Error fetching fields:', error);
+        // Fallback to static config on error
+        setDynamicFields([]);
+      } finally {
+        setIsLoadingFields(false);
+      }
+    };
+
+    fetchFields();
+  }, [requirement.process_type]);
+
+  // Use dynamic fields if available, otherwise fall back to static config
+  const fieldsToRender = dynamicFields.length > 0 ? dynamicFields : (processConfig?.fields || []);
+
+  const renderField = (field: FieldConfig, index: number) => {
     const value = requirement[field.name] || '';
     const error = errors[field.name];
-    const fieldId = `${field.name}-${Date.now()}`;
+    const fieldId = `${field.name}-${index}-${requirement.process_type}`;
+    const fieldKey = `${requirement.process_type}-${field.name}-${index}`;
 
     // Match the styling from AddJobModal/EditJobModal for consistency
     const baseInputClasses = `w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
@@ -35,7 +89,7 @@ export default function DynamicRequirementFields({
     switch (field.type) {
       case 'dropdown':
         return (
-          <div key={field.name} className="flex-1 min-w-[200px]">
+          <div key={fieldKey} className="flex-1 min-w-[200px]">
             <label htmlFor={fieldId} className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </label>
@@ -59,7 +113,7 @@ export default function DynamicRequirementFields({
 
       case 'number':
         return (
-          <div key={field.name} className="flex-1 min-w-[200px]">
+          <div key={fieldKey} className="flex-1 min-w-[200px]">
             <label htmlFor={fieldId} className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </label>
@@ -81,7 +135,7 @@ export default function DynamicRequirementFields({
 
       case 'currency':
         return (
-          <div key={field.name} className="flex-1 min-w-[200px]">
+          <div key={fieldKey} className="flex-1 min-w-[200px]">
             <label htmlFor={fieldId} className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </label>
@@ -108,7 +162,7 @@ export default function DynamicRequirementFields({
       case 'text':
       default:
         return (
-          <div key={field.name} className="flex-1 min-w-[200px]">
+          <div key={fieldKey} className="flex-1 min-w-[200px]">
             <label htmlFor={fieldId} className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </label>
@@ -158,17 +212,37 @@ export default function DynamicRequirementFields({
       </div>
 
       {/* Dynamic Fields Based on Selected Process Type */}
-      {processConfig && (
-        <div className="flex flex-wrap gap-4">
-          {processConfig.fields.map((field) => renderField(field))}
+      {isLoadingFields ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="flex items-center gap-3 text-[var(--text-light)]">
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Loading fields...</span>
+          </div>
         </div>
-      )}
+      ) : requirement.process_type && fieldsToRender.length > 0 ? (
+        <div className="flex flex-wrap gap-4">
+          {fieldsToRender.map((field, index) => renderField(field, index))}
+        </div>
+      ) : null}
 
       {/* Help Text */}
-      {!requirement.process_type && (
+      {!requirement.process_type && !isLoadingFields && (
         <p className="text-sm text-gray-500 italic">
           Select a process type to see relevant fields
         </p>
+      )}
+      
+      {/* Info badge when using dynamic fields */}
+      {dynamicFields.length > 0 && !isLoadingFields && (
+        <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <span>Using dynamic fields from machine configuration</span>
+        </div>
       )}
     </div>
   );

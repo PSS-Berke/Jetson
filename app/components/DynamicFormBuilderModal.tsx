@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import type { User } from '@/types';
 
 interface FormField {
   id: string;
@@ -15,9 +16,10 @@ interface FormField {
 interface DynamicFormBuilderModalProps {
   isOpen: boolean;
   onClose: () => void;
+  user?: User | null;
 }
 
-export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicFormBuilderModalProps) {
+export default function DynamicFormBuilderModal({ isOpen, onClose, user }: DynamicFormBuilderModalProps) {
   const [formType, setFormType] = useState('');
   const [fields, setFields] = useState<FormField[]>([]);
   const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
@@ -37,6 +39,36 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
 
   if (!isOpen) return null;
 
+  // Check if user is admin
+  if (!user?.admin) {
+    return (
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
+          <p className="text-gray-700 mb-6">
+            You must be an administrator to access the machine form builder.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Helper function to convert label to snake_case ID
+  const toSnakeCase = (str: string): string => {
+    return str
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '') // Remove special characters
+      .replace(/\s+/g, '_')     // Replace spaces with underscores
+      .replace(/_+/g, '_')      // Replace multiple underscores with single
+      .replace(/^_|_$/g, '');   // Remove leading/trailing underscores
+  };
+
   const resetFieldEditor = () => {
     setFieldId('');
     setFieldType('text');
@@ -48,13 +80,21 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
   };
 
   const handleAddField = () => {
-    if (!fieldId || !fieldLabel) {
-      alert('Please provide both an ID and a label for the field.');
+    if (!fieldLabel) {
+      alert('Please provide a label for the field.');
+      return;
+    }
+
+    // Auto-generate ID from label
+    const generatedId = toSnakeCase(fieldLabel);
+
+    if (!generatedId) {
+      alert('Please provide a valid label that contains letters or numbers.');
       return;
     }
 
     const newField: FormField = {
-      id: fieldId,
+      id: generatedId,
       type: fieldType,
       label: fieldLabel,
       placeholder: fieldPlaceholder || undefined,
@@ -92,10 +132,11 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
 
   const handleDuplicateField = (index: number) => {
     const field = fields[index];
+    const newLabel = `${field.label} (Copy)`;
     const duplicatedField: FormField = {
       ...field,
-      id: `${field.id}_copy`,
-      label: `${field.label} (Copy)`,
+      id: toSnakeCase(newLabel),
+      label: newLabel,
     };
     setFields([...fields, duplicatedField]);
   };
@@ -177,7 +218,7 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -216,35 +257,6 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
                 </h3>
                 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Field ID *
-                      </label>
-                      <input
-                        type="text"
-                        value={fieldId}
-                        onChange={(e) => setFieldId(e.target.value)}
-                        placeholder="e.g., max_speed"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Field Type *
-                      </label>
-                      <select
-                        value={fieldType}
-                        onChange={(e) => setFieldType(e.target.value as 'text' | 'number' | 'select')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="text">Text</option>
-                        <option value="number">Number</option>
-                        <option value="select">Select</option>
-                      </select>
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Label *
@@ -256,6 +268,24 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
                       placeholder="e.g., Maximum Speed"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      ID will be auto-generated: {fieldLabel ? toSnakeCase(fieldLabel) : 'e.g., maximum_speed'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Field Type *
+                    </label>
+                    <select
+                      value={fieldType}
+                      onChange={(e) => setFieldType(e.target.value as 'text' | 'number' | 'select')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                      <option value="select">Select</option>
+                    </select>
                   </div>
 
                   <div>
@@ -344,43 +374,53 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
                           <button
                             onClick={() => handleMoveField(index, 'up')}
                             disabled={index === 0}
-                            className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title="Move up"
                           >
-                            ↑
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                            </svg>
                           </button>
                           {/* Move Down */}
                           <button
                             onClick={() => handleMoveField(index, 'down')}
                             disabled={index === fields.length - 1}
-                            className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title="Move down"
                           >
-                            ↓
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
                           </button>
                           {/* Duplicate */}
                           <button
                             onClick={() => handleDuplicateField(index)}
-                            className="p-1 text-gray-500 hover:text-green-600"
+                            className="p-1.5 text-gray-500 hover:text-green-600 transition-colors"
                             title="Duplicate"
                           >
-                            📋
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
                           </button>
                           {/* Edit */}
                           <button
                             onClick={() => handleEditField(index)}
-                            className="p-1 text-gray-500 hover:text-blue-600"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 transition-colors"
                             title="Edit"
                           >
-                            ✏️
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
                           </button>
                           {/* Remove */}
                           <button
                             onClick={() => handleRemoveField(index)}
-                            className="p-1 text-gray-500 hover:text-red-600"
+                            className="p-1.5 text-gray-500 hover:text-red-600 transition-colors"
                             title="Remove"
                           >
-                            🗑️
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         </div>
                       </div>

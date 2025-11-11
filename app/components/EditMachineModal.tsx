@@ -3,7 +3,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import DynamicMachineCapabilityFields from './DynamicMachineCapabilityFields';
 import FacilityToggle from './FacilityToggle';
-import { Machine, MachineCapabilityValue, MachineStatus } from '@/types';
+import { Machine, MachineCapabilityValue, MachineStatus, User } from '@/types';
 import { updateMachine, deleteMachine } from '@/lib/api';
 import Toast from './Toast';
 
@@ -12,6 +12,7 @@ interface EditMachineModalProps {
   machine: Machine | null;
   onClose: () => void;
   onSuccess?: () => void;
+  user?: User | null;
 }
 
 interface MachineFormData {
@@ -27,7 +28,7 @@ interface MachineFormData {
   };
 }
 
-export default function EditMachineModal({ isOpen, machine, onClose, onSuccess }: EditMachineModalProps) {
+export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, user }: EditMachineModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -77,6 +78,74 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess }
   }, [isOpen]);
 
   if (!isOpen || !machine) return null;
+
+  // Check if user is admin - show read-only view for non-admins
+  if (!user?.admin) {
+    return (
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
+            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Machine Details</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Read-only Content */}
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Line Number</p>
+                <p className="font-medium text-gray-900">Line {machine.line}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Type</p>
+                <p className="font-medium text-gray-900">{machine.type}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Facility</p>
+                <p className="font-medium text-gray-900">
+                  {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Status</p>
+                <p className="font-medium text-gray-900 capitalize">{machine.status}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Speed/Hour</p>
+                <p className="font-medium text-gray-900">{machine.speed_hr || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Shift Capacity</p>
+                <p className="font-medium text-gray-900">{machine.shiftCapacity || 'N/A'}</p>
+              </div>
+            </div>
+            
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-500 italic">
+                Only administrators can edit machine details.
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
