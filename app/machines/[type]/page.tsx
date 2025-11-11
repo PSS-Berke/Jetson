@@ -13,6 +13,8 @@ import type { Machine, MachineCapabilityValue, MachineStatus } from '@/types';
 import { getProcessTypeConfig } from '@/lib/processTypeConfig';
 import { createMachine, updateMachine, deleteMachine } from '@/lib/api';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
+import { FaPen, FaTrash } from 'react-icons/fa6';
+import { FaTimes, FaSave } from 'react-icons/fa';
 
 // Dynamically import modals - only loaded when opened
 const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {
@@ -631,13 +633,13 @@ export default function MachineTypePage() {
                         <div className="flex gap-2">
                           <button
                             onClick={handleSaveNewMachine}
-                            className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                            className="px-3 py-1 bg-green-400 text-white rounded-md hover:bg-green-500 transition-colors"
                           >
                             Save
                           </button>
                           <button
                             onClick={handleCancelNewMachine}
-                            className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                            className="px-3 py-1 bg-gray-400 text-gray-800 rounded-md hover:bg-gray-500 transition-colors"
                           >
                             Cancel
                           </button>
@@ -652,15 +654,32 @@ export default function MachineTypePage() {
                     const isEditing = editingMachineId === machine.id;
 
                     return (
-                      <tr
-                        key={machine.id}
-                        className={`hover:bg-gray-50 transition-colors ${isEditing ? 'bg-yellow-50/50' : 'cursor-pointer'}`}
-                        onClick={() => !isEditing && handleMachineClick(machine)}
-                        
-                      >
+                      <tr key={machine.id} className="relative group">
                         {isEditing && editedMachineFormData ? (
                           <>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                            <td className="pl-16 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-row gap-1 p-0">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSaveEditedMachine();
+                                    }}
+                                    className="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                                    title="Save"
+                                  >
+                                    <FaSave size="0.75em" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCancelEdit();
+                                    }}
+                                    className="p-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                                    title="Cancel Edit"
+                                  >
+                                    <FaTimes size="0.75em" />
+                                  </button>
+                              </div>
                               {/* Facility Input */}
                               <select
                                 name="facilities_id"
@@ -758,41 +777,46 @@ export default function MachineTypePage() {
                               {errors.shiftCapacity && <p className="text-red-500 text-xs mt-1">{errors.shiftCapacity}</p>}
                             </td>
                             <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              {/* Actions: Save/Cancel/Delete */}
+                              {/* Actions: Delete */}
                               <div className="flex gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSaveEditedMachine();
-                                  }}
-                                  className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCancelEdit();
-                                  }}
-                                  className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
-                                >
-                                  Cancel
-                                </button>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeleteClick(machine.id);
                                   }}
-                                  className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                                  className="p-2 bg-red-500 text-white rounded-md hover:bg-red-500 transition-colors"
+                                  title="Delete"
                                 >
-                                  Delete
+                                  <FaTrash size="0.75em" />
                                 </button>
                               </div>
                             </td>
                           </>
                         ) : (
                           <>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                            <td className="pl-16 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-row gap-1 p-0">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent row click from being triggered
+                                      handleEditClick(machine);
+                                    }}
+                                    className="p-2 bg-orange-100 text-white rounded-md hover:bg-orange-500 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <FaPen size="0.75em" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteClick(machine.id);
+                                    }}
+                                    className="p-2 bg-red-100 text-white rounded-md hover:bg-red-600 transition-colors"
+                                    title="Delete"
+                                  >
+                                    <FaTrash size="0.75em" />
+                                  </button>
+                              </div>
                               {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
@@ -836,26 +860,6 @@ export default function MachineTypePage() {
                               ) : (
                                 <span className="text-[var(--text-light)]">No active job</span>
                               )}
-                              <div className="flex gap-2 mt-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation(); // Prevent row click from being triggered
-                                    handleEditClick(machine);
-                                  }}
-                                  className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(machine.id);
-                                  }}
-                                  className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                                >
-                                  Delete
-                                </button>
-                              </div>
                             </td>
                           </>
                         )}
