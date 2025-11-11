@@ -39,26 +39,6 @@ export default function DynamicFormBuilderModal({ isOpen, onClose, user }: Dynam
 
   if (!isOpen) return null;
 
-  // Check if user is admin
-  if (!user?.admin) {
-    return (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
-          <p className="text-gray-700 mb-6">
-            You must be an administrator to access the machine form builder.
-          </p>
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Helper function to convert label to snake_case ID
   const toSnakeCase = (str: string): string => {
     return str

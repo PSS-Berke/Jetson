@@ -59,26 +59,6 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
 
   if (!isOpen) return null;
 
-  // Check if user is admin
-  if (!user?.admin) {
-    return (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
-          <p className="text-gray-700 mb-6">
-            You must be an administrator to add machines.
-          </p>
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
@@ -212,36 +192,37 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
     <>
       {/* Modal Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         onClick={handleClose}
       >
-        {/* Modal Container */}
-        <div className="min-h-screen px-4 flex items-center justify-center py-8">
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-[var(--text-dark)]">Add New Machine</h2>
-              <button
-                onClick={handleClose}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center"
-              >
-                ×
-              </button>
-            </div>
+        {/* Modal Container - with max height and scrolling */}
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header - Fixed at top */}
+          <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-2xl font-bold text-[var(--text-dark)]">Add New Machine</h2>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors text-3xl font-light w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100"
+              type="button"
+            >
+              ×
+            </button>
+          </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Form - Scrollable content */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="px-6 py-6 space-y-8">
               {/* Basic Information */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[var(--text-dark)]">Basic Information</h3>
+              <div className="space-y-5">
+                <h3 className="text-lg font-semibold text-[var(--text-dark)] pb-2">Basic Information</h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Line Number */}
                   <div>
-                    <label htmlFor="line" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label htmlFor="line" className="block text-sm font-medium text-gray-700 mb-2">
                       Line Number <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -250,20 +231,20 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                       name="line"
                       value={formData.line}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.line
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                          : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
                       }`}
                       placeholder="e.g., 101"
                       required
                     />
-                    {errors.line && <p className="mt-1 text-sm text-red-600">{errors.line}</p>}
+                    {errors.line && <p className="mt-1.5 text-sm text-red-600">{errors.line}</p>}
                   </div>
 
                   {/* Machine Type Name */}
                   <div>
-                    <label htmlFor="type" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
                       Machine Type Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -272,21 +253,21 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                       name="type"
                       value={formData.type}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.type
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                          : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
                       }`}
                       placeholder="e.g., Inserter, Folder, Laser"
                       required
                     />
-                    {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
+                    {errors.type && <p className="mt-1.5 text-sm text-red-600">{errors.type}</p>}
                   </div>
                 </div>
 
                 {/* Facility */}
                 <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Facility <span className="text-red-500">*</span>
                   </label>
                   <FacilityToggle
@@ -294,13 +275,13 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                     onFacilityChange={(facilityId) => setFormData({ ...formData, facilities_id: facilityId })}
                     showAll={false}
                   />
-                  {errors.facilities_id && <p className="mt-1 text-sm text-red-600">{errors.facilities_id}</p>}
+                  {errors.facilities_id && <p className="mt-1.5 text-sm text-red-600">{errors.facilities_id}</p>}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   {/* Status */}
                   <div>
-                    <label htmlFor="status" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
                       Status <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -308,7 +289,7 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                       name="status"
                       value={formData.status}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-[var(--primary-blue)] bg-white"
                       required
                     >
                       <option value="available">Available</option>
@@ -319,7 +300,7 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
 
                   {/* Speed per Hour */}
                   <div>
-                    <label htmlFor="speed_hr" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label htmlFor="speed_hr" className="block text-sm font-medium text-gray-700 mb-2">
                       Speed/hr <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -328,22 +309,22 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                       name="speed_hr"
                       value={formData.speed_hr}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.speed_hr
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                          : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
                       }`}
                       placeholder="e.g., 5000"
                       min="0"
                       step="1"
                       required
                     />
-                    {errors.speed_hr && <p className="mt-1 text-sm text-red-600">{errors.speed_hr}</p>}
+                    {errors.speed_hr && <p className="mt-1.5 text-sm text-red-600">{errors.speed_hr}</p>}
                   </div>
 
                   {/* Shift Capacity */}
                   <div>
-                    <label htmlFor="shiftCapacity" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label htmlFor="shiftCapacity" className="block text-sm font-medium text-gray-700 mb-2">
                       Shift Capacity <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -352,24 +333,24 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                       name="shiftCapacity"
                       value={formData.shiftCapacity}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.shiftCapacity
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                          : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
                       }`}
                       placeholder="e.g., 40000"
                       min="0"
                       step="1"
                       required
                     />
-                    {errors.shiftCapacity && <p className="mt-1 text-sm text-red-600">{errors.shiftCapacity}</p>}
+                    {errors.shiftCapacity && <p className="mt-1.5 text-sm text-red-600">{errors.shiftCapacity}</p>}
                   </div>
                 </div>
               </div>
 
               {/* Machine Capabilities */}
-              <div className="space-y-4 border-t pt-6">
-                <h3 className="text-lg font-semibold text-[var(--text-dark)]">Machine Capabilities</h3>
+              <div className="space-y-5 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-[var(--text-dark)] pb-2">Machine Capabilities</h3>
                 <DynamicMachineCapabilityFields
                   processTypeKey={formData.process_type_key}
                   capabilities={formData.capabilities}
@@ -378,27 +359,27 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess, user }: Ad
                   errors={errors}
                 />
               </div>
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-4 pt-6 border-t">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Creating...' : 'Create Machine'}
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* Action Buttons - Fixed at bottom */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-white transition-colors shadow-sm"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-[var(--primary-blue)] text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                disabled={submitting}
+              >
+                {submitting ? 'Creating...' : 'Create Machine'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 

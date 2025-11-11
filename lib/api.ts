@@ -69,7 +69,19 @@ const apiFetch = async <T = unknown>(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    let error: any;
+    let errorText: string = '';
+    try {
+      errorText = await response.text();
+      console.log('[apiFetch] Raw error response:', errorText);
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { message: errorText || 'Request failed' };
+      }
+    } catch {
+      error = { message: 'Request failed' };
+    }
 
     // Suppress error logging for endpoints that may not be configured yet
     const isProductionEndpoint = endpoint.includes('/production_entry');
@@ -83,7 +95,10 @@ const apiFetch = async <T = unknown>(
         fullUrl: `${baseType === 'auth' ? AUTH_BASE_URL : baseType === 'jobs' ? JOBS_BASE_URL : API_BASE_URL}${endpoint}`,
         status: response.status,
         statusText: response.statusText,
-        error
+        error,
+        errorString: JSON.stringify(error, null, 2),
+        requestBody: options.body,
+        requestBodyParsed: options.body ? JSON.parse(options.body as string) : null
       });
     }
 
@@ -96,7 +111,9 @@ const apiFetch = async <T = unknown>(
       }
     }
 
-    throw new Error(error.message || `HTTP ${response.status}`);
+    // Extract more detailed error message
+    const errorMessage = error.message || error.error || error.detail || `HTTP ${response.status}`;
+    throw new Error(errorMessage);
   }
 
   const responseData = await response.json();
@@ -240,27 +257,58 @@ export const createMachine = async (machineData: Omit<Machine, 'id' | 'created_a
   console.log('[createMachine] Creating machine:', machineData);
   console.log('[createMachine] Capabilities object:', machineData.capabilities);
   
-  // Transform frontend data to API format
-  const apiData = {
-    ...machineData,
-    name: machineData.line?.toString() || '0',
+  // Transform frontend data to API format that Xano expects
+  // Based on Xano's expected format:
+  // - quantity should be 1 (For Loop will execute once to create one machine)
+  // - speed_hr should be a string
+  // - shift_capacity should be snake_case
+  // - Include all expected fields with defaults
+  const apiData: Record<string, any> = {
+    quantity: 1, // For Loop executes this many times - we want to create 1 machine
+    line: machineData.line?.toString() || '',
+    type: machineData.type || '',
+    speed_hr: machineData.speed_hr?.toString() || '0',
+    status: machineData.status || 'available',
+    facilities_id: machineData.facilities_id || 0,
+    paper_size: '',
+    shift_capacity: machineData.shiftCapacity?.toString() || '',
+    jobs_id: 0,
+    pockets: 0,
     details: machineData.capabilities || {},
   };
   
+  // Add process_type_key if provided
+  if (machineData.process_type_key) {
+    apiData.process_type_key = machineData.process_type_key;
+  }
+  
   console.log('[createMachine] Request body:', JSON.stringify(apiData, null, 2));
+  console.log('[createMachine] Request body (parsed):', apiData);
+  
   const result = await apiFetch<any>('/machines', {
     method: 'POST',
     body: JSON.stringify(apiData),
   });
   console.log('[createMachine] Response:', result);
   
+  // Xano returns machines1 (from For Loop) - it might be an array or single object
+  // Extract the machine data from the response
+  let machineResult: any;
+  if (result.machines1) {
+    // If machines1 is an array, take the first element (since quantity=1)
+    machineResult = Array.isArray(result.machines1) ? result.machines1[0] : result.machines1;
+  } else {
+    // Fallback to result itself if machines1 doesn't exist
+    machineResult = result;
+  }
+  
   // Transform API response to frontend format
   return {
-    ...result,
-    line: result.name ? parseInt(result.name) : result.line || 0,
-    capabilities: result.details || result.capabilities || {},
-    speed_hr: result.speed_hr ? parseInt(result.speed_hr) : 0,
-    process_type_key: result.process_type_key || inferProcessTypeKey(result.type),
+    ...machineResult,
+    line: machineResult.line ? (typeof machineResult.line === 'number' ? machineResult.line : parseInt(machineResult.line)) : 0,
+    capabilities: machineResult.details || machineResult.capabilities || {},
+    speed_hr: machineResult.speed_hr ? (typeof machineResult.speed_hr === 'number' ? machineResult.speed_hr : parseFloat(machineResult.speed_hr)) : 0,
+    process_type_key: machineResult.process_type_key || inferProcessTypeKey(machineResult.type),
   };
 };
 

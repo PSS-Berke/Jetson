@@ -54,6 +54,10 @@ const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {
   ssr: false,
 });
 
+const AddMachineModal = dynamic(() => import('../../components/AddMachineModal'), {
+  ssr: false,
+});
+
 const EditMachineModal = dynamic(() => import('../../components/EditMachineModal'), {
   ssr: false,
 });
@@ -94,6 +98,7 @@ export default function MachineTypePage() {
   const machineType = params.type as string;
   
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [isAddMachineModalOpen, setIsAddMachineModalOpen] = useState(false);
   const [isFormBuilderOpen, setIsFormBuilderOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
@@ -133,6 +138,11 @@ export default function MachineTypePage() {
 
   const handleMachineModalClose = () => {
     setSelectedMachine(null);
+    refetch(filterStatus, filterFacility || undefined);
+  };
+
+  const handleAddMachineSuccess = () => {
+    setIsAddMachineModalOpen(false);
     refetch(filterStatus, filterFacility || undefined);
   };
 
@@ -442,13 +452,28 @@ export default function MachineTypePage() {
               showAll={true}
             />
           </div>
-          <button
-            onClick={() => setIsFormBuilderOpen(true)}
-            className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
-          >
-            <span className="text-lg">+</span>
-            Form
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsAddMachineModalOpen(true)}
+              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span className="hidden lg:inline">Add Machine</span>
+              <span className="lg:hidden">Machine</span>
+            </button>
+            <button
+              onClick={() => setIsFormBuilderOpen(true)}
+              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span className="hidden lg:inline">Build Form</span>
+              <span className="lg:hidden">Form</span>
+            </button>
+          </div>
         </div>
 
         {/* Status Filters */}
@@ -961,6 +986,14 @@ export default function MachineTypePage() {
       </main>
 
       <AddJobModal isOpen={isJobModalOpen} onClose={() => setIsJobModalOpen(false)} />
+
+      {/* Add Machine Modal */}
+      <AddMachineModal
+        isOpen={isAddMachineModalOpen}
+        onClose={() => setIsAddMachineModalOpen(false)}
+        onSuccess={handleAddMachineSuccess}
+        user={user}
+      />
 
       {/* Edit Machine Modal */}
       <EditMachineModal
