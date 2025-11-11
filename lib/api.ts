@@ -550,6 +550,33 @@ export const batchCreateJobCostEntries = async (
 };
 
 // ============================================================================
+// Machine Variables API Functions (Dynamic Form Builder)
+// ============================================================================
+
+/**
+ * Fetch machine variables/fields configuration for a specific process type
+ * Used to dynamically generate form fields based on the selected process type
+ * 
+ * @param processType - The process type (e.g., 'insert', 'fold', 'laser')
+ * @returns Array of machine variable configurations
+ */
+export const getMachineVariables = async (processType: string): Promise<any[]> => {
+  console.log('[getMachineVariables] Fetching variables for process type:', processType);
+  
+  const params = new URLSearchParams();
+  params.append('process_type', processType);
+  
+  const endpoint = `/machine_variables?${params.toString()}`;
+  
+  const result = await apiFetch<any[]>(endpoint, {
+    method: 'GET',
+  });
+  
+  console.log('[getMachineVariables] Response:', result);
+  return result;
+};
+
+// ============================================================================
 // Job Cost Entry Sync Functions (Auto-populate from Requirements)
 // ============================================================================
 

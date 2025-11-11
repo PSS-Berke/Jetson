@@ -196,7 +196,7 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -352,43 +352,53 @@ export default function DynamicFormBuilderModal({ isOpen, onClose }: DynamicForm
                           <button
                             onClick={() => handleMoveField(index, 'up')}
                             disabled={index === 0}
-                            className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title="Move up"
                           >
-                            ↑
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                            </svg>
                           </button>
                           {/* Move Down */}
                           <button
                             onClick={() => handleMoveField(index, 'down')}
                             disabled={index === fields.length - 1}
-                            className="p-1 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             title="Move down"
                           >
-                            ↓
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
                           </button>
                           {/* Duplicate */}
                           <button
                             onClick={() => handleDuplicateField(index)}
-                            className="p-1 text-gray-500 hover:text-green-600"
+                            className="p-1.5 text-gray-500 hover:text-green-600 transition-colors"
                             title="Duplicate"
                           >
-                            📋
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
                           </button>
                           {/* Edit */}
                           <button
                             onClick={() => handleEditField(index)}
-                            className="p-1 text-gray-500 hover:text-blue-600"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 transition-colors"
                             title="Edit"
                           >
-                            ✏️
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
                           </button>
                           {/* Remove */}
                           <button
                             onClick={() => handleRemoveField(index)}
-                            className="p-1 text-gray-500 hover:text-red-600"
+                            className="p-1.5 text-gray-500 hover:text-red-600 transition-colors"
                             title="Remove"
                           >
-                            🗑️
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         </div>
                       </div>

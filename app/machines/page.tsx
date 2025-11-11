@@ -92,10 +92,13 @@ export default function Machines() {
             </button>
             <button
               onClick={() => setIsFormBuilderOpen(true)}
-              className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
+              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
             >
-              <span className="text-lg">+</span>
-              Form
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span className="hidden lg:inline">Build Form</span>
+              <span className="lg:hidden">Form</span>
             </button>
           </div>
         </div>
