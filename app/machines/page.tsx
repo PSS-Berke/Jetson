@@ -24,6 +24,10 @@ const EditMachineModal = dynamic(() => import('../components/EditMachineModal'),
   ssr: false,
 });
 
+const DynamicFormBuilderModal = dynamic(() => import('../components/DynamicFormBuilderModal'), {
+  ssr: false,
+});
+
 const machineTypes = [
   {
     name: 'Inserters',
@@ -55,6 +59,7 @@ const machineTypes = [
 export default function Machines() {
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
   const [isAddMachineModalOpen, setIsAddMachineModalOpen] = useState(false);
+  const [isFormBuilderOpen, setIsFormBuilderOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -141,14 +146,23 @@ export default function Machines() {
               showAll={true}
             />
           </div>
-          {filterFacility !== null && (
+          <div className="flex gap-3">
+            {filterFacility !== null && (
+              <button
+                onClick={() => setIsAddMachineModalOpen(true)}
+                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              >
+                + Add Machine
+              </button>
+            )}
             <button
-              onClick={() => setIsAddMachineModalOpen(true)}
-              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              onClick={() => setIsFormBuilderOpen(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
             >
-              + Add Machine
+              <span>🔧</span>
+              Build Form
             </button>
-          )}
+          </div>
         </div>
 
         {filterFacility === null ? (
@@ -180,49 +194,47 @@ export default function Machines() {
           // Table View - shown when a specific facility is selected
           <>
             {/* Status Filters */}
-            <div className="flex flex-wrap gap-2 mb-6 justify-between items-center">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleFilterChange('')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    filterStatus === ''
-                      ? 'bg-[var(--primary-blue)] text-white'
-                      : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => handleFilterChange('running')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    filterStatus === 'running'
-                      ? 'bg-[var(--primary-blue)] text-white'
-                      : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
-                  }`}
-                >
-                  Running
-                </button>
-                <button
-                  onClick={() => handleFilterChange('avalible')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    filterStatus === 'avalible'
-                      ? 'bg-[var(--primary-blue)] text-white'
-                      : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
-                  }`}
-                >
-                  Available
-                </button>
-                <button
-                  onClick={() => handleFilterChange('maintenance')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    filterStatus === 'maintenance'
-                      ? 'bg-[var(--primary-blue)] text-white'
-                      : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
-                  }`}
-                >
-                  Maintenance
-                </button>
-              </div>
+            <div className="flex flex-wrap gap-2 mb-6">
+              <button
+                onClick={() => handleFilterChange('')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  filterStatus === ''
+                    ? 'bg-[var(--primary-blue)] text-white'
+                    : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => handleFilterChange('running')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  filterStatus === 'running'
+                    ? 'bg-[var(--primary-blue)] text-white'
+                    : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
+                }`}
+              >
+                Running
+              </button>
+              <button
+                onClick={() => handleFilterChange('avalible')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  filterStatus === 'avalible'
+                    ? 'bg-[var(--primary-blue)] text-white'
+                    : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
+                }`}
+              >
+                Available
+              </button>
+              <button
+                onClick={() => handleFilterChange('maintenance')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  filterStatus === 'maintenance'
+                    ? 'bg-[var(--primary-blue)] text-white'
+                    : 'bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50'
+                }`}
+              >
+                Maintenance
+              </button>
             </div>
 
             {/* Machines Table */}
@@ -452,6 +464,12 @@ export default function Machines() {
         machine={selectedMachine}
         onClose={handleMachineModalClose}
         onSuccess={handleMachineModalClose}
+      />
+
+      {/* Dynamic Form Builder Modal */}
+      <DynamicFormBuilderModal
+        isOpen={isFormBuilderOpen}
+        onClose={() => setIsFormBuilderOpen(false)}
       />
     </>
   );

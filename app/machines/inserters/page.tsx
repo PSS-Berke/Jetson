@@ -19,8 +19,13 @@ const EditMachineModal = dynamic(() => import('../../components/EditMachineModal
   ssr: false,
 });
 
+const DynamicFormBuilderModal = dynamic(() => import('../../components/DynamicFormBuilderModal'), {
+  ssr: false,
+});
+
 export default function Inserters() {
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [isFormBuilderOpen, setIsFormBuilderOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -121,6 +126,13 @@ export default function Inserters() {
               showAll={true}
             />
           </div>
+          <button
+            onClick={() => setIsFormBuilderOpen(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+          >
+            <span>🔧</span>
+            Build Form
+          </button>
         </div>
 
         {/* Status Filters */}
@@ -278,6 +290,12 @@ export default function Inserters() {
         machine={selectedMachine}
         onClose={handleMachineModalClose}
         onSuccess={handleMachineModalClose}
+      />
+
+      {/* Dynamic Form Builder Modal */}
+      <DynamicFormBuilderModal
+        isOpen={isFormBuilderOpen}
+        onClose={() => setIsFormBuilderOpen(false)}
       />
     </>
   );
