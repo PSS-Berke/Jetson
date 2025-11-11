@@ -550,6 +550,84 @@ export const batchCreateJobCostEntries = async (
 };
 
 // ============================================================================
+// Bulk Job Operations
+// ============================================================================
+
+/**
+ * Bulk delete multiple jobs
+ * @param jobIds - Array of job IDs to delete
+ * @returns Object with success and failure counts
+ */
+export const bulkDeleteJobs = async (
+  jobIds: number[]
+): Promise<{ success: number; failures: { jobId: number; error: string }[] }> => {
+  const failures: { jobId: number; error: string }[] = [];
+  let successCount = 0;
+
+  // Delete jobs in parallel for better performance
+  const results = await Promise.allSettled(
+    jobIds.map(async (jobId) => {
+      try {
+        await deleteJob(jobId);
+        return jobId;
+      } catch (error) {
+        throw { jobId, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    })
+  );
+
+  results.forEach((result) => {
+    if (result.status === 'fulfilled') {
+      successCount++;
+    } else {
+      const failureData = result.reason as { jobId: number; error: string };
+      failures.push(failureData);
+    }
+  });
+
+  console.log(`[bulkDeleteJobs] Deleted ${successCount} of ${jobIds.length} jobs`);
+  return { success: successCount, failures };
+};
+
+/**
+ * Bulk update job status or other fields
+ * @param jobIds - Array of job IDs to update
+ * @param updates - Partial job data to apply to all jobs
+ * @returns Object with success and failure counts
+ */
+export const bulkUpdateJobs = async (
+  jobIds: number[],
+  updates: Partial<Job>
+): Promise<{ success: Job[]; failures: { jobId: number; error: string }[] }> => {
+  const failures: { jobId: number; error: string }[] = [];
+  const success: Job[] = [];
+
+  // Update jobs in parallel for better performance
+  const results = await Promise.allSettled(
+    jobIds.map(async (jobId) => {
+      try {
+        const updatedJob = await updateJob(jobId, updates);
+        return updatedJob;
+      } catch (error) {
+        throw { jobId, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    })
+  );
+
+  results.forEach((result) => {
+    if (result.status === 'fulfilled') {
+      success.push(result.value);
+    } else {
+      const failureData = result.reason as { jobId: number; error: string };
+      failures.push(failureData);
+    }
+  });
+
+  console.log(`[bulkUpdateJobs] Updated ${success.length} of ${jobIds.length} jobs`);
+  return { success, failures };
+};
+
+// ============================================================================
 // Job Cost Entry Sync Functions (Auto-populate from Requirements)
 // ============================================================================
 

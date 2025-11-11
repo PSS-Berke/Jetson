@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo, useEffect, useRef } from 'react';
 import { ParsedJob } from '@/hooks/useJobs';
 import { JobProjection, ServiceTypeSummary } from '@/hooks/useProjections';
 import { formatQuantity, TimeRange } from '@/lib/projectionUtils';
 import JobDetailsModal from './JobDetailsModal';
 import ProcessTypeBadge from './ProcessTypeBadge';
+import { Trash, Lock, Unlock, ChevronDown } from 'lucide-react';
+import { bulkDeleteJobs, bulkUpdateJobs } from '@/lib/api';
 
 type SortField = 'job_number' | 'client' | 'sub_client' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
 type SortDirection = 'asc' | 'desc';
@@ -30,21 +32,36 @@ const ProjectionTableRow = memo(({
   projection,
   timeRanges,
   onJobClick,
-  dataDisplayMode
+  dataDisplayMode,
+  isSelected,
+  onToggleSelect
 }: {
   projection: JobProjection;
   timeRanges: TimeRange[];
   onJobClick: (job: ParsedJob) => void;
   dataDisplayMode: 'pieces' | 'revenue';
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) => {
   const job = projection.job;
 
   return (
     <tr
       key={job.id}
-      className="cursor-pointer"
+      className={`cursor-pointer ${isSelected ? 'bg-blue-100' : ''}`}
       onClick={() => onJobClick(job)}
     >
+      <td
+        className="px-2 py-2 w-12"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </td>
       <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
         {job.job_number}
       </td>
@@ -114,7 +131,9 @@ const ProjectionMobileCard = memo(({
   onJobClick,
   scrollPositions,
   onScrollPositionChange,
-  dataDisplayMode
+  dataDisplayMode,
+  isSelected,
+  onToggleSelect
 }: {
   projection: JobProjection;
   timeRanges: TimeRange[];
@@ -122,6 +141,8 @@ const ProjectionMobileCard = memo(({
   scrollPositions: Map<number, number>;
   onScrollPositionChange: (jobId: number, index: number) => void;
   dataDisplayMode: 'pieces' | 'revenue';
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) => {
   const job = projection.job;
   const [localScrollIndex, setLocalScrollIndex] = useState(scrollPositions.get(job.id) || 0);
@@ -179,9 +200,27 @@ const ProjectionMobileCard = memo(({
   return (
     <div
       key={job.id}
-      className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4 cursor-pointer hover:shadow-md transition-shadow"
+      className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-md transition-shadow ${
+        isSelected ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-500' : 'border-[var(--border)]'
+      }`}
       onClick={() => onJobClick(job)}
     >
+      {/* Selection Checkbox */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <label
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            className="w-4 h-4"
+          />
+          <span className="text-sm text-gray-600">Select</span>
+        </label>
+      </div>
+
       {/* Job Header */}
       <div className="flex justify-between items-start mb-3">
         <div>
@@ -313,21 +352,36 @@ const MobileTableRow = memo(({
   projection,
   visibleTimeRanges,
   onJobClick,
-  dataDisplayMode
+  dataDisplayMode,
+  isSelected,
+  onToggleSelect
 }: {
   projection: JobProjection;
   visibleTimeRanges: TimeRange[];
   onJobClick: (job: ParsedJob) => void;
   dataDisplayMode: 'pieces' | 'revenue';
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) => {
   const job = projection.job;
 
   return (
     <tr
-      className="cursor-pointer border-b border-[var(--border)] hover:bg-gray-50"
+      className={`cursor-pointer border-b border-[var(--border)] hover:bg-gray-50 ${isSelected ? 'bg-blue-100' : ''}`}
       onClick={() => onJobClick(job)}
     >
-      <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)] sticky left-0 bg-white">
+      <td
+        className="px-2 py-2 w-12 sticky left-0 bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </td>
+      <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]">
         {job.job_number}
       </td>
       <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
@@ -377,7 +431,138 @@ export default function ProjectionsTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [cardScrollPositions, setCardScrollPositions] = useState<Map<number, number>>(new Map());
 
+  // Selection state
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<number>>(new Set());
+
+  // Bulk actions menu state
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<'hard' | 'soft' | null>(null);
+  const bulkMenuRef = useRef<HTMLDivElement>(null);
+
   const VISIBLE_PERIODS = 3; // For mobile table view
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (bulkMenuRef.current && !bulkMenuRef.current.contains(event.target as Node)) {
+        setShowBulkMenu(false);
+        setShowStatusSubmenu(false);
+      }
+    };
+
+    if (showBulkMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showBulkMenu]);
+
+  // Selection handlers
+  const handleToggleSelect = (jobId: number) => {
+    setSelectedJobIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(sortedJobProjections.map(p => p.job.id));
+      setSelectedJobIds(allIds);
+    } else {
+      setSelectedJobIds(new Set());
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedJobIds(new Set());
+    setShowBulkMenu(false);
+    setShowStatusSubmenu(false);
+    setSelectedStatus(null);
+  };
+
+  // Bulk action handlers
+  const handleBulkDelete = async () => {
+    setShowBulkMenu(false);
+
+    const count = selectedJobIds.size;
+    if (!confirm(`Are you sure you want to delete ${count} selected job${count > 1 ? 's' : ''}?`)) {
+      return;
+    }
+
+    try {
+      const result = await bulkDeleteJobs(Array.from(selectedJobIds));
+
+      if (result.failures.length > 0) {
+        alert(`Deleted ${result.success} of ${count} jobs. ${result.failures.length} failed.`);
+      } else {
+        alert(`Successfully deleted ${result.success} job${result.success > 1 ? 's' : ''}`);
+      }
+
+      setSelectedJobIds(new Set());
+      onRefresh();
+    } catch (error) {
+      alert('Error deleting jobs. Please try again.');
+      console.error('Bulk delete error:', error);
+    }
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!selectedStatus) return;
+
+    setShowBulkMenu(false);
+    setShowStatusSubmenu(false);
+
+    const shouldLock = selectedStatus === 'hard';
+    await handleBulkLockWeeks(shouldLock);
+
+    setSelectedStatus(null);
+  };
+
+  const handleBulkLockWeeks = async (shouldLock: boolean) => {
+    const count = selectedJobIds.size;
+    const action = shouldLock ? 'lock' : 'unlock';
+
+    if (!confirm(`Are you sure you want to ${action} ${count} selected job${count > 1 ? 's' : ''}?`)) {
+      return;
+    }
+
+    try {
+      // Get the selected jobs to update their locked_weeks arrays
+      const selectedJobs = sortedJobProjections.filter(p => selectedJobIds.has(p.job.id));
+
+      const updates = await Promise.allSettled(
+        selectedJobs.map(async (projection) => {
+          const job = projection.job;
+          // Create an array of locked states based on the job's weekly split
+          const weeksCount = job.weekly_split?.length || 0;
+          const locked_weeks = new Array(weeksCount).fill(shouldLock);
+
+          return bulkUpdateJobs([job.id], { locked_weeks });
+        })
+      );
+
+      const successCount = updates.filter(r => r.status === 'fulfilled').length;
+      const failureCount = updates.filter(r => r.status === 'rejected').length;
+
+      if (failureCount > 0) {
+        alert(`${action === 'lock' ? 'Locked' : 'Unlocked'} ${successCount} of ${count} jobs. ${failureCount} failed.`);
+      } else {
+        alert(`Successfully ${action === 'lock' ? 'locked' : 'unlocked'} ${successCount} job${successCount > 1 ? 's' : ''}`);
+      }
+
+      setSelectedJobIds(new Set());
+      onRefresh();
+    } catch (error) {
+      alert(`Error ${action}ing jobs. Please try again.`);
+      console.error(`Bulk ${action} error:`, error);
+    }
+  };
 
   const handleJobClick = (job: ParsedJob) => {
     setSelectedJob(job);
@@ -478,14 +663,129 @@ export default function ProjectionsTable({
     return <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>;
   };
 
+  // Calculate selection state
+  const allSelected = sortedJobProjections.length > 0 && sortedJobProjections.every(p => selectedJobIds.has(p.job.id));
+  const someSelected = sortedJobProjections.some(p => selectedJobIds.has(p.job.id));
+  const selectAllIndeterminate = someSelected && !allSelected;
+
   return (
     <>
+      {/* Bulk Actions Toolbar */}
+      {selectedJobIds.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-blue-900">
+              {selectedJobIds.size} {selectedJobIds.size === 1 ? 'job' : 'jobs'} selected
+            </span>
+            <button
+              onClick={handleClearSelection}
+              className="text-sm text-blue-700 hover:text-blue-900 underline"
+            >
+              Clear selection
+            </button>
+          </div>
+          <div className="relative" ref={bulkMenuRef}>
+            <button
+              onClick={() => setShowBulkMenu(!showBulkMenu)}
+              className="px-4 py-2 rounded font-medium text-sm flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            >
+              Bulk Actions
+              <ChevronDown className={`w-4 h-4 transition-transform ${showBulkMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showBulkMenu && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+                {/* Change Status Option */}
+                <div className="border-b border-gray-200">
+                  <button
+                    onClick={() => setShowStatusSubmenu(!showStatusSubmenu)}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <Lock className="w-4 h-4" />
+                      Change Status
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showStatusSubmenu ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Status Submenu */}
+                  {showStatusSubmenu && (
+                    <div className="bg-gray-50 px-4 py-3 space-y-3">
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="status"
+                            value="hard"
+                            checked={selectedStatus === 'hard'}
+                            onChange={(e) => setSelectedStatus(e.target.value as 'hard')}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          <span className="text-sm text-gray-700 flex items-center gap-2">
+                            <Lock className="w-3.5 h-3.5 text-green-600" />
+                            Hard Scheduled (Lock)
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="status"
+                            value="soft"
+                            checked={selectedStatus === 'soft'}
+                            onChange={(e) => setSelectedStatus(e.target.value as 'soft')}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          <span className="text-sm text-gray-700 flex items-center gap-2">
+                            <Unlock className="w-3.5 h-3.5 text-gray-600" />
+                            Soft Scheduled (Unlock)
+                          </span>
+                        </label>
+                      </div>
+                      <button
+                        onClick={handleConfirmStatusChange}
+                        disabled={!selectedStatus}
+                        className="w-full px-3 py-1.5 rounded text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delete Option */}
+                <button
+                  onClick={handleBulkDelete}
+                  className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
+                >
+                  <Trash className="w-4 h-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-600">Delete Selected</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
           <thead>
             {/* Column Headers */}
             <tr className="bg-gray-50 border-y border-gray-200">
+              <th className="px-2 py-2 text-left w-12">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(input) => {
+                    if (input) {
+                      input.indeterminate = selectAllIndeterminate;
+                    }
+                  }}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th
                 onClick={() => handleSort('job_number')}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -569,7 +869,7 @@ export default function ProjectionsTable({
           <tbody className="divide-y divide-[var(--border)]">
             {sortedJobProjections.length === 0 ? (
               <tr>
-                <td colSpan={9 + timeRanges.length} className="px-4 py-8 text-center text-[var(--text-light)]">
+                <td colSpan={10 + timeRanges.length} className="px-4 py-8 text-center text-[var(--text-light)]">
                   No jobs found for the selected criteria
                 </td>
               </tr>
@@ -581,6 +881,8 @@ export default function ProjectionsTable({
                   timeRanges={timeRanges}
                   onJobClick={handleJobClick}
                   dataDisplayMode={dataDisplayMode}
+                  isSelected={selectedJobIds.has(projection.job.id)}
+                  onToggleSelect={() => handleToggleSelect(projection.job.id)}
                 />
               ))
             )}
@@ -630,7 +932,20 @@ export default function ProjectionsTable({
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase sticky left-0 bg-gray-50">
+                  <th className="px-2 py-2 text-left w-12 sticky left-0 bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = selectAllIndeterminate;
+                        }
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
                     Job #
                   </th>
                   <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
@@ -654,7 +969,7 @@ export default function ProjectionsTable({
               <tbody>
                 {sortedJobProjections.length === 0 ? (
                   <tr>
-                    <td colSpan={5 + VISIBLE_PERIODS} className="px-4 py-8 text-center text-[var(--text-light)]">
+                    <td colSpan={6 + VISIBLE_PERIODS} className="px-4 py-8 text-center text-[var(--text-light)]">
                       No jobs found for the selected criteria
                     </td>
                   </tr>
@@ -666,6 +981,8 @@ export default function ProjectionsTable({
                       visibleTimeRanges={mobileTableVisibleRanges}
                       onJobClick={handleJobClick}
                       dataDisplayMode={dataDisplayMode}
+                      isSelected={selectedJobIds.has(projection.job.id)}
+                      onToggleSelect={() => handleToggleSelect(projection.job.id)}
                     />
                   ))
                 )}
@@ -689,6 +1006,8 @@ export default function ProjectionsTable({
                   scrollPositions={cardScrollPositions}
                   onScrollPositionChange={handleCardScrollPositionChange}
                   dataDisplayMode={dataDisplayMode}
+                  isSelected={selectedJobIds.has(projection.job.id)}
+                  onToggleSelect={() => handleToggleSelect(projection.job.id)}
                 />
               ))
             )}
