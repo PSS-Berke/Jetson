@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { Machine, MachineCapabilityValue, MachineStatus } from '@/types';
 import { getProcessTypeConfig } from '@/lib/processTypeConfig';
-import { createMachine, updateMachine } from '@/lib/api';
+import { createMachine, updateMachine, deleteMachine } from '@/lib/api';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
 
 // Dynamically import modals - only loaded when opened
@@ -260,6 +260,10 @@ export default function MachineTypePage() {
       ...machine,
       // Ensure capabilities are deep-copied to avoid direct modification of original machine object
       capabilities: machine.capabilities ? { ...machine.capabilities } : {},
+      // Ensure shiftCapacity is a string for input value, or undefined
+      shiftCapacity: machine.shiftCapacity === undefined || machine.shiftCapacity === null
+        ? undefined
+        : machine.shiftCapacity,
     });
     setErrors({}); // Clear errors when starting edit
   };
@@ -328,9 +332,6 @@ export default function MachineTypePage() {
     if (editedMachine.speed_hr === undefined || editedMachine.speed_hr === null) {
       newErrors.speed_hr = 'Speed/hr is required';
     }
-    if (editedMachine.shiftCapacity === undefined || editedMachine.shiftCapacity === null) {
-      newErrors.shiftCapacity = 'Shift Capacity is required';
-    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -353,6 +354,23 @@ export default function MachineTypePage() {
     setEditingMachineId(null);
     setEditedMachineFormData(null);
     setErrors({});
+  };
+
+  const handleDeleteClick = async (machineId: number) => {
+    if (!confirm('Are you sure you want to delete this machine?')) {
+      return;
+    }
+
+    try {
+      await deleteMachine(machineId);
+      refetch(filterStatus, filterFacility || undefined);
+      setEditingMachineId(null);
+      setEditedMachineFormData(null);
+      setErrors({});
+    } catch (error) {
+      console.error('Error deleting machine:', error);
+      setErrors((prev) => ({ ...prev, general: 'Failed to delete machine. Please try again.' }));
+    }
   };
 
   return (
@@ -740,7 +758,7 @@ export default function MachineTypePage() {
                               {errors.shiftCapacity && <p className="text-red-500 text-xs mt-1">{errors.shiftCapacity}</p>}
                             </td>
                             <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              {/* Actions: Save/Cancel */}
+                              {/* Actions: Save/Cancel/Delete */}
                               <div className="flex gap-2">
                                 <button
                                   onClick={(e) => {
@@ -759,6 +777,15 @@ export default function MachineTypePage() {
                                   className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
                                 >
                                   Cancel
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteClick(machine.id);
+                                  }}
+                                  className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                                >
+                                  Delete
                                 </button>
                               </div>
                             </td>
@@ -809,15 +836,26 @@ export default function MachineTypePage() {
                               ) : (
                                 <span className="text-[var(--text-light)]">No active job</span>
                               )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent row click from being triggered
-                                  handleEditClick(machine);
-                                }}
-                                className="ml-4 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-                              >
-                                Edit
-                              </button>
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent row click from being triggered
+                                    handleEditClick(machine);
+                                  }}
+                                  className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteClick(machine.id);
+                                  }}
+                                  className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </td>
                           </>
                         )}

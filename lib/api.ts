@@ -205,7 +205,8 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
     ...machine,
     line: machine.name ? parseInt(machine.name) : machine.line || 0,
     capabilities: machine.details || machine.capabilities || {},
-    speed_hr: machine.speed_hr ? parseInt(machine.speed_hr) : 0,
+    speed_hr: machine.speed_hr ? parseFloat(machine.speed_hr) : undefined,
+    shiftCapacity: machine.shiftCapacity ? parseFloat(machine.shiftCapacity) : undefined,
     // Infer process_type_key from machine type if not provided
     process_type_key: machine.process_type_key || inferProcessTypeKey(machine.type),
   }));
