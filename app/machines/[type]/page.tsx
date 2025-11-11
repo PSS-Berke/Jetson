@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { Machine, MachineCapabilityValue, MachineStatus } from '@/types';
 import { getProcessTypeConfig } from '@/lib/processTypeConfig';
-import { createMachine } from '@/lib/api';
+import { createMachine, updateMachine } from '@/lib/api';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
 
 // Dynamically import modals - only loaded when opened
@@ -66,6 +66,8 @@ export default function MachineTypePage() {
   const [showNewMachineRow, setShowNewMachineRow] = useState(false);
   const [newMachineFormData, setNewMachineFormData] = useState<Partial<Machine> | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editingMachineId, setEditingMachineId] = useState<number | null>(null);
+  const [editedMachineFormData, setEditedMachineFormData] = useState<Partial<Machine> | null>(null);
   const { user, isLoading: userLoading } = useUser();
   const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
@@ -252,6 +254,107 @@ export default function MachineTypePage() {
     setErrors({});
   };
 
+  const handleEditClick = (machine: Machine) => {
+    setEditingMachineId(machine.id);
+    setEditedMachineFormData({
+      ...machine,
+      // Ensure capabilities are deep-copied to avoid direct modification of original machine object
+      capabilities: machine.capabilities ? { ...machine.capabilities } : {},
+    });
+    setErrors({}); // Clear errors when starting edit
+  };
+
+  const handleEditedMachineInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    id: number
+  ) => {
+    const { name, value } = e.target;
+
+    let processedValue: string | number | null | undefined = value;
+
+    if (name === 'line' || name === 'speed_hr' || name === 'shiftCapacity') {
+      processedValue = value === '' ? undefined : parseFloat(value);
+      if (isNaN(processedValue as number)) {
+        processedValue = undefined;
+      }
+    } else if (name === 'facilities_id') {
+      processedValue = value === '' ? undefined : parseInt(value);
+    }
+
+    setEditedMachineFormData((prev) => ({
+      ...prev,
+      [name]: processedValue,
+    }));
+    setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handleEditedMachineCapabilityChange = (
+    field: string,
+    value: MachineCapabilityValue,
+    id: number
+  ) => {
+    setEditedMachineFormData((prev) => ({
+      ...prev,
+      capabilities: {
+        ...prev?.capabilities,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleEditedMachineProcessTypeChange = (processTypeKey: string, id: number) => {
+    setEditedMachineFormData((prev) => ({ ...prev, process_type_key: processTypeKey }));
+    setErrors((prev) => ({ ...prev, process_type_key: '' }));
+  };
+
+  const handleSaveEditedMachine = async () => {
+    const editedMachine = editedMachineFormData;
+    if (!editingMachineId || !editedMachine) return;
+
+    // Basic validation (can be expanded)
+    const newErrors: Record<string, string> = {};
+    if (editedMachine.facilities_id === undefined || editedMachine.facilities_id === null) {
+      newErrors.facilities_id = 'Facility is required';
+    }
+    if (editedMachine.line === undefined || editedMachine.line === null) {
+      newErrors.line = 'Line is required';
+    }
+    if (editedMachine.type === undefined || editedMachine.type === null || editedMachine.type.trim() === '') {
+      newErrors.type = 'Type is required';
+    }
+    if (editedMachine.process_type_key === undefined || editedMachine.process_type_key.trim() === '') {
+      newErrors.process_type_key = 'Process type is required';
+    }
+    if (editedMachine.speed_hr === undefined || editedMachine.speed_hr === null) {
+      newErrors.speed_hr = 'Speed/hr is required';
+    }
+    if (editedMachine.shiftCapacity === undefined || editedMachine.shiftCapacity === null) {
+      newErrors.shiftCapacity = 'Shift Capacity is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    try {
+      await updateMachine(editingMachineId, editedMachine as Machine);
+      refetch(filterStatus, filterFacility || undefined);
+      setEditingMachineId(null);
+      setEditedMachineFormData(null);
+      setErrors({});
+    } catch (error) {
+      console.error('Error updating machine:', error);
+      setErrors((prev) => ({ ...prev, general: 'Failed to update machine. Please try again.' }));
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMachineId(null);
+    setEditedMachineFormData(null);
+    setErrors({});
+  };
+
   return (
     <>
       <PageHeader
@@ -380,7 +483,7 @@ export default function MachineTypePage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
                       Type
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider w-[10%]">
                       Process
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
@@ -444,7 +547,7 @@ export default function MachineTypePage() {
                         />
                         {errors.type && <p className="text-red-500 text-xs mt-1">{errors.type}</p>}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                      <td className="px-6 py-4 text-sm text-[var(--text-dark)] w-[10%]">
                         {/* Process Type - DynamicMachineCapabilityFields will handle this */}
                         <DynamicMachineCapabilityFields
                           processTypeKey={newMachineFormData.process_type_key ?? ''}
@@ -528,58 +631,196 @@ export default function MachineTypePage() {
                     const capabilityKeys = getCapabilityColumns(machine);
                     const processConfig = machine.process_type_key ? getProcessTypeConfig(machine.process_type_key) : null;
 
+                    const isEditing = editingMachineId === machine.id;
+
                     return (
                       <tr
                         key={machine.id}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => handleMachineClick(machine)}
+                        className={`hover:bg-gray-50 transition-colors ${isEditing ? 'bg-yellow-50/50' : 'cursor-pointer'}`}
+                        onClick={() => !isEditing && handleMachineClick(machine)}
                         
                       >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                          {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
-                          Line {machine.line}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                          {machine.type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                          {processConfig ? processConfig.label : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
-                            {statusLabels[machine.status]}
-                          </span>
-                        </td>
-                        {capabilityKeys.map((key, idx) => {
-                          const field = processConfig?.fields.find(f => f.name === key);
-                          const capKey = field?.type === 'dropdown' ? `supported_${key}s` :
-                                       field?.type === 'number' ? `max_${key}` : key;
-                          return (
-                            <td key={idx} className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              {renderCapabilityValue(machine, capKey)}
+                        {isEditing && editedMachineFormData ? (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {/* Facility Input */}
+                              <select
+                                name="facilities_id"
+                                value={editedMachineFormData.facilities_id ?? ''}
+                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.facilities_id ? 'border-red-400' : 'border-gray-300'}`}
+                              >
+                                <option value="">Select Facility</option>
+                                <option value="1">Bolingbrook</option>
+                                <option value="2">Lemont</option>
+                              </select>
+                              {errors.facilities_id && <p className="text-red-500 text-xs mt-1">{errors.facilities_id}</p>}
                             </td>
-                          );
-                        })}
-                        {capabilityKeys.length < 2 && (
-                          <td className="px-6 py-4 text-sm text-[var(--text-dark)]">N/A</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {/* Line Input */}
+                              <input
+                                type="number"
+                                name="line"
+                                value={editedMachineFormData.line ?? ''}
+                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.line ? 'border-red-400' : 'border-gray-300'}`}
+                                placeholder="Line #"
+                              />
+                              {errors.line && <p className="text-red-500 text-xs mt-1">{errors.line}</p>}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {/* Type Input */}
+                              <input
+                                type="text"
+                                name="type"
+                                value={editedMachineFormData.type ?? ''}
+                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.type ? 'border-red-400' : 'border-gray-300'}`}
+                                placeholder="Type"
+                              />
+                              {errors.type && <p className="text-red-500 text-xs mt-1">{errors.type}</p>}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-dark)] w-[10%]">
+                              {/* Process Type - DynamicMachineCapabilityFields will handle this */}
+                              <DynamicMachineCapabilityFields
+                                processTypeKey={editedMachineFormData.process_type_key ?? ''}
+                                capabilities={editedMachineFormData.capabilities ?? {}}
+                                onChange={(field, value) => handleEditedMachineCapabilityChange(field, value, machine.id)}
+                                onProcessTypeChange={(processTypeKey) => handleEditedMachineProcessTypeChange(processTypeKey, machine.id)}
+                                errors={errors}
+                                minimalMode={true}
+                              />
+                              {errors.process_type_key && <p className="text-red-500 text-xs mt-1">{errors.process_type_key}</p>}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {/* Status Select */}
+                              <select
+                                name="status"
+                                value={editedMachineFormData.status ?? 'available'}
+                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                              >
+                                <option value="available">Available</option>
+                                <option value="running">Running</option>
+                                <option value="maintenance">Maintenance</option>
+                              </select>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                              N/A
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                              N/A
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {/* Speed/hr Input */}
+                              <input
+                                type="number"
+                                name="speed_hr"
+                                value={editedMachineFormData.speed_hr ?? ''}
+                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.speed_hr ? 'border-red-400' : 'border-gray-300'}`}
+                                placeholder="Speed/hr"
+                                min="0"
+                                step="1"
+                              />
+                              {errors.speed_hr && <p className="text-red-500 text-xs mt-1">{errors.speed_hr}</p>}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {/* Shift Capacity Input */}
+                              <input
+                                type="number"
+                                name="shiftCapacity"
+                                value={editedMachineFormData.shiftCapacity ?? ''}
+                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.shiftCapacity ? 'border-red-400' : 'border-gray-300'}`}
+                                placeholder="Shift Capacity"
+                                min="0"
+                                step="1"
+                              />
+                              {errors.shiftCapacity && <p className="text-red-500 text-xs mt-1">{errors.shiftCapacity}</p>}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                              {/* Actions: Save/Cancel */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSaveEditedMachine();
+                                  }}
+                                  className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelEdit();
+                                  }}
+                                  className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
+                              Line {machine.line}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {machine.type}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)] w-[10%]">
+                              {processConfig ? processConfig.label : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}>
+                                {statusLabels[machine.status]}
+                              </span>
+                            </td>
+                            {capabilityKeys.map((key, idx) => {
+                              const field = processConfig?.fields.find(f => f.name === key);
+                              const capKey = field?.type === 'dropdown' ? `supported_${key}s` :
+                                           field?.type === 'number' ? `max_${key}` : key;
+                              return (
+                                <td key={idx} className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                                  {renderCapabilityValue(machine, capKey)}
+                                </td>
+                              );
+                            })}
+                            {capabilityKeys.length < 2 && (
+                              <td className="px-6 py-4 text-sm text-[var(--text-dark)]">N/A</td>
+                            )}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              {machine.shiftCapacity ? machine.shiftCapacity.toLocaleString() : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                              {machine.currentJob ? (
+                                <span>Job #{machine.currentJob.number} - {machine.currentJob.name}</span>
+                              ) : (machine.status === 'available' || machine.status === 'avalible') ? (
+                                <span className="text-[var(--success)]">Ready for next job</span>
+                              ) : (
+                                <span className="text-[var(--text-light)]">No active job</span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent row click from being triggered
+                                  handleEditClick(machine);
+                                }}
+                                className="ml-4 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                              >
+                                Edit
+                              </button>
+                            </td>
+                          </>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                          {machine.speed_hr ? `${machine.speed_hr}/hr` : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                          {machine.shiftCapacity ? machine.shiftCapacity.toLocaleString() : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                          {machine.currentJob ? (
-                            <span>Job #{machine.currentJob.number} - {machine.currentJob.name}</span>
-                          ) : (machine.status === 'available' || machine.status === 'avalible') ? (
-                            <span className="text-[var(--success)]">Ready for next job</span>
-                          ) : (
-                            <span className="text-[var(--text-light)]">No active job</span>
-                          )}
-                        </td>
                       </tr>
                     );
                   })}

@@ -279,7 +279,7 @@ export const updateMachine = async (machineId: number, machineData: Partial<Mach
   
   console.log('[updateMachine] Request body:', JSON.stringify(apiData, null, 2));
   const result = await apiFetch<any>(`/machines/${machineId}`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(apiData),
   });
   console.log('[updateMachine] Response:', result);
