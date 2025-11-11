@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
 import { useMachines } from '@/hooks/useMachines';
@@ -9,8 +10,13 @@ import FacilityToggle from '../../components/FacilityToggle';
 import PageHeader from '../../components/PageHeader';
 import Link from 'next/link';
 
+const DynamicFormBuilderModal = dynamic(() => import('../../components/DynamicFormBuilderModal'), {
+  ssr: false,
+});
+
 export default function Folders() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormBuilderOpen, setIsFormBuilderOpen] = useState(false);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const { user, isLoading: userLoading } = useUser();
@@ -87,6 +93,13 @@ export default function Folders() {
               showAll={true}
             />
           </div>
+          <button
+            onClick={() => setIsFormBuilderOpen(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+          >
+            <span>🔧</span>
+            Build Form
+          </button>
         </div>
 
         {/* Status Filters */}
@@ -233,6 +246,12 @@ export default function Folders() {
       </main>
 
       <AddJobModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      {/* Dynamic Form Builder Modal */}
+      <DynamicFormBuilderModal
+        isOpen={isFormBuilderOpen}
+        onClose={() => setIsFormBuilderOpen(false)}
+      />
     </>
   );
 }

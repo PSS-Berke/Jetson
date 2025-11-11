@@ -129,6 +129,12 @@ export default function JobDetailsModal({ isOpen, job, onClose, onRefresh }: Job
                 <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Client</label>
                 <p className="text-base text-[var(--text-dark)]">{job.client?.name || 'Unknown'}</p>
               </div>
+              {job.sub_client && (
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Sub Client</label>
+                  <p className="text-base text-[var(--text-dark)]">{job.sub_client.name}</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">Service Type</label>
                 <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">

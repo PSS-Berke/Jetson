@@ -147,6 +147,38 @@ export const logout = (): void => {
   removeToken();
 };
 
+// Generic API object with common HTTP methods
+export const api = {
+  get: async <T = unknown>(endpoint: string, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
+    return apiFetch<T>(endpoint, { method: 'GET' }, baseType);
+  },
+  
+  post: async <T = unknown>(endpoint: string, data: unknown, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
+    return apiFetch<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, baseType);
+  },
+  
+  put: async <T = unknown>(endpoint: string, data: unknown, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
+    return apiFetch<T>(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, baseType);
+  },
+  
+  patch: async <T = unknown>(endpoint: string, data: unknown, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
+    return apiFetch<T>(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, baseType);
+  },
+  
+  delete: async <T = unknown>(endpoint: string, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
+    return apiFetch<T>(endpoint, { method: 'DELETE' }, baseType);
+  },
+};
+
 // Get all machines
 export const getMachines = async (status?: string, facilitiesId?: number): Promise<Machine[]> => {
   const params = new URLSearchParams();
@@ -164,37 +196,102 @@ export const getMachines = async (status?: string, facilitiesId?: number): Promi
   const queryString = params.toString();
   const endpoint = queryString ? `/machines?${queryString}` : '/machines';
 
-  const data = await apiFetch<Machine[]>(endpoint, {
+  const data = await apiFetch<any[]>(endpoint, {
     method: 'GET',
   });
 
-  return data;
+  // Transform API response to match Machine interface
+  return data.map(machine => ({
+    ...machine,
+    line: machine.name ? parseInt(machine.name) : machine.line || 0,
+    capabilities: machine.details || machine.capabilities || {},
+    speed_hr: machine.speed_hr ? parseInt(machine.speed_hr) : 0,
+    // Infer process_type_key from machine type if not provided
+    process_type_key: machine.process_type_key || inferProcessTypeKey(machine.type),
+  }));
+};
+
+// Helper function to infer process_type_key from machine type
+const inferProcessTypeKey = (type: string): string => {
+  const typeMap: { [key: string]: string } = {
+    'insert': 'insert',
+    'inserter': 'insert',
+    'inserters': 'insert',
+    'folder': 'fold',
+    'folders': 'fold',
+    'fold': 'fold',
+    'hp press': 'laser',
+    'laser': 'laser',
+    'inkjet': 'inkjet',
+    'inkjetter': 'inkjet',
+    'inkjetters': 'inkjet',
+    'affix': 'affix',
+    'affixer': 'affix',
+    'affixers': 'affix',
+  };
+  
+  const normalizedType = type.toLowerCase().trim();
+  return typeMap[normalizedType] || 'insert'; // Default to 'insert' if unknown
 };
 
 // Create a new machine
 export const createMachine = async (machineData: Omit<Machine, 'id' | 'created_at'>): Promise<Machine> => {
   console.log('[createMachine] Creating machine:', machineData);
   console.log('[createMachine] Capabilities object:', machineData.capabilities);
-  console.log('[createMachine] Request body:', JSON.stringify(machineData, null, 2));
-  const result = await apiFetch<Machine>('/machines', {
+  
+  // Transform frontend data to API format
+  const apiData = {
+    ...machineData,
+    name: machineData.line?.toString() || '0',
+    details: machineData.capabilities || {},
+  };
+  
+  console.log('[createMachine] Request body:', JSON.stringify(apiData, null, 2));
+  const result = await apiFetch<any>('/machines', {
     method: 'POST',
-    body: JSON.stringify(machineData),
+    body: JSON.stringify(apiData),
   });
   console.log('[createMachine] Response:', result);
-  return result;
+  
+  // Transform API response to frontend format
+  return {
+    ...result,
+    line: result.name ? parseInt(result.name) : result.line || 0,
+    capabilities: result.details || result.capabilities || {},
+    speed_hr: result.speed_hr ? parseInt(result.speed_hr) : 0,
+    process_type_key: result.process_type_key || inferProcessTypeKey(result.type),
+  };
 };
 
 // Update an existing machine
 export const updateMachine = async (machineId: number, machineData: Partial<Machine>): Promise<Machine> => {
   console.log('[updateMachine] Updating machine:', machineId, 'with data:', machineData);
   console.log('[updateMachine] Capabilities object:', machineData.capabilities);
-  console.log('[updateMachine] Request body:', JSON.stringify(machineData, null, 2));
-  const result = await apiFetch<Machine>(`/machines/${machineId}`, {
+  
+  // Transform frontend data to API format
+  const apiData: any = { ...machineData };
+  if (machineData.line !== undefined) {
+    apiData.name = machineData.line.toString();
+  }
+  if (machineData.capabilities !== undefined) {
+    apiData.details = machineData.capabilities;
+  }
+  
+  console.log('[updateMachine] Request body:', JSON.stringify(apiData, null, 2));
+  const result = await apiFetch<any>(`/machines/${machineId}`, {
     method: 'PUT',
-    body: JSON.stringify(machineData),
+    body: JSON.stringify(apiData),
   });
   console.log('[updateMachine] Response:', result);
-  return result;
+  
+  // Transform API response to frontend format
+  return {
+    ...result,
+    line: result.name ? parseInt(result.name) : result.line || 0,
+    capabilities: result.details || result.capabilities || {},
+    speed_hr: result.speed_hr ? parseInt(result.speed_hr) : 0,
+    process_type_key: result.process_type_key || inferProcessTypeKey(result.type),
+  };
 };
 
 // Delete a machine

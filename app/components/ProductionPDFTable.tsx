@@ -75,6 +75,7 @@ export default function ProductionPDFTable({ comparisons }: ProductionPDFTablePr
                 </td>
                 <td className="border border-gray-300 px-2 py-2 text-gray-900">
                   {comparison.job.client?.name || 'Unknown Client'}
+                  {comparison.job.sub_client && ` / ${comparison.job.sub_client.name}`}
                 </td>
                 <td className="border border-gray-300 px-2 py-2 text-gray-900">
                   {comparison.last_updated_at

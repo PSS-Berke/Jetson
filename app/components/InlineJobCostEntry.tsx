@@ -82,12 +82,16 @@ export default function InlineJobCostEntry({
             const entries: JobCostEntryData[] = relevantJobs.map((job) => {
               const billingRate = calculateBillingRatePerM(job);
               const currentCost = costsMap.get(job.id) || 0;
+              const clientName = job.client?.name || 'Unknown';
+              const fullClientName = job.sub_client 
+                ? `${clientName} / ${job.sub_client.name}`
+                : clientName;
 
               return {
                 job_id: job.id,
                 job_number: job.job_number,
                 job_name: job.job_name,
-                client_name: job.client?.name || 'Unknown',
+                client_name: fullClientName,
                 quantity: job.quantity,
                 billing_rate_per_m: billingRate,
                 current_cost_per_m: currentCost,
@@ -148,32 +152,42 @@ export default function InlineJobCostEntry({
   }, [isBatchMode]);
 
   // Handle input changes
-  const handleAddToCostChange = (index: number, value: string) => {
+  const handleAddToCostChange = (jobId: number, value: string) => {
     const validChars = value.replace(/[^\d.]/g, '');
     const parts = validChars.split('.');
     if (parts.length > 2) return;
 
-    const newEntries = [...jobEntries];
-    newEntries[index].add_to_cost = validChars;
-    newEntries[index].set_total_cost = '';
-    setJobEntries(newEntries);
+    setJobEntries(prev =>
+      prev.map(entry =>
+        entry.job_id === jobId
+          ? { ...entry, add_to_cost: validChars, set_total_cost: '' }
+          : entry
+      )
+    );
   };
 
-  const handleSetTotalCostChange = (index: number, value: string) => {
+  const handleSetTotalCostChange = (jobId: number, value: string) => {
     const validChars = value.replace(/[^\d.]/g, '');
     const parts = validChars.split('.');
     if (parts.length > 2) return;
 
-    const newEntries = [...jobEntries];
-    newEntries[index].set_total_cost = validChars;
-    newEntries[index].add_to_cost = '';
-    setJobEntries(newEntries);
+    setJobEntries(prev =>
+      prev.map(entry =>
+        entry.job_id === jobId
+          ? { ...entry, set_total_cost: validChars, add_to_cost: '' }
+          : entry
+      )
+    );
   };
 
-  const handleNotesChange = (index: number, value: string) => {
-    const newEntries = [...jobEntries];
-    newEntries[index].notes = value;
-    setJobEntries(newEntries);
+  const handleNotesChange = (jobId: number, value: string) => {
+    setJobEntries(prev =>
+      prev.map(entry =>
+        entry.job_id === jobId
+          ? { ...entry, notes: value }
+          : entry
+      )
+    );
   };
 
   // Calculate the new cost for display
@@ -572,7 +586,7 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.add_to_cost}
-                          onChange={(e) => handleAddToCostChange(actualIndex, e.target.value)}
+                          onChange={(e) => handleAddToCostChange(entry.job_id, e.target.value)}
                           placeholder="Add..."
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -583,7 +597,7 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.set_total_cost}
-                          onChange={(e) => handleSetTotalCostChange(actualIndex, e.target.value)}
+                          onChange={(e) => handleSetTotalCostChange(entry.job_id, e.target.value)}
                           placeholder="Set..."
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -601,7 +615,7 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.notes}
-                          onChange={(e) => handleNotesChange(actualIndex, e.target.value)}
+                          onChange={(e) => handleNotesChange(entry.job_id, e.target.value)}
                           placeholder="Optional notes"
                           className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />

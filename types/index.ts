@@ -82,6 +82,7 @@ export interface Job {
   ext_price: string;
   total_billing: string;
   client: string;
+  sub_client?: string;
   machines: string;
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
 }

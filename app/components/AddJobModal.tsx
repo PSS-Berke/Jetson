@@ -27,6 +27,8 @@ interface JobFormData {
   job_number: string;
   clients_id: number | null;
   client_name: string;
+  sub_clients_id: number | null;
+  sub_client_name: string;
   job_name: string;
   description: string;
   quantity: string;
@@ -57,6 +59,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     job_number: '',
     clients_id: null,
     client_name: '',
+    sub_clients_id: null,
+    sub_client_name: '',
     job_name: '',
     description: '',
     quantity: '',
@@ -140,6 +144,14 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       ...formData,
       clients_id: clientId,
       client_name: clientName
+    });
+  };
+
+  const handleSubClientChange = (clientId: number, clientName: string) => {
+    setFormData({
+      ...formData,
+      sub_clients_id: clientId,
+      sub_client_name: clientName
     });
   };
 
@@ -415,6 +427,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         description: formData.description,
         quantity: quantity,
         clients_id: formData.clients_id,
+        sub_clients_id: formData.sub_clients_id,
         machines_id: formData.machines_id,
         job_number: parseInt(formData.job_number),
         service_type: formData.service_type,
@@ -494,6 +507,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         job_number: '',
         clients_id: null,
         client_name: '',
+        sub_clients_id: null,
+        sub_client_name: '',
         job_name: '',
         description: '',
         quantity: '',
@@ -611,6 +626,19 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     required
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Sub Client
+                  </label>
+                  <SmartClientSelect
+                    value={formData.sub_clients_id}
+                    onChange={handleSubClientChange}
+                    required={false}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Job Name
