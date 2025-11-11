@@ -9,8 +9,10 @@ import FacilityToggle from '../../components/FacilityToggle';
 import PageHeader from '../../components/PageHeader';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { Machine } from '@/types';
+import type { Machine, MachineCapabilityValue, MachineStatus } from '@/types';
 import { getProcessTypeConfig } from '@/lib/processTypeConfig';
+import { createMachine } from '@/lib/api';
+import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
 
 // Dynamically import modals - only loaded when opened
 const AddJobModal = dynamic(() => import('../../components/AddJobModal'), {
@@ -61,9 +63,23 @@ export default function MachineTypePage() {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const [showNewMachineRow, setShowNewMachineRow] = useState(false);
+  const [newMachineFormData, setNewMachineFormData] = useState<Partial<Machine> | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const { user, isLoading: userLoading } = useUser();
   const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
+
+  const getNewMachineInitialState = (): Partial<Machine> => ({
+    line: undefined,
+    type: '',
+    process_type_key: '',
+    facilities_id: undefined,
+    status: 'available',
+    speed_hr: undefined,
+    shiftCapacity: undefined,
+    capabilities: {},
+  });
 
   const handleFacilityChange = (facility: number | null) => {
     setFilterFacility(facility);
@@ -145,6 +161,97 @@ export default function MachineTypePage() {
     maintenance: 'Maintenance'
   };
 
+  const handleNewMachineInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+
+    let processedValue: string | number | null | undefined = value;
+
+    // Handle numeric inputs
+    if (name === 'line' || name === 'speed_hr' || name === 'shiftCapacity') {
+      processedValue = value === '' ? undefined : parseFloat(value);
+      if (isNaN(processedValue as number)) { // If parseFloat results in NaN, set to undefined
+        processedValue = undefined;
+      }
+    } else if (name === 'facilities_id') {
+      processedValue = value === '' ? undefined : parseInt(value);
+    }
+
+    setNewMachineFormData(prev => ({ ...prev, [name]: processedValue }));
+    setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const handleNewMachineCapabilityChange = (field: string, value: MachineCapabilityValue) => {
+    setNewMachineFormData(prev => ({
+      ...prev,
+      capabilities: {
+        ...prev?.capabilities,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleNewMachineProcessTypeChange = (processTypeKey: string) => {
+    setNewMachineFormData(prev => ({ ...prev, process_type_key: processTypeKey }));
+  };
+
+  const handleSaveNewMachine = async () => {
+    const newMachine = newMachineFormData;
+    if (!newMachine) return;
+
+    const processConfig = newMachine.process_type_key ? getProcessTypeConfig(newMachine.process_type_key) : null;
+    if (!processConfig) {
+      setErrors(prev => ({ ...prev, process_type_key: 'Invalid process type' }));
+      return;
+    }
+
+    // Validate required fields
+    if (!newMachine.facilities_id) {
+      setErrors(prev => ({ ...prev, facilities_id: 'Facility is required' }));
+      return;
+    }
+    if (!newMachine.line) {
+      setErrors(prev => ({ ...prev, line: 'Line is required' }));
+      return;
+    }
+    if (!newMachine.type) {
+      setErrors(prev => ({ ...prev, type: 'Type is required' }));
+      return;
+    }
+    if (!newMachine.process_type_key) {
+      setErrors(prev => ({ ...prev, process_type_key: 'Process type is required' }));
+      return;
+    }
+    if (!newMachine.status) {
+      setErrors(prev => ({ ...prev, status: 'Status is required' }));
+      return;
+    }
+    if (newMachine.speed_hr === undefined) {
+      setErrors(prev => ({ ...prev, speed_hr: 'Speed/hr is required' }));
+      return;
+    }
+    if (newMachine.shiftCapacity === undefined) {
+      setErrors(prev => ({ ...prev, shiftCapacity: 'Shift capacity is required' }));
+      return;
+    }
+
+    try {
+      await createMachine(newMachine);
+      setShowNewMachineRow(false);
+      setNewMachineFormData(null);
+      setErrors({});
+      refetch(filterStatus, filterFacility || undefined);
+    } catch (error) {
+      console.error('Error creating machine:', error);
+      setErrors(prev => ({ ...prev, process_type_key: 'Failed to create machine' }));
+    }
+  };
+
+  const handleCancelNewMachine = () => {
+    setShowNewMachineRow(false);
+    setNewMachineFormData(null);
+    setErrors({});
+  };
+
   return (
     <>
       <PageHeader
@@ -179,13 +286,25 @@ export default function MachineTypePage() {
               showAll={true}
             />
           </div>
-          <button
-            onClick={() => setIsFormBuilderOpen(true)}
-            className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
-          >
-            <span className="text-lg">+</span>
-            Form
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setIsFormBuilderOpen(true)}
+              className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#C01A1F] transition-colors font-medium flex items-center gap-2 border-2 border-[#E31E24]"
+            >
+              <span className="text-lg">+</span>
+              Form
+            </button>
+            <button
+              onClick={() => {
+                setShowNewMachineRow(true);
+                setNewMachineFormData(getNewMachineInitialState());
+              }}
+              className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2 border-2 border-[var(--primary-blue)]"
+            >
+              <span className="text-lg">+</span>
+              Add Machine
+            </button>
+          </div>
         </div>
 
         {/* Status Filters */}
@@ -285,6 +404,126 @@ export default function MachineTypePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
+                  {showNewMachineRow && newMachineFormData && (
+                    <tr className="bg-blue-50/50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Facility Input */}
+                        <select
+                          name="facilities_id"
+                          value={newMachineFormData.facilities_id ?? ''}
+                          onChange={handleNewMachineInputChange}
+                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.facilities_id ? 'border-red-400' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select Facility</option>
+                          <option value="1">Bolingbrook</option>
+                          <option value="2">Lemont</option>
+                        </select>
+                        {errors.facilities_id && <p className="text-red-500 text-xs mt-1">{errors.facilities_id}</p>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Line Input */}
+                        <input
+                          type="number"
+                          name="line"
+                          value={newMachineFormData.line ?? ''}
+                          onChange={handleNewMachineInputChange}
+                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.line ? 'border-red-400' : 'border-gray-300'}`}
+                          placeholder="Line #"
+                        />
+                        {errors.line && <p className="text-red-500 text-xs mt-1">{errors.line}</p>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Type Input */}
+                        <input
+                          type="text"
+                          name="type"
+                          value={newMachineFormData.type ?? ''}
+                          onChange={handleNewMachineInputChange}
+                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.type ? 'border-red-400' : 'border-gray-300'}`}
+                          placeholder="Type"
+                        />
+                        {errors.type && <p className="text-red-500 text-xs mt-1">{errors.type}</p>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Process Type - DynamicMachineCapabilityFields will handle this */}
+                        <DynamicMachineCapabilityFields
+                          processTypeKey={newMachineFormData.process_type_key ?? ''}
+                          capabilities={newMachineFormData.capabilities ?? {}}
+                          onChange={handleNewMachineCapabilityChange}
+                          onProcessTypeChange={handleNewMachineProcessTypeChange}
+                          errors={errors}
+                          minimalMode={true} // Add a prop to render a more compact version if needed
+                        />
+                        {errors.process_type_key && <p className="text-red-500 text-xs mt-1">{errors.process_type_key}</p>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Status Select */}
+                        <select
+                          name="status"
+                          value={newMachineFormData.status ?? 'available'}
+                          onChange={handleNewMachineInputChange}
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                        >
+                          <option value="available">Available</option>
+                          <option value="running">Running</option>
+                          <option value="maintenance">Maintenance</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                        {/* Capability 1 - Will be rendered by DynamicMachineCapabilityFields */}
+                        N/A
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                        {/* Capability 2 - Will be rendered by DynamicMachineCapabilityFields */}
+                        N/A
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Speed/hr Input */}
+                        <input
+                          type="number"
+                          name="speed_hr"
+                          value={newMachineFormData.speed_hr ?? ''}
+                          onChange={handleNewMachineInputChange}
+                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.speed_hr ? 'border-red-400' : 'border-gray-300'}`}
+                          placeholder="Speed/hr"
+                          min="0"
+                          step="1"
+                        />
+                        {errors.speed_hr && <p className="text-red-500 text-xs mt-1">{errors.speed_hr}</p>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                        {/* Shift Capacity Input */}
+                        <input
+                          type="number"
+                          name="shiftCapacity"
+                          value={newMachineFormData.shiftCapacity ?? ''}
+                          onChange={handleNewMachineInputChange}
+                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.shiftCapacity ? 'border-red-400' : 'border-gray-300'}`}
+                          placeholder="Shift Capacity"
+                          min="0"
+                          step="1"
+                        />
+                        {errors.shiftCapacity && <p className="text-red-500 text-xs mt-1">{errors.shiftCapacity}</p>}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
+                        {/* Actions: Save/Cancel */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveNewMachine}
+                            className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelNewMachine}
+                            className="px-3 py-1 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {filteredMachines.map(machine => {
                     const capabilityKeys = getCapabilityColumns(machine);
                     const processConfig = machine.process_type_key ? getProcessTypeConfig(machine.process_type_key) : null;

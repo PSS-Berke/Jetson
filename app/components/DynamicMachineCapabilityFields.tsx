@@ -12,6 +12,7 @@ interface DynamicMachineCapabilityFieldsProps {
   onChange: (field: string, value: MachineCapabilityValue) => void;
   onProcessTypeChange: (processTypeKey: string) => void;
   errors?: Record<string, string>;
+  minimalMode?: boolean;
 }
 
 export default function DynamicMachineCapabilityFields({
@@ -20,6 +21,7 @@ export default function DynamicMachineCapabilityFields({
   onChange,
   onProcessTypeChange,
   errors = {},
+  minimalMode = false,
 }: DynamicMachineCapabilityFieldsProps) {
   const processConfig = getProcessTypeConfig(processTypeKey);
   const processTypeOptions = getProcessTypeOptions();
