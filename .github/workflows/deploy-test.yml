@@ -1,0 +1,54 @@
+name: Deploy to Test Environment
+
+on:
+  push:
+    branches:
+      - develop
+      - test
+  pull_request:
+    branches:
+      - develop
+      - test
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: test
+          NEXT_PUBLIC_ENV: test
+          # Add your test environment variables here
+          # NEXT_PUBLIC_API_URL: ${{ secrets.TEST_API_URL }}
+
+      - name: Deploy to Test (placeholder)
+        run: |
+          echo "Deploying to test environment..."
+          echo "Replace this step with your actual deployment command"
+          # Example for Vercel:
+          # - name: Deploy to Vercel (Test)
+          #   uses: amondnet/vercel-action@v25
+          #   with:
+          #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          #     vercel-args: '--env production'
+          #     scope: ${{ secrets.VERCEL_ORG_ID }}
