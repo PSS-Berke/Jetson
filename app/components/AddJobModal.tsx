@@ -713,6 +713,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
           }
         ],
         weekly_split: [],
+        locked_weeks: [],
         price_per_m: '',
         add_on_charges: '',
         ext_price: '',
