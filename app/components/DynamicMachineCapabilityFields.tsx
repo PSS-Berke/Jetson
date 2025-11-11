@@ -34,10 +34,10 @@ export default function DynamicMachineCapabilityFields({
   const renderCapabilityField = (field: FieldConfig) => {
     const fieldId = `${field.name}-${Date.now()}`;
 
-    const baseInputClasses = `w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+    const baseInputClasses = `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
       errors[field.name]
-        ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500'
-        : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+        ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-200'
+        : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
     }`;
 
     // Skip price_per_m - that's job-specific, not machine capability
@@ -53,12 +53,12 @@ export default function DynamicMachineCapabilityFields({
 
         return (
           <div key={field.name} className="flex-1 min-w-[200px]">
-            <label htmlFor={fieldId} className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+            <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-2">
               Supported {field.label}s {field.required && <span className="text-red-500">*</span>}
             </label>
-            <div className="border rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
+            <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-white shadow-sm">
               {field.options?.map((option) => (
-                <label key={option} className="flex items-center space-x-2 py-1.5 hover:bg-gray-50 px-2 rounded cursor-pointer">
+                <label key={option} className="flex items-center space-x-2.5 py-2 hover:bg-gray-50 px-2 rounded cursor-pointer transition-colors">
                   <input
                     type="checkbox"
                     checked={selectedOptions.includes(option)}
@@ -68,16 +68,16 @@ export default function DynamicMachineCapabilityFields({
                         : selectedOptions.filter((item) => item !== option);
                       onChange(capabilityFieldName, newSelected);
                     }}
-                    className="w-4 h-4 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-[var(--primary-blue)]"
+                    className="w-4 h-4 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-2 focus:ring-blue-200"
                   />
-                  <span className="text-sm">{option}</span>
+                  <span className="text-sm text-gray-700">{option}</span>
                 </label>
               ))}
             </div>
             {errors[capabilityFieldName] && (
-              <p className="mt-1 text-sm text-red-600">{errors[capabilityFieldName]}</p>
+              <p className="mt-1.5 text-sm text-red-600">{errors[capabilityFieldName]}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-500">
               Select all options this machine supports
             </p>
           </div>
@@ -91,12 +91,12 @@ export default function DynamicMachineCapabilityFields({
 
         return (
           <div key={field.name} className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               {field.label} Range {field.required && <span className="text-red-500">*</span>}
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <div className="flex-1">
-                <label htmlFor={`${fieldId}-min`} className="block text-xs text-gray-600 mb-1">
+                <label htmlFor={`${fieldId}-min`} className="block text-xs font-medium text-gray-600 mb-1.5">
                   Min
                 </label>
                 <input
@@ -112,7 +112,7 @@ export default function DynamicMachineCapabilityFields({
                 />
               </div>
               <div className="flex-1">
-                <label htmlFor={`${fieldId}-max`} className="block text-xs text-gray-600 mb-1">
+                <label htmlFor={`${fieldId}-max`} className="block text-xs font-medium text-gray-600 mb-1.5">
                   Max
                 </label>
                 <input
@@ -129,7 +129,7 @@ export default function DynamicMachineCapabilityFields({
               </div>
             </div>
             {(errors[`min_${field.name}`] || errors[`max_${field.name}`]) && (
-              <p className="mt-1 text-sm text-red-600">
+              <p className="mt-1.5 text-sm text-red-600">
                 {errors[`min_${field.name}`] || errors[`max_${field.name}`]}
               </p>
             )}
@@ -144,7 +144,7 @@ export default function DynamicMachineCapabilityFields({
 
         return (
           <div key={field.name} className="flex-1 min-w-[200px]">
-            <label htmlFor={fieldId} className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+            <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-2">
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </label>
             <input
@@ -155,7 +155,7 @@ export default function DynamicMachineCapabilityFields({
               placeholder={field.placeholder}
               className={baseInputClasses}
             />
-            {errors[field.name] && <p className="mt-1 text-sm text-red-600">{errors[field.name]}</p>}
+            {errors[field.name] && <p className="mt-1.5 text-sm text-red-600">{errors[field.name]}</p>}
           </div>
         );
       }
@@ -163,20 +163,20 @@ export default function DynamicMachineCapabilityFields({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Process Type Selector */}
       <div className="w-full">
-        <label htmlFor="process-type" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+        <label htmlFor="process-type" className="block text-sm font-medium text-gray-700 mb-2">
           Process Type <span className="text-red-500">*</span>
         </label>
         <select
           id="process-type"
           value={processTypeKey}
           onChange={(e) => onProcessTypeChange(e.target.value)}
-          className={`w-full px-4 py-3 text-base border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+          className={`w-full px-4 py-2.5 text-base border rounded-lg focus:outline-none focus:ring-2 transition-colors bg-white ${
             errors.process_type_key
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-              : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+              : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
           }`}
           required
         >
@@ -188,23 +188,23 @@ export default function DynamicMachineCapabilityFields({
           ))}
         </select>
         {errors.process_type_key && (
-          <p className="mt-1 text-sm text-red-600 break-words">{errors.process_type_key}</p>
+          <p className="mt-1.5 text-sm text-red-600 break-words">{errors.process_type_key}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500 break-words">
+        <p className="mt-1.5 text-xs text-gray-500 break-words">
           This determines what capabilities this machine can support
         </p>
       </div>
 
       {/* Dynamic Capability Fields Based on Selected Process Type */}
       {processConfig && (
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-5">
           {processConfig.fields.map((field) => renderCapabilityField(field))}
         </div>
       )}
 
       {/* Help Text */}
       {!processTypeKey && (
-        <p className="text-sm text-gray-500 italic break-words">
+        <p className="text-sm text-gray-500 italic break-words bg-gray-50 p-4 rounded-lg border border-gray-200">
           Select a process type to configure machine capabilities
         </p>
       )}
