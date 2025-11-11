@@ -3,7 +3,7 @@
 import { useState, memo, useMemo, useEffect, useRef } from 'react';
 import { ParsedJob } from '@/hooks/useJobs';
 import { JobProjection, ServiceTypeSummary } from '@/hooks/useProjections';
-import { formatQuantity, TimeRange } from '@/lib/projectionUtils';
+import { formatQuantity, TimeRange, ProcessProjection, expandJobProjectionsToProcesses } from '@/lib/projectionUtils';
 import JobDetailsModal from './JobDetailsModal';
 import ProcessTypeBadge from './ProcessTypeBadge';
 import { Trash, Lock, Unlock, ChevronDown } from 'lucide-react';
@@ -25,6 +25,7 @@ interface ProjectionsTableProps {
   globalTimeScrollIndex?: number;
   onGlobalTimeScrollIndexChange?: (index: number) => void;
   dataDisplayMode?: 'pieces' | 'revenue';
+  viewMode?: 'jobs' | 'processes';
 }
 
 // Memoized desktop table row component
@@ -123,6 +124,129 @@ const ProjectionTableRow = memo(({
 });
 
 ProjectionTableRow.displayName = 'ProjectionTableRow';
+
+// Memoized process table row component
+const ProcessProjectionTableRow = memo(({
+  processProjection,
+  timeRanges,
+  isFirstInGroup,
+  onJobClick,
+  dataDisplayMode,
+  isSelected,
+  onToggleSelect
+}: {
+  processProjection: ProcessProjection;
+  timeRanges: TimeRange[];
+  isFirstInGroup: boolean;
+  onJobClick: (job: ParsedJob) => void;
+  dataDisplayMode: 'pieces' | 'revenue';
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) => {
+  const job = processProjection.job;
+
+  return (
+    <tr
+      key={`${job.id}-${processProjection.processType}`}
+      className={`cursor-pointer border-l-4 ${
+        isSelected ? 'bg-blue-100 border-l-blue-500' : 'border-l-gray-300'
+      } ${isFirstInGroup ? 'border-t-2 border-t-gray-400' : ''}`}
+      onClick={() => onJobClick(job)}
+    >
+      {/* Checkbox - only show on first row of group */}
+      <td
+        className="px-2 py-2 w-12"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isFirstInGroup && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            className="w-4 h-4 cursor-pointer"
+          />
+        )}
+      </td>
+
+      {/* Job details - only show on first row */}
+      {isFirstInGroup ? (
+        <>
+          <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
+            {job.job_number}
+          </td>
+          <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+            {job.client?.name || 'Unknown'}
+          </td>
+          <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
+            {job.sub_client?.name || '-'}
+          </td>
+        </>
+      ) : (
+        <>
+          <td className="px-2 py-2"></td>
+          <td className="px-2 py-2"></td>
+          <td className="px-2 py-2"></td>
+        </>
+      )}
+
+      {/* Process Type - single badge */}
+      <td className="px-2 py-2 text-xs text-[var(--text-dark)] pl-6">
+        <ProcessTypeBadge processType={processProjection.processType} />
+      </td>
+
+      {/* Description - only on first row */}
+      <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
+        {isFirstInGroup ? (job.description || 'N/A') : ''}
+      </td>
+
+      {/* Quantity - per process */}
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
+        {processProjection.totalQuantity.toLocaleString()}
+      </td>
+
+      {/* Dates - only on first row */}
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        {isFirstInGroup && job.start_date
+          ? new Date(job.start_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+          : ''}
+      </td>
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        {isFirstInGroup && job.due_date
+          ? new Date(job.due_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+          : ''}
+      </td>
+
+      {/* Time period columns - per process */}
+      {timeRanges.map((range, index) => {
+        const quantity = processProjection.weeklyQuantities.get(range.label) || 0;
+        const revenue = processProjection.weeklyRevenues.get(range.label) || 0;
+        const displayValue = dataDisplayMode === 'revenue'
+          ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          : formatQuantity(quantity);
+
+        return (
+          <td
+            key={range.label}
+            className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+              index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
+            }`}
+          >
+            {displayValue}
+          </td>
+        );
+      })}
+
+      {/* Total - per process */}
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
+        {dataDisplayMode === 'revenue'
+          ? processProjection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          : formatQuantity(processProjection.totalQuantity)}
+      </td>
+    </tr>
+  );
+});
+
+ProcessProjectionTableRow.displayName = 'ProcessProjectionTableRow';
 
 // Memoized mobile card component
 const ProjectionMobileCard = memo(({
@@ -424,6 +548,7 @@ export default function ProjectionsTable({
   globalTimeScrollIndex = 0,
   onGlobalTimeScrollIndexChange,
   dataDisplayMode = 'pieces',
+  viewMode = 'jobs',
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -439,6 +564,14 @@ export default function ProjectionsTable({
   const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<'hard' | 'soft' | null>(null);
   const bulkMenuRef = useRef<HTMLDivElement>(null);
+
+  // Transform data for process view
+  const displayProjections = useMemo(() => {
+    if (viewMode === 'processes') {
+      return expandJobProjectionsToProcesses(jobProjections);
+    }
+    return jobProjections;
+  }, [viewMode, jobProjections]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
 
@@ -607,55 +740,71 @@ export default function ProjectionsTable({
     }
   };
 
-  // Sort job projections
+  // Sort projections (handles both jobs and processes)
   const sortedJobProjections = useMemo(() => {
-    return [...jobProjections].sort((a, b) => {
+    if (viewMode === 'processes') {
+      const processProjections = displayProjections as ProcessProjection[];
+      return [...processProjections].sort((a, b) => {
+        // Primary sort: by job
+        const jobCompare = a.jobNumber - b.jobNumber;
+        if (jobCompare !== 0) return jobCompare;
+
+        // Secondary sort: by process type within job
+        return a.processType.localeCompare(b.processType);
+      });
+    }
+
+    // Jobs view - existing sorting logic
+    return [...displayProjections].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
 
+      const aJob = a as JobProjection;
+      const bJob = b as JobProjection;
+
       switch (sortField) {
         case 'job_number':
-          aValue = a.job.job_number;
-          bValue = b.job.job_number;
+          aValue = aJob.job.job_number;
+          bValue = bJob.job.job_number;
           break;
         case 'client':
-          aValue = a.job.client?.name.toLowerCase() || '';
-          bValue = b.job.client?.name.toLowerCase() || '';
+          aValue = aJob.job.client?.name.toLowerCase() || '';
+          bValue = bJob.job.client?.name.toLowerCase() || '';
           break;
         case 'sub_client':
-          aValue = a.job.sub_client?.name.toLowerCase() || '';
-          bValue = b.job.sub_client?.name.toLowerCase() || '';
+          aValue = aJob.job.sub_client?.name.toLowerCase() || '';
+          bValue = bJob.job.sub_client?.name.toLowerCase() || '';
           break;
         case 'description':
-          aValue = a.job.description?.toLowerCase() || '';
-          bValue = b.job.description?.toLowerCase() || '';
+          aValue = aJob.job.description?.toLowerCase() || '';
+          bValue = bJob.job.description?.toLowerCase() || '';
           break;
         case 'quantity':
-          aValue = a.job.quantity;
-          bValue = b.job.quantity;
+          aValue = aJob.job.quantity;
+          bValue = bJob.job.quantity;
           break;
         case 'start_date':
-          aValue = a.job.start_date || 0;
-          bValue = b.job.start_date || 0;
+          aValue = aJob.job.start_date || 0;
+          bValue = bJob.job.start_date || 0;
           break;
         case 'due_date':
-          aValue = a.job.due_date || 0;
-          bValue = b.job.due_date || 0;
+          aValue = aJob.job.due_date || 0;
+          bValue = bJob.job.due_date || 0;
           break;
         case 'total':
-          aValue = a.totalQuantity;
-          bValue = b.totalQuantity;
+          aValue = aJob.totalQuantity;
+          bValue = bJob.totalQuantity;
           break;
         default:
-          aValue = a.job.job_number;
-          bValue = b.job.job_number;
+          aValue = aJob.job.job_number;
+          bValue = bJob.job.job_number;
       }
 
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [jobProjections, sortField, sortDirection]);
+  }, [displayProjections, sortField, sortDirection, viewMode]);
 
   // Render sort icon
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -811,7 +960,7 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                Processes
+                {viewMode === 'processes' ? 'Process' : 'Processes'}
               </th>
               <th
                 onClick={() => handleSort('description')}
@@ -873,8 +1022,29 @@ export default function ProjectionsTable({
                   No jobs found for the selected criteria
                 </td>
               </tr>
+            ) : viewMode === 'processes' ? (
+              // Process view
+              (sortedJobProjections as ProcessProjection[]).map((processProjection, index, array) => {
+                // Determine if this is the first row for this job
+                const isFirstInGroup = index === 0 ||
+                  processProjection.jobId !== (array[index - 1] as ProcessProjection).jobId;
+
+                return (
+                  <ProcessProjectionTableRow
+                    key={`${processProjection.jobId}-${processProjection.processType}`}
+                    processProjection={processProjection}
+                    timeRanges={timeRanges}
+                    isFirstInGroup={isFirstInGroup}
+                    onJobClick={handleJobClick}
+                    dataDisplayMode={dataDisplayMode}
+                    isSelected={selectedJobIds.has(processProjection.jobId)}
+                    onToggleSelect={() => handleToggleSelect(processProjection.jobId)}
+                  />
+                );
+              })
             ) : (
-              sortedJobProjections.map((projection) => (
+              // Jobs view (existing code)
+              (sortedJobProjections as JobProjection[]).map((projection) => (
                 <ProjectionTableRow
                   key={projection.job.id}
                   projection={projection}

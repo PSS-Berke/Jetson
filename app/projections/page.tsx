@@ -61,6 +61,7 @@ export default function ProjectionsPage() {
   const [dataDisplayMode, setDataDisplayMode] = useState<'pieces' | 'revenue'>('pieces');
   const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
   const [globalTimeScrollIndex, setGlobalTimeScrollIndex] = useState(0);
+  const [tableViewMode, setTableViewMode] = useState<'jobs' | 'processes'>('jobs');
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -332,6 +333,8 @@ export default function ProjectionsPage() {
             onDataDisplayModeChange={setDataDisplayMode}
             mobileViewMode={mobileViewMode}
             onMobileViewModeChange={setMobileViewMode}
+            viewMode={tableViewMode}
+            onViewModeChange={setTableViewMode}
             onExportPDF={viewMode === 'financials' ? handleFinancialsPrint : handlePrint}
             onBulkUpload={() => setIsBulkUploadOpen(true)}
           />
@@ -497,6 +500,7 @@ export default function ProjectionsPage() {
                   globalTimeScrollIndex={globalTimeScrollIndex}
                   onGlobalTimeScrollIndexChange={setGlobalTimeScrollIndex}
                   dataDisplayMode={dataDisplayMode}
+                  viewMode={tableViewMode}
                 />
 
                 {/* Pagination */}

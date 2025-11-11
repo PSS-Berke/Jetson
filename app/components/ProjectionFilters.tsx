@@ -7,6 +7,7 @@ import { startOfMonth, startOfQuarter } from 'date-fns';
 import type { Granularity } from './GranularityToggle';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { Filter, SlidersHorizontal, LayoutGrid, Table2, Upload } from 'lucide-react';
+import ViewModeToggle from './ViewModeToggle';
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -27,6 +28,8 @@ interface ProjectionFiltersProps {
   onFilterViewModeChange: (mode: 'simple' | 'advanced') => void;
   dataDisplayMode: 'pieces' | 'revenue';
   onDataDisplayModeChange: (mode: 'pieces' | 'revenue') => void;
+  viewMode?: 'jobs' | 'processes';
+  onViewModeChange?: (mode: 'jobs' | 'processes') => void;
   mobileViewMode?: 'cards' | 'table';
   onMobileViewModeChange?: (mode: 'cards' | 'table') => void;
   onExportPDF?: () => void;
@@ -52,6 +55,8 @@ export default function ProjectionFilters({
   onFilterViewModeChange,
   dataDisplayMode,
   onDataDisplayModeChange,
+  viewMode = 'jobs',
+  onViewModeChange,
   mobileViewMode = 'cards',
   onMobileViewModeChange,
   onExportPDF,
@@ -532,6 +537,14 @@ export default function ProjectionFilters({
                 Revenue
               </button>
             </div>
+
+            {/* Jobs vs Processes View Toggle */}
+            {onViewModeChange && (
+              <ViewModeToggle
+                currentMode={viewMode}
+                onModeChange={onViewModeChange}
+              />
+            )}
 
             {/* Mobile View Toggle (Cards vs Table) - Only visible on mobile */}
             {onMobileViewModeChange && (
