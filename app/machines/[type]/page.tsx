@@ -32,7 +32,7 @@ const machineTypeConfig: Record<string, {
 }> = {
   'inserters': {
     label: 'Inserter Machines',
-    filterFn: (machine) => machine.type.toLowerCase().includes('inserter')
+    filterFn: (machine) => machine.type.toLowerCase().includes('insert')
   },
   'folders': {
     label: 'Folder Machines',
@@ -74,6 +74,7 @@ export default function MachineTypePage() {
   };
 
   const handleMachineClick = (machine: Machine) => {
+    console.log('Selected machine:', machine);
     setSelectedMachine(machine);
   };
 
@@ -293,6 +294,7 @@ export default function MachineTypePage() {
                         key={machine.id}
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => handleMachineClick(machine)}
+                        
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
                           {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
