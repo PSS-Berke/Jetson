@@ -87,20 +87,50 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
             Edit
           </button>
         </div>
-        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <dt className="text-sm font-medium text-gray-500">Line Number</dt>
-            <dd className="mt-1 text-lg font-semibold text-gray-900">{state.line}</dd>
+            <dt className="text-sm font-medium text-gray-500">Quantity</dt>
+            <dd className="mt-1 text-lg font-semibold text-gray-900">
+              {state.quantity} {state.quantity === 1 ? 'Machine' : 'Machines'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm font-medium text-gray-500">
+              {state.quantity === 1 ? 'Line Number' : 'Line Range'}
+            </dt>
+            <dd className="mt-1 text-lg font-semibold text-gray-900">
+              {state.quantity === 1 ? state.line : `${state.lineStart} - ${state.lineEnd}`}
+            </dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Machine Name</dt>
             <dd className="mt-1 text-lg font-semibold text-gray-900">{state.machineName}</dd>
           </div>
           <div>
+            <dt className="text-sm font-medium text-gray-500">Machine Designation</dt>
+            <dd className="mt-1 text-lg font-semibold text-gray-900">
+              {state.machineDesignation}
+              {state.quantity > 1 && (
+                <span className="text-sm text-gray-500 ml-2">
+                  ({state.machineDesignation}1, {state.machineDesignation}2, ...)
+                </span>
+              )}
+            </dd>
+          </div>
+          <div>
             <dt className="text-sm font-medium text-gray-500">Facility</dt>
             <dd className="mt-1 text-lg font-semibold text-gray-900">{facilityName}</dd>
           </div>
         </dl>
+        
+        {state.quantity > 1 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Multiple Machines:</strong> {state.quantity} machines will be created with lines {state.lineStart} through {state.lineEnd}, 
+              named &quot;{state.machineName} {state.machineDesignation}1&quot; through &quot;{state.machineName} {state.machineDesignation}{state.quantity}&quot;
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Section 3: Process Type & Capabilities */}
@@ -119,15 +149,36 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
 
         {state.isCustomProcessType ? (
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-3">
               <div className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
                 Custom
               </div>
               <span className="font-medium text-gray-900">{state.customProcessTypeName}</span>
             </div>
-            <p className="text-sm text-gray-600">
-              Custom process type - capabilities will be configured through rules and groups
-            </p>
+            
+            {state.customProcessTypeFields.length > 0 ? (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Custom Fields & Values</h4>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {state.customProcessTypeFields.map((field) => {
+                    const value = state.capabilities[field.id];
+                    return (
+                      <div key={field.id}>
+                        <dt className="text-sm text-gray-600">
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-medium text-gray-900">
+                          {value ? String(value) : <span className="text-gray-400 italic">Not set</span>}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 italic">No custom fields defined</p>
+            )}
           </div>
         ) : processConfig ? (
           <div>
@@ -139,24 +190,54 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
               <span className="font-medium text-gray-900">{processConfig.label}</span>
             </div>
 
-            {Object.keys(state.capabilities).length > 0 ? (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Configured Capabilities</h4>
+            {/* Standard Capabilities */}
+            {Object.keys(state.capabilities).length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-3">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">
+                  {state.customProcessTypeFields.length > 0 ? 'Standard Fields' : 'Configured Capabilities'}
+                </h4>
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(state.capabilities).map(([key, value]) => {
-                    const field = processConfig.fields.find((f) => f.name === key);
+                  {Object.entries(state.capabilities)
+                    .filter(([key]) => !state.customProcessTypeFields.some(f => f.id === key))
+                    .map(([key, value]) => {
+                      const field = processConfig.fields.find((f) => f.name === key);
+                      return (
+                        <div key={key}>
+                          <dt className="text-sm text-gray-600">{field?.label || key}</dt>
+                          <dd className="mt-0.5 text-sm font-medium text-gray-900">
+                            {Array.isArray(value) ? value.join(', ') : String(value)}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                </dl>
+              </div>
+            )}
+
+            {/* Custom Fields (if added to standard process type) */}
+            {state.customProcessTypeFields.length > 0 && (
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h4 className="text-sm font-medium text-blue-800 mb-3">Additional Custom Fields</h4>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {state.customProcessTypeFields.map((field) => {
+                    const value = state.capabilities[field.id];
                     return (
-                      <div key={key}>
-                        <dt className="text-sm text-gray-600">{field?.label || key}</dt>
-                        <dd className="mt-0.5 text-sm font-medium text-gray-900">
-                          {Array.isArray(value) ? value.join(', ') : String(value)}
+                      <div key={field.id}>
+                        <dt className="text-sm text-blue-700">
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-medium text-blue-900">
+                          {value ? String(value) : <span className="text-blue-400 italic">Not set</span>}
                         </dd>
                       </div>
                     );
                   })}
                 </dl>
               </div>
-            ) : (
+            )}
+
+            {Object.keys(state.capabilities).length === 0 && state.customProcessTypeFields.length === 0 && (
               <p className="text-sm text-gray-600 italic">No capabilities configured</p>
             )}
           </div>
@@ -252,9 +333,11 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
             />
           </svg>
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-blue-900">Ready to Create Machine</h4>
+            <h4 className="text-sm font-semibold text-blue-900">
+              Ready to Create {state.quantity === 1 ? 'Machine' : `${state.quantity} Machines`}
+            </h4>
             <p className="mt-1 text-sm text-blue-800">
-              Review all the information above. If everything looks correct, click &quot;Create Machine&quot;
+              Review all the information above. If everything looks correct, click &quot;Create {state.quantity === 1 ? 'Machine' : 'Machines'}&quot;
               to save. You can edit any section by clicking the Edit button.
             </p>
           </div>
@@ -267,23 +350,27 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
         <ul className="space-y-1 text-sm text-gray-600">
           <li className="flex items-start gap-2">
             <span className="text-green-500 mt-0.5">✓</span>
-            <span>The machine will be created with status &quot;Offline&quot;</span>
+            <span>
+              {state.quantity === 1 
+                ? 'The machine will be created with status "Offline"'
+                : `All ${state.quantity} machines will be created with status "Offline"`}
+            </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-500 mt-0.5">✓</span>
             <span>
               {state.machineGroupOption === 'new'
-                ? 'A new machine group will be created and this machine added to it'
+                ? `A new machine group will be created and ${state.quantity === 1 ? 'this machine' : 'these machines'} added to it`
                 : state.machineGroupOption === 'existing'
-                ? 'This machine will be added to the selected group'
-                : 'This machine will operate independently'}
+                ? `${state.quantity === 1 ? 'This machine' : 'These machines'} will be added to the selected group`
+                : `${state.quantity === 1 ? 'This machine' : 'These machines'} will operate independently`}
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-500 mt-0.5">✓</span>
             <span>
               {state.rules.length > 0
-                ? `${state.rules.length} rule(s) will be created and associated with the machine`
+                ? `${state.rules.length} rule(s) will be created and associated with ${state.quantity === 1 ? 'the machine' : 'all machines'}`
                 : 'No rules will be created (you can add them later)'}
             </span>
           </li>

@@ -97,27 +97,61 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
         machineGroupId = state.existingGroupId || undefined;
       }
 
-      // Step 2: Create the machine
-      const machineData = {
-        line: state.line,
-        name: state.machineName,
-        facilities_id: state.facilities_id!,
-        process_type_key: state.isCustomProcessType ? state.customProcessTypeName : state.process_type_key,
-        machine_category: state.machineCategory as MachineCategory,
-        machine_group_id: machineGroupId,
-        capabilities: state.capabilities,
-        status: 'Offline' as MachineStatus,
-        // Placeholder values - will be determined by rules
-        speed_hr: 0,
-        shiftCapacity: 0,
-        people_per_process: 1,
-      };
+      // Step 2: Create machine(s)
+      const createdMachines = [];
+      
+      if (state.quantity === 1) {
+        // Single machine
+        const machineData = {
+          line: parseInt(state.line),
+          name: state.machineName,
+          facilities_id: state.facilities_id!,
+          process_type_key: state.isCustomProcessType ? state.customProcessTypeName : state.process_type_key,
+          machine_category: state.machineCategory as MachineCategory,
+          machine_group_id: machineGroupId,
+          capabilities: state.capabilities,
+          status: 'Offline' as MachineStatus,
+          // Placeholder values - will be determined by rules
+          speed_hr: 0,
+          shiftCapacity: 0,
+          people_per_process: 1,
+        };
 
-      const newMachine = await createMachine(machineData);
+        const newMachine = await createMachine(machineData);
+        createdMachines.push(newMachine);
+      } else {
+        // Multiple machines
+        const startLine = parseInt(state.lineStart);
+        
+        for (let i = 0; i < state.quantity; i++) {
+          const lineNumber = startLine + i;
+          const designation = `${state.machineDesignation}${i + 1}`;
+          
+          const machineData = {
+            line: lineNumber,
+            name: `${state.machineName} ${designation}`,
+            facilities_id: state.facilities_id!,
+            process_type_key: state.isCustomProcessType ? state.customProcessTypeName : state.process_type_key,
+            machine_category: state.machineCategory as MachineCategory,
+            machine_group_id: machineGroupId,
+            capabilities: state.capabilities,
+            status: 'Offline' as MachineStatus,
+            // Placeholder values - will be determined by rules
+            speed_hr: 0,
+            shiftCapacity: 0,
+            people_per_process: 1,
+          };
 
-      // Step 3: Add machine to existing group if selected
+          const newMachine = await createMachine(machineData);
+          createdMachines.push(newMachine);
+        }
+      }
+
+      // Step 3: Add machines to existing group if selected
       if (state.machineGroupOption === 'existing' && state.existingGroupId) {
-        await addMachineToGroup(state.existingGroupId, newMachine.id);
+        for (const machine of createdMachines) {
+          await addMachineToGroup(state.existingGroupId, machine.id);
+        }
       }
 
       // Step 4: Create rules
@@ -125,7 +159,7 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
         await createMachineRule({
           name: rule.name,
           process_type_key: state.process_type_key || state.customProcessTypeName,
-          machine_id: machineGroupId ? undefined : newMachine.id,
+          machine_id: machineGroupId ? undefined : (createdMachines.length === 1 ? createdMachines[0].id : undefined),
           machine_group_id: machineGroupId,
           priority: rule.priority,
           conditions: rule.conditions,
@@ -135,7 +169,10 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
       }
 
       // Success!
-      setToastMessage(`Machine "${state.machineName}" created successfully!`);
+      const message = state.quantity === 1 
+        ? `Machine "${state.machineName}" created successfully!`
+        : `${state.quantity} machines created successfully!`;
+      setToastMessage(message);
       setShowSuccessToast(true);
 
       // Clear the draft
@@ -201,8 +238,12 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
 
             {state.currentStep === 2 && (
               <StepBasicInfo
+                quantity={state.quantity}
                 line={state.line}
+                lineStart={state.lineStart}
+                lineEnd={state.lineEnd}
                 machineName={state.machineName}
+                machineDesignation={state.machineDesignation}
                 facilities_id={state.facilities_id}
                 onChange={(field, value) =>
                   dispatch({ type: 'SET_BASIC_INFO', payload: { [field]: value } })

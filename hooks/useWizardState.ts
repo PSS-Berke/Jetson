@@ -30,8 +30,12 @@ export interface WizardState {
   machineCategory: MachineCategory | null;
 
   // Step 2: Basic Information
+  quantity: number;
   line: string;
+  lineStart: string;
+  lineEnd: string;
   machineName: string;
+  machineDesignation: string;
   facilities_id: number | null;
 
   // Step 3: Process Type & Capabilities
@@ -56,7 +60,7 @@ export interface WizardState {
 type WizardAction =
   | { type: 'SET_STEP'; payload: number }
   | { type: 'SET_CATEGORY'; payload: MachineCategory }
-  | { type: 'SET_BASIC_INFO'; payload: { line?: string; machineName?: string; facilities_id?: number | null } }
+  | { type: 'SET_BASIC_INFO'; payload: { quantity?: number; line?: string; lineStart?: string; lineEnd?: string; machineName?: string; machineDesignation?: string; facilities_id?: number | null } }
   | { type: 'SET_PROCESS_TYPE'; payload: string }
   | { type: 'SET_CUSTOM_PROCESS_TYPE'; payload: { name: string; isCustom: boolean } }
   | { type: 'SET_CUSTOM_PROCESS_TYPE_FIELDS'; payload: CustomFormField[] }
@@ -77,8 +81,12 @@ type WizardAction =
 const initialState: WizardState = {
   currentStep: 1,
   machineCategory: null,
+  quantity: 1,
   line: '',
+  lineStart: '',
+  lineEnd: '',
   machineName: '',
+  machineDesignation: '',
   facilities_id: null,
   process_type_key: '',
   isCustomProcessType: false,
@@ -249,14 +257,53 @@ export function useWizardState() {
   const validateStep2 = useCallback((): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!state.line.trim()) {
-      errors.line = 'Line number is required';
-    } else if (!/^\d+$/.test(state.line.trim())) {
-      errors.line = 'Line number must be numeric';
+    if (state.quantity < 1) {
+      errors.quantity = 'Quantity must be at least 1';
+    } else if (state.quantity > 100) {
+      errors.quantity = 'Quantity cannot exceed 100';
+    }
+
+    if (state.quantity === 1) {
+      if (!state.line.trim()) {
+        errors.line = 'Line number is required';
+      } else if (!/^\d+$/.test(state.line.trim())) {
+        errors.line = 'Line number must be numeric';
+      }
+    } else {
+      // Multiple machines - validate line range
+      if (!state.lineStart.trim()) {
+        errors.lineStart = 'Starting line number is required';
+      } else if (!/^\d+$/.test(state.lineStart.trim())) {
+        errors.lineStart = 'Starting line number must be numeric';
+      }
+
+      if (!state.lineEnd.trim()) {
+        errors.lineEnd = 'Ending line number is required';
+      } else if (!/^\d+$/.test(state.lineEnd.trim())) {
+        errors.lineEnd = 'Ending line number must be numeric';
+      }
+
+      if (state.lineStart.trim() && state.lineEnd.trim() && 
+          parseInt(state.lineStart) >= parseInt(state.lineEnd)) {
+        errors.lineEnd = 'Ending line must be greater than starting line';
+      }
+
+      const lineRange = state.lineEnd.trim() && state.lineStart.trim() 
+        ? parseInt(state.lineEnd) - parseInt(state.lineStart) + 1 
+        : 0;
+      if (lineRange !== state.quantity) {
+        errors.lineEnd = `Line range must match quantity (${state.quantity} machines)`;
+      }
     }
 
     if (!state.machineName.trim()) {
       errors.machineName = 'Machine name is required';
+    }
+
+    if (!state.machineDesignation.trim()) {
+      errors.machineDesignation = 'Machine designation is required';
+    } else if (!/^[a-zA-Z0-9]+$/.test(state.machineDesignation)) {
+      errors.machineDesignation = 'Machine designation must be alphanumeric';
     }
 
     if (!state.facilities_id) {
@@ -268,7 +315,7 @@ export function useWizardState() {
     });
 
     return Object.keys(errors).length === 0;
-  }, [state.line, state.machineName, state.facilities_id]);
+  }, [state.quantity, state.line, state.lineStart, state.lineEnd, state.machineName, state.machineDesignation, state.facilities_id]);
 
   const validateStep3 = useCallback((): boolean => {
     const errors: Record<string, string> = {};
@@ -285,8 +332,18 @@ export function useWizardState() {
       errors.customProcessTypeFields = 'Please add at least one field to your custom process type';
     }
 
-    // At least one capability should be set for existing process types
-    if (!state.isCustomProcessType && Object.keys(state.capabilities).length === 0) {
+    // Validate custom field values if any custom fields exist
+    if (state.customProcessTypeFields.length > 0) {
+      const requiredFields = state.customProcessTypeFields.filter(f => f.required);
+      const missingFields = requiredFields.filter(field => !state.capabilities[field.id]);
+      
+      if (missingFields.length > 0) {
+        errors.capabilities = `Please fill in all required custom fields: ${missingFields.map(f => f.label).join(', ')}`;
+      }
+    }
+
+    // At least one capability should be set for standard process types (without custom fields)
+    if (!state.isCustomProcessType && state.customProcessTypeFields.length === 0 && Object.keys(state.capabilities).length === 0) {
       errors.capabilities = 'Please configure at least one capability';
     }
 
@@ -337,12 +394,42 @@ export function useWizardState() {
       case 1:
         return !!state.machineCategory;
       case 2:
-        return !!(state.line.trim() && /^\d+$/.test(state.line.trim()) && state.machineName.trim() && state.facilities_id);
+        if (state.quantity < 1 || state.quantity > 100) return false;
+        if (!state.machineName.trim() || !state.machineDesignation.trim() || !state.facilities_id) return false;
+        if (!/^[a-zA-Z0-9]+$/.test(state.machineDesignation)) return false;
+        
+        if (state.quantity === 1) {
+          return !!(state.line.trim() && /^\d+$/.test(state.line.trim()));
+        } else {
+          if (!state.lineStart.trim() || !state.lineEnd.trim()) return false;
+          if (!/^\d+$/.test(state.lineStart.trim()) || !/^\d+$/.test(state.lineEnd.trim())) return false;
+          const lineRange = parseInt(state.lineEnd) - parseInt(state.lineStart) + 1;
+          return lineRange === state.quantity && parseInt(state.lineStart) < parseInt(state.lineEnd);
+        }
+        return true;
       case 3:
-        return !!(state.process_type_key || state.isCustomProcessType) &&
-               (state.isCustomProcessType
-                 ? (!!state.customProcessTypeName.trim() && state.customProcessTypeFields.length > 0)
-                 : Object.keys(state.capabilities).length > 0);
+        if (!state.process_type_key && !state.isCustomProcessType) return false;
+        
+        if (state.isCustomProcessType) {
+          // Custom process type validation
+          if (!state.customProcessTypeName.trim() || state.customProcessTypeFields.length === 0) return false;
+          
+          // Check if all required custom fields have values
+          const requiredFields = state.customProcessTypeFields.filter(f => f.required);
+          const allRequiredFilled = requiredFields.every(field => state.capabilities[field.id]);
+          return allRequiredFilled;
+        } else {
+          // Standard process type validation
+          // If there are custom fields added, check those are filled
+          if (state.customProcessTypeFields.length > 0) {
+            const requiredFields = state.customProcessTypeFields.filter(f => f.required);
+            const allRequiredFilled = requiredFields.every(field => state.capabilities[field.id]);
+            return allRequiredFilled;
+          } else {
+            // No custom fields, just check standard capabilities
+            return Object.keys(state.capabilities).length > 0;
+          }
+        }
       case 4:
         if (state.machineGroupOption === 'existing' && !state.existingGroupId) return false;
         if (state.machineGroupOption === 'new' && !state.newGroupName.trim()) return false;
@@ -352,7 +439,8 @@ export function useWizardState() {
       default:
         return false;
     }
-  }, [state.machineCategory, state.line, state.machineName, state.facilities_id, state.process_type_key,
+  }, [state.machineCategory, state.quantity, state.line, state.lineStart, state.lineEnd, state.machineName, 
+      state.machineDesignation, state.facilities_id, state.process_type_key,
       state.isCustomProcessType, state.customProcessTypeName, state.customProcessTypeFields, state.capabilities,
       state.machineGroupOption, state.existingGroupId, state.newGroupName]);
 
