@@ -327,8 +327,11 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
             });
           }
 
-          // Skip completely empty rows (no job number AND no quantity)
-          if (!jobNumberStr && !quantityStr) {
+          // Skip completely empty rows (no job number AND no quantity AND no client)
+          const clientRaw = findColumnValue(row, 'sub_client');
+          const clientStr = String(clientRaw || '').trim();
+
+          if (!jobNumberStr && !quantityStr && !clientStr) {
             console.log(`[CSV Parser] Skipping empty row ${rowNum}`);
             return; // Skip this row entirely
           }
@@ -340,15 +343,12 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
             return;
           }
 
-          // If job number is empty but quantity exists, that's an error we'll catch below
-          // If quantity is empty but job number exists, that's also an error we'll catch below
-
-          // Validate required fields (only job_number and quantity are truly required)
-          if (!jobNumberRaw) {
-            errors.push(`Missing job_number`);
+          // Validate required fields (only quantity is truly required now)
+          if (!jobNumberRaw || jobNumberStr === '') {
+            warnings.push(`No job_number specified - will need to add later`);
           }
-          if (!quantityRaw) {
-            errors.push(`Missing quantity`);
+          if (!quantityRaw || quantityStr === '') {
+            errors.push(`Missing quantity - required field`);
           }
           // Process type and price are now optional - warn instead of error
           if (!processTypeRaw) {
@@ -360,22 +360,25 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
 
           // Parse values - handle alphanumeric job numbers by extracting digits
           let job_number: number;
-          const jobNumStr = String(jobNumberRaw).replace(/,/g, '').trim();
-          // Check if it's purely numeric or alphanumeric (e.g., "60468-2", "COSTCO IJ")
-          const numericPart = jobNumStr.match(/\d+/);
-          if (numericPart) {
-            job_number = parseInt(numericPart[0]);
+          if (jobNumberRaw && jobNumberStr) {
+            const jobNumStr = String(jobNumberRaw).replace(/,/g, '').trim();
+            // Check if it's purely numeric or alphanumeric (e.g., "60468-2", "COSTCO IJ")
+            const numericPart = jobNumStr.match(/\d+/);
+            if (numericPart) {
+              job_number = parseInt(numericPart[0]);
+            } else {
+              job_number = NaN;
+              errors.push(`Invalid job_number format: '${jobNumberRaw}'`);
+            }
           } else {
-            job_number = NaN;
+            // No job number provided - use 0 as placeholder
+            job_number = 0;
           }
 
           const quantity = parseInt(String(quantityRaw).replace(/,/g, ''));
           const price_per_m = pricePerMRaw ? parseFloat(String(pricePerMRaw).replace(/,/g, '')) : 0;
 
           // Validate parsed values
-          if (isNaN(job_number)) {
-            errors.push(`Invalid job_number: '${jobNumberRaw}'`);
-          }
           if (isNaN(quantity) || quantity <= 0) {
             errors.push(`Invalid quantity: '${quantityRaw}'`);
           }

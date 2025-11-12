@@ -97,9 +97,12 @@ export default function ProjectionFilters({
         clientMap.set(job.client.id, job.client);
       }
     });
-    return Array.from(clientMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+    return Array.from(clientMap.values()).sort((a, b) => {
+      // Handle null or undefined names
+      const nameA = a.name || '';
+      const nameB = b.name || '';
+      return nameA.localeCompare(nameB);
+    });
   }, [jobs]);
 
   // Map legacy process type names to new full names
