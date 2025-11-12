@@ -114,14 +114,23 @@ function parseDate(dateStr: any): Date | undefined {
   // Also handle formats like "10/29/25", "now 10/9", "rolls in 9/24 AM"
   let cleanStr = str;
 
-  // Remove text prefixes like "now", "rolls in", "data", etc.
-  cleanStr = cleanStr.replace(/^(now|data|rolls in|mat in|arrives folded|in folded)\s+/i, '');
+  // Remove text prefixes like "now", "rolls in", "data", "PU", "drop 1 -", "mat in", etc.
+  cleanStr = cleanStr.replace(/^(now|data|rolls in|mat in|arrives folded|in folded|p\/?u|pickup|drop \d+ -?)\s+/i, '');
+
+  // Handle comma-separated dates - take the first one (e.g., "10/2,10/9" -> "10/2")
+  if (cleanStr.includes(',')) {
+    const firstDate = cleanStr.split(',')[0].trim();
+    cleanStr = firstDate;
+  }
 
   // Extract just the date portion before any range or additional text
   // Match patterns like "10/29", "10/29/25", "10/29/2025"
   const dateMatch = cleanStr.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
   if (dateMatch) {
     cleanStr = dateMatch[1];
+  } else {
+    // No valid date pattern found
+    return undefined;
   }
 
   // If no year specified, assume 2025 (or current year)

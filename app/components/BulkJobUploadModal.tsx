@@ -189,13 +189,22 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
       let weekly_split: number[] | undefined;
       if (pj.start_date && pj.end_date) {
         const weeks = Math.ceil((pj.end_date.getTime() - pj.start_date.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        const perWeek = Math.floor(pj.quantity / Math.max(weeks, 1));
-        weekly_split = Array(Math.max(weeks, 1)).fill(perWeek);
-        // Add remainder to last week
-        const remainder = pj.quantity - (perWeek * weeks);
-        if (remainder > 0 && weekly_split.length > 0) {
-          weekly_split[weekly_split.length - 1] += remainder;
+
+        // Handle invalid date ranges (end before start)
+        if (weeks <= 0) {
+          console.warn(`[BulkJobUpload] Job ${pj.job_number}: Invalid date range - end date before start date. Start: ${pj.start_date}, End: ${pj.end_date}`);
+        } else {
+          const perWeek = Math.floor(pj.quantity / Math.max(weeks, 1));
+          weekly_split = Array(Math.max(weeks, 1)).fill(perWeek);
+          // Add remainder to last week
+          const remainder = pj.quantity - (perWeek * weeks);
+          if (remainder > 0 && weekly_split.length > 0) {
+            weekly_split[weekly_split.length - 1] += remainder;
+          }
+          console.log(`[BulkJobUpload] Job ${pj.job_number}: Created weekly split for ${weeks} weeks:`, weekly_split);
         }
+      } else {
+        console.warn(`[BulkJobUpload] Job ${pj.job_number}: Missing dates - Start: ${pj.start_date}, End: ${pj.end_date}`);
       }
 
       // Convert weekly split to daily split (7 days per week, all on Monday for simplicity)

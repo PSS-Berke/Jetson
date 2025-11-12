@@ -567,6 +567,10 @@ export default function ProjectionsTable({
   const [selectedStatus, setSelectedStatus] = useState<'hard' | 'soft' | null>(null);
   const bulkMenuRef = useRef<HTMLDivElement>(null);
 
+  // Delete confirmation modal state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Transform data for process view
   const displayProjections = useMemo(() => {
     if (viewMode === 'processes' && processViewMode === 'expanded') {
@@ -622,16 +626,20 @@ export default function ProjectionsTable({
   };
 
   // Bulk action handlers
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     setShowBulkMenu(false);
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmDelete = async () => {
     const count = selectedJobIds.size;
-    if (!confirm(`Are you sure you want to delete ${count} selected job${count > 1 ? 's' : ''}?`)) {
-      return;
-    }
+    setIsDeleting(true);
 
     try {
       const result = await bulkDeleteJobs(Array.from(selectedJobIds));
+
+      setShowDeleteConfirm(false);
+      setIsDeleting(false);
 
       if (result.failures.length > 0) {
         alert(`Deleted ${result.success} of ${count} jobs. ${result.failures.length} failed.`);
@@ -642,9 +650,15 @@ export default function ProjectionsTable({
       setSelectedJobIds(new Set());
       onRefresh();
     } catch (error) {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
       alert('Error deleting jobs. Please try again.');
       console.error('Bulk delete error:', error);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   const handleConfirmStatusChange = async () => {
@@ -1236,6 +1250,59 @@ export default function ProjectionsTable({
         onClose={handleCloseModal}
         onRefresh={onRefresh}
       />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete Jobs</h3>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to delete <span className="font-semibold">{selectedJobIds.size}</span> selected job{selectedJobIds.size > 1 ? 's' : ''}?
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={cancelDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash className="w-4 h-4" />
+                      Delete {selectedJobIds.size} Job{selectedJobIds.size > 1 ? 's' : ''}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
