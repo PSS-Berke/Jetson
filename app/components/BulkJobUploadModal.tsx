@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Upload, Download, CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import ExcelUploadZone from './ExcelUploadZone';
 import { parseJobCsv, type ParsedBulkJob } from '@/lib/jobCsvParser';
 import { downloadJobTemplate } from '@/lib/jobCsvTemplate';
-import { batchCreateJobs } from '@/lib/api';
-import { useJobs } from '@/hooks/useJobs';
+import { batchCreateJobs, getToken } from '@/lib/api';
 import type { Job } from '@/types';
 
 interface BulkJobUploadModalProps {
@@ -19,6 +18,12 @@ interface ClientMapping {
   subClient: string;
   clientId: number | null;
   subClientName: string;
+}
+
+interface Client {
+  id: number;
+  name: string;
+  created_at: number;
 }
 
 type UploadStep = 'upload' | 'mapping' | 'preview' | 'uploading' | 'complete';
@@ -34,17 +39,39 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
   const [errorMessage, setErrorMessage] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [editingJob, setEditingJob] = useState<number | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
 
-  const { jobs: existingJobs } = useJobs();
+  // Fetch clients from API
+  useEffect(() => {
+    const fetchClients = async () => {
+      setLoadingClients(true);
+      try {
+        const token = getToken();
+        const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-  // Get unique clients from existing jobs
-  const uniqueClients = Array.from(
-    new Map(
-      existingJobs
-        .filter(job => job.client)
-        .map(job => [job.clients_id, { id: job.clients_id, name: job.client?.name || 'Unknown' }])
-    ).values()
-  ).sort((a, b) => a.name.localeCompare(b.name));
+        if (response.ok) {
+          const data = await response.json();
+          setClients(data);
+        } else {
+          console.error('Error fetching clients:', response.status, await response.text());
+        }
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+      } finally {
+        setLoadingClients(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchClients();
+    }
+  }, [isOpen]);
 
   const handleFileUpload = async (uploadedFile: File) => {
     setFile(uploadedFile);
@@ -61,12 +88,17 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
       setParsedJobs(result.jobs);
       setSubClients(result.subClients);
 
-      // Initialize client mappings
-      const mappings: ClientMapping[] = result.subClients.map(sc => ({
-        subClient: sc,
-        clientId: null,
-        subClientName: sc,
-      }));
+      // Initialize client mappings with automatic matching
+      const mappings: ClientMapping[] = result.subClients.map(sc => {
+        // Try to find an existing client with matching name (case-insensitive)
+        const existingClient = clients.find(c => c.name.toLowerCase() === sc.toLowerCase());
+
+        return {
+          subClient: sc,
+          clientId: existingClient?.id || null,
+          subClientName: sc,
+        };
+      });
       setClientMappings(mappings);
 
       // If no sub-clients to map, skip to preview
@@ -81,13 +113,6 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
   };
 
   const handleMappingComplete = () => {
-    // Validate that all sub-clients have been mapped
-    const unmapped = clientMappings.filter(m => m.clientId === null);
-    if (unmapped.length > 0) {
-      setErrorMessage(`Please map all sub-clients to clients: ${unmapped.map(m => m.subClient).join(', ')}`);
-      return;
-    }
-
     setErrorMessage('');
     setStep('preview');
   };
@@ -105,10 +130,54 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
       return;
     }
 
+    // First, create any new clients that don't exist yet
+    const token = getToken();
+    const updatedMappings = [...clientMappings];
+
+    for (let i = 0; i < updatedMappings.length; i++) {
+      const mapping = updatedMappings[i];
+
+      // If no client is mapped, create a new client with the sub-client name
+      if (!mapping.clientId) {
+        try {
+          const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: mapping.subClient,
+            }),
+          });
+
+          if (response.ok) {
+            const newClient = await response.json();
+            updatedMappings[i].clientId = newClient.id;
+            console.log(`[BulkJobUpload] Created new client: ${mapping.subClient} with ID ${newClient.id}`);
+          } else {
+            console.error(`[BulkJobUpload] Failed to create client ${mapping.subClient}:`, await response.text());
+          }
+        } catch (error) {
+          console.error(`[BulkJobUpload] Error creating client ${mapping.subClient}:`, error);
+        }
+      }
+    }
+
+    // Update the mappings state with new client IDs
+    setClientMappings(updatedMappings);
+
     // Convert parsed jobs to API format
     const jobsToCreate: Partial<Job>[] = validJobs.map(pj => {
-      // Find client mapping for this job's sub_client
-      const mapping = clientMappings.find(m => m.subClient === pj.sub_client);
+      // Find client mapping for this job's sub_client (use updatedMappings which now has new client IDs)
+      const mapping = updatedMappings.find(m => m.subClient === pj.sub_client);
+
+      console.log(`[BulkJobUpload] Job ${pj.job_number}:`, {
+        sub_client_from_csv: pj.sub_client,
+        found_mapping: mapping,
+        mapped_client_id: mapping?.clientId,
+        all_mappings: updatedMappings
+      });
 
       // Calculate weekly split if dates are provided
       let weekly_split: number[] | undefined;
@@ -314,7 +383,8 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Map Sub-Clients to Clients</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Match the sub-clients from your CSV file to existing clients in the system.
+                  Match the sub-clients from your CSV file to existing clients, or leave blank to create new clients automatically.
+                  Clients are automatically matched by name where possible.
                 </p>
               </div>
 
@@ -332,7 +402,7 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Select Client *
+                          Select Client
                         </label>
                         <select
                           value={mapping.clientId || ''}
@@ -342,14 +412,20 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                             setClientMappings(newMappings);
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          disabled={loadingClients}
                         >
-                          <option value="">Select a client...</option>
-                          {uniqueClients.map(client => (
+                          <option value="">{loadingClients ? 'Loading clients...' : 'Create new client'}</option>
+                          {clients.map((client) => (
                             <option key={client.id} value={client.id}>
                               {client.name}
                             </option>
                           ))}
                         </select>
+                        {!mapping.clientId && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            ✓ Will create new client: "{mapping.subClient}"
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -417,7 +493,7 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                       const hasWarnings = job.warnings.length > 0;
                       const isExpanded = expandedRows.has(index);
                       const mapping = clientMappings.find(m => m.subClient === job.sub_client);
-                      const clientName = mapping ? uniqueClients.find(c => c.id === mapping.clientId)?.name : job.sub_client;
+                      const clientName = mapping ? clients.find(c => c.id === mapping.clientId)?.name : job.sub_client;
 
                       return (
                         <div key={index} className={`border rounded-lg ${hasErrors ? 'border-red-300 bg-red-50' : hasWarnings ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-white'}`}>
