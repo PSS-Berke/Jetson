@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/useUser';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,9 +9,10 @@ import FacilityToggle from '../../components/FacilityToggle';
 import PageHeader from '../../components/PageHeader';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { Machine, MachineCapabilityValue, MachineStatus } from '@/types';
+import type { Machine, MachineCapabilityValue, MachineStatus, MachineRule } from '@/types';
 import { getProcessTypeConfig } from '@/lib/processTypeConfig';
-import { createMachine, updateMachine, deleteMachine } from '@/lib/api';
+import { createMachine, updateMachine, deleteMachine, getMachineRules } from '@/lib/api';
+import { formatConditions } from '@/lib/rulesEngine';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
 import { FaPen, FaTrash } from 'react-icons/fa6';
 import { FaTimes, FaSave } from 'react-icons/fa';
@@ -108,9 +109,36 @@ export default function MachineTypePage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editingMachineId, setEditingMachineId] = useState<number | null>(null);
   const [editedMachineFormData, setEditedMachineFormData] = useState<Partial<Machine> | null>(null);
+  const [activeRules, setActiveRules] = useState<MachineRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
   const { user, isLoading: userLoading } = useUser();
   const { machines, isLoading: machinesLoading, error: machinesError, refetch } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
+
+  // Fetch active rules for this machine type
+  useEffect(() => {
+    const loadRules = async () => {
+      if (!filteredMachines.length) return;
+
+      // Get process_type_key from the first machine of this type
+      const processTypeKey = filteredMachines[0]?.process_type_key;
+      if (!processTypeKey) return;
+
+      setRulesLoading(true);
+      try {
+        const rules = await getMachineRules(processTypeKey, undefined, true);
+        setActiveRules(rules);
+      } catch (error) {
+        console.error('[MachineTypePage] Error loading rules:', error);
+        // Set empty array if endpoint is not available yet
+        setActiveRules([]);
+      } finally {
+        setRulesLoading(false);
+      }
+    };
+
+    loadRules();
+  }, [filteredMachines]);
 
   const getNewMachineInitialState = (): Partial<Machine> => ({
     line: undefined,
@@ -519,6 +547,39 @@ export default function MachineTypePage() {
             Maintenance
           </button>
         </div>
+
+        {/* Active Rules Section */}
+        {activeRules.length > 0 && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+              </svg>
+              Active Rules for {config.label} ({activeRules.length})
+            </h3>
+            <div className="space-y-2">
+              {activeRules.map((rule) => (
+                <div key={rule.id} className="bg-white border border-green-200 rounded p-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="font-medium text-gray-900">{rule.name}</span>
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <span>Speed: {rule.outputs.speed_modifier}%</span>
+                      <span>People: {rule.outputs.people_required}</span>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">Conditions:</span> {formatConditions(rule.conditions)}
+                  </div>
+                  {rule.outputs.notes && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {rule.outputs.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Machines Table */}
         {machinesError ? (

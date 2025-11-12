@@ -12,11 +12,7 @@ const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
   ssr: false,
 });
 
-const AddMachineModal = dynamic(() => import('../components/AddMachineModal'), {
-  ssr: false,
-});
-
-const DynamicFormBuilderModal = dynamic(() => import('../components/DynamicFormBuilderModal'), {
+const CreateMachineWizard = dynamic(() => import('../components/CreateMachineWizard'), {
   ssr: false,
 });
 
@@ -50,13 +46,13 @@ const machineTypes = [
 
 export default function Machines() {
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
-  const [isAddMachineModalOpen, setIsAddMachineModalOpen] = useState(false);
-  const [isFormBuilderOpen, setIsFormBuilderOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
 
-  const handleAddMachineSuccess = () => {
-    setIsAddMachineModalOpen(false);
+  const handleWizardSuccess = () => {
+    setIsWizardOpen(false);
+    // Optionally trigger a refresh of the machines list
   };
 
   if (userLoading) {
@@ -83,28 +79,15 @@ export default function Machines() {
           <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
             Machine Types
           </h2>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setIsAddMachineModalOpen(true)}
-              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              <span className="hidden lg:inline">Add Machine</span>
-              <span className="lg:hidden">Machine</span>
-            </button>
-            <button
-              onClick={() => setIsFormBuilderOpen(true)}
-              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              <span className="hidden lg:inline">Build Form</span>
-              <span className="lg:hidden">Form</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setIsWizardOpen(true)}
+            className="px-4 lg:px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md flex items-center gap-2 cursor-pointer relative z-10"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <span>Machine</span>
+          </button>
         </div>
 
         {/* Machine Type Tiles */}
@@ -136,19 +119,11 @@ export default function Machines() {
       {/* Add Job Modal */}
       <AddJobModal isOpen={isJobModalOpen} onClose={() => setIsJobModalOpen(false)} />
 
-      {/* Add Machine Modal */}
-      <AddMachineModal
-        isOpen={isAddMachineModalOpen}
-        onClose={() => setIsAddMachineModalOpen(false)}
-        onSuccess={handleAddMachineSuccess}
-        user={user}
-      />
-
-      {/* Dynamic Form Builder Modal */}
-      <DynamicFormBuilderModal
-        isOpen={isFormBuilderOpen}
-        onClose={() => setIsFormBuilderOpen(false)}
-        user={user}
+      {/* Create Machine Wizard */}
+      <CreateMachineWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onSuccess={handleWizardSuccess}
       />
     </>
   );

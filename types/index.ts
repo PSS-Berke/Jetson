@@ -10,6 +10,11 @@
 export type MachineStatus = 'running' | 'available' | 'avalible' | 'maintenance';
 
 /**
+ * Machine category - conveyances are primary machines, ancillary are attachments
+ */
+export type MachineCategory = 'conveyance' | 'ancillary';
+
+/**
  * Machine capability values - can be strings, numbers, or arrays of strings
  */
 export type MachineCapabilityValue = string | number | string[] | undefined;
@@ -27,6 +32,10 @@ export interface Machine {
   facilities_id?: number;
   status: MachineStatus;
 
+  // NEW: Machine categorization and grouping
+  machine_category?: MachineCategory; // Whether this is a conveyance or ancillary machine
+  machine_group_id?: number; // Optional foreign key to machine_groups table
+
   // Dynamic capabilities based on process type
   // Examples:
   // - Inserter: { supported_paper_sizes: ['6x9', '9x12'], max_pockets: 6 }
@@ -36,7 +45,7 @@ export interface Machine {
   };
 
   // Performance metrics
-  speed_hr: number; // Speed per hour
+  speed_hr: number; // Speed per hour (can be 0 if determined by rules)
   shiftCapacity?: number; // Capacity per shift
 
   // Legacy fields - kept for backward compatibility
@@ -51,6 +60,20 @@ export interface Machine {
 
   // Allow additional dynamic fields
   [key: string]: string | number | boolean | object | undefined;
+}
+
+/**
+ * Machine Group - for organizing machines with shared rules and configurations
+ */
+export interface MachineGroup {
+  id: number;
+  created_at: number;
+  updated_at: number;
+  name: string; // Group name (e.g., "Inserters with Affixers in Line")
+  description?: string; // Optional description
+  process_type_key: string; // All machines in group must have same process type
+  machine_ids: number[]; // Array of machine IDs in this group
+  facilities_id?: number; // Optional - restrict to specific facility
 }
 
 // ============================================================================
@@ -160,6 +183,74 @@ export type FacilityId = 1 | 2;
 export interface Facility {
   id: FacilityId;
   name: string;
+}
+
+// ============================================================================
+// Machine Rules Types
+// ============================================================================
+
+/**
+ * Operator types for rule conditions
+ */
+export type RuleOperator = 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_than_or_equal' | 'less_than_or_equal' | 'between' | 'in' | 'not_in';
+
+/**
+ * Logic operator for combining conditions
+ */
+export type LogicOperator = 'AND' | 'OR';
+
+/**
+ * A single condition in a rule
+ */
+export interface RuleCondition {
+  parameter: string; // e.g., 'paper_size', 'pockets', 'fold_type'
+  operator: RuleOperator;
+  value: string | number | string[] | number[]; // Single value or array for 'in', 'between'
+  logic?: LogicOperator; // How to combine with next condition (default: AND)
+}
+
+/**
+ * Rule outputs that affect machine performance
+ */
+export interface RuleOutputs {
+  speed_modifier: number; // Percentage of base speed (e.g., 80 = 80% of base speed)
+  people_required: number; // Can be fractional (e.g., 0.25, 0.5, 0.75, 1, 2, etc.)
+  notes?: string; // Optional explanation of why this rule affects performance
+}
+
+/**
+ * Machine rule entity
+ * Rules determine how job parameters affect machine speed and staffing requirements
+ */
+export interface MachineRule {
+  id: number;
+  created_at: number;
+  updated_at: number;
+
+  // Rule identity and scope
+  name: string; // Descriptive name (e.g., "Large Envelope Speed Reduction")
+  process_type_key: string; // Which process type this applies to (insert, fold, etc.)
+  machine_id?: number; // Optional - if set, applies only to specific machine; if null, applies to all machines of this type
+  machine_group_id?: number; // NEW: Optional - if set, applies to all machines in this group
+  priority: number; // Higher priority rules are evaluated first (for tie-breaking)
+
+  // Rule logic
+  conditions: RuleCondition[]; // Array of conditions with AND/OR logic
+  outputs: RuleOutputs; // Performance impacts when conditions are met
+
+  // Metadata
+  active?: boolean; // Whether this rule is currently active (default: true)
+}
+
+/**
+ * Result of evaluating rules for a given set of parameters
+ */
+export interface RuleEvaluationResult {
+  matchedRule?: MachineRule; // The rule that was applied (most restrictive)
+  calculatedSpeed: number; // Final calculated speed after applying rule
+  peopleRequired: number; // Number of people needed
+  baseSpeed: number; // Original base speed before rule application
+  explanation?: string; // Human-readable explanation of why this speed was chosen
 }
 
 // ============================================================================

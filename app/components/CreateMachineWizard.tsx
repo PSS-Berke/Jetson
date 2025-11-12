@@ -1,0 +1,310 @@
+/**
+ * Create Machine Wizard
+ * 5-step wizard for creating machines with full configuration
+ */
+
+'use client';
+
+import React, { useState } from 'react';
+import { useWizardState } from '@/hooks/useWizardState';
+import { createMachine, createMachineGroup, createMachineRule, addMachineToGroup } from '@/lib/api';
+import type { MachineCategory, MachineCapabilityValue, MachineStatus } from '@/types';
+
+// Wizard components
+import WizardStepIndicator from './wizard/WizardStepIndicator';
+import WizardNavigation from './wizard/WizardNavigation';
+import StepCategorySelection from './wizard/StepCategorySelection';
+import StepBasicInfo from './wizard/StepBasicInfo';
+import StepCapabilities from './wizard/StepCapabilities';
+import StepGroupsAndRules from './wizard/StepGroupsAndRules';
+import StepReview from './wizard/StepReview';
+import Toast from './Toast';
+
+interface CreateMachineWizardProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+const WIZARD_STEPS = [
+  { number: 1, label: 'Category', shortLabel: 'Type' },
+  { number: 2, label: 'Basic Info', shortLabel: 'Info' },
+  { number: 3, label: 'Process & Capabilities', shortLabel: 'Config' },
+  { number: 4, label: 'Groups & Rules', shortLabel: 'Rules' },
+  { number: 5, label: 'Review', shortLabel: 'Review' },
+];
+
+const FACILITIES = [
+  { id: 1, name: 'Bolingbrook' },
+  { id: 2, name: 'Lemont' },
+];
+
+export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: CreateMachineWizardProps) {
+  const { state, dispatch, nextStep, prevStep, goToStep, canProceed, checkCanProceed, reset, clearStorage } = useWizardState();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (!isSubmitting) {
+      onClose();
+    }
+  };
+
+  const handleCancel = () => {
+    const confirmCancel = confirm(
+      'Are you sure you want to cancel? Your progress has been saved as a draft and you can continue later.'
+    );
+    if (confirmCancel) {
+      handleClose();
+    }
+  };
+
+  const handleNext = () => {
+    nextStep();
+  };
+
+  const handleBack = () => {
+    prevStep();
+  };
+
+  const handleSubmit = async () => {
+    if (!canProceed(5)) {
+      setToastMessage('Please complete all required fields');
+      setShowErrorToast(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Step 1: Create machine group if needed
+      let machineGroupId: number | undefined;
+
+      if (state.machineGroupOption === 'new') {
+        const newGroup = await createMachineGroup({
+          name: state.newGroupName,
+          description: state.newGroupDescription,
+          process_type_key: state.process_type_key || state.customProcessTypeName,
+          machine_ids: [],
+          facilities_id: state.facilities_id || undefined,
+        });
+        machineGroupId = newGroup.id;
+      } else if (state.machineGroupOption === 'existing') {
+        machineGroupId = state.existingGroupId || undefined;
+      }
+
+      // Step 2: Create the machine
+      const machineData = {
+        line: state.line,
+        name: state.machineName,
+        facilities_id: state.facilities_id!,
+        process_type_key: state.isCustomProcessType ? state.customProcessTypeName : state.process_type_key,
+        machine_category: state.machineCategory as MachineCategory,
+        machine_group_id: machineGroupId,
+        capabilities: state.capabilities,
+        status: 'Offline' as MachineStatus,
+        // Placeholder values - will be determined by rules
+        speed_hr: 0,
+        shiftCapacity: 0,
+        people_per_process: 1,
+      };
+
+      const newMachine = await createMachine(machineData);
+
+      // Step 3: Add machine to existing group if selected
+      if (state.machineGroupOption === 'existing' && state.existingGroupId) {
+        await addMachineToGroup(state.existingGroupId, newMachine.id);
+      }
+
+      // Step 4: Create rules
+      for (const rule of state.rules) {
+        await createMachineRule({
+          name: rule.name,
+          process_type_key: state.process_type_key || state.customProcessTypeName,
+          machine_id: machineGroupId ? undefined : newMachine.id,
+          machine_group_id: machineGroupId,
+          priority: rule.priority,
+          conditions: rule.conditions,
+          outputs: rule.outputs,
+          active: true,
+        });
+      }
+
+      // Success!
+      setToastMessage(`Machine "${state.machineName}" created successfully!`);
+      setShowSuccessToast(true);
+
+      // Clear the draft
+      clearStorage();
+      reset();
+
+      // Wait a moment for toast to show, then close and callback
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 1500);
+    } catch (error: any) {
+      console.error('[CreateMachineWizard] Error creating machine:', error);
+      setToastMessage(error.message || 'Failed to create machine. Please try again.');
+      setShowErrorToast(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Use checkCanProceed for rendering (no side effects)
+  const canProceedCurrentStep = checkCanProceed(state.currentStep);
+
+  return (
+    <>
+      {/* Modal Overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        {/* Modal Container */}
+        <div
+          className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Create New Machine</h2>
+              <button
+                onClick={handleClose}
+                disabled={isSubmitting}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Step Indicator */}
+            <div className="mt-4">
+              <WizardStepIndicator currentStep={state.currentStep} steps={WIZARD_STEPS} />
+            </div>
+          </div>
+
+          {/* Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            {state.currentStep === 1 && (
+              <StepCategorySelection
+                selected={state.machineCategory}
+                onSelect={(category) => dispatch({ type: 'SET_CATEGORY', payload: category })}
+                error={state.errors.machineCategory}
+              />
+            )}
+
+            {state.currentStep === 2 && (
+              <StepBasicInfo
+                line={state.line}
+                machineName={state.machineName}
+                facilities_id={state.facilities_id}
+                onChange={(field, value) =>
+                  dispatch({ type: 'SET_BASIC_INFO', payload: { [field]: value } })
+                }
+                errors={state.errors}
+                touched={state.touched}
+                onBlur={(field) => dispatch({ type: 'SET_TOUCHED', payload: field })}
+              />
+            )}
+
+            {state.currentStep === 3 && (
+              <StepCapabilities
+                processTypeKey={state.process_type_key}
+                isCustomProcessType={state.isCustomProcessType}
+                customProcessTypeName={state.customProcessTypeName}
+                customProcessTypeFields={state.customProcessTypeFields}
+                capabilities={state.capabilities}
+                onSelectProcessType={(key) => dispatch({ type: 'SET_PROCESS_TYPE', payload: key })}
+                onSelectCustomProcessType={(name) =>
+                  dispatch({ type: 'SET_CUSTOM_PROCESS_TYPE', payload: { name, isCustom: true } })
+                }
+                onCancelCustomProcessType={() =>
+                  dispatch({ type: 'SET_CUSTOM_PROCESS_TYPE', payload: { name: '', isCustom: false } })
+                }
+                onSetCustomProcessTypeFields={(fields) =>
+                  dispatch({ type: 'SET_CUSTOM_PROCESS_TYPE_FIELDS', payload: fields })
+                }
+                onCapabilityChange={(field, value) =>
+                  dispatch({ type: 'SET_CAPABILITY', payload: { field, value } })
+                }
+                errors={state.errors}
+              />
+            )}
+
+            {state.currentStep === 4 && (
+              <StepGroupsAndRules
+                machineGroupOption={state.machineGroupOption}
+                existingGroupId={state.existingGroupId}
+                newGroupName={state.newGroupName}
+                newGroupDescription={state.newGroupDescription}
+                processTypeKey={state.process_type_key || state.customProcessTypeName}
+                facilitiesId={state.facilities_id}
+                rules={state.rules}
+                onSelectGroupOption={(option) =>
+                  dispatch({ type: 'SET_GROUP_OPTION', payload: option })
+                }
+                onSelectExistingGroup={(groupId) =>
+                  dispatch({ type: 'SET_EXISTING_GROUP', payload: groupId })
+                }
+                onSetNewGroupName={(name) =>
+                  dispatch({ type: 'SET_NEW_GROUP', payload: { name } })
+                }
+                onSetNewGroupDescription={(description) =>
+                  dispatch({ type: 'SET_NEW_GROUP', payload: { description } })
+                }
+                onAddRule={(rule) => dispatch({ type: 'ADD_RULE', payload: rule })}
+                onRemoveRule={(index) => dispatch({ type: 'REMOVE_RULE', payload: index })}
+                errors={state.errors}
+              />
+            )}
+
+            {state.currentStep === 5 && (
+              <StepReview
+                state={state}
+                onEditStep={(step) => goToStep(step)}
+                facilities={FACILITIES}
+              />
+            )}
+          </div>
+
+          {/* Footer - Navigation */}
+          <WizardNavigation
+            currentStep={state.currentStep}
+            totalSteps={WIZARD_STEPS.length}
+            onBack={handleBack}
+            onNext={handleNext}
+            onSubmit={handleSubmit}
+            canProceed={canProceedCurrentStep}
+            isSubmitting={isSubmitting}
+            showCancel={true}
+            onCancel={handleCancel}
+          />
+        </div>
+      </div>
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setShowSuccessToast(false)}
+        />
+      )}
+
+      {/* Error Toast */}
+      {showErrorToast && (
+        <Toast
+          message={toastMessage}
+          type="error"
+          onClose={() => setShowErrorToast(false)}
+        />
+      )}
+    </>
+  );
+}

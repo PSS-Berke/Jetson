@@ -6,7 +6,9 @@ import type {
   LoginCredentials,
   SignupData,
   AuthResponse,
-  ProductionEntry
+  ProductionEntry,
+  MachineRule,
+  MachineGroup
 } from '@/types';
 import type { JobCostEntry } from '@/lib/jobCostUtils';
 import { calculateAverageCostFromRequirements } from '@/lib/jobCostUtils';
@@ -86,9 +88,11 @@ const apiFetch = async <T = unknown>(
     // Suppress error logging for endpoints that may not be configured yet
     const isProductionEndpoint = endpoint.includes('/production_entry');
     const isJobCostEndpoint = endpoint.includes('/job_cost_entry');
+    const isMachineRulesEndpoint = endpoint.includes('/machine_rules');
+    const isMachineGroupsEndpoint = endpoint.includes('/machine_groups');
 
     // Log error details for debugging (unless it's an expected endpoint error)
-    if (!isProductionEndpoint && !isJobCostEndpoint) {
+    if (!isProductionEndpoint && !isJobCostEndpoint && !isMachineRulesEndpoint && !isMachineGroupsEndpoint) {
       console.error('[API Error]', {
         endpoint,
         baseType,
@@ -797,4 +801,238 @@ export const syncJobCostEntryFromRequirements = async (
     // Don't throw - we don't want to fail job creation/update if cost entry sync fails
     return null;
   }
+};
+
+// ============================================================================
+// Machine Rules API Functions
+// ============================================================================
+
+/**
+ * Get all machine rules with optional filters
+ * @param processTypeKey - Filter by process type (e.g., 'insert', 'fold')
+ * @param machineId - Filter by specific machine ID
+ * @param active - Filter by active status
+ * @returns Array of machine rules
+ */
+export const getMachineRules = async (
+  processTypeKey?: string,
+  machineId?: number,
+  active?: boolean
+): Promise<MachineRule[]> => {
+  const params = new URLSearchParams();
+
+  if (processTypeKey) {
+    params.append('process_type_key', processTypeKey);
+  }
+
+  if (machineId !== undefined && machineId !== null) {
+    params.append('machine_id', machineId.toString());
+  }
+
+  if (active !== undefined) {
+    params.append('active', active.toString());
+  }
+
+  const queryString = params.toString();
+  const endpoint = queryString ? `/machine_rules?${queryString}` : '/machine_rules';
+
+  console.log('[getMachineRules] Fetching rules from:', endpoint);
+  const result = await apiFetch<MachineRule[]>(endpoint, {
+    method: 'GET',
+  });
+  console.log('[getMachineRules] Received', result.length, 'rules');
+  return result;
+};
+
+/**
+ * Get a single machine rule by ID
+ * @param ruleId - The rule ID
+ * @returns Machine rule
+ */
+export const getMachineRule = async (ruleId: number): Promise<MachineRule> => {
+  console.log('[getMachineRule] Fetching rule:', ruleId);
+  return apiFetch<MachineRule>(`/machine_rules/${ruleId}`, {
+    method: 'GET',
+  });
+};
+
+/**
+ * Create a new machine rule
+ * @param ruleData - The rule data (without id, created_at, updated_at)
+ * @returns Created machine rule
+ */
+export const createMachineRule = async (
+  ruleData: Omit<MachineRule, 'id' | 'created_at' | 'updated_at'>
+): Promise<MachineRule> => {
+  console.log('[createMachineRule] Creating rule:', ruleData);
+  const result = await apiFetch<MachineRule>('/machine_rules', {
+    method: 'POST',
+    body: JSON.stringify(ruleData),
+  });
+  console.log('[createMachineRule] Rule created with ID:', result.id);
+  return result;
+};
+
+/**
+ * Update an existing machine rule
+ * @param ruleId - The rule ID
+ * @param ruleData - Partial rule data to update
+ * @returns Updated machine rule
+ */
+export const updateMachineRule = async (
+  ruleId: number,
+  ruleData: Partial<Omit<MachineRule, 'id' | 'created_at' | 'updated_at'>>
+): Promise<MachineRule> => {
+  console.log('[updateMachineRule] Updating rule:', ruleId, 'with data:', ruleData);
+  const result = await apiFetch<MachineRule>(`/machine_rules/${ruleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(ruleData),
+  });
+  console.log('[updateMachineRule] Rule updated successfully');
+  return result;
+};
+
+/**
+ * Delete a machine rule
+ * @param ruleId - The rule ID
+ */
+export const deleteMachineRule = async (ruleId: number): Promise<void> => {
+  console.log('[deleteMachineRule] Deleting rule:', ruleId);
+  await apiFetch<void>(`/machine_rules/${ruleId}`, {
+    method: 'DELETE',
+  });
+  console.log('[deleteMachineRule] Rule deleted successfully');
+};
+
+// ============================================================================
+// Machine Groups API Functions
+// ============================================================================
+
+/**
+ * Get all machine groups with optional filters
+ * @param processTypeKey - Filter by process type
+ * @param facilitiesId - Filter by facility
+ * @returns Array of machine groups
+ */
+export const getMachineGroups = async (
+  processTypeKey?: string,
+  facilitiesId?: number
+): Promise<MachineGroup[]> => {
+  const params = new URLSearchParams();
+
+  if (processTypeKey) {
+    params.append('process_type_key', processTypeKey);
+  }
+
+  if (facilitiesId !== undefined && facilitiesId !== null) {
+    params.append('facilities_id', facilitiesId.toString());
+  }
+
+  const queryString = params.toString();
+  const endpoint = queryString ? `/machine_groups?${queryString}` : '/machine_groups';
+
+  console.log('[getMachineGroups] Fetching groups from:', endpoint);
+  const result = await apiFetch<MachineGroup[]>(endpoint, {
+    method: 'GET',
+  });
+  console.log('[getMachineGroups] Received', result.length, 'groups');
+  return result;
+};
+
+/**
+ * Get a single machine group by ID
+ * @param groupId - The group ID
+ * @returns Machine group
+ */
+export const getMachineGroup = async (groupId: number): Promise<MachineGroup> => {
+  console.log('[getMachineGroup] Fetching group:', groupId);
+  return apiFetch<MachineGroup>(`/machine_groups/${groupId}`, {
+    method: 'GET',
+  });
+};
+
+/**
+ * Create a new machine group
+ * @param groupData - The group data (without id, created_at, updated_at)
+ * @returns Created machine group
+ */
+export const createMachineGroup = async (
+  groupData: Omit<MachineGroup, 'id' | 'created_at' | 'updated_at'>
+): Promise<MachineGroup> => {
+  console.log('[createMachineGroup] Creating group:', groupData);
+  const result = await apiFetch<MachineGroup>('/machine_groups', {
+    method: 'POST',
+    body: JSON.stringify(groupData),
+  });
+  console.log('[createMachineGroup] Group created with ID:', result.id);
+  return result;
+};
+
+/**
+ * Update an existing machine group
+ * @param groupId - The group ID
+ * @param groupData - Partial group data to update
+ * @returns Updated machine group
+ */
+export const updateMachineGroup = async (
+  groupId: number,
+  groupData: Partial<Omit<MachineGroup, 'id' | 'created_at' | 'updated_at'>>
+): Promise<MachineGroup> => {
+  console.log('[updateMachineGroup] Updating group:', groupId, 'with data:', groupData);
+  const result = await apiFetch<MachineGroup>(`/machine_groups/${groupId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(groupData),
+  });
+  console.log('[updateMachineGroup] Group updated successfully');
+  return result;
+};
+
+/**
+ * Delete a machine group
+ * @param groupId - The group ID
+ */
+export const deleteMachineGroup = async (groupId: number): Promise<void> => {
+  console.log('[deleteMachineGroup] Deleting group:', groupId);
+  await apiFetch<void>(`/machine_groups/${groupId}`, {
+    method: 'DELETE',
+  });
+  console.log('[deleteMachineGroup] Group deleted successfully');
+};
+
+/**
+ * Add a machine to a group
+ * @param groupId - The group ID
+ * @param machineId - The machine ID to add
+ * @returns Updated machine group
+ */
+export const addMachineToGroup = async (
+  groupId: number,
+  machineId: number
+): Promise<MachineGroup> => {
+  console.log('[addMachineToGroup] Adding machine', machineId, 'to group', groupId);
+  const group = await getMachineGroup(groupId);
+  const updatedMachineIds = [...group.machine_ids, machineId];
+
+  return updateMachineGroup(groupId, {
+    machine_ids: updatedMachineIds,
+  });
+};
+
+/**
+ * Remove a machine from a group
+ * @param groupId - The group ID
+ * @param machineId - The machine ID to remove
+ * @returns Updated machine group
+ */
+export const removeMachineFromGroup = async (
+  groupId: number,
+  machineId: number
+): Promise<MachineGroup> => {
+  console.log('[removeMachineFromGroup] Removing machine', machineId, 'from group', groupId);
+  const group = await getMachineGroup(groupId);
+  const updatedMachineIds = group.machine_ids.filter(id => id !== machineId);
+
+  return updateMachineGroup(groupId, {
+    machine_ids: updatedMachineIds,
+  });
 };

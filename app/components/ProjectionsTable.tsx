@@ -9,7 +9,7 @@ import ProcessTypeBadge from './ProcessTypeBadge';
 import { Trash, Lock, Unlock, ChevronDown } from 'lucide-react';
 import { bulkDeleteJobs, bulkUpdateJobs } from '@/lib/api';
 
-type SortField = 'job_number' | 'client' | 'sub_client' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
+type SortField = 'job_number' | 'client' | 'sub_client' | 'process_type' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
 type SortDirection = 'asc' | 'desc';
 
 interface ProjectionsTableProps {
@@ -26,6 +26,7 @@ interface ProjectionsTableProps {
   onGlobalTimeScrollIndexChange?: (index: number) => void;
   dataDisplayMode?: 'pieces' | 'revenue';
   viewMode?: 'jobs' | 'processes';
+  processViewMode?: 'consolidated' | 'expanded';
 }
 
 // Memoized desktop table row component
@@ -549,6 +550,7 @@ export default function ProjectionsTable({
   onGlobalTimeScrollIndexChange,
   dataDisplayMode = 'pieces',
   viewMode = 'jobs',
+  processViewMode = 'consolidated',
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -567,11 +569,11 @@ export default function ProjectionsTable({
 
   // Transform data for process view
   const displayProjections = useMemo(() => {
-    if (viewMode === 'processes') {
+    if (viewMode === 'processes' && processViewMode === 'expanded') {
       return expandJobProjectionsToProcesses(jobProjections);
     }
     return jobProjections;
-  }, [viewMode, jobProjections]);
+  }, [viewMode, processViewMode, jobProjections]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
 
@@ -742,15 +744,46 @@ export default function ProjectionsTable({
 
   // Sort projections (handles both jobs and processes)
   const sortedJobProjections = useMemo(() => {
-    if (viewMode === 'processes') {
+    if (viewMode === 'processes' && processViewMode === 'expanded') {
       const processProjections = displayProjections as ProcessProjection[];
       return [...processProjections].sort((a, b) => {
-        // Primary sort: by job
-        const jobCompare = a.jobNumber - b.jobNumber;
-        if (jobCompare !== 0) return jobCompare;
+        let compareValue = 0;
 
-        // Secondary sort: by process type within job
-        return a.processType.localeCompare(b.processType);
+        // Allow sorting by different fields in expanded process view
+        switch (sortField) {
+          case 'process_type':
+            // Primary sort by process type
+            compareValue = a.processType.localeCompare(b.processType);
+            if (compareValue !== 0) {
+              return sortDirection === 'asc' ? compareValue : -compareValue;
+            }
+            // Secondary sort by job number
+            return a.jobNumber - b.jobNumber;
+
+          case 'job_number':
+            compareValue = a.jobNumber - b.jobNumber;
+            if (compareValue !== 0) {
+              return sortDirection === 'asc' ? compareValue : -compareValue;
+            }
+            // Secondary sort by process type
+            return a.processType.localeCompare(b.processType);
+
+          case 'quantity':
+          case 'total':
+            compareValue = a.totalQuantity - b.totalQuantity;
+            break;
+
+          default:
+            // Default: group by job, then by process type
+            compareValue = a.jobNumber - b.jobNumber;
+            if (compareValue !== 0) return compareValue;
+            return a.processType.localeCompare(b.processType);
+        }
+
+        if (compareValue !== 0) {
+          return sortDirection === 'asc' ? compareValue : -compareValue;
+        }
+        return 0;
       });
     }
 
@@ -804,7 +837,7 @@ export default function ProjectionsTable({
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [displayProjections, sortField, sortDirection, viewMode]);
+  }, [displayProjections, sortField, sortDirection, viewMode, processViewMode]);
 
   // Render sort icon
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -959,8 +992,19 @@ export default function ProjectionsTable({
                   Sub Client <SortIcon field="sub_client" />
                 </div>
               </th>
-              <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider">
-                {viewMode === 'processes' ? 'Process' : 'Processes'}
+              <th
+                onClick={() => viewMode === 'processes' && processViewMode === 'expanded' ? handleSort('process_type') : undefined}
+                className={`px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
+                  viewMode === 'processes' && processViewMode === 'expanded' ? 'cursor-pointer hover:bg-gray-100' : ''
+                }`}
+              >
+                {viewMode === 'processes' && processViewMode === 'expanded' ? (
+                  <div className="flex items-center gap-1">
+                    Process <SortIcon field="process_type" />
+                  </div>
+                ) : (
+                  viewMode === 'processes' ? 'Process' : 'Processes'
+                )}
               </th>
               <th
                 onClick={() => handleSort('description')}
@@ -1022,10 +1066,10 @@ export default function ProjectionsTable({
                   No jobs found for the selected criteria
                 </td>
               </tr>
-            ) : viewMode === 'processes' ? (
-              // Process view
+            ) : viewMode === 'processes' && processViewMode === 'expanded' ? (
+              // Expanded Process view - each process on its own line, sortable
               (sortedJobProjections as ProcessProjection[]).map((processProjection, index, array) => {
-                // Determine if this is the first row for this job
+                // Determine if this is the first row for this job (for visual grouping)
                 const isFirstInGroup = index === 0 ||
                   processProjection.jobId !== (array[index - 1] as ProcessProjection).jobId;
 
@@ -1043,7 +1087,7 @@ export default function ProjectionsTable({
                 );
               })
             ) : (
-              // Jobs view (existing code)
+              // Jobs view or Consolidated view (standard jobs table)
               (sortedJobProjections as JobProjection[]).map((projection) => (
                 <ProjectionTableRow
                   key={projection.job.id}

@@ -8,6 +8,7 @@ import type { Granularity } from './GranularityToggle';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { Filter, SlidersHorizontal, LayoutGrid, Table2, Upload } from 'lucide-react';
 import ViewModeToggle from './ViewModeToggle';
+import ProcessViewToggle from './ProcessViewToggle';
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -30,6 +31,8 @@ interface ProjectionFiltersProps {
   onDataDisplayModeChange: (mode: 'pieces' | 'revenue') => void;
   viewMode?: 'jobs' | 'processes';
   onViewModeChange?: (mode: 'jobs' | 'processes') => void;
+  processViewMode?: 'consolidated' | 'expanded';
+  onProcessViewModeChange?: (mode: 'consolidated' | 'expanded') => void;
   mobileViewMode?: 'cards' | 'table';
   onMobileViewModeChange?: (mode: 'cards' | 'table') => void;
   onExportPDF?: () => void;
@@ -57,6 +60,8 @@ export default function ProjectionFilters({
   onDataDisplayModeChange,
   viewMode = 'jobs',
   onViewModeChange,
+  processViewMode = 'consolidated',
+  onProcessViewModeChange,
   mobileViewMode = 'cards',
   onMobileViewModeChange,
   onExportPDF,
@@ -543,6 +548,14 @@ export default function ProjectionFilters({
               <ViewModeToggle
                 currentMode={viewMode}
                 onModeChange={onViewModeChange}
+              />
+            )}
+
+            {/* Consolidated vs Expanded Toggle - Only visible when in process view */}
+            {viewMode === 'processes' && onProcessViewModeChange && (
+              <ProcessViewToggle
+                currentMode={processViewMode}
+                onModeChange={onProcessViewModeChange}
               />
             )}
 
