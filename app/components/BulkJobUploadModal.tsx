@@ -513,10 +513,10 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                               </div>
                               <div className="flex-1 grid grid-cols-6 gap-4 text-sm">
                                 <div>
-                                  <span className="font-medium">Job #{job.job_number}</span>
+                                  <span className="font-medium">Job #{isNaN(job.job_number) ? 'N/A' : job.job_number}</span>
                                 </div>
                                 <div className="text-gray-600">{clientName || '-'}</div>
-                                <div className="text-gray-600">{job.quantity.toLocaleString()} pcs</div>
+                                <div className="text-gray-600">{isNaN(job.quantity) ? '0' : job.quantity.toLocaleString()} pcs</div>
                                 <div className="text-gray-600">{job.process_types.length > 0 ? job.process_types.join(', ') : 'None'}</div>
                                 <div className="text-gray-600">{job.start_date ? job.start_date.toLocaleDateString() : '-'}</div>
                                 <div className="text-gray-600">{job.end_date ? job.end_date.toLocaleDateString() : '-'}</div>
@@ -572,7 +572,7 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                                       <label className="block text-sm font-medium text-gray-700 mb-1">Job Number *</label>
                                       <input
                                         type="number"
-                                        value={job.job_number}
+                                        value={isNaN(job.job_number) ? '' : job.job_number}
                                         onChange={(e) => handleEditJob(index, 'job_number', e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                       />
@@ -581,7 +581,7 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                                       <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
                                       <input
                                         type="number"
-                                        value={job.quantity}
+                                        value={isNaN(job.quantity) ? '' : job.quantity}
                                         onChange={(e) => handleEditJob(index, 'quantity', e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                       />

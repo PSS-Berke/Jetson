@@ -50,12 +50,12 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   schedule_type: ['schedule_type', 'schedule type', 'schedule', 'type'],
   facility: ['facility', 'facilities', 'location', 'plant'],
   job_number: ['job_number', 'job number', 'job#', 'job_no', 'jobnumber'],
-  sub_client: ['sub_client', 'sub client', 'client', 'customer', 'subclient'],
+  sub_client: ['sub_client', 'sub client', 'subclient', 'client', 'customer'],
   description: ['description', 'desc', 'job description', 'job_description'],
   quantity: ['quantity', 'qty', 'pieces', 'count'],
   start_date: ['start_date', 'start date', 'start', 'begin_date'],
   end_date: ['end_date', 'end date', 'due_date', 'due date', 'end'],
-  process_type: ['process_type', 'process type', 'process', 'service_type', 'service type'],
+  process_type: ['process_type', 'process type', 'process', 'service_type', 'service type', 'service'],
   price_per_m: ['price_per_m', 'price per m', 'price', 'rate', 'price_per_thousand'],
   paper_size: ['paper_size', 'paper size', 'size', 'envelope'],
   pockets: ['pockets', 'inserts', 'pieces'],
@@ -77,10 +77,12 @@ function findColumnValue(row: any, fieldName: string): any {
   const aliases = COLUMN_ALIASES[fieldName] || [fieldName];
 
   for (const alias of aliases) {
-    // Check exact match (case-insensitive)
+    // Check exact match (case-insensitive, trimmed, normalized spaces)
     for (const key in row) {
-      if (key.toLowerCase().trim() === alias.toLowerCase().trim()) {
-        return row[key];
+      const normalizedKey = key.toLowerCase().trim().replace(/\s+/g, ' ');
+      const normalizedAlias = alias.toLowerCase().trim().replace(/\s+/g, ' ');
+      if (normalizedKey === normalizedAlias) {
+        return row[key]; // Return the value even if empty - let caller decide what to do
       }
     }
   }
@@ -107,8 +109,27 @@ function parseDate(dateStr: any): Date | undefined {
   const str = String(dateStr).trim();
   if (!str) return undefined;
 
+  // Handle date ranges - take the first date (e.g., "10/29-10/31" -> "10/29")
+  // Also handle formats like "10/29/25", "now 10/9", "rolls in 9/24 AM"
+  let cleanStr = str;
+
+  // Remove text prefixes like "now", "rolls in", "data", etc.
+  cleanStr = cleanStr.replace(/^(now|data|rolls in|mat in|arrives folded|in folded)\s+/i, '');
+
+  // Extract just the date portion before any range or additional text
+  // Match patterns like "10/29", "10/29/25", "10/29/2025"
+  const dateMatch = cleanStr.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
+  if (dateMatch) {
+    cleanStr = dateMatch[1];
+  }
+
+  // If no year specified, assume 2025 (or current year)
+  if (cleanStr.match(/^\d{1,2}\/\d{1,2}$/)) {
+    cleanStr += '/2025';
+  }
+
   // Try standard date parse
-  const parsed = new Date(str);
+  const parsed = new Date(cleanStr);
   if (!isNaN(parsed.getTime())) return parsed;
 
   return undefined;
@@ -250,7 +271,29 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
         ) || workbook.SheetNames[0];
 
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        // First, try to parse and detect if the first row is empty (all __EMPTY columns)
+        let jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        // Check if first row columns are all __EMPTY (indicating an empty header row)
+        if (jsonData.length > 0 && jsonData[0]) {
+          const firstRowKeys = Object.keys(jsonData[0] as object);
+          const allEmpty = firstRowKeys.every(key => key.startsWith('__EMPTY'));
+
+          if (allEmpty) {
+            console.log('[CSV Parser] Detected empty first row, re-parsing with range starting from row 2');
+            // Re-parse starting from row 2 (skip the empty row)
+            jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '', range: 1 });
+          }
+        }
+
+        console.log('[CSV Parser] Total rows:', jsonData.length);
+        const firstRowKeys = jsonData[0] ? Object.keys(jsonData[0]) : [];
+        console.log('[CSV Parser] First row columns:', firstRowKeys);
+        console.log('[CSV Parser] Column names with quotes:', firstRowKeys.map(k => `"${k}"`));
+        if (jsonData[0]) {
+          console.log('[CSV Parser] First row sample data:', jsonData[0]);
+        }
 
         const jobs: ParsedBulkJob[] = [];
         const globalErrors: string[] = [];
@@ -268,6 +311,38 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
           const processTypeRaw = findColumnValue(row, 'process_type');
           const pricePerMRaw = findColumnValue(row, 'price_per_m');
 
+          // Convert to strings for checking
+          const jobNumberStr = String(jobNumberRaw || '').trim().toLowerCase();
+          const quantityStr = String(quantityRaw || '').trim();
+
+          // Debug first few rows
+          if (index < 3) {
+            console.log(`[CSV Parser] Row ${rowNum}:`, {
+              allColumns: Object.keys(row),
+              jobNumberRaw,
+              quantityRaw,
+              jobNumberStr,
+              quantityStr,
+              fullRow: row,
+            });
+          }
+
+          // Skip completely empty rows (no job number AND no quantity)
+          if (!jobNumberStr && !quantityStr) {
+            console.log(`[CSV Parser] Skipping empty row ${rowNum}`);
+            return; // Skip this row entirely
+          }
+
+          // Skip rows with placeholder job numbers (but still has some data)
+          if ((jobNumberStr === 'tbd' || jobNumberStr === 'n/a') && quantityStr) {
+            console.log(`[CSV Parser] Skipping placeholder row ${rowNum}: ${jobNumberStr}`);
+            // Has quantity but job number is placeholder - skip
+            return;
+          }
+
+          // If job number is empty but quantity exists, that's an error we'll catch below
+          // If quantity is empty but job number exists, that's also an error we'll catch below
+
           // Validate required fields (only job_number and quantity are truly required)
           if (!jobNumberRaw) {
             errors.push(`Missing job_number`);
@@ -283,8 +358,17 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
             warnings.push(`No price_per_m specified - will default to 0`);
           }
 
-          // Parse values
-          const job_number = parseInt(String(jobNumberRaw).replace(/,/g, ''));
+          // Parse values - handle alphanumeric job numbers by extracting digits
+          let job_number: number;
+          const jobNumStr = String(jobNumberRaw).replace(/,/g, '').trim();
+          // Check if it's purely numeric or alphanumeric (e.g., "60468-2", "COSTCO IJ")
+          const numericPart = jobNumStr.match(/\d+/);
+          if (numericPart) {
+            job_number = parseInt(numericPart[0]);
+          } else {
+            job_number = NaN;
+          }
+
           const quantity = parseInt(String(quantityRaw).replace(/,/g, ''));
           const price_per_m = pricePerMRaw ? parseFloat(String(pricePerMRaw).replace(/,/g, '')) : 0;
 
@@ -396,6 +480,10 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
           }
           jobNumbers.add(job.job_number);
         });
+
+        console.log('[CSV Parser] Parsed jobs:', jobs.length);
+        console.log('[CSV Parser] Sub-clients found:', Array.from(subClientsSet));
+        console.log('[CSV Parser] Global errors:', globalErrors);
 
         resolve({
           jobs,
