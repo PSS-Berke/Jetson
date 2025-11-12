@@ -138,7 +138,7 @@ export default function MachineTypePage() {
     };
 
     loadRules();
-  }, [filteredMachines]);
+  }, [machines]);
 
   const getNewMachineInitialState = (): Partial<Machine> => ({
     line: undefined,

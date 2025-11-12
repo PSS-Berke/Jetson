@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect } from 'react';
-import { X, Plus, Trash2, Edit2, Save } from 'lucide-react';
+import { X, Plus, Trash2, Edit2 } from 'lucide-react';
 import type {
   MachineRule,
   RuleCondition,
@@ -289,7 +289,11 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
       machine_id: rule.machine_id?.toString() || '',
       priority: rule.priority,
       conditions: rule.conditions,
-      outputs: rule.outputs,
+      outputs: {
+        speed_modifier: rule.outputs.speed_modifier,
+        people_required: rule.outputs.people_required,
+        notes: rule.outputs.notes || '',
+      },
     });
     setEditingRuleId(rule.id);
     setActiveTab('create');
@@ -316,7 +320,7 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
 
     // If parameter has options and operator is 'in' or 'not_in', show multi-select
     if (parameter?.options && (condition.operator === 'in' || condition.operator === 'not_in')) {
-      const selectedValues = Array.isArray(condition.value) ? condition.value : [];
+      const selectedValues: (string | number)[] = Array.isArray(condition.value) ? condition.value : [];
       return (
         <div className="space-y-2">
           <label className="block text-sm text-gray-600">Select values:</label>

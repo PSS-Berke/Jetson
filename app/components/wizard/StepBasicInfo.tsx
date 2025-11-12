@@ -146,7 +146,7 @@ export default function StepBasicInfo({
             />
           </svg>
           <div className="text-sm text-blue-800">
-            <strong>Note:</strong> The machine will be created with "Available" status by default.
+            <strong>Note:</strong> The machine will be created with &quot;Available&quot; status by default.
             Speed and capacity will be determined by the performance rules you configure in Step 4.
           </div>
         </div>

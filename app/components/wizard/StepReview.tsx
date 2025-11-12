@@ -254,7 +254,7 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
           <div className="flex-1">
             <h4 className="text-sm font-semibold text-blue-900">Ready to Create Machine</h4>
             <p className="mt-1 text-sm text-blue-800">
-              Review all the information above. If everything looks correct, click "Create Machine"
+              Review all the information above. If everything looks correct, click &quot;Create Machine&quot;
               to save. You can edit any section by clicking the Edit button.
             </p>
           </div>
@@ -267,7 +267,7 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
         <ul className="space-y-1 text-sm text-gray-600">
           <li className="flex items-start gap-2">
             <span className="text-green-500 mt-0.5">✓</span>
-            <span>The machine will be created with status "Offline"</span>
+            <span>The machine will be created with status &quot;Offline&quot;</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-500 mt-0.5">✓</span>

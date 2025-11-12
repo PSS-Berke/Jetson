@@ -60,14 +60,14 @@ export function evaluateCondition(
     case 'in':
       // Check if paramValue is in the conditionValue array
       if (Array.isArray(conditionValue)) {
-        return conditionValue.includes(paramValue);
+        return (conditionValue as (string | number)[]).includes(paramValue);
       }
       return false;
 
     case 'not_in':
       // Check if paramValue is NOT in the conditionValue array
       if (Array.isArray(conditionValue)) {
-        return !conditionValue.includes(paramValue);
+        return !(conditionValue as (string | number)[]).includes(paramValue);
       }
       return false;
 

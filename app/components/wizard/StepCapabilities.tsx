@@ -99,7 +99,7 @@ export default function StepCapabilities({
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Build Custom Form</h3>
             <p className="mt-1 text-sm text-gray-600">
-              Define the fields for your custom process type "<strong>{customProcessTypeName}</strong>".
+              Define the fields for your custom process type &quot;<strong>{customProcessTypeName}</strong>&quot;.
             </p>
           </div>
 
