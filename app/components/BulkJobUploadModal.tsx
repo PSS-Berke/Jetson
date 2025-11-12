@@ -180,6 +180,11 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
         all_mappings: updatedMappings
       });
 
+      // Warn if no client mapping found
+      if (!mapping && pj.sub_client) {
+        console.warn(`[BulkJobUpload] WARNING: No client mapping found for job ${pj.job_number}, sub_client: "${pj.sub_client}"`);
+      }
+
       // Calculate weekly split if dates are provided
       let weekly_split: number[] | undefined;
       if (pj.start_date && pj.end_date) {

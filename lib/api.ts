@@ -411,10 +411,18 @@ export const batchCreateJobs = async (
     const chunkResults = await Promise.allSettled(
       chunk.map(async (job) => {
         try {
+          console.log(`[batchCreateJobs] Creating job with clients_id:`, job.clients_id);
           const createdJob = await apiFetch<Job>('/jobs', {
             method: 'POST',
             body: JSON.stringify(job),
           }, 'jobs');
+          console.log(`[batchCreateJobs] Created job response:`, {
+            id: createdJob.id,
+            job_number: createdJob.job_number,
+            clients_id: createdJob.clients_id,
+            client: createdJob.client,
+            sub_client: createdJob.sub_client
+          });
           return createdJob;
         } catch (error) {
           throw { job, error: error instanceof Error ? error.message : 'Unknown error' };

@@ -374,45 +374,55 @@ export default function ProjectionsPage() {
                 {/* Summary Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-6">
                   {/* Simple Mode - Always visible tiles */}
-                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                    <div className="text-sm text-[var(--text-light)]">Total Jobs</div>
-                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                      {totalJobsInTimeframe}
+                  {totalJobsInTimeframe > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                      <div className="text-sm text-[var(--text-light)]">Total Jobs</div>
+                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                        {totalJobsInTimeframe}
+                      </div>
                     </div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                    <div className="text-sm text-[var(--text-light)]">Total Revenue</div>
-                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                      {totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                  )}
+                  {totalRevenue > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                      <div className="text-sm text-[var(--text-light)]">Total Revenue</div>
+                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                        {totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                      </div>
                     </div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                    <div className="text-sm text-[var(--text-light)]">Total Quantity</div>
-                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                      {grandTotals.grandTotal.toLocaleString()}
+                  )}
+                  {grandTotals.grandTotal > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                      <div className="text-sm text-[var(--text-light)]">Total Quantity</div>
+                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                        {grandTotals.grandTotal.toLocaleString()}
+                      </div>
                     </div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                    <div className="text-sm text-[var(--text-light)]">Process Types</div>
-                    <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                      {Object.values(processTypeCounts).filter(pt => pt.jobs > 0).length}
+                  )}
+                  {Object.values(processTypeCounts).filter(pt => pt.jobs > 0).length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                      <div className="text-sm text-[var(--text-light)]">Process Types</div>
+                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                        {Object.values(processTypeCounts).filter(pt => pt.jobs > 0).length}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Advanced Mode - Additional tiles */}
                   {filterViewMode === 'advanced' && (
                     <>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">
-                          Avg per {granularity === 'weekly' ? 'Week' : granularity === 'monthly' ? 'Month' : 'Quarter'}
+                      {Math.round(grandTotals.grandTotal / timeRanges.length) > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">
+                            Avg per {granularity === 'weekly' ? 'Week' : granularity === 'monthly' ? 'Month' : 'Quarter'}
+                          </div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {Math.round(grandTotals.grandTotal / timeRanges.length).toLocaleString()}
+                          </div>
                         </div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {Math.round(grandTotals.grandTotal / timeRanges.length).toLocaleString()}
-                        </div>
-                      </div>
+                      )}
 
                       {/* Service Type Tiles */}
-                      {serviceSummaries.filter(summary => summary.serviceType.toLowerCase() !== 'insert').map(summary => (
+                      {serviceSummaries.filter(summary => summary.serviceType.toLowerCase() !== 'insert' && summary.grandTotal > 0).map(summary => (
                         <div key={summary.serviceType} className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
                           <div className="text-sm text-[var(--text-light)]">{summary.serviceType}</div>
                           <div className="text-2xl font-bold text-[var(--dark-blue)]">
@@ -425,69 +435,83 @@ export default function ProjectionsPage() {
                       ))}
 
                       {/* Process Type Tiles */}
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total Insert</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.insert.pieces.toLocaleString()} pcs
+                      {processTypeCounts.insert.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total Insert</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.insert.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.insert.jobs} jobs
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.insert.jobs} jobs
+                      )}
+                      {processTypeCounts.sort.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total Sort</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.sort.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.sort.jobs} jobs
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total Sort</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.sort.pieces.toLocaleString()} pcs
+                      )}
+                      {processTypeCounts.inkjet.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total Inkjet</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.inkjet.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.inkjet.jobs} jobs
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.sort.jobs} jobs
+                      )}
+                      {processTypeCounts.labelApply.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total Label/Apply</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.labelApply.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.labelApply.jobs} jobs
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total Inkjet</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.inkjet.pieces.toLocaleString()} pcs
+                      )}
+                      {processTypeCounts.fold.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total Fold</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.fold.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.fold.jobs} jobs
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.inkjet.jobs} jobs
+                      )}
+                      {processTypeCounts.laser.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total Laser</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.laser.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.laser.jobs} jobs
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total Label/Apply</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.labelApply.pieces.toLocaleString()} pcs
+                      )}
+                      {processTypeCounts.hpPress.pieces > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                          <div className="text-sm text-[var(--text-light)]">Total HP Press</div>
+                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                            {processTypeCounts.hpPress.pieces.toLocaleString()} pcs
+                          </div>
+                          <div className="text-sm text-[var(--text-light)] mt-1">
+                            {processTypeCounts.hpPress.jobs} jobs
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.labelApply.jobs} jobs
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total Fold</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.fold.pieces.toLocaleString()} pcs
-                        </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.fold.jobs} jobs
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total Laser</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.laser.pieces.toLocaleString()} pcs
-                        </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.laser.jobs} jobs
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                        <div className="text-sm text-[var(--text-light)]">Total HP Press</div>
-                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                          {processTypeCounts.hpPress.pieces.toLocaleString()} pcs
-                        </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {processTypeCounts.hpPress.jobs} jobs
-                        </div>
-                      </div>
+                      )}
                     </>
                   )}
                 </div>

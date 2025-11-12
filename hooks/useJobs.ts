@@ -100,18 +100,39 @@ const parseJob = (job: Job): ParsedJob => {
         }
       }
 
+      // Parse client field with better error handling
+      let parsedClient: { id: number; name: string };
+      try {
+        if (!job.client || job.client === '' || job.client === 'null') {
+          console.warn(`[parseJob] Job ${job.job_number} has empty/null client field. clients_id: ${job.clients_id}`);
+          parsedClient = { id: job.clients_id || 0, name: 'Unknown' };
+        } else if (typeof job.client === 'string') {
+          parsedClient = JSON.parse(job.client);
+        } else {
+          parsedClient = job.client as { id: number; name: string };
+        }
+      } catch (clientError) {
+        console.error(`[parseJob] Failed to parse client for job ${job.job_number}:`, {
+          error: clientError,
+          client_value: job.client,
+          clients_id: job.clients_id
+        });
+        parsedClient = { id: job.clients_id || 0, name: 'Unknown' };
+      }
+
       return {
         ...job,
-        client: JSON.parse(job.client),
+        client: parsedClient,
         sub_client: parsedSubClient,
         machines: JSON.parse(job.machines),
         requirements: parsedRequirements,
         daily_split: parsedDailySplit,
       };
     } catch (e) {
+      console.error(`[parseJob] Critical error parsing job ${job.job_number}:`, e);
       return {
         ...job,
-        client: { id: 0, name: 'Unknown' },
+        client: { id: job.clients_id || 0, name: 'Unknown' },
         sub_client: null,
         machines: [],
         requirements: [],
