@@ -50,7 +50,8 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   schedule_type: ['schedule_type', 'schedule type', 'schedule', 'type'],
   facility: ['facility', 'facilities', 'location', 'plant'],
   job_number: ['job_number', 'job number', 'job#', 'job_no', 'jobnumber'],
-  sub_client: ['sub_client', 'sub client', 'subclient', 'client', 'customer'],
+  client: ['client', 'customer'], // Main client name
+  sub_client: ['sub_client', 'sub client', 'subclient'], // Sub-client name (removed 'client' to avoid conflict)
   description: ['description', 'desc', 'job description', 'job_description'],
   quantity: ['quantity', 'qty', 'pieces', 'count'],
   start_date: ['start_date', 'start date', 'start', 'begin_date'],
@@ -328,10 +329,10 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
           }
 
           // Skip completely empty rows (no job number AND no quantity AND no client)
-          const clientRaw = findColumnValue(row, 'sub_client');
-          const clientStr = String(clientRaw || '').trim();
+          const anyClientRaw = findColumnValue(row, 'sub_client') || findColumnValue(row, 'client');
+          const anyClientStr = String(anyClientRaw || '').trim();
 
-          if (!jobNumberStr && !quantityStr && !clientStr) {
+          if (!jobNumberStr && !quantityStr && !anyClientStr) {
             console.log(`[CSV Parser] Skipping empty row ${rowNum}`);
             return; // Skip this row entirely
           }
@@ -395,7 +396,11 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
             : [];
 
           // Extract optional fields
-          const sub_client = String(findColumnValue(row, 'sub_client') || '').trim();
+          // Try to get client name from either 'sub_client' or 'client' column (prefer sub_client if both exist)
+          const subClientRaw = String(findColumnValue(row, 'sub_client') || '').trim();
+          const clientRaw = String(findColumnValue(row, 'client') || '').trim();
+          const sub_client = subClientRaw || clientRaw; // Use sub_client if present, otherwise fall back to client
+
           const description = String(findColumnValue(row, 'description') || '').trim();
           const schedule_type = findColumnValue(row, 'schedule_type');
           const facility = findColumnValue(row, 'facility');
@@ -406,7 +411,7 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
           if (sub_client) {
             subClientsSet.add(sub_client);
           } else {
-            warnings.push(`No sub_client specified - will need to assign a client`);
+            warnings.push(`No client specified - will need to assign a client`);
           }
 
           // Extract process-specific fields
