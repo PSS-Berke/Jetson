@@ -189,60 +189,57 @@ export default function StepReview({ state, onEditStep, facilities }: StepReview
               />
               <span className="font-medium text-gray-900">{processConfig.label}</span>
             </div>
-
-            {/* Standard Capabilities */}
-            {Object.keys(state.capabilities).length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-4 mb-3">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">
-                  {state.customProcessTypeFields.length > 0 ? 'Standard Fields' : 'Configured Capabilities'}
-                </h4>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(state.capabilities)
-                    .filter(([key]) => !state.customProcessTypeFields.some(f => f.id === key))
-                    .map(([key, value]) => {
-                      const field = processConfig.fields.find((f) => f.name === key);
-                      return (
-                        <div key={key}>
-                          <dt className="text-sm text-gray-600">{field?.label || key}</dt>
-                          <dd className="mt-0.5 text-sm font-medium text-gray-900">
-                            {Array.isArray(value) ? value.join(', ') : String(value)}
-                          </dd>
-                        </div>
-                      );
-                    })}
-                </dl>
-              </div>
-            )}
-
-            {/* Custom Fields (if added to standard process type) */}
-            {state.customProcessTypeFields.length > 0 && (
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <h4 className="text-sm font-medium text-blue-800 mb-3">Additional Custom Fields</h4>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {state.customProcessTypeFields.map((field) => {
-                    const value = state.capabilities[field.id];
-                    return (
-                      <div key={field.id}>
-                        <dt className="text-sm text-blue-700">
-                          {field.label}
-                          {field.required && <span className="text-red-500 ml-1">*</span>}
-                        </dt>
-                        <dd className="mt-0.5 text-sm font-medium text-blue-900">
-                          {value ? String(value) : <span className="text-blue-400 italic">Not set</span>}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              </div>
-            )}
-
-            {Object.keys(state.capabilities).length === 0 && state.customProcessTypeFields.length === 0 && (
-              <p className="text-sm text-gray-600 italic">No capabilities configured</p>
-            )}
+            <p className="text-sm text-gray-600">
+              Process type selected. Machine variables from API will be configured below.
+            </p>
           </div>
         ) : (
           <p className="text-sm text-gray-600 italic">No process type selected</p>
+        )}
+
+        {/* Form Builder Fields */}
+        {state.formBuilderFields && state.formBuilderFields.length > 0 && (
+          <div className="mt-4 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-green-800 mb-3">Form Fields & Values</h4>
+            <div className="space-y-3">
+              {state.formBuilderFields.map((field) => (
+                <div key={field.id} className="bg-white rounded-lg p-3 border border-green-200">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <dt className="text-sm text-green-700 font-medium">
+                        {field.fieldLabel}
+                        {field.required && <span className="text-red-500 ml-1">*</span>}
+                      </dt>
+                      <dd className="mt-0.5 text-sm text-green-900">
+                        {field.fieldValue !== undefined && field.fieldValue !== null && field.fieldValue !== ''
+                          ? String(field.fieldValue)
+                          : <span className="text-green-400 italic">Not set</span>}
+                      </dd>
+                    </div>
+                    <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                      {field.fieldName}
+                    </span>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-green-100 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-green-600">Type:</span>
+                      <span className="ml-1 text-green-800">{field.fieldType}</span>
+                    </div>
+                    <div>
+                      <span className="text-green-600">Required:</span>
+                      <span className="ml-1 text-green-800">{field.required ? 'Yes' : 'No'}</span>
+                    </div>
+                    {field.options && field.options.length > 0 && (
+                      <div className="col-span-2 sm:col-span-1">
+                        <span className="text-green-600">Options:</span>
+                        <span className="ml-1 text-green-800">{field.options.join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

@@ -707,6 +707,81 @@ export const getMachineVariables = async (processType: string): Promise<any[]> =
   return result;
 };
 
+/**
+ * Get all machine variables (for wizard configuration)
+ * @returns Array of machine variable definitions
+ */
+export const getAllMachineVariables = async (): Promise<any[]> => {
+  console.log('[getAllMachineVariables] Fetching all machine variables');
+
+  const result = await apiFetch<any[]>('/machine_variables', {
+    method: 'GET',
+  });
+
+  console.log('[getAllMachineVariables] Response:', result);
+  return result;
+};
+
+/**
+ * Get machine variables by ID
+ * @param machineVariablesId - The ID of the machine variables record
+ * @returns Machine variables configuration
+ */
+export const getMachineVariablesById = async (machineVariablesId: number): Promise<any> => {
+  console.log('[getMachineVariablesById] Fetching machine variables by ID:', machineVariablesId);
+
+  const result = await apiFetch<any>(`/machine_variables/${machineVariablesId}`, {
+    method: 'GET',
+  });
+
+  console.log('[getMachineVariablesById] Response:', result);
+  return result;
+};
+
+/**
+ * Update machine variables using PATCH
+ * @param machineVariablesId - The ID of the machine variables record
+ * @param variables - Object containing form fields and their values
+ * @returns Updated machine variables
+ */
+export const updateMachineVariables = async (
+  machineVariablesId: number,
+  variables: Record<string, any>
+): Promise<any> => {
+  console.log('[updateMachineVariables] Updating machine variables:', { 
+    machineVariablesId, 
+    variables,
+    endpoint: `/machine_variables/${machineVariablesId}`,
+    fullUrl: `${API_BASE_URL}/machine_variables/${machineVariablesId}`
+  });
+
+  try {
+    const requestBody = {
+      machine_variables_id: machineVariablesId,
+      variables: variables,
+    };
+
+    console.log('[updateMachineVariables] Request body:', JSON.stringify(requestBody, null, 2));
+
+    const result = await apiFetch<any>(`/machine_variables/${machineVariablesId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('[updateMachineVariables] Response:', result);
+    return result;
+  } catch (error: any) {
+    console.error('[updateMachineVariables] Error details:', {
+      machineVariablesId,
+      endpoint: `/machine_variables/${machineVariablesId}`,
+      fullUrl: `${API_BASE_URL}/machine_variables/${machineVariablesId}`,
+      error: error.message,
+      errorObject: error
+    });
+    throw error;
+  }
+};
+
 // ============================================================================
 // Job Cost Entry Sync Functions (Auto-populate from Requirements)
 // ============================================================================

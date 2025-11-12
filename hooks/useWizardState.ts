@@ -23,6 +23,42 @@ export interface RuleFormData {
   priority: number;
 }
 
+export interface MachineVariable {
+  id: string; // Use string ID for client-side generated items
+  key: string;
+  value: string;
+  // Additional fields from API
+  label?: string;
+  type?: string;
+  options?: string[];
+  required?: boolean;
+  [key: string]: any; // Allow any other fields from API
+}
+
+export interface MachineVariableFromAPI {
+  id?: number;
+  type: string;
+  variables: Array<{
+    variable_name: string;
+    variable_label?: string;
+    variable_type?: string;
+    variable_value?: string;
+    options?: string[];
+    required?: boolean;
+    [key: string]: any; // Allow any other fields from API
+  }> | Record<string, any>;
+}
+
+export interface FormBuilderField {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  fieldType: 'text' | 'number' | 'select' | 'boolean';
+  fieldValue: string | number | boolean;
+  options?: string[];
+  required?: boolean;
+}
+
 export interface WizardState {
   currentStep: 1 | 2 | 3 | 4 | 5;
 
@@ -44,6 +80,9 @@ export interface WizardState {
   customProcessTypeName: string;
   customProcessTypeFields: CustomFormField[];
   capabilities: Record<string, MachineCapabilityValue>;
+  machineVariables: MachineVariable[];
+  machineVariablesId: number | null;
+  formBuilderFields: FormBuilderField[];
 
   // Step 4: Machine Groups & Rules
   machineGroupOption: 'none' | 'existing' | 'new';
@@ -66,6 +105,15 @@ type WizardAction =
   | { type: 'SET_CUSTOM_PROCESS_TYPE_FIELDS'; payload: CustomFormField[] }
   | { type: 'SET_CAPABILITIES'; payload: Record<string, MachineCapabilityValue> }
   | { type: 'SET_CAPABILITY'; payload: { field: string; value: MachineCapabilityValue } }
+  | { type: 'SET_MACHINE_VARIABLES'; payload: MachineVariable[] }
+  | { type: 'SET_MACHINE_VARIABLES_ID'; payload: number | null }
+  | { type: 'ADD_MACHINE_VARIABLE'; payload: MachineVariable }
+  | { type: 'UPDATE_MACHINE_VARIABLE'; payload: { id: string; key?: string; value?: string } }
+  | { type: 'REMOVE_MACHINE_VARIABLE'; payload: string }
+  | { type: 'SET_FORM_BUILDER_FIELDS'; payload: FormBuilderField[] }
+  | { type: 'ADD_FORM_BUILDER_FIELD'; payload: FormBuilderField }
+  | { type: 'UPDATE_FORM_BUILDER_FIELD'; payload: { id: string; field?: Partial<FormBuilderField> } }
+  | { type: 'REMOVE_FORM_BUILDER_FIELD'; payload: string }
   | { type: 'SET_GROUP_OPTION'; payload: 'none' | 'existing' | 'new' }
   | { type: 'SET_EXISTING_GROUP'; payload: number }
   | { type: 'SET_NEW_GROUP'; payload: { name?: string; description?: string } }
@@ -93,6 +141,9 @@ const initialState: WizardState = {
   customProcessTypeName: '',
   customProcessTypeFields: [],
   capabilities: {},
+  machineVariables: [],
+  machineVariablesId: null,
+  formBuilderFields: [],
   machineGroupOption: 'none',
   existingGroupId: null,
   newGroupName: '',
@@ -145,6 +196,58 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
           ...state.capabilities,
           [action.payload.field]: action.payload.value,
         },
+      };
+
+    case 'SET_MACHINE_VARIABLES':
+      return { ...state, machineVariables: action.payload };
+
+    case 'SET_MACHINE_VARIABLES_ID':
+      return { ...state, machineVariablesId: action.payload };
+
+    case 'ADD_MACHINE_VARIABLE':
+      return { ...state, machineVariables: [...state.machineVariables, action.payload] };
+
+    case 'UPDATE_MACHINE_VARIABLE':
+      return {
+        ...state,
+        machineVariables: state.machineVariables.map(variable =>
+          variable.id === action.payload.id
+            ? { 
+                ...variable, 
+                key: action.payload.key !== undefined ? action.payload.key : variable.key,
+                value: action.payload.value !== undefined ? action.payload.value : variable.value,
+                // Preserve all other fields
+              }
+            : variable
+        ),
+      };
+
+    case 'REMOVE_MACHINE_VARIABLE':
+      return {
+        ...state,
+        machineVariables: state.machineVariables.filter(variable => variable.id !== action.payload),
+      };
+
+    case 'SET_FORM_BUILDER_FIELDS':
+      return { ...state, formBuilderFields: action.payload };
+
+    case 'ADD_FORM_BUILDER_FIELD':
+      return { ...state, formBuilderFields: [...state.formBuilderFields, action.payload] };
+
+    case 'UPDATE_FORM_BUILDER_FIELD':
+      return {
+        ...state,
+        formBuilderFields: state.formBuilderFields.map(field =>
+          field.id === action.payload.id
+            ? { ...field, ...action.payload.field }
+            : field
+        ),
+      };
+
+    case 'REMOVE_FORM_BUILDER_FIELD':
+      return {
+        ...state,
+        formBuilderFields: state.formBuilderFields.filter(field => field.id !== action.payload),
       };
 
     case 'SET_GROUP_OPTION':
@@ -342,9 +445,14 @@ export function useWizardState() {
       }
     }
 
-    // At least one capability should be set for standard process types (without custom fields)
-    if (!state.isCustomProcessType && state.customProcessTypeFields.length === 0 && Object.keys(state.capabilities).length === 0) {
-      errors.capabilities = 'Please configure at least one capability';
+    // Validate required machine variables from API
+    if (state.machineVariables && state.machineVariables.length > 0) {
+      const requiredVariables = state.machineVariables.filter(v => v.required);
+      const missingVariables = requiredVariables.filter(v => !v.value || v.value === '');
+      
+      if (missingVariables.length > 0) {
+        errors.machineVariables = `Please fill in all required machine variables: ${missingVariables.map(v => v.label || v.key).join(', ')}`;
+      }
     }
 
     Object.entries(errors).forEach(([field, error]) => {
@@ -426,8 +534,13 @@ export function useWizardState() {
             const allRequiredFilled = requiredFields.every(field => state.capabilities[field.id]);
             return allRequiredFilled;
           } else {
-            // No custom fields, just check standard capabilities
-            return Object.keys(state.capabilities).length > 0;
+            // Check if all required machine variables are filled
+            if (state.machineVariables && state.machineVariables.length > 0) {
+              const requiredVariables = state.machineVariables.filter(v => v.required);
+              return requiredVariables.every(v => v.value && v.value !== '');
+            }
+            // No validation required if no machine variables
+            return true;
           }
         }
       case 4:

@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useWizardState } from '@/hooks/useWizardState';
-import { createMachine, createMachineGroup, createMachineRule, addMachineToGroup } from '@/lib/api';
+import { createMachine, createMachineGroup, createMachineRule, addMachineToGroup, updateMachineVariables } from '@/lib/api';
 import type { MachineCategory, MachineCapabilityValue, MachineStatus } from '@/types';
 
 // Wizard components
@@ -63,7 +63,39 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // If on step 3 and user has added custom input form fields, save them via PATCH
+    if (state.currentStep === 3 && state.machineVariablesId && state.formBuilderFields && state.formBuilderFields.length > 0) {
+      try {
+        console.log('[CreateMachineWizard] Step 3 Next: Saving machine variables before proceeding');
+        console.log('[CreateMachineWizard] Machine Variables ID:', state.machineVariablesId);
+        console.log('[CreateMachineWizard] Form Builder Fields:', state.formBuilderFields);
+
+        // Convert form builder fields to variables object
+        const variables: Record<string, any> = {};
+        state.formBuilderFields.forEach((field) => {
+          variables[field.fieldName] = {
+            label: field.fieldLabel,
+            type: field.fieldType,
+            value: field.fieldValue,
+            options: field.options,
+            required: field.required,
+          };
+        });
+
+        console.log('[CreateMachineWizard] Variables object to save:', JSON.stringify(variables, null, 2));
+        console.log('[CreateMachineWizard] Calling PATCH /machine_variables/' + state.machineVariablesId);
+
+        await updateMachineVariables(state.machineVariablesId, variables);
+        console.log('[CreateMachineWizard] ✓ Machine variables updated successfully');
+      } catch (error: any) {
+        console.error('[CreateMachineWizard] ✗ Error updating machine variables:', error);
+        // Show error but don't block navigation - user can still proceed
+        setToastMessage('Warning: Failed to save form fields. You can continue, but fields may need to be re-entered.');
+        setShowErrorToast(true);
+      }
+    }
+    
     nextStep();
   };
 
@@ -168,6 +200,50 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
         });
       }
 
+      // Step 5: Save machine variables (form builder fields + values)
+      // Only save if we have a valid ID and at least one field
+      if (state.machineVariablesId && typeof state.machineVariablesId === 'number' && state.formBuilderFields && state.formBuilderFields.length > 0) {
+        try {
+          console.log('[CreateMachineWizard] ===== SAVING MACHINE VARIABLES =====');
+          console.log('[CreateMachineWizard] Machine Variables ID:', state.machineVariablesId);
+          console.log('[CreateMachineWizard] Form Builder Fields:', state.formBuilderFields);
+
+          // Convert form builder fields to variables object
+          const variables: Record<string, any> = {};
+          state.formBuilderFields.forEach((field) => {
+            variables[field.fieldName] = {
+              label: field.fieldLabel,
+              type: field.fieldType,
+              value: field.fieldValue,
+              options: field.options,
+              required: field.required,
+            };
+          });
+
+          console.log('[CreateMachineWizard] Variables object to save:', JSON.stringify(variables, null, 2));
+          console.log('[CreateMachineWizard] Calling PATCH /machine_variables/' + state.machineVariablesId);
+
+          await updateMachineVariables(state.machineVariablesId, variables);
+          console.log('[CreateMachineWizard] ✓ Machine variables updated successfully');
+        } catch (error: any) {
+          console.error('[CreateMachineWizard] ✗ Error updating machine variables:', error);
+          console.error('[CreateMachineWizard] Error details:', {
+            message: error?.message,
+            stack: error?.stack,
+            machineVariablesId: state.machineVariablesId
+          });
+          // Don't fail the entire operation if variables fail to save
+        }
+      } else {
+        console.log('[CreateMachineWizard] Skipping machine variables save - missing required data:', {
+          hasId: !!state.machineVariablesId,
+          idType: typeof state.machineVariablesId,
+          idValue: state.machineVariablesId,
+          hasFields: !!state.formBuilderFields && state.formBuilderFields.length > 0,
+          formBuilderFieldsCount: state.formBuilderFields?.length || 0
+        });
+      }
+
       // Success!
       const message = state.quantity === 1 
         ? `Machine "${state.machineName}" created successfully!`
@@ -261,6 +337,9 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
                 customProcessTypeName={state.customProcessTypeName}
                 customProcessTypeFields={state.customProcessTypeFields}
                 capabilities={state.capabilities}
+                machineVariables={state.machineVariables}
+                machineVariablesId={state.machineVariablesId}
+                formBuilderFields={state.formBuilderFields}
                 onSelectProcessType={(key) => dispatch({ type: 'SET_PROCESS_TYPE', payload: key })}
                 onSelectCustomProcessType={(name) =>
                   dispatch({ type: 'SET_CUSTOM_PROCESS_TYPE', payload: { name, isCustom: true } })
@@ -273,6 +352,27 @@ export default function CreateMachineWizard({ isOpen, onClose, onSuccess }: Crea
                 }
                 onCapabilityChange={(field, value) =>
                   dispatch({ type: 'SET_CAPABILITY', payload: { field, value } })
+                }
+                onSetMachineVariables={(variables) =>
+                  dispatch({ type: 'SET_MACHINE_VARIABLES', payload: variables })
+                }
+                onSetMachineVariablesId={(id) =>
+                  dispatch({ type: 'SET_MACHINE_VARIABLES_ID', payload: id })
+                }
+                onUpdateMachineVariable={(id, key, value) =>
+                  dispatch({ type: 'UPDATE_MACHINE_VARIABLE', payload: { id, key, value } })
+                }
+                onSetFormBuilderFields={(fields) =>
+                  dispatch({ type: 'SET_FORM_BUILDER_FIELDS', payload: fields })
+                }
+                onAddFormBuilderField={(field) =>
+                  dispatch({ type: 'ADD_FORM_BUILDER_FIELD', payload: field })
+                }
+                onUpdateFormBuilderField={(id, field) =>
+                  dispatch({ type: 'UPDATE_FORM_BUILDER_FIELD', payload: { id, field } })
+                }
+                onRemoveFormBuilderField={(id) =>
+                  dispatch({ type: 'REMOVE_FORM_BUILDER_FIELD', payload: id })
                 }
                 errors={state.errors}
               />

@@ -5,8 +5,10 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PROCESS_TYPE_CONFIGS } from '@/lib/processTypeConfig';
+import { getAllMachineVariables } from '@/lib/api';
+import { Pen, Trash2 } from 'lucide-react';
 
 interface ProcessTypeSelectorProps {
   selectedProcessType: string;
@@ -15,7 +17,13 @@ interface ProcessTypeSelectorProps {
   onSelectExisting: (key: string) => void;
   onSelectCustom: (name: string) => void;
   onCancelCustom: () => void;
+  onEditField?: (fieldLabel: string) => void;
   error?: string;
+}
+
+interface MachineVariableGroup {
+  type: string;
+  variables: any[];
 }
 
 export default function ProcessTypeSelector({
@@ -25,10 +33,63 @@ export default function ProcessTypeSelector({
   onSelectExisting,
   onSelectCustom,
   onCancelCustom,
+  onEditField,
   error,
 }: ProcessTypeSelectorProps) {
   const [showCustomForm, setShowCustomForm] = useState(isCustom);
   const [customNameInput, setCustomNameInput] = useState(customName);
+  const [variableCounts, setVariableCounts] = useState<Record<string, number>>({});
+  const [loadingCounts, setLoadingCounts] = useState(true);
+  const [apiProcessTypes, setApiProcessTypes] = useState<Array<{ key: string; label: string; color: string }>>([]);
+  const [expandedProcessType, setExpandedProcessType] = useState<string | null>(null);
+
+  // Fetch machine variables and group by type
+  useEffect(() => {
+    const fetchVariableCounts = async () => {
+      try {
+        setLoadingCounts(true);
+        const allVariables = await getAllMachineVariables();
+        
+        // Group by type and count variables, collect ALL process types from API
+        const counts: Record<string, number> = {};
+        const apiTypes: Array<{ key: string; label: string; color: string }> = [];
+        
+        allVariables.forEach((group: MachineVariableGroup) => {
+          if (group.type) {
+            // Count variables
+            if (Array.isArray(group.variables)) {
+              counts[group.type] = group.variables.length;
+            } else if (group.variables && typeof group.variables === 'object') {
+              // Handle case where variables is an object (empty {} or object with keys)
+              counts[group.type] = Object.keys(group.variables).length;
+            } else {
+              counts[group.type] = 0;
+            }
+            
+            // Add all process types from API (check if we already added it)
+            if (!apiTypes.find(t => t.key === group.type)) {
+              // Check if it exists in config for label/color, otherwise use defaults
+              const configMatch = PROCESS_TYPE_CONFIGS.find(c => c.key === group.type);
+              apiTypes.push({
+                key: group.type,
+                label: configMatch?.label || group.type.charAt(0).toUpperCase() + group.type.slice(1),
+                color: configMatch?.color || '#6B7280',
+              });
+            }
+          }
+        });
+        
+        setVariableCounts(counts);
+        setApiProcessTypes(apiTypes);
+      } catch (error) {
+        console.error('[ProcessTypeSelector] Error fetching variable counts:', error);
+      } finally {
+        setLoadingCounts(false);
+      }
+    };
+
+    fetchVariableCounts();
+  }, []);
 
   const handleCreateCustom = () => {
     setShowCustomForm(true);
@@ -48,6 +109,10 @@ export default function ProcessTypeSelector({
   };
 
   const selectedConfig = PROCESS_TYPE_CONFIGS.find((c) => c.key === selectedProcessType);
+  const selectedApiType = apiProcessTypes.find((t) => t.key === selectedProcessType);
+  const selectedTypeLabel = selectedConfig?.label || selectedApiType?.label || selectedProcessType;
+  const selectedTypeColor = selectedConfig?.color || selectedApiType?.color || '#6B7280';
+  const selectedTypeFieldCount = variableCounts[selectedProcessType] ?? selectedConfig?.fields.length ?? 0;
 
   return (
     <div className="space-y-4">
@@ -58,29 +123,141 @@ export default function ProcessTypeSelector({
             Select Existing Process Type
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {PROCESS_TYPE_CONFIGS.map((config) => (
-              <button
-                key={config.key}
-                type="button"
-                onClick={() => onSelectExisting(config.key)}
-                className={`p-3 rounded-lg border-2 text-left transition-all ${
-                  selectedProcessType === config.key && !isCustom
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
+            {loadingCounts ? (
+              <div className="col-span-full text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-500">Loading process types...</p>
+              </div>
+            ) : apiProcessTypes.length === 0 ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-sm text-gray-500">No process types found in the system.</p>
+              </div>
+            ) : (
+              apiProcessTypes.map((apiType) => {
+                const isExpanded = expandedProcessType === apiType.key;
+                const isSelected = selectedProcessType === apiType.key && !isCustom;
+                
+                return (
                   <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: config.color }}
-                  />
-                  <span className="font-medium text-gray-900">{config.label}</span>
-                </div>
-                <p className="text-xs text-gray-500">
-                  {config.fields.length} fields configured
-                </p>
-              </button>
-            ))}
+                    key={apiType.key}
+                    className={`rounded-lg border-2 transition-all ${
+                      isExpanded ? 'col-span-full' : ''
+                    } ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectExisting(apiType.key);
+                        setExpandedProcessType(isExpanded ? null : apiType.key);
+                      }}
+                      className="w-full p-3 text-left"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: apiType.color }}
+                        />
+                        <span className="font-medium text-gray-900">{apiType.label}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {variableCounts[apiType.key] !== undefined ? (
+                          `${variableCounts[apiType.key]} fields configured`
+                        ) : (
+                          '0 fields configured'
+                        )}
+                      </p>
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="px-3 pb-3 border-t border-gray-200 pt-3">
+                        <div className="space-y-2">
+                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">Supported Colors</div>
+                              <div className="text-xs text-gray-500">Supported Colors | Type: boolean</div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button 
+                                type="button" 
+                                className="p-1 text-blue-500 hover:text-blue-700" 
+                                title="Edit"
+                                onClick={() => onEditField?.('Supported Colors')}
+                              >
+                                <Pen className="w-4 h-4" />
+                              </button>
+                              <button type="button" className="p-1 text-red-500 hover:text-red-700" title="Remove">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">Supported Paper Sizes</div>
+                              <div className="text-xs text-gray-500">Supported Paper Sizes | Type: select</div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button 
+                                type="button" 
+                                className="p-1 text-blue-500 hover:text-blue-700" 
+                                title="Edit"
+                                onClick={() => onEditField?.('Supported Paper Sizes')}
+                              >
+                                <Pen className="w-4 h-4" />
+                              </button>
+                              <button type="button" className="p-1 text-red-500 hover:text-red-700" title="Remove">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">Supported Print Types</div>
+                              <div className="text-xs text-gray-500">Supported Print Types | Type: select</div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button 
+                                type="button" 
+                                className="p-1 text-blue-500 hover:text-blue-700" 
+                                title="Edit"
+                                onClick={() => onEditField?.('Supported Print Types')}
+                              >
+                                <Pen className="w-4 h-4" />
+                              </button>
+                              <button type="button" className="p-1 text-red-500 hover:text-red-700" title="Remove">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">Supported Paper Stocks</div>
+                              <div className="text-xs text-gray-500">Supported Paper Stocks | Type: select</div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button 
+                                type="button" 
+                                className="p-1 text-blue-500 hover:text-blue-700" 
+                                title="Edit"
+                                onClick={() => onEditField?.('Supported Paper Stocks')}
+                              >
+                                <Pen className="w-4 h-4" />
+                              </button>
+                              <button type="button" className="p-1 text-red-500 hover:text-red-700" title="Remove">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -97,12 +274,12 @@ export default function ProcessTypeSelector({
               />
             </svg>
             <span className="font-medium text-green-900">
-              {selectedConfig?.label} Selected
+              {selectedTypeLabel} Selected
             </span>
           </div>
           <p className="text-sm text-green-700">
-            This machine will use the {selectedConfig?.label} process type with{' '}
-            {selectedConfig?.fields.length} pre-configured fields.
+            This machine will use the {selectedTypeLabel} process type with{' '}
+            {selectedTypeFieldCount} pre-configured fields.
           </p>
         </div>
       )}
