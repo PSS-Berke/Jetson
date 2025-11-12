@@ -30,6 +30,7 @@ type UploadStep = 'upload' | 'mapping' | 'preview' | 'uploading' | 'complete';
 
 export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJobUploadModalProps) {
   const [step, setStep] = useState<UploadStep>('upload');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
   const [parsedJobs, setParsedJobs] = useState<ParsedBulkJob[]>([]);
   const [subClients, setSubClients] = useState<string[]>([]);
@@ -423,7 +424,7 @@ export default function BulkJobUploadModal({ isOpen, onClose, onSuccess }: BulkJ
                         </select>
                         {!mapping.clientId && (
                           <p className="text-xs text-blue-600 mt-1">
-                            ✓ Will create new client: "{mapping.subClient}"
+                            ✓ Will create new client: &quot;{mapping.subClient}&quot;
                           </p>
                         )}
                       </div>
