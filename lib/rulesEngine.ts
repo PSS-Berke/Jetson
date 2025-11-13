@@ -9,8 +9,8 @@ import type {
   RuleEvaluationResult,
   RuleOperator,
   Machine,
-} from '@/types';
-import { getMachineRules } from './api';
+} from "@/types";
+import { getMachineRules } from "./api";
 
 /**
  * Evaluate a single condition against job parameters
@@ -20,7 +20,7 @@ import { getMachineRules } from './api';
  */
 export function evaluateCondition(
   condition: RuleCondition,
-  parameters: Record<string, any>
+  parameters: Record<string, any>,
 ): boolean {
   const paramValue = parameters[condition.parameter];
   const conditionValue = condition.value;
@@ -31,40 +31,43 @@ export function evaluateCondition(
   }
 
   switch (condition.operator) {
-    case 'equals':
+    case "equals":
       return paramValue === conditionValue;
 
-    case 'not_equals':
+    case "not_equals":
       return paramValue !== conditionValue;
 
-    case 'greater_than':
+    case "greater_than":
       return Number(paramValue) > Number(conditionValue);
 
-    case 'less_than':
+    case "less_than":
       return Number(paramValue) < Number(conditionValue);
 
-    case 'greater_than_or_equal':
+    case "greater_than_or_equal":
       return Number(paramValue) >= Number(conditionValue);
 
-    case 'less_than_or_equal':
+    case "less_than_or_equal":
       return Number(paramValue) <= Number(conditionValue);
 
-    case 'between':
+    case "between":
       // conditionValue should be an array [min, max]
       if (Array.isArray(conditionValue) && conditionValue.length === 2) {
         const numValue = Number(paramValue);
-        return numValue >= Number(conditionValue[0]) && numValue <= Number(conditionValue[1]);
+        return (
+          numValue >= Number(conditionValue[0]) &&
+          numValue <= Number(conditionValue[1])
+        );
       }
       return false;
 
-    case 'in':
+    case "in":
       // Check if paramValue is in the conditionValue array
       if (Array.isArray(conditionValue)) {
         return (conditionValue as (string | number)[]).includes(paramValue);
       }
       return false;
 
-    case 'not_in':
+    case "not_in":
       // Check if paramValue is NOT in the conditionValue array
       if (Array.isArray(conditionValue)) {
         return !(conditionValue as (string | number)[]).includes(paramValue);
@@ -85,7 +88,7 @@ export function evaluateCondition(
  */
 export function evaluateConditions(
   conditions: RuleCondition[],
-  parameters: Record<string, any>
+  parameters: Record<string, any>,
 ): boolean {
   if (conditions.length === 0) {
     return false;
@@ -97,11 +100,11 @@ export function evaluateConditions(
   for (let i = 0; i < conditions.length - 1; i++) {
     const condition = conditions[i];
     const nextCondition = conditions[i + 1];
-    const logic = condition.logic || 'AND'; // Default to AND
+    const logic = condition.logic || "AND"; // Default to AND
 
     const nextResult = evaluateCondition(nextCondition, parameters);
 
-    if (logic === 'OR') {
+    if (logic === "OR") {
       currentResult = currentResult || nextResult;
     } else {
       // AND
@@ -122,7 +125,7 @@ export function evaluateConditions(
 export function findMatchingRules(
   rules: MachineRule[],
   parameters: Record<string, any>,
-  machineId?: number
+  machineId?: number,
 ): MachineRule[] {
   return rules.filter((rule) => {
     // Skip inactive rules
@@ -149,7 +152,7 @@ export function findMatchingRules(
  * @returns The most restrictive rule, or undefined if no rules match
  */
 export function selectMostRestrictiveRule(
-  matchingRules: MachineRule[]
+  matchingRules: MachineRule[],
 ): MachineRule | undefined {
   if (matchingRules.length === 0) {
     return undefined;
@@ -182,10 +185,10 @@ export async function evaluateRulesForMachine(
   processTypeKey: string,
   baseSpeed: number,
   parameters: Record<string, any>,
-  machineId?: number
+  machineId?: number,
 ): Promise<RuleEvaluationResult> {
   try {
-    console.log('[rulesEngine] Evaluating rules for:', {
+    console.log("[rulesEngine] Evaluating rules for:", {
       processTypeKey,
       baseSpeed,
       parameters,
@@ -196,16 +199,20 @@ export async function evaluateRulesForMachine(
     let allRules: MachineRule[] = [];
     try {
       allRules = await getMachineRules(processTypeKey, undefined, true); // Only active rules
-      console.log('[rulesEngine] Found', allRules.length, 'active rules for process type');
+      console.log(
+        "[rulesEngine] Found",
+        allRules.length,
+        "active rules for process type",
+      );
     } catch (error) {
-      console.error('[rulesEngine] Error loading rules:', error);
-      console.log('[rulesEngine] Continuing without rules');
+      console.error("[rulesEngine] Error loading rules:", error);
+      console.log("[rulesEngine] Continuing without rules");
     }
 
     // Find matching rules
     const matchingRules = findMatchingRules(allRules, parameters, machineId);
 
-    console.log('[rulesEngine] Found', matchingRules.length, 'matching rules');
+    console.log("[rulesEngine] Found", matchingRules.length, "matching rules");
 
     // If no rules match, return base speed with default staffing
     if (matchingRules.length === 0) {
@@ -213,7 +220,7 @@ export async function evaluateRulesForMachine(
         calculatedSpeed: baseSpeed,
         peopleRequired: 1, // Default to 1 person
         baseSpeed,
-        explanation: 'No matching rules found. Using base speed.',
+        explanation: "No matching rules found. Using base speed.",
       };
     }
 
@@ -225,15 +232,21 @@ export async function evaluateRulesForMachine(
         calculatedSpeed: baseSpeed,
         peopleRequired: 1,
         baseSpeed,
-        explanation: 'No matching rules found. Using base speed.',
+        explanation: "No matching rules found. Using base speed.",
       };
     }
 
     // Calculate final speed
-    const calculatedSpeed = (baseSpeed * selectedRule.outputs.speed_modifier) / 100;
+    const calculatedSpeed =
+      (baseSpeed * selectedRule.outputs.speed_modifier) / 100;
 
-    console.log('[rulesEngine] Selected rule:', selectedRule.name);
-    console.log('[rulesEngine] Calculated speed:', calculatedSpeed, 'from base:', baseSpeed);
+    console.log("[rulesEngine] Selected rule:", selectedRule.name);
+    console.log(
+      "[rulesEngine] Calculated speed:",
+      calculatedSpeed,
+      "from base:",
+      baseSpeed,
+    );
 
     return {
       matchedRule: selectedRule,
@@ -243,13 +256,13 @@ export async function evaluateRulesForMachine(
       explanation: `Rule "${selectedRule.name}" applied: ${selectedRule.outputs.speed_modifier}% of base speed (${baseSpeed}/hr) = ${Math.round(calculatedSpeed)}/hr. Requires ${selectedRule.outputs.people_required} people.`,
     };
   } catch (error) {
-    console.error('[rulesEngine] Error evaluating rules:', error);
+    console.error("[rulesEngine] Error evaluating rules:", error);
     // Return base speed on error to prevent blocking
     return {
       calculatedSpeed: baseSpeed,
       peopleRequired: 1,
       baseSpeed,
-      explanation: 'Error evaluating rules. Using base speed.',
+      explanation: "Error evaluating rules. Using base speed.",
     };
   }
 }
@@ -263,15 +276,17 @@ export async function evaluateRulesForMachine(
  */
 export async function evaluateRulesForMachineObject(
   machine: Machine,
-  parameters: Record<string, any>
+  parameters: Record<string, any>,
 ): Promise<RuleEvaluationResult> {
   if (!machine.process_type_key) {
-    console.warn('[rulesEngine] Machine has no process_type_key, using base speed');
+    console.warn(
+      "[rulesEngine] Machine has no process_type_key, using base speed",
+    );
     return {
       calculatedSpeed: machine.speed_hr,
       peopleRequired: 1,
       baseSpeed: machine.speed_hr,
-      explanation: 'Machine has no process type. Using base speed.',
+      explanation: "Machine has no process type. Using base speed.",
     };
   }
 
@@ -279,7 +294,7 @@ export async function evaluateRulesForMachineObject(
     machine.process_type_key,
     machine.speed_hr,
     parameters,
-    machine.id
+    machine.id,
   );
 }
 
@@ -290,25 +305,26 @@ export async function evaluateRulesForMachineObject(
  */
 export function formatCondition(condition: RuleCondition): string {
   const operatorLabels: Record<RuleOperator, string> = {
-    equals: '=',
-    not_equals: '≠',
-    greater_than: '>',
-    less_than: '<',
-    greater_than_or_equal: '≥',
-    less_than_or_equal: '≤',
-    between: 'between',
-    in: 'is one of',
-    not_in: 'is not one of',
+    equals: "=",
+    not_equals: "≠",
+    greater_than: ">",
+    less_than: "<",
+    greater_than_or_equal: "≥",
+    less_than_or_equal: "≤",
+    between: "between",
+    in: "is one of",
+    not_in: "is not one of",
   };
 
-  const operatorLabel = operatorLabels[condition.operator] || condition.operator;
+  const operatorLabel =
+    operatorLabels[condition.operator] || condition.operator;
 
-  let valueStr = '';
+  let valueStr = "";
   if (Array.isArray(condition.value)) {
-    if (condition.operator === 'between') {
+    if (condition.operator === "between") {
       valueStr = `${condition.value[0]} and ${condition.value[1]}`;
     } else {
-      valueStr = condition.value.join(', ');
+      valueStr = condition.value.join(", ");
     }
   } else {
     valueStr = String(condition.value);
@@ -324,7 +340,7 @@ export function formatCondition(condition: RuleCondition): string {
  */
 export function formatConditions(conditions: RuleCondition[]): string {
   if (conditions.length === 0) {
-    return 'No conditions';
+    return "No conditions";
   }
 
   const parts: string[] = [];
@@ -334,10 +350,10 @@ export function formatConditions(conditions: RuleCondition[]): string {
 
     // Add logic operator for all except the last condition
     if (i < conditions.length - 1) {
-      const logic = condition.logic || 'AND';
+      const logic = condition.logic || "AND";
       parts.push(logic);
     }
   }
 
-  return parts.join(' ');
+  return parts.join(" ");
 }

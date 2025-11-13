@@ -1,68 +1,94 @@
-'use client';
+"use client";
 
-import { useState, useRef, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import { useUser } from '@/hooks/useUser';
-import { useAuth } from '@/hooks/useAuth';
-import { useProjections, type ProjectionFilters } from '@/hooks/useProjections';
-import { getStartOfWeek } from '@/lib/projectionUtils';
-import { startOfMonth, startOfQuarter, format } from 'date-fns';
+import { useState, useRef, useMemo } from "react";
+import dynamic from "next/dynamic";
+import { useUser } from "@/hooks/useUser";
+import { useAuth } from "@/hooks/useAuth";
+import { useProjections, type ProjectionFilters } from "@/hooks/useProjections";
+import { getStartOfWeek } from "@/lib/projectionUtils";
+import { startOfMonth, startOfQuarter, format } from "date-fns";
 import {
   calculateCFOSummaryMetrics,
   calculateRevenueByClient,
   calculateRevenueByServiceType,
-} from '@/lib/cfoUtils';
-import { useReactToPrint } from 'react-to-print';
-import ProjectionFiltersComponent from '../components/ProjectionFilters';
-import ProjectionsTable from '../components/ProjectionsTable';
-import FacilityToggle from '../components/FacilityToggle';
-import GranularityToggle, { type Granularity } from '../components/GranularityToggle';
-import PageHeader from '../components/PageHeader';
-import Pagination from '../components/Pagination';
-import ProjectionsPDFHeader from '../components/ProjectionsPDFHeader';
-import ProjectionsPDFSummary from '../components/ProjectionsPDFSummary';
-import ProjectionsPDFTable from '../components/ProjectionsPDFTable';
-import FinancialsPDFHeader from '../components/FinancialsPDFHeader';
-import FinancialsPDFSummary from '../components/FinancialsPDFSummary';
-import FinancialsPDFTables from '../components/FinancialsPDFTables';
-import CFODashboard from '../components/CFODashboard';
+} from "@/lib/cfoUtils";
+import { useReactToPrint } from "react-to-print";
+import ProjectionFiltersComponent from "../components/ProjectionFilters";
+import ProjectionsTable from "../components/ProjectionsTable";
+import FacilityToggle from "../components/FacilityToggle";
+import GranularityToggle, {
+  type Granularity,
+} from "../components/GranularityToggle";
+import PageHeader from "../components/PageHeader";
+import Pagination from "../components/Pagination";
+import ProjectionsPDFHeader from "../components/ProjectionsPDFHeader";
+import ProjectionsPDFSummary from "../components/ProjectionsPDFSummary";
+import ProjectionsPDFTable from "../components/ProjectionsPDFTable";
+import FinancialsPDFHeader from "../components/FinancialsPDFHeader";
+import FinancialsPDFSummary from "../components/FinancialsPDFSummary";
+import FinancialsPDFTables from "../components/FinancialsPDFTables";
+import CFODashboard from "../components/CFODashboard";
 
 // Dynamically import calendar and modals - only loaded when needed
-const EmbeddedCalendar = dynamic(() => import('../components/EmbeddedCalendar'), {
-  loading: () => <div className="text-center py-12 text-[var(--text-light)]">Loading calendar...</div>,
+const EmbeddedCalendar = dynamic(
+  () => import("../components/EmbeddedCalendar"),
+  {
+    loading: () => (
+      <div className="text-center py-12 text-[var(--text-light)]">
+        Loading calendar...
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const AddJobModal = dynamic(() => import("../components/AddJobModal"), {
   ssr: false,
 });
 
-const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
-  ssr: false,
-});
+const BulkJobUploadModal = dynamic(
+  () => import("../components/BulkJobUploadModal"),
+  {
+    ssr: false,
+  },
+);
 
-const BulkJobUploadModal = dynamic(() => import('../components/BulkJobUploadModal'), {
-  ssr: false,
-});
-
-type ViewMode = 'table' | 'calendar' | 'financials';
+type ViewMode = "table" | "calendar" | "financials";
 
 export default function ProjectionsPage() {
-  const [granularity, setGranularity] = useState<Granularity>('weekly');
+  const [granularity, setGranularity] = useState<Granularity>("weekly");
   const [startDate, setStartDate] = useState<Date>(getStartOfWeek());
   const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
-  const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [scheduleFilter, setScheduleFilter] = useState<'all' | 'confirmed' | 'soft'>('all');
-  const [filterMode, setFilterMode] = useState<'and' | 'or'>('and');
+  const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>(
+    [],
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [scheduleFilter, setScheduleFilter] = useState<
+    "all" | "confirmed" | "soft"
+  >("all");
+  const [filterMode, setFilterMode] = useState<"and" | "or">("and");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [filterViewMode, setFilterViewMode] = useState<'simple' | 'advanced'>('simple');
-  const [dataDisplayMode, setDataDisplayMode] = useState<'pieces' | 'revenue'>('pieces');
-  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
+  const [filterViewMode, setFilterViewMode] = useState<"simple" | "advanced">(
+    "simple",
+  );
+  const [dataDisplayMode, setDataDisplayMode] = useState<"pieces" | "revenue">(
+    "pieces",
+  );
+  const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">(
+    "cards",
+  );
   const [globalTimeScrollIndex, setGlobalTimeScrollIndex] = useState(0);
-  const [tableViewMode, setTableViewMode] = useState<'jobs' | 'processes'>('jobs');
-  const [processViewMode, setProcessViewMode] = useState<'consolidated' | 'expanded'>('consolidated');
+  const [tableViewMode, setTableViewMode] = useState<"jobs" | "processes">(
+    "jobs",
+  );
+  const [processViewMode, setProcessViewMode] = useState<
+    "consolidated" | "expanded"
+  >("consolidated");
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -95,16 +121,25 @@ export default function ProjectionsPage() {
     refetch,
   } = useProjections(startDate, filters);
 
-  console.log('[DEBUG] ProjectionsPage - startDate:', startDate);
-  console.log('[DEBUG] ProjectionsPage - timeRanges:', timeRanges);
-  console.log('[DEBUG] ProjectionsPage - processTypeCounts received:', processTypeCounts);
-  console.log('[DEBUG] ProjectionsPage - filteredJobProjections count:', filteredJobProjections.length);
-  console.log('[DEBUG] ProjectionsPage - totalRevenue:', totalRevenue);
+  console.log("[DEBUG] ProjectionsPage - startDate:", startDate);
+  console.log("[DEBUG] ProjectionsPage - timeRanges:", timeRanges);
+  console.log(
+    "[DEBUG] ProjectionsPage - processTypeCounts received:",
+    processTypeCounts,
+  );
+  console.log(
+    "[DEBUG] ProjectionsPage - filteredJobProjections count:",
+    filteredJobProjections.length,
+  );
+  console.log("[DEBUG] ProjectionsPage - totalRevenue:", totalRevenue);
 
   // Calculate paginated job projections
   const indexOfLastJob = currentPage * itemsPerPage;
   const indexOfFirstJob = indexOfLastJob - itemsPerPage;
-  const paginatedJobProjections = filteredJobProjections.slice(indexOfFirstJob, indexOfLastJob);
+  const paginatedJobProjections = filteredJobProjections.slice(
+    indexOfFirstJob,
+    indexOfLastJob,
+  );
 
   // Handle granularity change and adjust start date accordingly
   const handleGranularityChange = (newGranularity: Granularity) => {
@@ -113,13 +148,13 @@ export default function ProjectionsPage() {
 
     // Adjust start date to align with the new granularity
     switch (newGranularity) {
-      case 'monthly':
+      case "monthly":
         setStartDate(startOfMonth(new Date()));
         break;
-      case 'quarterly':
+      case "quarterly":
         setStartDate(startOfQuarter(new Date()));
         break;
-      case 'weekly':
+      case "weekly":
       default:
         setStartDate(getStartOfWeek());
         break;
@@ -127,31 +162,36 @@ export default function ProjectionsPage() {
   };
 
   // Map granularity to calendar view type
-  const mapGranularityToViewType = (gran: Granularity): 'month' | 'week' | 'day' | 'quarterly' => {
+  const mapGranularityToViewType = (
+    gran: Granularity,
+  ): "month" | "week" | "day" | "quarterly" => {
     switch (gran) {
-      case 'weekly':
-        return 'week';
-      case 'monthly':
-        return 'month';
-      case 'quarterly':
-        return 'quarterly'; // Show custom quarterly view
+      case "weekly":
+        return "week";
+      case "monthly":
+        return "month";
+      case "quarterly":
+        return "quarterly"; // Show custom quarterly view
       default:
-        return 'month';
+        return "month";
     }
   };
 
   // Get client names for PDF header
   const selectedClientNames = useMemo(() => {
     return jobProjections
-      .filter(proj => proj.job.client && selectedClients.includes(proj.job.client.id))
-      .map(proj => proj.job.client?.name || 'Unknown')
+      .filter(
+        (proj) =>
+          proj.job.client && selectedClients.includes(proj.job.client.id),
+      )
+      .map((proj) => proj.job.client?.name || "Unknown")
       .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
   }, [jobProjections, selectedClients]);
 
   // PDF print handler for projections
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `Projections_Report_${format(startDate, 'yyyy-MM-dd')}`,
+    documentTitle: `Projections_Report_${format(startDate, "yyyy-MM-dd")}`,
     onBeforePrint: () => {
       return new Promise((resolve) => {
         // Give content time to render
@@ -183,7 +223,7 @@ export default function ProjectionsPage() {
   // PDF print handler for financials
   const handleFinancialsPrint = useReactToPrint({
     contentRef: financialsPrintRef,
-    documentTitle: `Financial_Analysis_${format(startDate, 'yyyy-MM-dd')}`,
+    documentTitle: `Financial_Analysis_${format(startDate, "yyyy-MM-dd")}`,
     onBeforePrint: () => {
       return new Promise((resolve) => {
         // Give content time to render
@@ -214,14 +254,14 @@ export default function ProjectionsPage() {
 
   // Calculate data for financials PDF export
   const financialsData = useMemo(() => {
-    const jobs = filteredJobProjections.map(p => p.job);
+    const jobs = filteredJobProjections.map((p) => p.job);
     const summary = calculateCFOSummaryMetrics(jobs);
     const topClients = calculateRevenueByClient(jobs).slice(0, 10);
     const serviceTypes = calculateRevenueByServiceType(jobs);
 
     // Calculate additional metrics
-    const totalClients = new Set(jobs.map(j => j.clients_id)).size;
-    const primaryProcessType = serviceTypes[0]?.serviceType || 'N/A';
+    const totalClients = new Set(jobs.map((j) => j.clients_id)).size;
+    const primaryProcessType = serviceTypes[0]?.serviceType || "N/A";
     const revenuePerJob = jobs.length > 0 ? totalRevenue / jobs.length : 0;
 
     return {
@@ -256,7 +296,12 @@ export default function ProjectionsPage() {
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Page Title */}
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)] mb-4 no-print">
-          {granularity === 'weekly' ? '5-Week' : granularity === 'monthly' ? '3-Month' : '4-Quarter'} Projections
+          {granularity === "weekly"
+            ? "5-Week"
+            : granularity === "monthly"
+              ? "3-Month"
+              : "4-Quarter"}{" "}
+          Projections
         </h2>
 
         {/* Toggles */}
@@ -278,43 +323,43 @@ export default function ProjectionsPage() {
         {/* View Mode Tabs */}
         <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] no-print">
           <div className="flex gap-2 overflow-x-auto">
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-              viewMode === 'table'
-                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-            }`}
-          >
-            Table View
-          </button>
-          <button
-            onClick={() => setViewMode('calendar')}
-            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-              viewMode === 'calendar'
-                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-            }`}
-          >
-            Calendar View
-          </button>
-          <button
-            onClick={() => setViewMode('financials')}
-            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-              viewMode === 'financials'
-                ? 'text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]'
-                : 'text-[var(--text-light)] hover:text-[var(--dark-blue)]'
-            }`}
-          >
-            Financials
-          </button>
+            <button
+              onClick={() => setViewMode("table")}
+              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+                viewMode === "table"
+                  ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                  : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
+              }`}
+            >
+              Table View
+            </button>
+            <button
+              onClick={() => setViewMode("calendar")}
+              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+                viewMode === "calendar"
+                  ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                  : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
+              }`}
+            >
+              Calendar View
+            </button>
+            <button
+              onClick={() => setViewMode("financials")}
+              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+                viewMode === "financials"
+                  ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                  : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
+              }`}
+            >
+              Financials
+            </button>
           </div>
         </div>
 
         {/* Filters */}
         <div className="no-print">
           <ProjectionFiltersComponent
-            jobs={jobProjections.map(p => p.job)}
+            jobs={jobProjections.map((p) => p.job)}
             startDate={startDate}
             onStartDateChange={setStartDate}
             selectedClients={selectedClients}
@@ -338,250 +383,319 @@ export default function ProjectionsPage() {
             onViewModeChange={setTableViewMode}
             processViewMode={processViewMode}
             onProcessViewModeChange={setProcessViewMode}
-            onExportPDF={viewMode === 'financials' ? handleFinancialsPrint : handlePrint}
+            onExportPDF={
+              viewMode === "financials" ? handleFinancialsPrint : handlePrint
+            }
             onBulkUpload={() => setIsBulkUploadOpen(true)}
           />
         </div>
 
         {/* Content */}
         <div>
-        {error ? (
-          <div className="text-center py-12">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl mx-auto">
-              <div className="text-red-800 font-semibold text-lg mb-2">Error Loading Projections</div>
-              <div className="text-red-600 mb-4">{error}</div>
-              <div className="text-sm text-red-700 mb-4">
-                This may be caused by corrupted data in the database. Check the browser console for detailed error information,
-                or check your Xano backend logs for the /jobs endpoint.
-              </div>
-              <button
-                onClick={refetch}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        ) : isLoading ? (
-          <div className="text-center py-12">
-            <div className="text-[var(--text-light)]">Loading projections...</div>
-          </div>
-        ) : (
-          <>
-            {/* Table View */}
-            {viewMode === 'table' && (
-              <>
-                {/* Summary Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-6">
-                  {/* Simple Mode - Always visible tiles */}
-                  {totalJobsInTimeframe > 0 && (
-                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                      <div className="text-sm text-[var(--text-light)]">Total Jobs</div>
-                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                        {totalJobsInTimeframe}
-                      </div>
-                    </div>
-                  )}
-                  {totalRevenue > 0 && (
-                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                      <div className="text-sm text-[var(--text-light)]">Total Revenue</div>
-                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                        {totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                      </div>
-                    </div>
-                  )}
-                  {grandTotals.grandTotal > 0 && (
-                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                      <div className="text-sm text-[var(--text-light)]">Total Quantity</div>
-                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                        {grandTotals.grandTotal.toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                  {Object.values(processTypeCounts).filter(pt => pt.jobs > 0).length > 0 && (
-                    <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                      <div className="text-sm text-[var(--text-light)]">Process Types</div>
-                      <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                        {Object.values(processTypeCounts).filter(pt => pt.jobs > 0).length}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Advanced Mode - Additional tiles */}
-                  {filterViewMode === 'advanced' && (
-                    <>
-                      {Math.round(grandTotals.grandTotal / timeRanges.length) > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">
-                            Avg per {granularity === 'weekly' ? 'Week' : granularity === 'monthly' ? 'Month' : 'Quarter'}
-                          </div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {Math.round(grandTotals.grandTotal / timeRanges.length).toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Service Type Tiles */}
-                      {serviceSummaries.filter(summary => summary.serviceType.toLowerCase() !== 'insert' && summary.grandTotal > 0).map(summary => (
-                        <div key={summary.serviceType} className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">{summary.serviceType}</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {summary.grandTotal.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {summary.jobCount} jobs
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Process Type Tiles */}
-                      {processTypeCounts.insert.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total Insert</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.insert.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.insert.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                      {processTypeCounts.sort.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total Sort</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.sort.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.sort.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                      {processTypeCounts.inkjet.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total Inkjet</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.inkjet.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.inkjet.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                      {processTypeCounts.labelApply.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total Label/Apply</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.labelApply.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.labelApply.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                      {processTypeCounts.fold.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total Fold</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.fold.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.fold.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                      {processTypeCounts.laser.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total Laser</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.laser.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.laser.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                      {processTypeCounts.hpPress.pieces > 0 && (
-                        <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
-                          <div className="text-sm text-[var(--text-light)]">Total HP Press</div>
-                          <div className="text-2xl font-bold text-[var(--dark-blue)]">
-                            {processTypeCounts.hpPress.pieces.toLocaleString()} pcs
-                          </div>
-                          <div className="text-sm text-[var(--text-light)] mt-1">
-                            {processTypeCounts.hpPress.jobs} jobs
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+          {error ? (
+            <div className="text-center py-12">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-2xl mx-auto">
+                <div className="text-red-800 font-semibold text-lg mb-2">
+                  Error Loading Projections
                 </div>
+                <div className="text-red-600 mb-4">{error}</div>
+                <div className="text-sm text-red-700 mb-4">
+                  This may be caused by corrupted data in the database. Check
+                  the browser console for detailed error information, or check
+                  your Xano backend logs for the /jobs endpoint.
+                </div>
+                <button
+                  onClick={refetch}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : isLoading ? (
+            <div className="text-center py-12">
+              <div className="text-[var(--text-light)]">
+                Loading projections...
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Table View */}
+              {viewMode === "table" && (
+                <>
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-6">
+                    {/* Simple Mode - Always visible tiles */}
+                    {totalJobsInTimeframe > 0 && (
+                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                        <div className="text-sm text-[var(--text-light)]">
+                          Total Jobs
+                        </div>
+                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                          {totalJobsInTimeframe}
+                        </div>
+                      </div>
+                    )}
+                    {totalRevenue > 0 && (
+                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                        <div className="text-sm text-[var(--text-light)]">
+                          Total Revenue
+                        </div>
+                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                          {totalRevenue.toLocaleString("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {grandTotals.grandTotal > 0 && (
+                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                        <div className="text-sm text-[var(--text-light)]">
+                          Total Quantity
+                        </div>
+                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                          {grandTotals.grandTotal.toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+                    {Object.values(processTypeCounts).filter(
+                      (pt) => pt.jobs > 0,
+                    ).length > 0 && (
+                      <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                        <div className="text-sm text-[var(--text-light)]">
+                          Process Types
+                        </div>
+                        <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                          {
+                            Object.values(processTypeCounts).filter(
+                              (pt) => pt.jobs > 0,
+                            ).length
+                          }
+                        </div>
+                      </div>
+                    )}
 
-                {/* Projections Table */}
-                <ProjectionsTable
-                  timeRanges={timeRanges}
-                  jobProjections={paginatedJobProjections}
-                  serviceSummaries={serviceSummaries}
-                  grandTotals={grandTotals}
-                  onRefresh={refetch}
-                  mobileViewMode={mobileViewMode}
-                  globalTimeScrollIndex={globalTimeScrollIndex}
-                  onGlobalTimeScrollIndexChange={setGlobalTimeScrollIndex}
-                  dataDisplayMode={dataDisplayMode}
-                  viewMode={tableViewMode}
-                  processViewMode={processViewMode}
-                />
+                    {/* Advanced Mode - Additional tiles */}
+                    {filterViewMode === "advanced" && (
+                      <>
+                        {Math.round(
+                          grandTotals.grandTotal / timeRanges.length,
+                        ) > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Avg per{" "}
+                              {granularity === "weekly"
+                                ? "Week"
+                                : granularity === "monthly"
+                                  ? "Month"
+                                  : "Quarter"}
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {Math.round(
+                                grandTotals.grandTotal / timeRanges.length,
+                              ).toLocaleString()}
+                            </div>
+                          </div>
+                        )}
 
-                {/* Pagination */}
-                <div className="no-print">
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={filteredJobProjections.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={setItemsPerPage}
+                        {/* Service Type Tiles */}
+                        {serviceSummaries
+                          .filter(
+                            (summary) =>
+                              summary.serviceType.toLowerCase() !== "insert" &&
+                              summary.grandTotal > 0,
+                          )
+                          .map((summary) => (
+                            <div
+                              key={summary.serviceType}
+                              className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4"
+                            >
+                              <div className="text-sm text-[var(--text-light)]">
+                                {summary.serviceType}
+                              </div>
+                              <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                                {summary.grandTotal.toLocaleString()} pcs
+                              </div>
+                              <div className="text-sm text-[var(--text-light)] mt-1">
+                                {summary.jobCount} jobs
+                              </div>
+                            </div>
+                          ))}
+
+                        {/* Process Type Tiles */}
+                        {processTypeCounts.insert.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total Insert
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.insert.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.insert.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                        {processTypeCounts.sort.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total Sort
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.sort.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.sort.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                        {processTypeCounts.inkjet.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total Inkjet
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.inkjet.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.inkjet.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                        {processTypeCounts.labelApply.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total Label/Apply
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.labelApply.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.labelApply.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                        {processTypeCounts.fold.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total Fold
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.fold.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.fold.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                        {processTypeCounts.laser.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total Laser
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.laser.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.laser.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                        {processTypeCounts.hpPress.pieces > 0 && (
+                          <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
+                            <div className="text-sm text-[var(--text-light)]">
+                              Total HP Press
+                            </div>
+                            <div className="text-2xl font-bold text-[var(--dark-blue)]">
+                              {processTypeCounts.hpPress.pieces.toLocaleString()}{" "}
+                              pcs
+                            </div>
+                            <div className="text-sm text-[var(--text-light)] mt-1">
+                              {processTypeCounts.hpPress.jobs} jobs
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Projections Table */}
+                  <ProjectionsTable
+                    timeRanges={timeRanges}
+                    jobProjections={paginatedJobProjections}
+                    serviceSummaries={serviceSummaries}
+                    grandTotals={grandTotals}
+                    onRefresh={refetch}
+                    mobileViewMode={mobileViewMode}
+                    globalTimeScrollIndex={globalTimeScrollIndex}
+                    onGlobalTimeScrollIndexChange={setGlobalTimeScrollIndex}
+                    dataDisplayMode={dataDisplayMode}
+                    viewMode={tableViewMode}
+                    processViewMode={processViewMode}
+                  />
+
+                  {/* Pagination */}
+                  <div className="no-print">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalItems={filteredJobProjections.length}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={setItemsPerPage}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Calendar View */}
+              {viewMode === "calendar" && (
+                <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6">
+                  <EmbeddedCalendar
+                    startDate={startDate}
+                    selectedFacility={selectedFacility}
+                    selectedClients={selectedClients}
+                    selectedServiceTypes={selectedServiceTypes}
+                    searchQuery={searchQuery}
+                    scheduleFilter={scheduleFilter}
+                    filterMode={filterMode}
+                    height={800}
+                    viewType={mapGranularityToViewType(granularity)}
                   />
                 </div>
-              </>
-            )}
+              )}
 
-            {/* Calendar View */}
-            {viewMode === 'calendar' && (
-              <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6">
-                <EmbeddedCalendar
-                  startDate={startDate}
-                  selectedFacility={selectedFacility}
-                  selectedClients={selectedClients}
+              {/* Financials View */}
+              {viewMode === "financials" && (
+                <CFODashboard
+                  jobs={filteredJobProjections.map((p) => p.job)}
+                  timeRanges={timeRanges}
+                  totalRevenue={totalRevenue}
+                  periodLabel={`Current ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
+                  previousPeriodLabel={`Previous ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
+                  startDate={startDate.getTime()}
+                  endDate={
+                    timeRanges.length > 0
+                      ? timeRanges[timeRanges.length - 1].endDate.getTime()
+                      : startDate.getTime()
+                  }
+                  facilitiesId={selectedFacility || undefined}
+                  granularity={granularity}
+                  selectedClients={selectedClientNames}
                   selectedServiceTypes={selectedServiceTypes}
                   searchQuery={searchQuery}
-                  scheduleFilter={scheduleFilter}
-                  filterMode={filterMode}
-                  height={800}
-                  viewType={mapGranularityToViewType(granularity)}
+                  filterMode={filterMode.toUpperCase() as "AND" | "OR"}
+                  printRef={financialsPrintRef}
                 />
-              </div>
-            )}
-
-            {/* Financials View */}
-            {viewMode === 'financials' && (
-              <CFODashboard
-                jobs={filteredJobProjections.map(p => p.job)}
-                timeRanges={timeRanges}
-                totalRevenue={totalRevenue}
-                periodLabel={`Current ${granularity === 'weekly' ? '6 Weeks' : granularity === 'monthly' ? '6 Months' : '6 Quarters'}`}
-                previousPeriodLabel={`Previous ${granularity === 'weekly' ? '6 Weeks' : granularity === 'monthly' ? '6 Months' : '6 Quarters'}`}
-                startDate={startDate.getTime()}
-                endDate={timeRanges.length > 0 ? timeRanges[timeRanges.length - 1].endDate.getTime() : startDate.getTime()}
-                facilitiesId={selectedFacility || undefined}
-                granularity={granularity}
-                selectedClients={selectedClientNames}
-                selectedServiceTypes={selectedServiceTypes}
-                searchQuery={searchQuery}
-                filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
-                printRef={financialsPrintRef}
-              />
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
         </div>
       </main>
 
@@ -596,14 +710,16 @@ export default function ProjectionsPage() {
             selectedServiceTypes={selectedServiceTypes}
             searchQuery={searchQuery}
             scheduleFilter={scheduleFilter}
-            filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
+            filterMode={filterMode.toUpperCase() as "AND" | "OR"}
           />
           <ProjectionsPDFSummary
             totalJobs={totalJobsInTimeframe}
             totalRevenue={totalRevenue}
             totalQuantity={grandTotals.grandTotal}
             serviceTypeCount={serviceSummaries.length}
-            averagePerPeriod={Math.round(grandTotals.grandTotal / timeRanges.length)}
+            averagePerPeriod={Math.round(
+              grandTotals.grandTotal / timeRanges.length,
+            )}
             granularity={granularity}
             processTypeCounts={processTypeCounts}
             serviceSummaries={serviceSummaries}
@@ -623,14 +739,17 @@ export default function ProjectionsPage() {
           <FinancialsPDFHeader
             dateRange={{
               start: startDate,
-              end: timeRanges.length > 0 ? timeRanges[timeRanges.length - 1].endDate : startDate
+              end:
+                timeRanges.length > 0
+                  ? timeRanges[timeRanges.length - 1].endDate
+                  : startDate,
             }}
             granularity={granularity}
             facility={selectedFacility}
             selectedClients={selectedClientNames}
             selectedServiceTypes={selectedServiceTypes}
             searchQuery={searchQuery}
-            filterMode={filterMode.toUpperCase() as 'AND' | 'OR'}
+            filterMode={filterMode.toUpperCase() as "AND" | "OR"}
           />
           <FinancialsPDFSummary
             summary={financialsData.summary}

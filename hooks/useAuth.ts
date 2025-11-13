@@ -1,8 +1,12 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { login as apiLogin, signup as apiSignup, logout as apiLogout } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import {
+  login as apiLogin,
+  signup as apiSignup,
+  logout as apiLogout,
+} from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 interface LoginCredentials {
   email: string;
@@ -41,11 +45,11 @@ export const useAuth = (): UseAuthReturn => {
 
     try {
       const user = await apiLogin(credentials);
-      router.push('/projections'); // Redirect to projections after successful login
+      router.push("/projections"); // Redirect to projections after successful login
       router.refresh(); // Refresh to update server components
       return user;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      const errorMessage = err instanceof Error ? err.message : "Login failed";
       setError(errorMessage);
       throw err;
     } finally {
@@ -61,7 +65,7 @@ export const useAuth = (): UseAuthReturn => {
       const user = await apiSignup(userData);
       return user;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Signup failed';
+      const errorMessage = err instanceof Error ? err.message : "Signup failed";
       setError(errorMessage);
       throw err;
     } finally {
@@ -71,7 +75,7 @@ export const useAuth = (): UseAuthReturn => {
 
   const logout = (): void => {
     apiLogout();
-    router.push('/login');
+    router.push("/login");
     router.refresh(); // Refresh to update server components
   };
 

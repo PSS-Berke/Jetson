@@ -1,7 +1,11 @@
-import { TOTAL_HOURS_PER_DAY, calculateDaysDifference, timestampToDate } from './dateUtils';
-import { getCapacityColor } from './theme';
-import type { Machine } from '@/types';
-import type { ParsedJob } from '@/hooks/useJobs';
+import {
+  TOTAL_HOURS_PER_DAY,
+  calculateDaysDifference,
+  timestampToDate,
+} from "./dateUtils";
+import { getCapacityColor } from "./theme";
+import type { Machine } from "@/types";
+import type { ParsedJob } from "@/hooks/useJobs";
 
 // Re-export types for backwards compatibility
 export type { Machine };
@@ -24,28 +28,38 @@ export interface Job {
  */
 function getJobRevenue(job: Job | ParsedJob): number {
   // Check if job has parsed requirements with price_per_m
-  if ('requirements' in job && Array.isArray(job.requirements) && job.requirements.length > 0) {
-    const revenue = job.requirements.reduce((total: number, req: { price_per_m?: string }) => {
-      const pricePerMStr = req.price_per_m;
-      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
-      const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
-      return total + ((job.quantity / 1000) * pricePerM);
-    }, 0);
-    
+  if (
+    "requirements" in job &&
+    Array.isArray(job.requirements) &&
+    job.requirements.length > 0
+  ) {
+    const revenue = job.requirements.reduce(
+      (total: number, req: { price_per_m?: string }) => {
+        const pricePerMStr = req.price_per_m;
+        const isValidPrice =
+          pricePerMStr &&
+          pricePerMStr !== "undefined" &&
+          pricePerMStr !== "null";
+        const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+        return total + (job.quantity / 1000) * pricePerM;
+      },
+      0,
+    );
+
     // Add add-on charges if available
-    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    const addOnCharges = parseFloat(job.add_on_charges || "0");
     return revenue + addOnCharges;
   }
-  
+
   // Fallback to total_billing
-  return parseFloat(job.total_billing || '0');
+  return parseFloat(job.total_billing || "0");
 }
 
 /**
  * Parse speed_hr string to number (handles various formats)
  */
 export const parseSpeedPerHour = (speedHr: string): number => {
-  const parsed = parseFloat(speedHr.replace(/[^0-9.]/g, ''));
+  const parsed = parseFloat(speedHr.replace(/[^0-9.]/g, ""));
   return isNaN(parsed) ? 0 : parsed;
 };
 
@@ -53,7 +67,10 @@ export const parseSpeedPerHour = (speedHr: string): number => {
  * Calculate time estimate based on quantity and machine speed
  * Formula: quantity / speed_hr = hours needed
  */
-export const calculateTimeEstimate = (quantity: number, speedHr: string): number => {
+export const calculateTimeEstimate = (
+  quantity: number,
+  speedHr: string,
+): number => {
   const speed = parseSpeedPerHour(speedHr);
   if (speed === 0) return 0;
   return quantity / speed;
@@ -65,7 +82,7 @@ export const calculateTimeEstimate = (quantity: number, speedHr: string): number
  */
 export const calculateMultiMachineTimeEstimate = (
   quantity: number,
-  machines: Machine[]
+  machines: Machine[],
 ): number => {
   if (machines.length === 0) return 0;
 
@@ -85,7 +102,7 @@ export const calculateMultiMachineTimeEstimate = (
  */
 export const distributeHoursAcrossMachines = (
   totalHours: number,
-  machines: Machine[]
+  machines: Machine[],
 ): Map<number, number> => {
   const hoursPerMachine = new Map<number, number>();
 
@@ -99,14 +116,14 @@ export const distributeHoursAcrossMachines = (
   if (totalSpeed === 0) {
     // If no speed data, distribute equally
     const equalHours = totalHours / machines.length;
-    machines.forEach(machine => {
+    machines.forEach((machine) => {
       hoursPerMachine.set(machine.id, equalHours);
     });
     return hoursPerMachine;
   }
 
   // Distribute hours proportionally based on speed
-  machines.forEach(machine => {
+  machines.forEach((machine) => {
     const machineSpeed = parseSpeedPerHour(String(machine.speed_hr));
     const proportion = machineSpeed / totalSpeed;
     hoursPerMachine.set(machine.id, totalHours * proportion);
@@ -121,7 +138,7 @@ export const distributeHoursAcrossMachines = (
 export const distributeHoursAcrossDays = (
   totalHours: number,
   startDate: number,
-  dueDate: number
+  dueDate: number,
 ): Map<string, number> => {
   const hoursPerDay = new Map<string, number>();
 
@@ -137,7 +154,7 @@ export const distributeHoursAcrossDays = (
   for (let i = 0; i < numDays; i++) {
     const currentDate = new Date(start);
     currentDate.setDate(start.getDate() + i);
-    const dateKey = currentDate.toISOString().split('T')[0];
+    const dateKey = currentDate.toISOString().split("T")[0];
     hoursPerDay.set(dateKey, hoursPerDayValue);
   }
 
@@ -150,7 +167,9 @@ export const distributeHoursAcrossDays = (
  */
 export const calculateDailyMachineCapacity = (machine: Machine): number => {
   // Use shiftCapacity if available, otherwise use default
-  return machine.shiftCapacity ? machine.shiftCapacity * TOTAL_HOURS_PER_DAY : TOTAL_HOURS_PER_DAY;
+  return machine.shiftCapacity
+    ? machine.shiftCapacity * TOTAL_HOURS_PER_DAY
+    : TOTAL_HOURS_PER_DAY;
 };
 
 /**
@@ -159,7 +178,7 @@ export const calculateDailyMachineCapacity = (machine: Machine): number => {
  */
 export const calculateUtilizationPercent = (
   allocatedHours: number,
-  availableHours: number
+  availableHours: number,
 ): number => {
   if (availableHours === 0) return 0;
   return Math.round((allocatedHours / availableHours) * 100);
@@ -170,9 +189,9 @@ export const calculateUtilizationPercent = (
  * Green: < 50%, Yellow: 50-80%, Red: > 80%
  */
 export const getUtilizationColor = (utilizationPercent: number): string => {
-  if (utilizationPercent < 50) return 'green';
-  if (utilizationPercent <= 80) return 'yellow';
-  return 'red';
+  if (utilizationPercent < 50) return "green";
+  if (utilizationPercent <= 80) return "yellow";
+  return "red";
 };
 
 /**
@@ -190,14 +209,14 @@ export const getUtilizationColorVar = (utilizationPercent: number): string => {
 export const calculateDailyRevenue = (
   job: Job | ParsedJob | string,
   startDate?: number,
-  dueDate?: number
+  dueDate?: number,
 ): number => {
   let billing: number;
   let start: Date;
   let end: Date;
-  
+
   // Handle legacy string signature for backwards compatibility
-  if (typeof job === 'string') {
+  if (typeof job === "string") {
     billing = parseFloat(job) || 0;
     start = timestampToDate(startDate!);
     end = timestampToDate(dueDate!);
@@ -207,7 +226,7 @@ export const calculateDailyRevenue = (
     start = timestampToDate(job.start_date);
     end = timestampToDate(job.due_date);
   }
-  
+
   const numDays = calculateDaysDifference(start, end);
 
   if (numDays <= 0) return billing;
@@ -221,7 +240,7 @@ export const calculateDailyRevenue = (
 export const calculateDailyPieces = (
   totalQuantity: number,
   startDate: number,
-  dueDate: number
+  dueDate: number,
 ): number => {
   const start = timestampToDate(startDate);
   const end = timestampToDate(dueDate);
@@ -237,7 +256,7 @@ export const calculateDailyPieces = (
  */
 export const isOverCapacity = (
   allocatedHours: number,
-  machineCapacity: number
+  machineCapacity: number,
 ): boolean => {
   return allocatedHours > machineCapacity;
 };
@@ -255,10 +274,10 @@ export const calculateTotalCapacity = (machines: Machine[]): number => {
  * Get capacity status text
  */
 export const getCapacityStatus = (utilizationPercent: number): string => {
-  if (utilizationPercent < 50) return 'Low Utilization';
-  if (utilizationPercent <= 80) return 'Moderate Utilization';
-  if (utilizationPercent <= 100) return 'High Utilization';
-  return 'Over Capacity';
+  if (utilizationPercent < 50) return "Low Utilization";
+  if (utilizationPercent <= 80) return "Moderate Utilization";
+  if (utilizationPercent <= 100) return "High Utilization";
+  return "Over Capacity";
 };
 
 /**

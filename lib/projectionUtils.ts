@@ -1,5 +1,5 @@
-import { ParsedJob } from '@/hooks/useJobs';
-import { getDaysBetween, MonthRange, QuarterRange } from './dateUtils';
+import { ParsedJob } from "@/hooks/useJobs";
+import { getDaysBetween, MonthRange, QuarterRange } from "./dateUtils";
 
 export interface WeekRange {
   weekNumber: number;
@@ -43,21 +43,26 @@ export interface ProcessProjection {
  */
 export function getJobRevenue(job: ParsedJob): number {
   // Check if job has parsed requirements with price_per_m
-  if (job.requirements && Array.isArray(job.requirements) && job.requirements.length > 0) {
+  if (
+    job.requirements &&
+    Array.isArray(job.requirements) &&
+    job.requirements.length > 0
+  ) {
     const revenue = job.requirements.reduce((total, req) => {
       const pricePerMStr = req.price_per_m;
-      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const isValidPrice =
+        pricePerMStr && pricePerMStr !== "undefined" && pricePerMStr !== "null";
       const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
-      return total + ((job.quantity / 1000) * pricePerM);
+      return total + (job.quantity / 1000) * pricePerM;
     }, 0);
 
     // Add add-on charges if available
-    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    const addOnCharges = parseFloat(job.add_on_charges || "0");
     return revenue + addOnCharges;
   }
 
   // Fallback to total_billing
-  return parseFloat(job.total_billing || '0');
+  return parseFloat(job.total_billing || "0");
 }
 
 /**
@@ -72,7 +77,7 @@ export function generateWeekRanges(startDate: Date): WeekRange[] {
 
   for (let i = 0; i < 6; i++) {
     const weekStart = new Date(baseDate);
-    weekStart.setDate(baseDate.getDate() + (i * 7));
+    weekStart.setDate(baseDate.getDate() + i * 7);
 
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
@@ -96,12 +101,12 @@ export function generateWeekRanges(startDate: Date): WeekRange[] {
  */
 export function calculateJobWeeklyDistribution(
   job: ParsedJob,
-  weekRanges: WeekRange[]
+  weekRanges: WeekRange[],
 ): Map<string, number> {
   const weeklyQuantities = new Map<string, number>();
 
   // Initialize all weeks to 0
-  weekRanges.forEach(week => {
+  weekRanges.forEach((week) => {
     weeklyQuantities.set(week.label, 0);
   });
 
@@ -129,12 +134,15 @@ export function calculateJobWeeklyDistribution(
   const dailyQuantity = job.quantity / totalJobDays;
 
   // For each week, count how many job days fall within it
-  weekRanges.forEach(week => {
+  weekRanges.forEach((week) => {
     let daysInWeek = 0;
 
-    jobDays.forEach(day => {
+    jobDays.forEach((day) => {
       const dayTime = day.getTime();
-      if (dayTime >= week.startDate.getTime() && dayTime <= week.endDate.getTime()) {
+      if (
+        dayTime >= week.startDate.getTime() &&
+        dayTime <= week.endDate.getTime()
+      ) {
         daysInWeek++;
       }
     });
@@ -151,14 +159,14 @@ export function calculateJobWeeklyDistribution(
  */
 export function calculateJobProjections(
   jobs: ParsedJob[],
-  weekRanges: WeekRange[]
+  weekRanges: WeekRange[],
 ): JobProjection[] {
-  return jobs.map(job => {
+  return jobs.map((job) => {
     const weeklyQuantities = calculateJobWeeklyDistribution(job, weekRanges);
 
     // Calculate total from weekly quantities (may differ slightly from job.quantity due to rounding)
     let totalQuantity = 0;
-    weeklyQuantities.forEach(qty => {
+    weeklyQuantities.forEach((qty) => {
       totalQuantity += qty;
     });
 
@@ -176,7 +184,7 @@ export function calculateJobProjections(
       });
     } else {
       // If no quantity, set all revenues to 0
-      weekRanges.forEach(range => {
+      weekRanges.forEach((range) => {
         weeklyRevenues.set(range.label, 0);
       });
     }
@@ -196,16 +204,16 @@ export function calculateJobProjections(
  */
 export function calculateServiceTypeSummaries(
   jobProjections: JobProjection[],
-  weekRanges: WeekRange[]
+  weekRanges: WeekRange[],
 ): ServiceTypeSummary[] {
   const summaryMap = new Map<string, ServiceTypeSummary>();
 
-  jobProjections.forEach(projection => {
-    const serviceType = projection.job.service_type || 'Unknown';
+  jobProjections.forEach((projection) => {
+    const serviceType = projection.job.service_type || "Unknown";
 
     if (!summaryMap.has(serviceType)) {
       const weeklyTotals = new Map<string, number>();
-      weekRanges.forEach(week => {
+      weekRanges.forEach((week) => {
         weeklyTotals.set(week.label, 0);
       });
 
@@ -231,7 +239,7 @@ export function calculateServiceTypeSummaries(
 
   // Convert to array and sort by service type name
   return Array.from(summaryMap.values()).sort((a, b) =>
-    a.serviceType.localeCompare(b.serviceType)
+    a.serviceType.localeCompare(b.serviceType),
   );
 }
 
@@ -240,17 +248,17 @@ export function calculateServiceTypeSummaries(
  */
 export function calculateGrandTotals(
   summaries: ServiceTypeSummary[],
-  weekRanges: WeekRange[]
+  weekRanges: WeekRange[],
 ): { weeklyTotals: Map<string, number>; grandTotal: number } {
   const weeklyTotals = new Map<string, number>();
 
-  weekRanges.forEach(week => {
+  weekRanges.forEach((week) => {
     weeklyTotals.set(week.label, 0);
   });
 
   let grandTotal = 0;
 
-  summaries.forEach(summary => {
+  summaries.forEach((summary) => {
     summary.weeklyTotals.forEach((quantity, weekLabel) => {
       const currentTotal = weeklyTotals.get(weekLabel) || 0;
       weeklyTotals.set(weekLabel, currentTotal + quantity);
@@ -277,7 +285,7 @@ export function getStartOfWeek(date: Date = new Date()): Date {
  * Format number with thousands separator
  */
 export function formatQuantity(quantity: number): string {
-  if (quantity === 0) return '';
+  if (quantity === 0) return "";
   return quantity.toLocaleString();
 }
 
@@ -286,12 +294,12 @@ export function formatQuantity(quantity: number): string {
  */
 export function calculateJobDistribution(
   job: ParsedJob,
-  timeRanges: TimeRange[]
+  timeRanges: TimeRange[],
 ): Map<string, number> {
   const quantities = new Map<string, number>();
 
   // Initialize all periods to 0
-  timeRanges.forEach(range => {
+  timeRanges.forEach((range) => {
     quantities.set(range.label, 0);
   });
 
@@ -319,12 +327,15 @@ export function calculateJobDistribution(
   const dailyQuantity = job.quantity / totalJobDays;
 
   // For each time period, count how many job days fall within it
-  timeRanges.forEach(range => {
+  timeRanges.forEach((range) => {
     let daysInPeriod = 0;
 
-    jobDays.forEach(day => {
+    jobDays.forEach((day) => {
       const dayTime = day.getTime();
-      if (dayTime >= range.startDate.getTime() && dayTime <= range.endDate.getTime()) {
+      if (
+        dayTime >= range.startDate.getTime() &&
+        dayTime <= range.endDate.getTime()
+      ) {
         daysInPeriod++;
       }
     });
@@ -341,14 +352,14 @@ export function calculateJobDistribution(
  */
 export function calculateGenericJobProjections(
   jobs: ParsedJob[],
-  timeRanges: TimeRange[]
+  timeRanges: TimeRange[],
 ): JobProjection[] {
-  return jobs.map(job => {
+  return jobs.map((job) => {
     const weeklyQuantities = calculateJobDistribution(job, timeRanges);
 
     // Calculate total from quantities (may differ slightly from job.quantity due to rounding)
     let totalQuantity = 0;
-    weeklyQuantities.forEach(qty => {
+    weeklyQuantities.forEach((qty) => {
       totalQuantity += qty;
     });
 
@@ -366,7 +377,7 @@ export function calculateGenericJobProjections(
       });
     } else {
       // If no quantity, set all revenues to 0
-      timeRanges.forEach(range => {
+      timeRanges.forEach((range) => {
         weeklyRevenues.set(range.label, 0);
       });
     }
@@ -386,16 +397,16 @@ export function calculateGenericJobProjections(
  */
 export function calculateGenericServiceTypeSummaries(
   jobProjections: JobProjection[],
-  timeRanges: TimeRange[]
+  timeRanges: TimeRange[],
 ): ServiceTypeSummary[] {
   const summaryMap = new Map<string, ServiceTypeSummary>();
 
-  jobProjections.forEach(projection => {
-    const serviceType = projection.job.service_type || 'Unknown';
+  jobProjections.forEach((projection) => {
+    const serviceType = projection.job.service_type || "Unknown";
 
     if (!summaryMap.has(serviceType)) {
       const weeklyTotals = new Map<string, number>();
-      timeRanges.forEach(range => {
+      timeRanges.forEach((range) => {
         weeklyTotals.set(range.label, 0);
       });
 
@@ -421,7 +432,7 @@ export function calculateGenericServiceTypeSummaries(
 
   // Convert to array and sort by service type name
   return Array.from(summaryMap.values()).sort((a, b) =>
-    a.serviceType.localeCompare(b.serviceType)
+    a.serviceType.localeCompare(b.serviceType),
   );
 }
 
@@ -430,17 +441,17 @@ export function calculateGenericServiceTypeSummaries(
  */
 export function calculateGenericGrandTotals(
   summaries: ServiceTypeSummary[],
-  timeRanges: TimeRange[]
+  timeRanges: TimeRange[],
 ): { weeklyTotals: Map<string, number>; grandTotal: number } {
   const weeklyTotals = new Map<string, number>();
 
-  timeRanges.forEach(range => {
+  timeRanges.forEach((range) => {
     weeklyTotals.set(range.label, 0);
   });
 
   let grandTotal = 0;
 
-  summaries.forEach(summary => {
+  summaries.forEach((summary) => {
     summary.weeklyTotals.forEach((quantity, label) => {
       const currentTotal = weeklyTotals.get(label) || 0;
       weeklyTotals.set(label, currentTotal + quantity);
@@ -456,7 +467,8 @@ export function calculateGenericGrandTotals(
  */
 export function getProcessRevenue(job: ParsedJob, requirement: any): number {
   const pricePerMStr = requirement.price_per_m;
-  const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+  const isValidPrice =
+    pricePerMStr && pricePerMStr !== "undefined" && pricePerMStr !== "null";
   const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
   return (job.quantity / 1000) * pricePerM;
 }
@@ -466,11 +478,11 @@ export function getProcessRevenue(job: ParsedJob, requirement: any): number {
  * Each job with multiple processes becomes multiple rows
  */
 export function expandJobProjectionsToProcesses(
-  jobProjections: JobProjection[]
+  jobProjections: JobProjection[],
 ): ProcessProjection[] {
   const processProjections: ProcessProjection[] = [];
 
-  jobProjections.forEach(projection => {
+  jobProjections.forEach((projection) => {
     const job = projection.job;
     const numProcesses = job.requirements?.length || 0;
 
@@ -480,7 +492,7 @@ export function expandJobProjectionsToProcesses(
     }
 
     // Create a projection for each process
-    job.requirements.forEach(requirement => {
+    job.requirements.forEach((requirement) => {
       const processQuantities = new Map<string, number>();
       const processRevenues = new Map<string, number>();
       let totalProcessQuantity = 0;
@@ -505,7 +517,7 @@ export function expandJobProjectionsToProcesses(
 
       processProjections.push({
         job,
-        processType: requirement.process_type || 'Unknown',
+        processType: requirement.process_type || "Unknown",
         requirement,
         weeklyQuantities: processQuantities,
         weeklyRevenues: processRevenues,

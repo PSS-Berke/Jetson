@@ -3,13 +3,13 @@
  * Embedded rule creation for the wizard - simplified version
  */
 
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import type { RuleCondition, RuleOperator, LogicOperator } from '@/types';
-import type { RuleFormData } from '@/hooks/useWizardState';
-import { PROCESS_TYPE_CONFIGS } from '@/lib/processTypeConfig';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useState } from "react";
+import type { RuleCondition, RuleOperator, LogicOperator } from "@/types";
+import type { RuleFormData } from "@/hooks/useWizardState";
+import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
+import { Plus, Trash2 } from "lucide-react";
 
 interface RuleCreationFormProps {
   processTypeKey: string;
@@ -18,15 +18,15 @@ interface RuleCreationFormProps {
 }
 
 const OPERATOR_OPTIONS: { value: RuleOperator; label: string }[] = [
-  { value: 'equals', label: 'Equals' },
-  { value: 'not_equals', label: 'Not Equals' },
-  { value: 'greater_than', label: 'Greater Than' },
-  { value: 'less_than', label: 'Less Than' },
-  { value: 'greater_than_or_equal', label: 'Greater Than or Equal' },
-  { value: 'less_than_or_equal', label: 'Less Than or Equal' },
-  { value: 'between', label: 'Between' },
-  { value: 'in', label: 'Is One Of' },
-  { value: 'not_in', label: 'Is Not One Of' },
+  { value: "equals", label: "Equals" },
+  { value: "not_equals", label: "Not Equals" },
+  { value: "greater_than", label: "Greater Than" },
+  { value: "less_than", label: "Less Than" },
+  { value: "greater_than_or_equal", label: "Greater Than or Equal" },
+  { value: "less_than_or_equal", label: "Less Than or Equal" },
+  { value: "between", label: "Between" },
+  { value: "in", label: "Is One Of" },
+  { value: "not_in", label: "Is Not One Of" },
 ];
 
 const PEOPLE_FRACTION_OPTIONS = [0.25, 0.5, 0.75];
@@ -38,12 +38,12 @@ export default function RuleCreationForm({
 }: RuleCreationFormProps) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<RuleFormData>({
-    name: '',
+    name: "",
     conditions: [],
     outputs: {
       speed_modifier: 100,
       people_required: 1,
-      notes: '',
+      notes: "",
     },
     priority: existingRules.length + 1,
   });
@@ -51,7 +51,9 @@ export default function RuleCreationForm({
 
   const getAvailableParameters = () => {
     if (!processTypeKey) return [];
-    const processConfig = PROCESS_TYPE_CONFIGS.find((config) => config.key === processTypeKey);
+    const processConfig = PROCESS_TYPE_CONFIGS.find(
+      (config) => config.key === processTypeKey,
+    );
     return (
       processConfig?.fields.map((field) => ({
         value: field.name,
@@ -68,10 +70,10 @@ export default function RuleCreationForm({
       conditions: [
         ...prev.conditions,
         {
-          parameter: '',
-          operator: 'equals' as RuleOperator,
-          value: '',
-          logic: 'AND' as LogicOperator,
+          parameter: "",
+          operator: "equals" as RuleOperator,
+          value: "",
+          logic: "AND" as LogicOperator,
         },
       ],
     }));
@@ -84,10 +86,16 @@ export default function RuleCreationForm({
     }));
   };
 
-  const updateCondition = (index: number, field: keyof RuleCondition, value: any) => {
+  const updateCondition = (
+    index: number,
+    field: keyof RuleCondition,
+    value: any,
+  ) => {
     setFormData((prev) => ({
       ...prev,
-      conditions: prev.conditions.map((cond, i) => (i === index ? { ...cond, [field]: value } : cond)),
+      conditions: prev.conditions.map((cond, i) =>
+        i === index ? { ...cond, [field]: value } : cond,
+      ),
     }));
   };
 
@@ -95,24 +103,27 @@ export default function RuleCreationForm({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Rule name is required';
+      newErrors.name = "Rule name is required";
     }
     if (formData.conditions.length === 0) {
-      newErrors.conditions = 'At least one condition is required';
+      newErrors.conditions = "At least one condition is required";
     }
-    if (formData.outputs.speed_modifier <= 0 || formData.outputs.speed_modifier > 200) {
-      newErrors.speed_modifier = 'Speed modifier must be between 1 and 200';
+    if (
+      formData.outputs.speed_modifier <= 0 ||
+      formData.outputs.speed_modifier > 200
+    ) {
+      newErrors.speed_modifier = "Speed modifier must be between 1 and 200";
     }
     if (formData.outputs.people_required <= 0) {
-      newErrors.people_required = 'People required must be greater than 0';
+      newErrors.people_required = "People required must be greater than 0";
     }
 
     formData.conditions.forEach((cond, index) => {
       if (!cond.parameter) {
-        newErrors[`condition_${index}_parameter`] = 'Parameter is required';
+        newErrors[`condition_${index}_parameter`] = "Parameter is required";
       }
       if (!cond.value && cond.value !== 0) {
-        newErrors[`condition_${index}_value`] = 'Value is required';
+        newErrors[`condition_${index}_value`] = "Value is required";
       }
     });
 
@@ -125,12 +136,12 @@ export default function RuleCreationForm({
       onAddRule(formData);
       // Reset form
       setFormData({
-        name: '',
+        name: "",
         conditions: [],
         outputs: {
           speed_modifier: 100,
           people_required: 1,
-          notes: '',
+          notes: "",
         },
         priority: existingRules.length + 2,
       });
@@ -141,12 +152,12 @@ export default function RuleCreationForm({
 
   const handleCancel = () => {
     setFormData({
-      name: '',
+      name: "",
       conditions: [],
       outputs: {
         speed_modifier: 100,
         people_required: 1,
-        notes: '',
+        notes: "",
       },
       priority: existingRules.length + 1,
     });
@@ -178,8 +189,18 @@ export default function RuleCreationForm({
           onClick={handleCancel}
           className="text-gray-400 hover:text-gray-600"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
@@ -196,7 +217,9 @@ export default function RuleCreationForm({
           placeholder="e.g., Large Envelope Adjustment"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+        {errors.name && (
+          <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+        )}
       </div>
 
       {/* Conditions */}
@@ -216,15 +239,26 @@ export default function RuleCreationForm({
         </div>
 
         {formData.conditions.length === 0 ? (
-          <div className="text-sm text-gray-500 italic">No conditions added yet</div>
+          <div className="text-sm text-gray-500 italic">
+            No conditions added yet
+          </div>
         ) : (
           <div className="space-y-3">
             {formData.conditions.map((condition, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+              <div
+                key={index}
+                className="bg-white border border-gray-200 rounded-lg p-3 space-y-2"
+              >
                 {index > 0 && (
                   <select
                     value={condition.logic}
-                    onChange={(e) => updateCondition(index, 'logic', e.target.value as LogicOperator)}
+                    onChange={(e) =>
+                      updateCondition(
+                        index,
+                        "logic",
+                        e.target.value as LogicOperator,
+                      )
+                    }
                     className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
                   >
                     <option value="AND">AND</option>
@@ -235,7 +269,9 @@ export default function RuleCreationForm({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <select
                     value={condition.parameter}
-                    onChange={(e) => updateCondition(index, 'parameter', e.target.value)}
+                    onChange={(e) =>
+                      updateCondition(index, "parameter", e.target.value)
+                    }
                     className="px-2 py-2 border border-gray-300 rounded"
                   >
                     <option value="">Select Parameter</option>
@@ -248,7 +284,13 @@ export default function RuleCreationForm({
 
                   <select
                     value={condition.operator}
-                    onChange={(e) => updateCondition(index, 'operator', e.target.value as RuleOperator)}
+                    onChange={(e) =>
+                      updateCondition(
+                        index,
+                        "operator",
+                        e.target.value as RuleOperator,
+                      )
+                    }
                     className="px-2 py-2 border border-gray-300 rounded"
                   >
                     {OPERATOR_OPTIONS.map((op) => (
@@ -261,8 +303,10 @@ export default function RuleCreationForm({
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      value={String(condition.value || '')}
-                      onChange={(e) => updateCondition(index, 'value', e.target.value)}
+                      value={String(condition.value || "")}
+                      onChange={(e) =>
+                        updateCondition(index, "value", e.target.value)
+                      }
                       placeholder="Value"
                       className="flex-1 px-2 py-2 border border-gray-300 rounded"
                     />
@@ -277,16 +321,22 @@ export default function RuleCreationForm({
                 </div>
 
                 {errors[`condition_${index}_parameter`] && (
-                  <p className="text-xs text-red-600">{errors[`condition_${index}_parameter`]}</p>
+                  <p className="text-xs text-red-600">
+                    {errors[`condition_${index}_parameter`]}
+                  </p>
                 )}
                 {errors[`condition_${index}_value`] && (
-                  <p className="text-xs text-red-600">{errors[`condition_${index}_value`]}</p>
+                  <p className="text-xs text-red-600">
+                    {errors[`condition_${index}_value`]}
+                  </p>
                 )}
               </div>
             ))}
           </div>
         )}
-        {errors.conditions && <p className="mt-1 text-sm text-red-600">{errors.conditions}</p>}
+        {errors.conditions && (
+          <p className="mt-1 text-sm text-red-600">{errors.conditions}</p>
+        )}
       </div>
 
       {/* Outputs */}
@@ -301,14 +351,19 @@ export default function RuleCreationForm({
             onChange={(e) =>
               setFormData({
                 ...formData,
-                outputs: { ...formData.outputs, speed_modifier: parseFloat(e.target.value) },
+                outputs: {
+                  ...formData.outputs,
+                  speed_modifier: parseFloat(e.target.value),
+                },
               })
             }
             min="1"
             max="200"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
           />
-          {errors.speed_modifier && <p className="mt-1 text-sm text-red-600">{errors.speed_modifier}</p>}
+          {errors.speed_modifier && (
+            <p className="mt-1 text-sm text-red-600">{errors.speed_modifier}</p>
+          )}
         </div>
 
         <div>
@@ -322,7 +377,10 @@ export default function RuleCreationForm({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  outputs: { ...formData.outputs, people_required: parseFloat(e.target.value) },
+                  outputs: {
+                    ...formData.outputs,
+                    people_required: parseFloat(e.target.value),
+                  },
                 })
               }
               min="0.01"
@@ -337,7 +395,10 @@ export default function RuleCreationForm({
                   onClick={() =>
                     setFormData({
                       ...formData,
-                      outputs: { ...formData.outputs, people_required: fraction },
+                      outputs: {
+                        ...formData.outputs,
+                        people_required: fraction,
+                      },
                     })
                   }
                   className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
@@ -347,13 +408,19 @@ export default function RuleCreationForm({
               ))}
             </div>
           </div>
-          {errors.people_required && <p className="mt-1 text-sm text-red-600">{errors.people_required}</p>}
+          {errors.people_required && (
+            <p className="mt-1 text-sm text-red-600">
+              {errors.people_required}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Notes (Optional)
+        </label>
         <textarea
           value={formData.outputs.notes}
           onChange={(e) =>
@@ -370,15 +437,21 @@ export default function RuleCreationForm({
 
       {/* Priority */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Priority
+        </label>
         <input
           type="number"
           value={formData.priority}
-          onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
+          onChange={(e) =>
+            setFormData({ ...formData, priority: parseInt(e.target.value) })
+          }
           min="1"
           className="w-32 px-3 py-2 border border-gray-300 rounded-md"
         />
-        <p className="mt-1 text-xs text-gray-500">Higher priority rules are evaluated first</p>
+        <p className="mt-1 text-xs text-gray-500">
+          Higher priority rules are evaluated first
+        </p>
       </div>
 
       {/* Actions */}

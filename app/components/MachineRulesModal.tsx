@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import { useState, FormEvent, useEffect } from 'react';
-import { X, Plus, Trash2, Edit2 } from 'lucide-react';
+import { useState, FormEvent, useEffect } from "react";
+import { X, Plus, Trash2, Edit2 } from "lucide-react";
 import type {
   MachineRule,
   RuleCondition,
   RuleOperator,
   LogicOperator,
-} from '@/types';
+} from "@/types";
 import {
   createMachineRule,
   getMachineRules,
   updateMachineRule,
   deleteMachineRule,
   getMachines,
-} from '@/lib/api';
-import { PROCESS_TYPE_CONFIGS } from '@/lib/processTypeConfig';
-import { formatConditions } from '@/lib/rulesEngine';
-import Toast from './Toast';
+} from "@/lib/api";
+import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
+import { formatConditions } from "@/lib/rulesEngine";
+import Toast from "./Toast";
 
 interface MachineRulesModalProps {
   isOpen: boolean;
@@ -39,25 +39,29 @@ interface RuleFormData {
 }
 
 const OPERATOR_OPTIONS: { value: RuleOperator; label: string }[] = [
-  { value: 'equals', label: 'Equals' },
-  { value: 'not_equals', label: 'Not Equals' },
-  { value: 'greater_than', label: 'Greater Than' },
-  { value: 'less_than', label: 'Less Than' },
-  { value: 'greater_than_or_equal', label: 'Greater Than or Equal' },
-  { value: 'less_than_or_equal', label: 'Less Than or Equal' },
-  { value: 'between', label: 'Between' },
-  { value: 'in', label: 'Is One Of' },
-  { value: 'not_in', label: 'Is Not One Of' },
+  { value: "equals", label: "Equals" },
+  { value: "not_equals", label: "Not Equals" },
+  { value: "greater_than", label: "Greater Than" },
+  { value: "less_than", label: "Less Than" },
+  { value: "greater_than_or_equal", label: "Greater Than or Equal" },
+  { value: "less_than_or_equal", label: "Less Than or Equal" },
+  { value: "between", label: "Between" },
+  { value: "in", label: "Is One Of" },
+  { value: "not_in", label: "Is Not One Of" },
 ];
 
 const PEOPLE_FRACTION_OPTIONS = [0.25, 0.5, 0.75];
 
-export default function MachineRulesModal({ isOpen, onClose, onSuccess }: MachineRulesModalProps) {
-  const [activeTab, setActiveTab] = useState<'create' | 'view'>('create');
+export default function MachineRulesModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: MachineRulesModalProps) {
+  const [activeTab, setActiveTab] = useState<"create" | "view">("create");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const [toastMessage, setToastMessage] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [existingRules, setExistingRules] = useState<MachineRule[]>([]);
@@ -65,30 +69,30 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
   const [machines, setMachines] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<RuleFormData>({
-    name: '',
-    process_type_key: '',
-    machine_id: '', // Empty = all machines
+    name: "",
+    process_type_key: "",
+    machine_id: "", // Empty = all machines
     priority: 1,
     conditions: [],
     outputs: {
       speed_modifier: 100,
       people_required: 1,
-      notes: '',
+      notes: "",
     },
   });
 
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
       loadExistingRules();
       loadMachines();
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
@@ -97,7 +101,7 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
       const allMachines = await getMachines();
       setMachines(allMachines);
     } catch (error) {
-      console.error('[MachineRulesModal] Error loading machines:', error);
+      console.error("[MachineRulesModal] Error loading machines:", error);
     }
   };
 
@@ -107,7 +111,7 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
       const rules = await getMachineRules();
       setExistingRules(rules);
     } catch (error) {
-      console.error('[MachineRulesModal] Error loading rules:', error);
+      console.error("[MachineRulesModal] Error loading rules:", error);
       // Set empty array if endpoint is not available yet
       setExistingRules([]);
     } finally {
@@ -120,15 +124,15 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
   const handleClose = () => {
     // Reset form
     setFormData({
-      name: '',
-      process_type_key: '',
-      machine_id: '',
+      name: "",
+      process_type_key: "",
+      machine_id: "",
       priority: 1,
       conditions: [],
       outputs: {
         speed_modifier: 100,
         people_required: 1,
-        notes: '',
+        notes: "",
       },
     });
     setEditingRuleId(null);
@@ -142,10 +146,10 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
       conditions: [
         ...prev.conditions,
         {
-          parameter: '',
-          operator: 'equals',
-          value: '',
-          logic: 'AND',
+          parameter: "",
+          operator: "equals",
+          value: "",
+          logic: "AND",
         },
       ],
     }));
@@ -158,11 +162,15 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     }));
   };
 
-  const updateCondition = (index: number, field: keyof RuleCondition, value: any) => {
+  const updateCondition = (
+    index: number,
+    field: keyof RuleCondition,
+    value: any,
+  ) => {
     setFormData((prev) => ({
       ...prev,
       conditions: prev.conditions.map((cond, i) =>
-        i === index ? { ...cond, [field]: value } : cond
+        i === index ? { ...cond, [field]: value } : cond,
       ),
     }));
   };
@@ -171,48 +179,55 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     if (!formData.process_type_key) return [];
 
     const processConfig = PROCESS_TYPE_CONFIGS.find(
-      (config) => config.key === formData.process_type_key
+      (config) => config.key === formData.process_type_key,
     );
 
-    return processConfig?.fields.map((field) => ({
-      value: field.name,
-      label: field.label,
-      type: field.type,
-      options: field.options,
-    })) || [];
+    return (
+      processConfig?.fields.map((field) => ({
+        value: field.name,
+        label: field.label,
+        type: field.type,
+        options: field.options,
+      })) || []
+    );
   };
 
   const getFilteredMachines = () => {
     if (!formData.process_type_key) return [];
-    return machines.filter((m) => m.process_type_key === formData.process_type_key);
+    return machines.filter(
+      (m) => m.process_type_key === formData.process_type_key,
+    );
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Rule name is required';
+      newErrors.name = "Rule name is required";
     }
     if (!formData.process_type_key) {
-      newErrors.process_type_key = 'Process type is required';
+      newErrors.process_type_key = "Process type is required";
     }
     if (formData.conditions.length === 0) {
-      newErrors.conditions = 'At least one condition is required';
+      newErrors.conditions = "At least one condition is required";
     }
-    if (formData.outputs.speed_modifier <= 0 || formData.outputs.speed_modifier > 200) {
-      newErrors.speed_modifier = 'Speed modifier must be between 1 and 200';
+    if (
+      formData.outputs.speed_modifier <= 0 ||
+      formData.outputs.speed_modifier > 200
+    ) {
+      newErrors.speed_modifier = "Speed modifier must be between 1 and 200";
     }
     if (formData.outputs.people_required <= 0) {
-      newErrors.people_required = 'People required must be greater than 0';
+      newErrors.people_required = "People required must be greater than 0";
     }
 
     // Validate each condition
     formData.conditions.forEach((cond, index) => {
       if (!cond.parameter) {
-        newErrors[`condition_${index}_parameter`] = 'Parameter is required';
+        newErrors[`condition_${index}_parameter`] = "Parameter is required";
       }
       if (!cond.value && cond.value !== 0) {
-        newErrors[`condition_${index}_value`] = 'Value is required';
+        newErrors[`condition_${index}_value`] = "Value is required";
       }
     });
 
@@ -230,10 +245,12 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     setSubmitting(true);
 
     try {
-      const ruleData: Omit<MachineRule, 'id' | 'created_at' | 'updated_at'> = {
+      const ruleData: Omit<MachineRule, "id" | "created_at" | "updated_at"> = {
         name: formData.name,
         process_type_key: formData.process_type_key,
-        machine_id: formData.machine_id ? parseInt(formData.machine_id) : undefined,
+        machine_id: formData.machine_id
+          ? parseInt(formData.machine_id)
+          : undefined,
         priority: formData.priority,
         conditions: formData.conditions,
         outputs: formData.outputs,
@@ -242,25 +259,25 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
 
       if (editingRuleId) {
         await updateMachineRule(editingRuleId, ruleData);
-        setToastMessage('Rule updated successfully!');
+        setToastMessage("Rule updated successfully!");
       } else {
         await createMachineRule(ruleData);
-        setToastMessage('Rule created successfully!');
+        setToastMessage("Rule created successfully!");
       }
 
       setShowSuccessToast(true);
 
       // Reset form
       setFormData({
-        name: '',
-        process_type_key: '',
-        machine_id: '',
+        name: "",
+        process_type_key: "",
+        machine_id: "",
         priority: 1,
         conditions: [],
         outputs: {
           speed_modifier: 100,
           people_required: 1,
-          notes: '',
+          notes: "",
         },
       });
       setEditingRuleId(null);
@@ -269,14 +286,14 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
       await loadExistingRules();
 
       // Switch to view tab
-      setActiveTab('view');
+      setActiveTab("view");
 
       if (onSuccess) {
         onSuccess();
       }
     } catch (error) {
-      console.error('[MachineRulesModal] Error saving rule:', error);
-      alert('Failed to save rule. Please try again.');
+      console.error("[MachineRulesModal] Error saving rule:", error);
+      alert("Failed to save rule. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -286,41 +303,48 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     setFormData({
       name: rule.name,
       process_type_key: rule.process_type_key,
-      machine_id: rule.machine_id?.toString() || '',
+      machine_id: rule.machine_id?.toString() || "",
       priority: rule.priority,
       conditions: rule.conditions,
       outputs: {
         speed_modifier: rule.outputs.speed_modifier,
         people_required: rule.outputs.people_required,
-        notes: rule.outputs.notes || '',
+        notes: rule.outputs.notes || "",
       },
     });
     setEditingRuleId(rule.id);
-    setActiveTab('create');
+    setActiveTab("create");
   };
 
   const handleDeleteRule = async (ruleId: number) => {
-    if (!confirm('Are you sure you want to delete this rule?')) {
+    if (!confirm("Are you sure you want to delete this rule?")) {
       return;
     }
 
     try {
       await deleteMachineRule(ruleId);
-      setToastMessage('Rule deleted successfully!');
+      setToastMessage("Rule deleted successfully!");
       setShowSuccessToast(true);
       await loadExistingRules();
     } catch (error) {
-      console.error('[MachineRulesModal] Error deleting rule:', error);
-      alert('Failed to delete rule. Please try again.');
+      console.error("[MachineRulesModal] Error deleting rule:", error);
+      alert("Failed to delete rule. Please try again.");
     }
   };
 
   const renderConditionValue = (condition: RuleCondition, index: number) => {
-    const parameter = getAvailableParameters().find((p) => p.value === condition.parameter);
+    const parameter = getAvailableParameters().find(
+      (p) => p.value === condition.parameter,
+    );
 
     // If parameter has options and operator is 'in' or 'not_in', show multi-select
-    if (parameter?.options && (condition.operator === 'in' || condition.operator === 'not_in')) {
-      const selectedValues: (string | number)[] = Array.isArray(condition.value) ? condition.value : [];
+    if (
+      parameter?.options &&
+      (condition.operator === "in" || condition.operator === "not_in")
+    ) {
+      const selectedValues: (string | number)[] = Array.isArray(condition.value)
+        ? condition.value
+        : [];
       return (
         <div className="space-y-2">
           <label className="block text-sm text-gray-600">Select values:</label>
@@ -335,12 +359,12 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                     const newValues = isSelected
                       ? selectedValues.filter((v) => v !== option)
                       : [...selectedValues, option];
-                    updateCondition(index, 'value', newValues);
+                    updateCondition(index, "value", newValues);
                   }}
                   className={`px-3 py-1 rounded-md text-sm ${
                     isSelected
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   {option}
@@ -353,11 +377,14 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     }
 
     // If parameter has options and operator is 'equals' or 'not_equals', show dropdown
-    if (parameter?.options && ['equals', 'not_equals'].includes(condition.operator)) {
+    if (
+      parameter?.options &&
+      ["equals", "not_equals"].includes(condition.operator)
+    ) {
       return (
         <select
           value={condition.value as string}
-          onChange={(e) => updateCondition(index, 'value', e.target.value)}
+          onChange={(e) => updateCondition(index, "value", e.target.value)}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
         >
           <option value="">Select value...</option>
@@ -371,27 +398,29 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     }
 
     // For 'between' operator, show two inputs
-    if (condition.operator === 'between') {
-      const values = Array.isArray(condition.value) ? condition.value : ['', ''];
+    if (condition.operator === "between") {
+      const values = Array.isArray(condition.value)
+        ? condition.value
+        : ["", ""];
       return (
         <div className="flex gap-2 flex-1">
           <input
-            type={parameter?.type === 'number' ? 'number' : 'text'}
-            value={values[0] || ''}
+            type={parameter?.type === "number" ? "number" : "text"}
+            value={values[0] || ""}
             onChange={(e) => {
-              const newValues = [e.target.value, values[1] || ''];
-              updateCondition(index, 'value', newValues);
+              const newValues = [e.target.value, values[1] || ""];
+              updateCondition(index, "value", newValues);
             }}
             placeholder="Min"
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
           />
           <span className="py-2">and</span>
           <input
-            type={parameter?.type === 'number' ? 'number' : 'text'}
-            value={values[1] || ''}
+            type={parameter?.type === "number" ? "number" : "text"}
+            value={values[1] || ""}
             onChange={(e) => {
-              const newValues = [values[0] || '', e.target.value];
-              updateCondition(index, 'value', newValues);
+              const newValues = [values[0] || "", e.target.value];
+              updateCondition(index, "value", newValues);
             }}
             placeholder="Max"
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
@@ -403,12 +432,14 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
     // Default: single text/number input
     return (
       <input
-        type={parameter?.type === 'number' ? 'number' : 'text'}
+        type={parameter?.type === "number" ? "number" : "text"}
         value={condition.value as string | number}
         onChange={(e) => {
           const value =
-            parameter?.type === 'number' ? parseFloat(e.target.value) : e.target.value;
-          updateCondition(index, 'value', value);
+            parameter?.type === "number"
+              ? parseFloat(e.target.value)
+              : e.target.value;
+          updateCondition(index, "value", value);
         }}
         placeholder="Enter value..."
         className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
@@ -428,7 +459,9 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
         >
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-            <h2 className="text-2xl font-semibold text-gray-900">Machine Rules</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">
+              Machine Rules
+            </h2>
             <button
               onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -440,21 +473,21 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
           {/* Tabs */}
           <div className="flex border-b border-gray-200">
             <button
-              onClick={() => setActiveTab('create')}
+              onClick={() => setActiveTab("create")}
               className={`px-6 py-3 font-medium ${
-                activeTab === 'create'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                activeTab === "create"
+                  ? "border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {editingRuleId ? 'Edit Rule' : 'Create Rule'}
+              {editingRuleId ? "Edit Rule" : "Create Rule"}
             </button>
             <button
-              onClick={() => setActiveTab('view')}
+              onClick={() => setActiveTab("view")}
               className={`px-6 py-3 font-medium ${
-                activeTab === 'view'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                activeTab === "view"
+                  ? "border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               View Rules ({existingRules.length})
@@ -462,12 +495,17 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
           </div>
 
           {/* Content */}
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
-            {activeTab === 'create' ? (
+          <div
+            className="overflow-y-auto"
+            style={{ maxHeight: "calc(90vh - 140px)" }}
+          >
+            {activeTab === "create" ? (
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {/* Rule Identity */}
                 <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900">Rule Identity</h3>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Rule Identity
+                  </h3>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -476,11 +514,15 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                       placeholder="e.g., Large Envelope Speed Reduction"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     />
-                    {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+                    {errors.name && (
+                      <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -494,7 +536,7 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                           setFormData({
                             ...formData,
                             process_type_key: e.target.value,
-                            machine_id: '', // Reset machine when process type changes
+                            machine_id: "", // Reset machine when process type changes
                             conditions: [], // Reset conditions
                           })
                         }
@@ -508,7 +550,9 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                         ))}
                       </select>
                       {errors.process_type_key && (
-                        <p className="text-red-500 text-sm mt-1">{errors.process_type_key}</p>
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.process_type_key}
+                        </p>
                       )}
                     </div>
 
@@ -519,7 +563,10 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                       <select
                         value={formData.machine_id}
                         onChange={(e) =>
-                          setFormData({ ...formData, machine_id: e.target.value })
+                          setFormData({
+                            ...formData,
+                            machine_id: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                         disabled={!formData.process_type_key}
@@ -542,7 +589,10 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                       type="number"
                       value={formData.priority}
                       onChange={(e) =>
-                        setFormData({ ...formData, priority: parseInt(e.target.value) || 1 })
+                        setFormData({
+                          ...formData,
+                          priority: parseInt(e.target.value) || 1,
+                        })
                       }
                       min="1"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -556,7 +606,9 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                 {/* Conditions */}
                 <div className="bg-gray-50 p-4 rounded-lg space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">Conditions</h3>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Conditions
+                    </h3>
                     <button
                       type="button"
                       onClick={addCondition}
@@ -579,7 +631,10 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                   )}
 
                   {formData.conditions.map((condition, index) => (
-                    <div key={index} className="bg-white p-4 rounded-md space-y-3">
+                    <div
+                      key={index}
+                      className="bg-white p-4 rounded-md space-y-3"
+                    >
                       <div className="flex justify-between items-start">
                         <span className="text-sm font-medium text-gray-700">
                           Condition {index + 1}
@@ -595,10 +650,18 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
 
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Parameter</label>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Parameter
+                          </label>
                           <select
                             value={condition.parameter}
-                            onChange={(e) => updateCondition(index, 'parameter', e.target.value)}
+                            onChange={(e) =>
+                              updateCondition(
+                                index,
+                                "parameter",
+                                e.target.value,
+                              )
+                            }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           >
                             <option value="">Select...</option>
@@ -616,11 +679,17 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                         </div>
 
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Operator</label>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Operator
+                          </label>
                           <select
                             value={condition.operator}
                             onChange={(e) =>
-                              updateCondition(index, 'operator', e.target.value as RuleOperator)
+                              updateCondition(
+                                index,
+                                "operator",
+                                e.target.value as RuleOperator,
+                              )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           >
@@ -633,11 +702,17 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                         </div>
 
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Logic</label>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Logic
+                          </label>
                           <select
-                            value={condition.logic || 'AND'}
+                            value={condition.logic || "AND"}
                             onChange={(e) =>
-                              updateCondition(index, 'logic', e.target.value as LogicOperator)
+                              updateCondition(
+                                index,
+                                "logic",
+                                e.target.value as LogicOperator,
+                              )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                             disabled={index === formData.conditions.length - 1}
@@ -649,7 +724,9 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                       </div>
 
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Value</label>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Value
+                        </label>
                         {renderConditionValue(condition, index)}
                         {errors[`condition_${index}_value`] && (
                           <p className="text-red-500 text-xs mt-1">
@@ -687,10 +764,13 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      100 = base speed, 80 = 80% of base speed, 120 = 120% of base speed
+                      100 = base speed, 80 = 80% of base speed, 120 = 120% of
+                      base speed
                     </p>
                     {errors.speed_modifier && (
-                      <p className="text-red-500 text-sm mt-1">{errors.speed_modifier}</p>
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.speed_modifier}
+                      </p>
                     )}
                   </div>
 
@@ -720,9 +800,13 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                       <span className="text-gray-600">+</span>
                       <div className="flex gap-2">
                         {PEOPLE_FRACTION_OPTIONS.map((fraction) => {
-                          const whole = Math.floor(formData.outputs.people_required);
-                          const currentFraction = formData.outputs.people_required % 1;
-                          const isSelected = Math.abs(currentFraction - fraction) < 0.01;
+                          const whole = Math.floor(
+                            formData.outputs.people_required,
+                          );
+                          const currentFraction =
+                            formData.outputs.people_required % 1;
+                          const isSelected =
+                            Math.abs(currentFraction - fraction) < 0.01;
 
                           return (
                             <button
@@ -733,14 +817,15 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                                   ...formData,
                                   outputs: {
                                     ...formData.outputs,
-                                    people_required: whole + (isSelected ? 0 : fraction),
+                                    people_required:
+                                      whole + (isSelected ? 0 : fraction),
                                   },
                                 })
                               }
                               className={`px-3 py-2 rounded-md text-sm font-medium ${
                                 isSelected
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                               }`}
                             >
                               {fraction}
@@ -751,7 +836,9 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                       <span className="text-gray-600">people</span>
                     </div>
                     {errors.people_required && (
-                      <p className="text-red-500 text-sm mt-1">{errors.people_required}</p>
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.people_required}
+                      </p>
                     )}
                   </div>
 
@@ -791,7 +878,11 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                     disabled={submitting}
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    {submitting ? 'Saving...' : editingRuleId ? 'Update Rule' : 'Create Rule'}
+                    {submitting
+                      ? "Saving..."
+                      : editingRuleId
+                        ? "Update Rule"
+                        : "Create Rule"}
                   </button>
                 </div>
               </form>
@@ -803,7 +894,7 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                   <div className="text-center py-12">
                     <p className="text-gray-500 mb-4">No rules created yet</p>
                     <button
-                      onClick={() => setActiveTab('create')}
+                      onClick={() => setActiveTab("create")}
                       className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                     >
                       Create Your First Rule
@@ -813,7 +904,7 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                   <div className="space-y-4">
                     {existingRules.map((rule) => {
                       const processConfig = PROCESS_TYPE_CONFIGS.find(
-                        (c) => c.key === rule.process_type_key
+                        (c) => c.key === rule.process_type_key,
                       );
                       const machine = rule.machine_id
                         ? machines.find((m) => m.id === rule.machine_id)
@@ -826,13 +917,19 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
                         >
                           <div className="flex justify-between items-start mb-3">
                             <div className="flex-1">
-                              <h4 className="text-lg font-medium text-gray-900">{rule.name}</h4>
+                              <h4 className="text-lg font-medium text-gray-900">
+                                {rule.name}
+                              </h4>
                               <div className="flex items-center gap-2 mt-1">
                                 <span
                                   className="inline-block px-2 py-1 rounded text-xs font-medium text-white"
-                                  style={{ backgroundColor: processConfig?.color || '#gray' }}
+                                  style={{
+                                    backgroundColor:
+                                      processConfig?.color || "#gray",
+                                  }}
                                 >
-                                  {processConfig?.label || rule.process_type_key}
+                                  {processConfig?.label ||
+                                    rule.process_type_key}
                                 </span>
                                 {machine && (
                                   <span className="text-sm text-gray-600">
@@ -867,25 +964,37 @@ export default function MachineRulesModal({ isOpen, onClose, onSuccess }: Machin
 
                           <div className="space-y-2 text-sm">
                             <div>
-                              <span className="font-medium text-gray-700">Conditions: </span>
-                              <span className="text-gray-600">{formatConditions(rule.conditions)}</span>
+                              <span className="font-medium text-gray-700">
+                                Conditions:{" "}
+                              </span>
+                              <span className="text-gray-600">
+                                {formatConditions(rule.conditions)}
+                              </span>
                             </div>
                             <div>
-                              <span className="font-medium text-gray-700">Speed: </span>
+                              <span className="font-medium text-gray-700">
+                                Speed:{" "}
+                              </span>
                               <span className="text-gray-600">
                                 {rule.outputs.speed_modifier}% of base speed
                               </span>
                             </div>
                             <div>
-                              <span className="font-medium text-gray-700">People: </span>
+                              <span className="font-medium text-gray-700">
+                                People:{" "}
+                              </span>
                               <span className="text-gray-600">
                                 {rule.outputs.people_required}
                               </span>
                             </div>
                             {rule.outputs.notes && (
                               <div>
-                                <span className="font-medium text-gray-700">Notes: </span>
-                                <span className="text-gray-600">{rule.outputs.notes}</span>
+                                <span className="font-medium text-gray-700">
+                                  Notes:{" "}
+                                </span>
+                                <span className="text-gray-600">
+                                  {rule.outputs.notes}
+                                </span>
                               </div>
                             )}
                           </div>

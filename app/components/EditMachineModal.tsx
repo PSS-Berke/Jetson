@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, FormEvent, useEffect } from 'react';
-import DynamicMachineCapabilityFields from './DynamicMachineCapabilityFields';
-import FacilityToggle from './FacilityToggle';
-import { Machine, MachineCapabilityValue, MachineStatus, User } from '@/types';
-import { updateMachine, deleteMachine } from '@/lib/api';
-import Toast from './Toast';
+import { useState, FormEvent, useEffect } from "react";
+import DynamicMachineCapabilityFields from "./DynamicMachineCapabilityFields";
+import FacilityToggle from "./FacilityToggle";
+import { Machine, MachineCapabilityValue, MachineStatus, User } from "@/types";
+import { updateMachine, deleteMachine } from "@/lib/api";
+import Toast from "./Toast";
 
 interface EditMachineModalProps {
   isOpen: boolean;
@@ -28,7 +28,13 @@ interface MachineFormData {
   };
 }
 
-export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, user }: EditMachineModalProps) {
+export default function EditMachineModal({
+  isOpen,
+  machine,
+  onClose,
+  onSuccess,
+  user,
+}: EditMachineModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -36,29 +42,29 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState<MachineFormData>({
-    line: '',
-    type: '',
-    process_type_key: '',
+    line: "",
+    type: "",
+    process_type_key: "",
     facilities_id: null,
-    status: 'available',
-    speed_hr: '',
-    shiftCapacity: '',
+    status: "available",
+    speed_hr: "",
+    shiftCapacity: "",
     capabilities: {},
   });
 
   // Initialize form with machine data when modal opens
   useEffect(() => {
     if (isOpen && machine) {
-      console.log('[EditMachineModal] Initializing with machine:', machine);
+      console.log("[EditMachineModal] Initializing with machine:", machine);
 
       setFormData({
         line: machine.line.toString(),
         type: machine.type,
-        process_type_key: machine.process_type_key || '',
+        process_type_key: machine.process_type_key || "",
         facilities_id: machine.facilities_id || null,
         status: machine.status,
         speed_hr: machine.speed_hr.toString(),
-        shiftCapacity: machine.shiftCapacity?.toString() || '',
+        shiftCapacity: machine.shiftCapacity?.toString() || "",
         capabilities: machine.capabilities || {},
       });
     }
@@ -67,13 +73,13 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
@@ -86,7 +92,9 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
-            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Machine Details</h2>
+            <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
+              Machine Details
+            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
@@ -109,23 +117,33 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
               <div>
                 <p className="text-sm text-gray-500">Facility</p>
                 <p className="font-medium text-gray-900">
-                  {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                  {machine.facilities_id === 1
+                    ? "Bolingbrook"
+                    : machine.facilities_id === 2
+                      ? "Lemont"
+                      : "N/A"}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Status</p>
-                <p className="font-medium text-gray-900 capitalize">{machine.status}</p>
+                <p className="font-medium text-gray-900 capitalize">
+                  {machine.status}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Speed/Hour</p>
-                <p className="font-medium text-gray-900">{machine.speed_hr || 'N/A'}</p>
+                <p className="font-medium text-gray-900">
+                  {machine.speed_hr || "N/A"}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Shift Capacity</p>
-                <p className="font-medium text-gray-900">{machine.shiftCapacity || 'N/A'}</p>
+                <p className="font-medium text-gray-900">
+                  {machine.shiftCapacity || "N/A"}
+                </p>
               </div>
             </div>
-            
+
             <div className="pt-4 border-t border-gray-200">
               <p className="text-sm text-gray-500 italic">
                 Only administrators can edit machine details.
@@ -147,14 +165,19 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
     );
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
   };
 
-  const handleCapabilityChange = (field: string, value: MachineCapabilityValue) => {
+  const handleCapabilityChange = (
+    field: string,
+    value: MachineCapabilityValue,
+  ) => {
     setFormData((prev) => ({
       ...prev,
       capabilities: {
@@ -177,22 +200,22 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
     const newErrors: Record<string, string> = {};
 
     if (!formData.line) {
-      newErrors.line = 'Line number is required';
+      newErrors.line = "Line number is required";
     }
     if (!formData.type) {
-      newErrors.type = 'Machine type name is required';
+      newErrors.type = "Machine type name is required";
     }
     if (!formData.process_type_key) {
-      newErrors.process_type_key = 'Process type is required';
+      newErrors.process_type_key = "Process type is required";
     }
     if (!formData.facilities_id) {
-      newErrors.facilities_id = 'Facility is required';
+      newErrors.facilities_id = "Facility is required";
     }
     if (!formData.speed_hr || parseFloat(formData.speed_hr) <= 0) {
-      newErrors.speed_hr = 'Speed per hour must be greater than 0';
+      newErrors.speed_hr = "Speed per hour must be greater than 0";
     }
     if (!formData.shiftCapacity || parseFloat(formData.shiftCapacity) <= 0) {
-      newErrors.shiftCapacity = 'Shift capacity must be greater than 0';
+      newErrors.shiftCapacity = "Shift capacity must be greater than 0";
     }
 
     setErrors(newErrors);
@@ -221,11 +244,22 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
         capabilities: formData.capabilities,
       };
 
-      console.log('[EditMachineModal] Updating machine:', machine.id, 'with data:', machineData);
-      console.log('[EditMachineModal] Capabilities:', JSON.stringify(formData.capabilities, null, 2));
+      console.log(
+        "[EditMachineModal] Updating machine:",
+        machine.id,
+        "with data:",
+        machineData,
+      );
+      console.log(
+        "[EditMachineModal] Capabilities:",
+        JSON.stringify(formData.capabilities, null, 2),
+      );
 
       const updatedMachine = await updateMachine(machine.id, machineData);
-      console.log('[EditMachineModal] Machine updated successfully:', updatedMachine);
+      console.log(
+        "[EditMachineModal] Machine updated successfully:",
+        updatedMachine,
+      );
 
       setShowSuccessToast(true);
 
@@ -240,8 +274,12 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
         setShowSuccessToast(false);
       }, 2000);
     } catch (error) {
-      console.error('[EditMachineModal] Error updating machine:', error);
-      alert(error instanceof Error ? error.message : 'Failed to update machine. Please try again.');
+      console.error("[EditMachineModal] Error updating machine:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to update machine. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -253,10 +291,10 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
     setDeleting(true);
 
     try {
-      console.log('[EditMachineModal] Deleting machine:', machine.id);
+      console.log("[EditMachineModal] Deleting machine:", machine.id);
 
       await deleteMachine(machine.id);
-      console.log('[EditMachineModal] Machine deleted successfully');
+      console.log("[EditMachineModal] Machine deleted successfully");
 
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -266,8 +304,12 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
       // Close modal
       onClose();
     } catch (error) {
-      console.error('[EditMachineModal] Error deleting machine:', error);
-      alert(error instanceof Error ? error.message : 'Failed to delete machine. Please try again.');
+      console.error("[EditMachineModal] Error deleting machine:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete machine. Please try again.",
+      );
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -276,13 +318,13 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
 
   const handleClose = () => {
     setFormData({
-      line: '',
-      type: '',
-      process_type_key: '',
+      line: "",
+      type: "",
+      process_type_key: "",
       facilities_id: null,
-      status: 'available',
-      speed_hr: '',
-      shiftCapacity: '',
+      status: "available",
+      speed_hr: "",
+      shiftCapacity: "",
       capabilities: {},
     });
     setErrors({});
@@ -320,12 +362,17 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Basic Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[var(--text-dark)]">Basic Information</h3>
+                <h3 className="text-lg font-semibold text-[var(--text-dark)]">
+                  Basic Information
+                </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Line Number */}
                   <div>
-                    <label htmlFor="line" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label
+                      htmlFor="line"
+                      className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
+                    >
                       Line Number <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -336,18 +383,23 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                       onChange={handleInputChange}
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.line
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                          : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
                       }`}
                       placeholder="e.g., 101"
                       required
                     />
-                    {errors.line && <p className="mt-1 text-sm text-red-600">{errors.line}</p>}
+                    {errors.line && (
+                      <p className="mt-1 text-sm text-red-600">{errors.line}</p>
+                    )}
                   </div>
 
                   {/* Machine Type Name */}
                   <div>
-                    <label htmlFor="type" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label
+                      htmlFor="type"
+                      className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
+                    >
                       Machine Type Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -358,13 +410,15 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                       onChange={handleInputChange}
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.type
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                          : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
                       }`}
                       placeholder="e.g., Inserter, Folder, Laser"
                       required
                     />
-                    {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
+                    {errors.type && (
+                      <p className="mt-1 text-sm text-red-600">{errors.type}</p>
+                    )}
                   </div>
                 </div>
 
@@ -375,16 +429,25 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                   </label>
                   <FacilityToggle
                     currentFacility={formData.facilities_id}
-                    onFacilityChange={(facilityId) => setFormData({ ...formData, facilities_id: facilityId })}
+                    onFacilityChange={(facilityId) =>
+                      setFormData({ ...formData, facilities_id: facilityId })
+                    }
                     showAll={false}
                   />
-                  {errors.facilities_id && <p className="mt-1 text-sm text-red-600">{errors.facilities_id}</p>}
+                  {errors.facilities_id && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.facilities_id}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Status */}
                   <div>
-                    <label htmlFor="status" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label
+                      htmlFor="status"
+                      className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
+                    >
                       Status <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -403,7 +466,10 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
 
                   {/* Speed per Hour */}
                   <div>
-                    <label htmlFor="speed_hr" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label
+                      htmlFor="speed_hr"
+                      className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
+                    >
                       Speed/hr <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -414,20 +480,27 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                       onChange={handleInputChange}
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.speed_hr
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                          : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
                       }`}
                       placeholder="e.g., 5000"
                       min="0"
                       step="1"
                       required
                     />
-                    {errors.speed_hr && <p className="mt-1 text-sm text-red-600">{errors.speed_hr}</p>}
+                    {errors.speed_hr && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.speed_hr}
+                      </p>
+                    )}
                   </div>
 
                   {/* Shift Capacity */}
                   <div>
-                    <label htmlFor="shiftCapacity" className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    <label
+                      htmlFor="shiftCapacity"
+                      className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
+                    >
                       Shift Capacity <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -438,22 +511,28 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                       onChange={handleInputChange}
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                         errors.shiftCapacity
-                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                          : 'border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]'
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                          : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
                       }`}
                       placeholder="e.g., 40000"
                       min="0"
                       step="1"
                       required
                     />
-                    {errors.shiftCapacity && <p className="mt-1 text-sm text-red-600">{errors.shiftCapacity}</p>}
+                    {errors.shiftCapacity && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.shiftCapacity}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Machine Capabilities */}
               <div className="space-y-4 border-t pt-6">
-                <h3 className="text-lg font-semibold text-[var(--text-dark)]">Machine Capabilities</h3>
+                <h3 className="text-lg font-semibold text-[var(--text-dark)]">
+                  Machine Capabilities
+                </h3>
                 <DynamicMachineCapabilityFields
                   processTypeKey={formData.process_type_key}
                   capabilities={formData.capabilities}
@@ -487,7 +566,7 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                     className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={submitting || deleting}
                   >
-                    {submitting ? 'Saving...' : 'Save Changes'}
+                    {submitting ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
               </div>
@@ -506,9 +585,12 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
             className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Deletion</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Confirm Deletion
+            </h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete Machine Line {machine.line}? This action cannot be undone.
+              Are you sure you want to delete Machine Line {machine.line}? This
+              action cannot be undone.
             </p>
             <div className="flex justify-end gap-4">
               <button
@@ -523,7 +605,7 @@ export default function EditMachineModal({ isOpen, machine, onClose, onSuccess, 
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
                 disabled={deleting}
               >
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

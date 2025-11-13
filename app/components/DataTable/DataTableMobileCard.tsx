@@ -1,4 +1,4 @@
-import { ColumnConfig } from './DataTableTypes';
+import { ColumnConfig } from "./DataTableTypes";
 
 interface DataTableMobileCardProps<T> {
   row: T;
@@ -7,7 +7,11 @@ interface DataTableMobileCardProps<T> {
   isSelected: boolean;
   onToggleSelect: () => void;
   onRowClick?: (row: T) => void;
-  customTemplate?: (row: T, isSelected: boolean, onToggle: () => void) => React.ReactNode;
+  customTemplate?: (
+    row: T,
+    isSelected: boolean,
+    onToggle: () => void,
+  ) => React.ReactNode;
 }
 
 export function DataTableMobileCard<T>({
@@ -17,14 +21,14 @@ export function DataTableMobileCard<T>({
   isSelected,
   onToggleSelect,
   onRowClick,
-  customTemplate
+  customTemplate,
 }: DataTableMobileCardProps<T>) {
   const getValue = (row: T, column: ColumnConfig<T>): any => {
     if (column.getValue) {
       return column.getValue(row);
     }
 
-    const keys = column.key.split('.');
+    const keys = column.key.split(".");
     let value: any = row;
     for (const key of keys) {
       value = value?.[key];
@@ -39,8 +43,8 @@ export function DataTableMobileCard<T>({
       <div
         className={`
           bg-white border border-gray-200 rounded-lg p-4 mb-3
-          ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''}
-          ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+          ${isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""}
+          ${onRowClick ? "cursor-pointer hover:bg-gray-50" : ""}
         `}
         onClick={() => onRowClick?.(row)}
       >
@@ -54,8 +58,8 @@ export function DataTableMobileCard<T>({
     <div
       className={`
         bg-white border border-gray-200 rounded-lg p-4 mb-3
-        ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''}
-        ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+        ${isSelected ? "ring-2 ring-blue-500 bg-blue-50" : ""}
+        ${onRowClick ? "cursor-pointer hover:bg-gray-50" : ""}
       `}
       onClick={() => onRowClick?.(row)}
     >
@@ -86,8 +90,8 @@ export function DataTableMobileCard<T>({
             if (column.render) {
               displayValue = column.render(value, row);
             } else if (value === null || value === undefined) {
-              displayValue = '-';
-            } else if (typeof value === 'number') {
+              displayValue = "-";
+            } else if (typeof value === "number") {
               displayValue = value.toLocaleString();
             }
 

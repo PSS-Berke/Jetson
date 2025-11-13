@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -10,9 +10,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-} from 'recharts';
-import { ClientRevenue, formatCurrency, formatPercentage } from '@/lib/cfoUtils';
-import CFOClientSortToggle, { ClientSortType } from './CFOClientSortToggle';
+} from "recharts";
+import {
+  ClientRevenue,
+  formatCurrency,
+  formatPercentage,
+} from "@/lib/cfoUtils";
+import CFOClientSortToggle, { ClientSortType } from "./CFOClientSortToggle";
 
 interface CFOClientAnalysisProps {
   clientData: ClientRevenue[];
@@ -25,17 +29,17 @@ export default function CFOClientAnalysis({
   // title = 'Top Clients by Revenue',
   topN = 10,
 }: CFOClientAnalysisProps) {
-  const [sortBy, setSortBy] = useState<ClientSortType>('revenue');
+  const [sortBy, setSortBy] = useState<ClientSortType>("revenue");
 
   // Sort and take top N clients based on selected sort type
   const topClients = useMemo(() => {
     const sorted = [...clientData].sort((a, b) => {
       switch (sortBy) {
-        case 'revenue':
+        case "revenue":
           return b.revenue - a.revenue;
-        case 'volume':
+        case "volume":
           return b.quantity - a.quantity;
-        case 'profit':
+        case "profit":
           return b.profit - a.profit;
         default:
           return 0;
@@ -45,20 +49,21 @@ export default function CFOClientAnalysis({
   }, [clientData, sortBy, topN]);
 
   // Map sortBy to the actual data key in ClientRevenue interface
-  const chartDataKey = sortBy === 'volume' ? 'quantity' : sortBy;
+  const chartDataKey = sortBy === "volume" ? "quantity" : sortBy;
 
   // Dynamic subtitle based on active metric
-  const subtitle = sortBy === 'revenue'
-    ? 'Client concentration and distribution by revenue'
-    : sortBy === 'volume'
-    ? 'Client concentration and distribution by volume (pieces)'
-    : 'Client concentration and distribution by profitability';
+  const subtitle =
+    sortBy === "revenue"
+      ? "Client concentration and distribution by revenue"
+      : sortBy === "volume"
+        ? "Client concentration and distribution by volume (pieces)"
+        : "Client concentration and distribution by profitability";
 
   // Calculate concentration risk color for each client
   const getClientColor = (percentage: number): string => {
-    if (percentage >= 20) return '#dc2626'; // Red - high risk
-    if (percentage >= 10) return '#f59e0b'; // Yellow - moderate risk
-    return '#10b981'; // Green - healthy
+    if (percentage >= 20) return "#dc2626"; // Red - high risk
+    if (percentage >= 10) return "#f59e0b"; // Yellow - moderate risk
+    return "#10b981"; // Green - healthy
   };
 
   // Custom tooltip
@@ -71,23 +76,31 @@ export default function CFOClientAnalysis({
           <p className="font-semibold text-gray-900 mb-2">{data.clientName}</p>
           <div className="text-sm space-y-1">
             <div>
-              <span className="text-gray-600">Revenue:</span>{' '}
-              <span className="font-semibold">{formatCurrency(data.revenue)}</span>
+              <span className="text-gray-600">Revenue:</span>{" "}
+              <span className="font-semibold">
+                {formatCurrency(data.revenue)}
+              </span>
             </div>
             <div>
-              <span className="text-gray-600">Profit:</span>{' '}
-              <span className="font-semibold">{formatCurrency(data.profit)}</span>
+              <span className="text-gray-600">Profit:</span>{" "}
+              <span className="font-semibold">
+                {formatCurrency(data.profit)}
+              </span>
             </div>
             <div>
-              <span className="text-gray-600">Volume:</span>{' '}
-              <span className="font-semibold">{data.quantity.toLocaleString()} pieces</span>
+              <span className="text-gray-600">Volume:</span>{" "}
+              <span className="font-semibold">
+                {data.quantity.toLocaleString()} pieces
+              </span>
             </div>
             <div>
-              <span className="text-gray-600">% of Total Revenue:</span>{' '}
-              <span className="font-semibold">{formatPercentage(data.percentageOfTotal)}</span>
+              <span className="text-gray-600">% of Total Revenue:</span>{" "}
+              <span className="font-semibold">
+                {formatPercentage(data.percentageOfTotal)}
+              </span>
             </div>
             <div>
-              <span className="text-gray-600">Jobs:</span>{' '}
+              <span className="text-gray-600">Jobs:</span>{" "}
               <span className="font-semibold">{data.jobCount}</span>
             </div>
           </div>
@@ -99,7 +112,7 @@ export default function CFOClientAnalysis({
 
   // Format X-axis based on current sort metric
   const formatXAxis = (value: number) => {
-    if (sortBy === 'volume') {
+    if (sortBy === "volume") {
       // Format volume as number with commas
       if (value >= 1000000) {
         return `${(value / 1000000).toFixed(1)}M`;
@@ -121,7 +134,9 @@ export default function CFOClientAnalysis({
   };
 
   // Calculate risk assessment
-  const top3Concentration = topClients.slice(0, 3).reduce((sum, c) => sum + c.percentageOfTotal, 0);
+  const top3Concentration = topClients
+    .slice(0, 3)
+    .reduce((sum, c) => sum + c.percentageOfTotal, 0);
 
   return (
     <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
@@ -147,20 +162,26 @@ export default function CFOClientAnalysis({
             <XAxis
               type="number"
               stroke="#6b7280"
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: "12px" }}
               tickFormatter={formatXAxis}
             />
             <YAxis
               dataKey="clientName"
               type="category"
               stroke="#6b7280"
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: "12px" }}
               width={90}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }} />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
+            />
             <Bar dataKey={chartDataKey} radius={[0, 4, 4, 0]}>
               {topClients.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={getClientColor(entry.percentageOfTotal)} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={getClientColor(entry.percentageOfTotal)}
+                />
               ))}
             </Bar>
           </BarChart>
@@ -178,7 +199,9 @@ export default function CFOClientAnalysis({
         <div>
           <div className="text-xs text-gray-500">Top Client</div>
           <div className="text-sm font-semibold text-gray-900">
-            {topClients[0] ? formatPercentage(topClients[0].percentageOfTotal) : 'N/A'}
+            {topClients[0]
+              ? formatPercentage(topClients[0].percentageOfTotal)
+              : "N/A"}
           </div>
         </div>
         <div>
@@ -189,14 +212,20 @@ export default function CFOClientAnalysis({
         </div>
         <div>
           <div className="text-xs text-gray-500">Concentration Risk</div>
-          <div className={`text-sm font-semibold ${
-            top3Concentration >= 60 ? 'text-red-600' :
-            top3Concentration >= 50 ? 'text-yellow-600' :
-            'text-green-600'
-          }`}>
-            {top3Concentration >= 60 ? 'High' :
-             top3Concentration >= 50 ? 'Moderate' :
-             'Low'}
+          <div
+            className={`text-sm font-semibold ${
+              top3Concentration >= 60
+                ? "text-red-600"
+                : top3Concentration >= 50
+                  ? "text-yellow-600"
+                  : "text-green-600"
+            }`}
+          >
+            {top3Concentration >= 60
+              ? "High"
+              : top3Concentration >= 50
+                ? "Moderate"
+                : "Low"}
           </div>
         </div>
       </div>

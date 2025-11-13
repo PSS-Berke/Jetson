@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useRef, useLayoutEffect, useState } from 'react';
+import { useRef, useLayoutEffect, useState } from "react";
 
-export type Granularity = 'weekly' | 'monthly' | 'quarterly';
+export type Granularity = "weekly" | "monthly" | "quarterly";
 
 interface GranularityToggleProps {
   currentGranularity: Granularity;
@@ -10,19 +10,24 @@ interface GranularityToggleProps {
 }
 
 const granularities: { value: Granularity; label: string }[] = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Month' },
-  { value: 'quarterly', label: 'Quarterly' }
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Month" },
+  { value: "quarterly", label: "Quarterly" },
 ];
 
-export default function GranularityToggle({ currentGranularity, onGranularityChange }: GranularityToggleProps) {
+export default function GranularityToggle({
+  currentGranularity,
+  onGranularityChange,
+}: GranularityToggleProps) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [bubbleStyle, setBubbleStyle] = useState({ width: 0, left: 0 });
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = granularities.findIndex(g => g.value === currentGranularity);
+      const selectedIndex = granularities.findIndex(
+        (g) => g.value === currentGranularity,
+      );
       const selectedButton = buttonRefs.current[selectedIndex];
       const container = containerRef.current;
 
@@ -35,7 +40,7 @@ export default function GranularityToggle({ currentGranularity, onGranularityCha
 
         setBubbleStyle({
           width: buttonRect.width,
-          left: buttonRect.left - containerRect.left - containerPadding
+          left: buttonRect.left - containerRect.left - containerPadding,
         });
       }
     };
@@ -43,8 +48,8 @@ export default function GranularityToggle({ currentGranularity, onGranularityCha
     updateBubblePosition();
 
     // Update on window resize to handle responsive changes
-    window.addEventListener('resize', updateBubblePosition);
-    return () => window.removeEventListener('resize', updateBubblePosition);
+    window.addEventListener("resize", updateBubblePosition);
+    return () => window.removeEventListener("resize", updateBubblePosition);
   }, [currentGranularity]);
 
   return (
@@ -58,7 +63,7 @@ export default function GranularityToggle({ currentGranularity, onGranularityCha
           className="absolute top-1 bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
           style={{
             width: `${bubbleStyle.width}px`,
-            transform: `translateX(${bubbleStyle.left}px)`
+            transform: `translateX(${bubbleStyle.left}px)`,
           }}
         />
 
@@ -66,12 +71,14 @@ export default function GranularityToggle({ currentGranularity, onGranularityCha
         {granularities.map((granularity, index) => (
           <button
             key={granularity.value}
-            ref={el => { buttonRefs.current[index] = el; }}
+            ref={(el) => {
+              buttonRefs.current[index] = el;
+            }}
             onClick={() => onGranularityChange(granularity.value)}
             className={`relative z-10 px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               currentGranularity === granularity.value
-                ? 'text-white'
-                : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
+                ? "text-white"
+                : "text-[var(--text-dark)] hover:text-[var(--primary-blue)]"
             }`}
           >
             {granularity.label}

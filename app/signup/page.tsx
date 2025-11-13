@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, FormEvent, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useUser } from '@/hooks/useUser';
-import { useRouter } from 'next/navigation';
+import { useState, FormEvent, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useUser } from "@/hooks/useUser";
+import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
 
   const { signup, isLoading, error } = useAuth();
   const { user, isLoading: userLoading } = useUser();
@@ -18,20 +18,20 @@ export default function SignupPage() {
   // Redirect if not logged in or not an admin
   useEffect(() => {
     if (!userLoading && (!user || !user.admin)) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, userLoading, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setSuccessMessage('');
+    setSuccessMessage("");
 
     try {
       await signup({ email, password, admin: isAdmin });
-      setSuccessMessage('User created successfully!');
+      setSuccessMessage("User created successfully!");
       // Reset form
-      setEmail('');
-      setPassword('');
+      setEmail("");
+      setPassword("");
       setIsAdmin(false);
     } catch {
       // Error is handled by useAuth hook
@@ -79,7 +79,10 @@ export default function SignupPage() {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email address
               </label>
               <input
@@ -96,7 +99,10 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <input
@@ -121,7 +127,10 @@ export default function SignupPage() {
                 onChange={(e) => setIsAdmin(e.target.checked)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="admin" className="ml-2 block text-sm text-gray-900">
+              <label
+                htmlFor="admin"
+                className="ml-2 block text-sm text-gray-900"
+              >
                 Grant admin privileges
               </label>
             </div>
@@ -133,14 +142,14 @@ export default function SignupPage() {
               disabled={isLoading}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Creating user...' : 'Create User'}
+              {isLoading ? "Creating user..." : "Create User"}
             </button>
           </div>
         </form>
 
         <div className="text-center">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push("/")}
             className="text-sm text-blue-600 hover:text-blue-500"
           >
             Back to Home

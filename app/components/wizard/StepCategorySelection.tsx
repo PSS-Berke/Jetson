@@ -3,10 +3,10 @@
  * Small 200x400px modal for selecting Conveyance or Ancillary
  */
 
-'use client';
+"use client";
 
-import React from 'react';
-import type { MachineCategory } from '@/types';
+import React from "react";
+import type { MachineCategory } from "@/types";
 
 interface StepCategorySelectionProps {
   selected: MachineCategory | null;
@@ -21,7 +21,9 @@ export default function StepCategorySelection({
 }: StepCategorySelectionProps) {
   return (
     <div className="flex flex-col items-center justify-center py-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Select Machine Category</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        Select Machine Category
+      </h2>
       <p className="text-sm text-gray-600 mb-8 text-center max-w-md">
         Choose the type of machine you want to create
       </p>
@@ -30,33 +32,40 @@ export default function StepCategorySelection({
         {/* Conveyance Option */}
         <button
           type="button"
-          onClick={() => onSelect('conveyance')}
+          onClick={() => onSelect("conveyance")}
           className={`p-6 rounded-lg border-2 transition-all duration-200 text-left ${
-            selected === 'conveyance'
-              ? 'border-blue-500 bg-blue-50 shadow-lg'
-              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+            selected === "conveyance"
+              ? "border-blue-500 bg-blue-50 shadow-lg"
+              : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
           }`}
         >
           <div className="flex items-start gap-4">
             <div
               className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${
-                selected === 'conveyance' ? 'bg-blue-100' : 'bg-gray-100'
+                selected === "conveyance" ? "bg-blue-100" : "bg-gray-100"
               }`}
             >
               🏭
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Conveyance</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                Conveyance
+              </h3>
               <p className="text-sm text-gray-600">
-                Primary machines that process materials through various operations
+                Primary machines that process materials through various
+                operations
               </p>
               <div className="mt-2 text-xs text-gray-500">
                 Examples: Inserters, Folders, Printers, Sorters
               </div>
             </div>
-            {selected === 'conveyance' && (
+            {selected === "conveyance" && (
               <div className="text-blue-500">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
                   <path
                     fillRule="evenodd"
                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -71,33 +80,40 @@ export default function StepCategorySelection({
         {/* Ancillary Option */}
         <button
           type="button"
-          onClick={() => onSelect('ancillary')}
+          onClick={() => onSelect("ancillary")}
           className={`p-6 rounded-lg border-2 transition-all duration-200 text-left ${
-            selected === 'ancillary'
-              ? 'border-blue-500 bg-blue-50 shadow-lg'
-              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+            selected === "ancillary"
+              ? "border-blue-500 bg-blue-50 shadow-lg"
+              : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
           }`}
         >
           <div className="flex items-start gap-4">
             <div
               className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${
-                selected === 'ancillary' ? 'bg-blue-100' : 'bg-gray-100'
+                selected === "ancillary" ? "bg-blue-100" : "bg-gray-100"
               }`}
             >
               🔧
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Ancillary</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                Ancillary
+              </h3>
               <p className="text-sm text-gray-600">
-                Attachable systems that connect to conveyances to enhance functionality
+                Attachable systems that connect to conveyances to enhance
+                functionality
               </p>
               <div className="mt-2 text-xs text-gray-500">
                 Examples: Card Affixers, Inkjetters, Camera Systems
               </div>
             </div>
-            {selected === 'ancillary' && (
+            {selected === "ancillary" && (
               <div className="text-blue-500">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
                   <path
                     fillRule="evenodd"
                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"

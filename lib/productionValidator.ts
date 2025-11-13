@@ -1,6 +1,6 @@
-import { ParsedJob } from '@/hooks/useJobs';
-import { ProductionEntry } from '@/types';
-import { ParsedExcelRow } from './excelParser';
+import { ParsedJob } from "@/hooks/useJobs";
+import { ProductionEntry } from "@/types";
+import { ParsedExcelRow } from "./excelParser";
 
 /**
  * Validation result for a single Excel row
@@ -34,7 +34,7 @@ export interface ValidationWarning {
 export interface ValidatedProductionRow extends ParsedExcelRow {
   matchedJob: ParsedJob;
   validation: ValidationResult;
-  productionEntry?: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'>;
+  productionEntry?: Omit<ProductionEntry, "id" | "created_at" | "updated_at">;
 }
 
 /**
@@ -58,7 +58,7 @@ export interface ValidationOptions {
 export function validateProductionRow(
   row: ParsedExcelRow,
   jobs: ParsedJob[],
-  options: ValidationOptions = {}
+  options: ValidationOptions = {},
 ): ValidationResult {
   const result: ValidationResult = {
     isValid: true,
@@ -72,7 +72,7 @@ export function validateProductionRow(
   if (!matchedJob) {
     result.isValid = false;
     result.errors.push({
-      field: 'jobNumber',
+      field: "jobNumber",
       message: `Job number "${row.jobNumber}" not found in system`,
     });
     return result; // Can't continue without a valid job
@@ -81,9 +81,12 @@ export function validateProductionRow(
   result.matchedJob = matchedJob;
 
   // 2. Check facility mismatch
-  if (options.facilitiesId && matchedJob.facilities_id !== options.facilitiesId) {
+  if (
+    options.facilitiesId &&
+    matchedJob.facilities_id !== options.facilitiesId
+  ) {
     result.warnings.push({
-      field: 'facilities_id',
+      field: "facilities_id",
       message: `Job belongs to a different facility (expected: ${options.facilitiesId}, found: ${matchedJob.facilities_id})`,
     });
   }
@@ -92,15 +95,15 @@ export function validateProductionRow(
   if (row.quantity <= 0) {
     result.isValid = false;
     result.errors.push({
-      field: 'quantity',
-      message: 'Quantity must be greater than 0',
+      field: "quantity",
+      message: "Quantity must be greater than 0",
     });
   }
 
   // Check if quantity exceeds job total
   if (matchedJob.quantity && row.quantity > matchedJob.quantity) {
     result.warnings.push({
-      field: 'quantity',
+      field: "quantity",
       message: `Quantity (${row.quantity}) exceeds job total (${matchedJob.quantity})`,
     });
   }
@@ -115,8 +118,8 @@ export function validateProductionRow(
     if (isNaN(dateObj.getTime())) {
       result.isValid = false;
       result.errors.push({
-        field: 'date',
-        message: 'Invalid date format',
+        field: "date",
+        message: "Invalid date format",
       });
       return result;
     }
@@ -124,15 +127,15 @@ export function validateProductionRow(
     // Check if date is in the future
     if (!options.allowFutureDates && dateObj.getTime() > Date.now()) {
       result.warnings.push({
-        field: 'date',
-        message: 'Date is in the future',
+        field: "date",
+        message: "Date is in the future",
       });
     }
 
     // Check if date is before job start date
     if (matchedJob.start_date && dateObj.getTime() < matchedJob.start_date) {
       result.warnings.push({
-        field: 'date',
+        field: "date",
         message: `Date is before job start date (${new Date(matchedJob.start_date).toLocaleDateString()})`,
       });
     }
@@ -140,7 +143,7 @@ export function validateProductionRow(
     // Check if date is after job due date
     if (matchedJob.due_date && dateObj.getTime() > matchedJob.due_date) {
       result.warnings.push({
-        field: 'date',
+        field: "date",
         message: `Date is after job due date (${new Date(matchedJob.due_date).toLocaleDateString()})`,
       });
     }
@@ -148,14 +151,17 @@ export function validateProductionRow(
     entryDate = dateObj.getTime();
   } else if (options.defaultDate) {
     // Use default date if provided
-    const defaultDateObj = options.defaultDate instanceof Date ? options.defaultDate : new Date(options.defaultDate);
+    const defaultDateObj =
+      options.defaultDate instanceof Date
+        ? options.defaultDate
+        : new Date(options.defaultDate);
     entryDate = defaultDateObj.getTime();
   } else {
     // Use current date if no date provided
     entryDate = Date.now();
     result.warnings.push({
-      field: 'date',
-      message: 'No date provided, using current date',
+      field: "date",
+      message: "No date provided, using current date",
     });
   }
 
@@ -163,13 +169,12 @@ export function validateProductionRow(
   if (options.checkDuplicates && options.existingEntries) {
     const duplicate = options.existingEntries.find(
       (entry) =>
-        entry.job === matchedJob.id &&
-        isSameDay(entry.date, entryDate)
+        entry.job === matchedJob.id && isSameDay(entry.date, entryDate),
     );
 
     if (duplicate) {
       result.warnings.push({
-        field: 'duplicate',
+        field: "duplicate",
         message: `Production entry already exists for this job on ${new Date(entryDate).toLocaleDateString()} (${duplicate.actual_quantity} units)`,
       });
     }
@@ -188,7 +193,7 @@ export function validateProductionRow(
 export function validateProductionRows(
   rows: ParsedExcelRow[],
   jobs: ParsedJob[],
-  options: ValidationOptions = {}
+  options: ValidationOptions = {},
 ): ValidatedProductionRow[] {
   const validatedRows: ValidatedProductionRow[] = [];
 
@@ -206,10 +211,14 @@ export function validateProductionRows(
       let entryDate: number;
 
       if (row.date) {
-        const dateObj = row.date instanceof Date ? row.date : new Date(row.date);
+        const dateObj =
+          row.date instanceof Date ? row.date : new Date(row.date);
         entryDate = dateObj.getTime();
       } else if (options.defaultDate) {
-        const defaultDateObj = options.defaultDate instanceof Date ? options.defaultDate : new Date(options.defaultDate);
+        const defaultDateObj =
+          options.defaultDate instanceof Date
+            ? options.defaultDate
+            : new Date(options.defaultDate);
         entryDate = defaultDateObj.getTime();
       } else {
         entryDate = Date.now();
@@ -233,9 +242,13 @@ export function validateProductionRows(
 /**
  * Finds a job by job number (handles both number and string formats)
  */
-function findJobByJobNumber(jobNumber: number | string, jobs: ParsedJob[]): ParsedJob | undefined {
+function findJobByJobNumber(
+  jobNumber: number | string,
+  jobs: ParsedJob[],
+): ParsedJob | undefined {
   // Normalize job number to number for comparison
-  const normalizedJobNumber = typeof jobNumber === 'string' ? parseFloat(jobNumber) : jobNumber;
+  const normalizedJobNumber =
+    typeof jobNumber === "string" ? parseFloat(jobNumber) : jobNumber;
 
   if (isNaN(normalizedJobNumber)) {
     return undefined;
@@ -243,7 +256,10 @@ function findJobByJobNumber(jobNumber: number | string, jobs: ParsedJob[]): Pars
 
   return jobs.find((job) => {
     // Compare as numbers (handles "00123" vs 123)
-    return job.job_number === normalizedJobNumber || job.job_number === Math.floor(normalizedJobNumber);
+    return (
+      job.job_number === normalizedJobNumber ||
+      job.job_number === Math.floor(normalizedJobNumber)
+    );
   });
 }
 
@@ -276,7 +292,9 @@ export interface ValidationSummary {
 /**
  * Generates a summary of validation results
  */
-export function getValidationSummary(validatedRows: ValidatedProductionRow[]): ValidationSummary {
+export function getValidationSummary(
+  validatedRows: ValidatedProductionRow[],
+): ValidationSummary {
   const summary: ValidationSummary = {
     total: validatedRows.length,
     valid: 0,
@@ -293,7 +311,8 @@ export function getValidationSummary(validatedRows: ValidatedProductionRow[]): V
 
       // Count by facility
       if (row.matchedJob.facilities_id !== undefined) {
-        const count = summary.facilitiesCount.get(row.matchedJob.facilities_id) || 0;
+        const count =
+          summary.facilitiesCount.get(row.matchedJob.facilities_id) || 0;
         summary.facilitiesCount.set(row.matchedJob.facilities_id, count + 1);
       }
     } else {

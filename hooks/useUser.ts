@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { getMe, getToken } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { getMe, getToken } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 interface User {
   id: number;
@@ -31,8 +31,8 @@ export const useUser = (): UseUserReturn => {
       setIsLoading(false);
       setUser(null);
       // Redirect to login if no token
-      if (typeof window !== 'undefined') {
-        router.push('/login');
+      if (typeof window !== "undefined") {
+        router.push("/login");
       }
       return;
     }
@@ -44,7 +44,8 @@ export const useUser = (): UseUserReturn => {
       const userData = await getMe();
       setUser(userData);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch user';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch user";
       setError(errorMessage);
       setUser(null);
       // Note: apiFetch already handles redirect for 401/expired tokens

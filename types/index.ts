@@ -7,12 +7,16 @@
 // Machine Types
 // ============================================================================
 
-export type MachineStatus = 'running' | 'available' | 'avalible' | 'maintenance';
+export type MachineStatus =
+  | "running"
+  | "available"
+  | "avalible"
+  | "maintenance";
 
 /**
  * Machine category - conveyances are primary machines, ancillary are attachments
  */
-export type MachineCategory = 'conveyance' | 'ancillary';
+export type MachineCategory = "conveyance" | "ancillary";
 
 /**
  * Machine capability values - can be strings, numbers, or arrays of strings
@@ -128,7 +132,7 @@ export interface JobRequirement {
 /**
  * Parsed job with additional computed fields
  */
-export interface ParsedJob extends Omit<Job, 'client' | 'machines'> {
+export interface ParsedJob extends Omit<Job, "client" | "machines"> {
   client: {
     id: number;
     name: string;
@@ -192,12 +196,21 @@ export interface Facility {
 /**
  * Operator types for rule conditions
  */
-export type RuleOperator = 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_than_or_equal' | 'less_than_or_equal' | 'between' | 'in' | 'not_in';
+export type RuleOperator =
+  | "equals"
+  | "not_equals"
+  | "greater_than"
+  | "less_than"
+  | "greater_than_or_equal"
+  | "less_than_or_equal"
+  | "between"
+  | "in"
+  | "not_in";
 
 /**
  * Logic operator for combining conditions
  */
-export type LogicOperator = 'AND' | 'OR';
+export type LogicOperator = "AND" | "OR";
 
 /**
  * A single condition in a rule
@@ -276,7 +289,7 @@ export interface ProductionEntry {
  * Comparison between projected and actual production
  */
 export interface ProductionComparison {
-  job: import('@/hooks/useJobs').ParsedJob;
+  job: import("@/hooks/useJobs").ParsedJob;
   projected_quantity: number;
   actual_quantity: number;
   variance: number; // actual - projected

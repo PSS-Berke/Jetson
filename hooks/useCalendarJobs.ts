@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { useJobs, ParsedJob } from './useJobs';
-import { CalendarEvent, Machine } from '@/types/calendar';
-import { transformJobsToEvents } from '@/lib/calendarUtils';
-import { timestampToDate, isDateInRange } from '@/lib/dateUtils';
+import { useState, useEffect, useMemo } from "react";
+import { useJobs, ParsedJob } from "./useJobs";
+import { CalendarEvent, Machine } from "@/types/calendar";
+import { transformJobsToEvents } from "@/lib/calendarUtils";
+import { timestampToDate, isDateInRange } from "@/lib/dateUtils";
 
 interface UseCalendarJobsProps {
   machines: Machine[];
@@ -15,8 +15,8 @@ interface UseCalendarJobsProps {
   selectedClients?: number[];
   selectedServiceTypes?: string[];
   searchQuery?: string;
-  scheduleFilter?: 'all' | 'confirmed' | 'soft';
-  filterMode?: 'and' | 'or';
+  scheduleFilter?: "all" | "confirmed" | "soft";
+  filterMode?: "and" | "or";
 }
 
 interface UseCalendarJobsReturn {
@@ -39,9 +39,9 @@ export const useCalendarJobs = ({
   selectedMachines = [],
   selectedClients = [],
   selectedServiceTypes = [],
-  searchQuery = '',
-  scheduleFilter = 'all',
-  filterMode = 'and'
+  searchQuery = "",
+  scheduleFilter = "all",
+  filterMode = "and",
 }: UseCalendarJobsProps): UseCalendarJobsReturn => {
   const { jobs, isLoading, error, refetch } = useJobs(facilityId);
 
@@ -51,7 +51,7 @@ export const useCalendarJobs = ({
 
     // Filter by date range if provided
     if (startDate && endDate) {
-      filtered = filtered.filter(job => {
+      filtered = filtered.filter((job) => {
         const jobStart = timestampToDate(job.start_date);
         const jobEnd = timestampToDate(job.due_date);
 
@@ -66,8 +66,8 @@ export const useCalendarJobs = ({
 
     // Filter by selected machines
     if (selectedMachines.length > 0) {
-      filtered = filtered.filter(job =>
-        job.machines.some(machine => selectedMachines.includes(machine.id))
+      filtered = filtered.filter((job) =>
+        job.machines.some((machine) => selectedMachines.includes(machine.id)),
       );
     }
 
@@ -76,63 +76,84 @@ export const useCalendarJobs = ({
     const hasClientFilter = selectedClients.length > 0;
     const hasServiceTypeFilter = selectedServiceTypes.length > 0;
     const hasSearchFilter = searchQuery.trim().length > 0;
-    const hasScheduleFilter = scheduleFilter && scheduleFilter !== 'all';
+    const hasScheduleFilter = scheduleFilter && scheduleFilter !== "all";
 
-    if (filterMode === 'or') {
+    if (filterMode === "or") {
       // OR mode: job matches if it matches ANY of the selected filter values
-      filtered = filtered.filter(job => {
+      filtered = filtered.filter((job) => {
         // If no filters are active, show all jobs
-        if (!hasClientFilter && !hasServiceTypeFilter && !hasSearchFilter && !hasScheduleFilter) {
+        if (
+          !hasClientFilter &&
+          !hasServiceTypeFilter &&
+          !hasSearchFilter &&
+          !hasScheduleFilter
+        ) {
           return true;
         }
 
         // Check if matches any selected client
-        const matchesClient = hasClientFilter && selectedClients.includes(job.client?.id);
+        const matchesClient =
+          hasClientFilter && selectedClients.includes(job.client?.id);
 
         // Check if matches any selected service type (from requirements)
-        const matchesServiceType = hasServiceTypeFilter && (
-          job.requirements && job.requirements.length > 0 &&
-          job.requirements.some(req =>
-            req.process_type && selectedServiceTypes.includes(req.process_type)
-          )
-        );
+        const matchesServiceType =
+          hasServiceTypeFilter &&
+          job.requirements &&
+          job.requirements.length > 0 &&
+          job.requirements.some(
+            (req) =>
+              req.process_type &&
+              selectedServiceTypes.includes(req.process_type),
+          );
 
         // Check if matches search query
-        const matchesSearch = hasSearchFilter && (() => {
-          const query = searchQuery.toLowerCase();
-          return (
-            job.job_number.toString().includes(query) ||
-            job.client?.name.toLowerCase().includes(query) ||
-            job.description?.toLowerCase().includes(query)
-          );
-        })();
+        const matchesSearch =
+          hasSearchFilter &&
+          (() => {
+            const query = searchQuery.toLowerCase();
+            return (
+              job.job_number.toString().includes(query) ||
+              job.client?.name.toLowerCase().includes(query) ||
+              job.description?.toLowerCase().includes(query)
+            );
+          })();
 
         // Check if matches schedule filter
-        const matchesSchedule = hasScheduleFilter && (() => {
-          const isConfirmed = (job as any).confirmed === true || (job as any).confirmed === 1;
-          return scheduleFilter === 'confirmed' ? isConfirmed : !isConfirmed;
-        })();
+        const matchesSchedule =
+          hasScheduleFilter &&
+          (() => {
+            const isConfirmed =
+              (job as any).confirmed === true || (job as any).confirmed === 1;
+            return scheduleFilter === "confirmed" ? isConfirmed : !isConfirmed;
+          })();
 
         // Return true if matches ANY active filter
-        return matchesClient || matchesServiceType || matchesSearch || matchesSchedule;
+        return (
+          matchesClient ||
+          matchesServiceType ||
+          matchesSearch ||
+          matchesSchedule
+        );
       });
     } else {
       // AND mode: job must pass ALL active filters
 
       // Filter by clients
       if (hasClientFilter) {
-        filtered = filtered.filter(job =>
-          selectedClients.includes(job.client?.id)
+        filtered = filtered.filter((job) =>
+          selectedClients.includes(job.client?.id),
         );
       }
 
       // Filter by process types from requirements
       if (hasServiceTypeFilter) {
-        filtered = filtered.filter(job => {
+        filtered = filtered.filter((job) => {
           // Check if any requirement has a matching process type
           if (job.requirements && job.requirements.length > 0) {
-            return job.requirements.some(req =>
-              req.process_type && selectedServiceTypes.includes(req.process_type)
+            return job.requirements.some(
+              (req) =>
+                req.process_type &&
+                selectedServiceTypes.includes(req.process_type),
             );
           }
           return false;
@@ -142,7 +163,7 @@ export const useCalendarJobs = ({
       // Filter by search query (job number, client name, or description)
       if (hasSearchFilter) {
         const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(job => {
+        filtered = filtered.filter((job) => {
           return (
             job.job_number.toString().includes(query) ||
             job.client?.name.toLowerCase().includes(query) ||
@@ -153,11 +174,12 @@ export const useCalendarJobs = ({
 
       // Filter by schedule type (confirmed/soft)
       if (hasScheduleFilter) {
-        filtered = filtered.filter(job => {
-          const isConfirmed = (job as any).confirmed === true || (job as any).confirmed === 1;
-          if (scheduleFilter === 'confirmed') {
+        filtered = filtered.filter((job) => {
+          const isConfirmed =
+            (job as any).confirmed === true || (job as any).confirmed === 1;
+          if (scheduleFilter === "confirmed") {
             return isConfirmed;
-          } else if (scheduleFilter === 'soft') {
+          } else if (scheduleFilter === "soft") {
             return !isConfirmed;
           }
           return true;
@@ -166,7 +188,17 @@ export const useCalendarJobs = ({
     }
 
     return filtered;
-  }, [jobs, startDate, endDate, selectedMachines, selectedClients, selectedServiceTypes, searchQuery, scheduleFilter, filterMode]);
+  }, [
+    jobs,
+    startDate,
+    endDate,
+    selectedMachines,
+    selectedClients,
+    selectedServiceTypes,
+    searchQuery,
+    scheduleFilter,
+    filterMode,
+  ]);
 
   // Transform filtered jobs into calendar events
   const events = useMemo(() => {
@@ -179,6 +211,6 @@ export const useCalendarJobs = ({
     events,
     isLoading,
     error,
-    refetch
+    refetch,
   };
 };

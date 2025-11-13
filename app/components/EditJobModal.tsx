@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState, FormEvent, useEffect } from 'react';
-import SmartClientSelect from './SmartClientSelect';
-import FacilityToggle from './FacilityToggle';
-import ScheduleToggle from './ScheduleToggle';
-import DynamicRequirementFields from './DynamicRequirementFields';
-import { updateJob, deleteJob } from '@/lib/api';
-import { type ParsedJob } from '@/hooks/useJobs';
-import { getProcessTypeConfig } from '@/lib/processTypeConfig';
-import Toast from './Toast';
+import { useState, FormEvent, useEffect } from "react";
+import SmartClientSelect from "./SmartClientSelect";
+import FacilityToggle from "./FacilityToggle";
+import ScheduleToggle from "./ScheduleToggle";
+import DynamicRequirementFields from "./DynamicRequirementFields";
+import { updateJob, deleteJob } from "@/lib/api";
+import { type ParsedJob } from "@/hooks/useJobs";
+import { getProcessTypeConfig } from "@/lib/processTypeConfig";
+import Toast from "./Toast";
 
 interface EditJobModalProps {
   isOpen: boolean;
@@ -50,7 +50,12 @@ interface JobFormData {
   total_billing: string;
 }
 
-export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJobModalProps) {
+export default function EditJobModal({
+  isOpen,
+  job,
+  onClose,
+  onSuccess,
+}: EditJobModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
@@ -58,108 +63,120 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   const [isConfirmed, setIsConfirmed] = useState(false); // true = Schedule, false = Soft Schedule
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] = useState(false);
+  const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
+    useState(false);
   const [pendingRedistribution, setPendingRedistribution] = useState<{
     weekIndex: number;
     newValue: number;
   } | null>(null);
-  const [tempWeekQuantity, setTempWeekQuantity] = useState<string>('');
+  const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
   const [formData, setFormData] = useState<JobFormData>({
-    job_number: '',
+    job_number: "",
     clients_id: null,
     sub_clients_id: null,
-    client_name: '',
-    sub_client_name: '',
-    job_name: '',
-    description: '',
-    quantity: '',
-    csr: '',
-    prgm: '',
+    client_name: "",
+    sub_client_name: "",
+    job_name: "",
+    description: "",
+    quantity: "",
+    csr: "",
+    prgm: "",
     facilities_id: null,
-    start_date: '',
-    due_date: '',
-    service_type: 'insert',
-    pockets: '2',
+    start_date: "",
+    due_date: "",
+    service_type: "insert",
+    pockets: "2",
     machines_id: [],
     requirements: [
       {
-        process_type: '',
-        price_per_m: ''
-      }
+        process_type: "",
+        price_per_m: "",
+      },
     ],
     weekly_split: [],
     locked_weeks: [],
-    price_per_m: '',
-    add_on_charges: '',
-    ext_price: '',
-    total_billing: ''
+    price_per_m: "",
+    add_on_charges: "",
+    ext_price: "",
+    total_billing: "",
   });
 
   // Initialize form with job data when modal opens
   useEffect(() => {
     if (isOpen && job) {
-      console.log('EditJobModal - Initializing with job:', job);
-      console.log('EditJobModal - Client data:', job.client);
-      
+      console.log("EditJobModal - Initializing with job:", job);
+      console.log("EditJobModal - Client data:", job.client);
+
       // Parse requirements if it's a JSON string or already an array
       let parsedRequirements: Requirement[];
       try {
-        if (typeof job.requirements === 'string') {
+        if (typeof job.requirements === "string") {
           parsedRequirements = JSON.parse(job.requirements);
         } else if (Array.isArray(job.requirements)) {
           // Map ParsedRequirement[] to Requirement[] - copy all fields dynamically
-          parsedRequirements = job.requirements.map(req => {
+          parsedRequirements = job.requirements.map((req) => {
             // Create a copy with all fields, removing legacy shifts_id
             // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { shifts_id, ...rest } = req as any;
             return {
-              process_type: req.process_type || '',
-              ...rest
+              process_type: req.process_type || "",
+              ...rest,
             };
           });
         } else {
-          parsedRequirements = [{ process_type: '', price_per_m: '' }];
+          parsedRequirements = [{ process_type: "", price_per_m: "" }];
         }
 
         // Ensure requirements is an array with at least one item
         if (!parsedRequirements || parsedRequirements.length === 0) {
-          parsedRequirements = [{ process_type: '', price_per_m: '' }];
+          parsedRequirements = [{ process_type: "", price_per_m: "" }];
         }
       } catch (error) {
-        console.error('Failed to parse requirements:', error);
-        parsedRequirements = [{ process_type: '', price_per_m: '' }];
+        console.error("Failed to parse requirements:", error);
+        parsedRequirements = [{ process_type: "", price_per_m: "" }];
       }
 
       // Convert timestamps to YYYY-MM-DD format for date inputs
       const formatDate = (timestamp: number | null | undefined) => {
-        if (!timestamp) return '';
+        if (!timestamp) return "";
         const date = new Date(timestamp);
-        return date.toISOString().split('T')[0];
+        return date.toISOString().split("T")[0];
       };
 
       // Helper to safely convert to string, handling both string and number types
       const toStringValue = (value: unknown) => {
-        if (value === null || value === undefined) return '';
+        if (value === null || value === undefined) return "";
         return String(value);
       };
 
       const clientId = job.client?.id || null;
-      const clientName = job.client?.name || '';
+      const clientName = job.client?.name || "";
       const subClientId = job.sub_client?.id || null;
-      const subClientName = job.sub_client?.name || '';
+      const subClientName = job.sub_client?.name || "";
 
-      console.log('EditJobModal - Setting formData with:', { clientId, clientName, subClientId, subClientName });
-      
+      console.log("EditJobModal - Setting formData with:", {
+        clientId,
+        clientName,
+        subClientId,
+        subClientName,
+      });
+
       // Parse weekly_split if it exists
       let weeklySplit: number[] = [];
       let lockedWeeks: boolean[] = [];
-      const jobWithSplit = job as typeof job & { weekly_split?: number[] | string; locked_weeks?: boolean[] };
+      const jobWithSplit = job as typeof job & {
+        weekly_split?: number[] | string;
+        locked_weeks?: boolean[];
+      };
       if (jobWithSplit.weekly_split) {
         if (Array.isArray(jobWithSplit.weekly_split)) {
           weeklySplit = jobWithSplit.weekly_split;
         }
       }
-      if (jobWithSplit.locked_weeks && Array.isArray(jobWithSplit.locked_weeks)) {
+      if (
+        jobWithSplit.locked_weeks &&
+        Array.isArray(jobWithSplit.locked_weeks)
+      ) {
         lockedWeeks = jobWithSplit.locked_weeks;
       } else {
         // Initialize locked_weeks as all false if not present
@@ -177,12 +194,18 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       let facilitiesId: number | null = null;
       if (job.facilities_id !== undefined && job.facilities_id !== null) {
         // Convert to number if it's a string
-        facilitiesId = typeof job.facilities_id === 'string' 
-          ? parseInt(job.facilities_id, 10) 
-          : job.facilities_id;
+        facilitiesId =
+          typeof job.facilities_id === "string"
+            ? parseInt(job.facilities_id, 10)
+            : job.facilities_id;
       }
 
-      console.log('EditJobModal - facilities_id from job:', job.facilities_id, 'parsed to:', facilitiesId);
+      console.log(
+        "EditJobModal - facilities_id from job:",
+        job.facilities_id,
+        "parsed to:",
+        facilitiesId,
+      );
 
       setFormData({
         job_number: toStringValue(job.job_number),
@@ -198,16 +221,16 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         facilities_id: facilitiesId,
         start_date: formatDate(job.start_date),
         due_date: formatDate(job.due_date),
-        service_type: job.service_type || 'insert',
-        pockets: '2', // Default value - pockets are defined in requirements
-        machines_id: job.machines?.map(m => m.id) || [],
+        service_type: job.service_type || "insert",
+        pockets: "2", // Default value - pockets are defined in requirements
+        machines_id: job.machines?.map((m) => m.id) || [],
         requirements: parsedRequirements,
         weekly_split: weeklySplit,
         locked_weeks: lockedWeeks,
-        price_per_m: toStringValue(jobWithFields.price_per_m || ''),
-        add_on_charges: toStringValue(jobWithFields.add_on_charges || ''),
-        ext_price: toStringValue(jobWithFields.ext_price || ''),
-        total_billing: toStringValue(jobWithFields.total_billing || '')
+        price_per_m: toStringValue(jobWithFields.price_per_m || ""),
+        add_on_charges: toStringValue(jobWithFields.add_on_charges || ""),
+        ext_price: toStringValue(jobWithFields.ext_price || ""),
+        total_billing: toStringValue(jobWithFields.total_billing || ""),
       });
     }
   }, [isOpen, job]);
@@ -218,12 +241,15 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       const startDate = new Date(formData.start_date);
       const dueDate = new Date(formData.due_date);
       const quantity = parseInt(formData.quantity);
-      
+
       if (!isNaN(quantity) && quantity > 0 && dueDate >= startDate) {
         // Calculate number of weeks (ceiling to capture partial weeks)
-        const daysDiff = Math.ceil((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const daysDiff =
+          Math.ceil(
+            (dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+          ) + 1;
         const weeks = Math.ceil(daysDiff / 7);
-        
+
         if (weeks > 0 && formData.weekly_split.length === 0) {
           // Only auto-calculate if weekly_split is empty (not pre-populated from existing job)
           // Split quantity evenly across weeks
@@ -241,33 +267,47 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           // Initialize locked_weeks as all false
           const newLockedWeeks = Array(weeks).fill(false);
 
-          setFormData(prev => ({ ...prev, weekly_split: newSplit, locked_weeks: newLockedWeeks }));
+          setFormData((prev) => ({
+            ...prev,
+            weekly_split: newSplit,
+            locked_weeks: newLockedWeeks,
+          }));
         }
       }
     }
-  }, [formData.start_date, formData.due_date, formData.quantity, formData.weekly_split.length]);
+  }, [
+    formData.start_date,
+    formData.due_date,
+    formData.quantity,
+    formData.weekly_split.length,
+  ]);
 
   // Handle quantity changes when weekly_split already exists - respect locked weeks
   useEffect(() => {
     if (formData.weekly_split.length > 0 && formData.quantity) {
       const totalQuantity = parseInt(formData.quantity) || 0;
-      const currentTotal = formData.weekly_split.reduce((sum, val) => sum + val, 0);
+      const currentTotal = formData.weekly_split.reduce(
+        (sum, val) => sum + val,
+        0,
+      );
       const difference = totalQuantity - currentTotal;
 
       // Only redistribute if there's a difference and we have unlocked weeks
       if (difference !== 0) {
-        setFormData(prev => {
+        setFormData((prev) => {
           const newSplit = [...prev.weekly_split];
           const lockedWeeks = prev.locked_weeks;
 
           // Get indices of all unlocked weeks
           const unlockedIndices = newSplit
             .map((_, idx) => idx)
-            .filter(idx => !lockedWeeks[idx]);
+            .filter((idx) => !lockedWeeks[idx]);
 
           if (unlockedIndices.length > 0) {
             // Calculate base adjustment per unlocked week
-            const baseAdjustment = Math.floor(difference / unlockedIndices.length);
+            const baseAdjustment = Math.floor(
+              difference / unlockedIndices.length,
+            );
             const remainder = difference % unlockedIndices.length;
 
             // Apply adjustments to unlocked weeks
@@ -295,31 +335,35 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
   if (!isOpen || !job) return null;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Remove commas from the input value before storing
-    const cleanedValue = e.target.value.replace(/,/g, '');
+    const cleanedValue = e.target.value.replace(/,/g, "");
     setFormData({
       ...formData,
-      quantity: cleanedValue
+      quantity: cleanedValue,
     });
   };
 
@@ -327,48 +371,61 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
     setFormData({
       ...formData,
       clients_id: clientId,
-      client_name: clientName
+      client_name: clientName,
     });
   };
 
-  const handleRequirementChange = (requirementIndex: number, field: keyof Requirement, value: string | number) => {
-    setFormData(prev => ({
+  const handleRequirementChange = (
+    requirementIndex: number,
+    field: keyof Requirement,
+    value: string | number,
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       requirements: prev.requirements.map((req, idx) =>
-        idx === requirementIndex ? { ...req, [field]: value } : req
-      )
+        idx === requirementIndex ? { ...req, [field]: value } : req,
+      ),
     }));
   };
 
   const addRequirement = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      requirements: [...prev.requirements, {
-        process_type: '',
-        price_per_m: ''
-      }]
+      requirements: [
+        ...prev.requirements,
+        {
+          process_type: "",
+          price_per_m: "",
+        },
+      ],
     }));
   };
 
   const removeRequirement = (requirementIndex: number) => {
     if (formData.requirements.length > 1) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        requirements: prev.requirements.filter((_, idx) => idx !== requirementIndex)
+        requirements: prev.requirements.filter(
+          (_, idx) => idx !== requirementIndex,
+        ),
       }));
     }
   };
 
   const handleWeeklySplitChange = (weekIndex: number, value: string) => {
     // Remove commas from the input value before parsing
-    const cleanedValue = value.replace(/,/g, '');
+    const cleanedValue = value.replace(/,/g, "");
     const newValue = parseInt(cleanedValue) || 0;
 
     performRedistribution(weekIndex, newValue, false);
   };
 
-  const performRedistribution = (weekIndex: number, newValue: number, allowBackward: boolean) => {
-    setFormData(prev => {
+  const performRedistribution = (
+    weekIndex: number,
+    newValue: number,
+    allowBackward: boolean,
+  ) => {
+    setFormData((prev) => {
       const totalQuantity = parseInt(prev.quantity) || 0;
       const newSplit = [...prev.weekly_split];
       const newLockedWeeks = [...prev.locked_weeks];
@@ -386,7 +443,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         // Get indices of unlocked weeks AFTER the changed week
         const unlockedWeeksAfter = newSplit
           .map((_, idx) => idx)
-          .filter(idx => idx > weekIndex && !newLockedWeeks[idx]);
+          .filter((idx) => idx > weekIndex && !newLockedWeeks[idx]);
 
         // If no unlocked weeks after, check if we should redistribute backward
         if (unlockedWeeksAfter.length === 0 && !allowBackward) {
@@ -403,12 +460,14 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           // Get all unlocked weeks (forward and backward)
           targetWeekIndices = newSplit
             .map((_, idx) => idx)
-            .filter(idx => idx !== weekIndex && !newLockedWeeks[idx]);
+            .filter((idx) => idx !== weekIndex && !newLockedWeeks[idx]);
         }
 
         if (targetWeekIndices.length > 0) {
           // Calculate base adjustment per week
-          const baseAdjustment = Math.floor(difference / targetWeekIndices.length);
+          const baseAdjustment = Math.floor(
+            difference / targetWeekIndices.length,
+          );
           const remainder = difference % targetWeekIndices.length;
 
           // Apply adjustments to target weeks
@@ -433,23 +492,23 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
   const handleBackwardRedistributeConfirm = () => {
     if (pendingRedistribution) {
-      const cleanedValue = tempWeekQuantity.replace(/,/g, '');
+      const cleanedValue = tempWeekQuantity.replace(/,/g, "");
       const finalValue = parseInt(cleanedValue) || 0;
       performRedistribution(pendingRedistribution.weekIndex, finalValue, true);
       setPendingRedistribution(null);
-      setTempWeekQuantity('');
+      setTempWeekQuantity("");
     }
     setShowBackwardRedistributeWarning(false);
   };
 
   const handleBackwardRedistributeCancel = () => {
     setPendingRedistribution(null);
-    setTempWeekQuantity('');
+    setTempWeekQuantity("");
     setShowBackwardRedistributeWarning(false);
   };
 
   const handleUnlockWeek = (weekIndex: number) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const newLockedWeeks = [...prev.locked_weeks];
       newLockedWeeks[weekIndex] = false;
       return { ...prev, locked_weeks: newLockedWeeks };
@@ -462,7 +521,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   };
 
   const handleTempQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const cleanedValue = e.target.value.replace(/,/g, '');
+    const cleanedValue = e.target.value.replace(/,/g, "");
     setTempWeekQuantity(cleanedValue);
   };
 
@@ -470,7 +529,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   const calculateRedistributionPreview = () => {
     if (!pendingRedistribution) return null;
 
-    const cleanedValue = tempWeekQuantity.replace(/,/g, '');
+    const cleanedValue = tempWeekQuantity.replace(/,/g, "");
     const proposedValue = parseInt(cleanedValue) || 0;
     const totalQuantity = parseInt(formData.quantity) || 0;
     const weekIndex = pendingRedistribution.weekIndex;
@@ -485,7 +544,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
     // Get unlocked weeks before the adjusted week
     const unlockedBefore = formData.weekly_split
       .map((_, idx) => idx)
-      .filter(idx => idx < weekIndex && !formData.locked_weeks[idx]);
+      .filter((idx) => idx < weekIndex && !formData.locked_weeks[idx]);
 
     const lockedBefore = formData.weekly_split
       .map((val, idx) => ({ idx, val }))
@@ -494,7 +553,8 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
     const canRedistribute = unlockedBefore.length > 0;
 
     // Calculate preview of changes
-    const preview: { weekIndex: number; oldValue: number; newValue: number; }[] = [];
+    const preview: { weekIndex: number; oldValue: number; newValue: number }[] =
+      [];
 
     if (canRedistribute) {
       const baseAdjustment = Math.floor(difference / unlockedBefore.length);
@@ -516,7 +576,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       lockedBefore,
       canRedistribute,
       preview,
-      hasNegativeValues: preview.some(p => p.newValue < 0)
+      hasNegativeValues: preview.some((p) => p.newValue < 0),
     };
   };
 
@@ -532,34 +592,37 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
   const handleNext = () => {
     if (currentStep === 1) {
       if (!formData.job_number || !formData.clients_id) {
-        alert('Please fill in job number and client name');
+        alert("Please fill in job number and client name");
         return;
       }
       // Validate weekly split if present
-      if (formData.weekly_split.length > 0 && getWeeklySplitDifference() !== 0) {
-        alert('Weekly split total must equal the total quantity');
+      if (
+        formData.weekly_split.length > 0 &&
+        getWeeklySplitDifference() !== 0
+      ) {
+        alert("Weekly split total must equal the total quantity");
         return;
       }
     }
 
     // Validate step 2 - all requirements must have required fields based on their process type
     if (currentStep === 2) {
-      const allRequirementsValid = formData.requirements.every(r => {
+      const allRequirementsValid = formData.requirements.every((r) => {
         if (!r.process_type) return false;
 
         const config = getProcessTypeConfig(r.process_type);
         if (!config) return false;
 
         // Check all required fields for this process type
-        return config.fields.every(field => {
+        return config.fields.every((field) => {
           if (!field.required) return true;
           const value = r[field.name];
-          return value !== undefined && value !== null && value !== '';
+          return value !== undefined && value !== null && value !== "";
         });
       });
 
       if (!allRequirementsValid) {
-        alert('Please fill in all required fields for each requirement');
+        alert("Please fill in all required fields for each requirement");
         return;
       }
     }
@@ -581,12 +644,12 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
+
     // Only allow submission on step 3 (review step) and if explicitly allowed
     if (currentStep !== 3 || !canSubmit) {
       return;
     }
-    
+
     setCanSubmit(false); // Reset the flag
     setSubmitting(true);
 
@@ -601,24 +664,24 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
       // Validate that we have at least one machine selected
       if (!formData.machines_id || formData.machines_id.length === 0) {
-        alert('Please select at least one machine');
+        alert("Please select at least one machine");
         return;
       }
 
       // Validate that we have requirements
       if (!formData.requirements || formData.requirements.length === 0) {
-        alert('Please add at least one requirement');
+        alert("Please add at least one requirement");
         return;
       }
 
       // Calculate total billing from requirements
       const quantity = parseInt(formData.quantity);
       const calculatedRevenue = formData.requirements.reduce((total, req) => {
-        const pricePerM = parseFloat(req.price_per_m || '0');
-        return total + ((quantity / 1000) * pricePerM);
+        const pricePerM = parseFloat(req.price_per_m || "0");
+        return total + (quantity / 1000) * pricePerM;
       }, 0);
 
-      const addOnCharges = parseFloat(formData.add_on_charges || '0');
+      const addOnCharges = parseFloat(formData.add_on_charges || "0");
       const calculatedTotalBilling = calculatedRevenue + addOnCharges;
 
       const payload: Partial<{
@@ -658,13 +721,13 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
-        price_per_m: formData.price_per_m || '0',
+        price_per_m: formData.price_per_m || "0",
         add_on_charges: addOnCharges.toString(),
-        ext_price: formData.ext_price || '0',
+        ext_price: formData.ext_price || "0",
         total_billing: calculatedTotalBilling.toString(),
         weekly_split: formData.weekly_split,
         locked_weeks: formData.locked_weeks,
-        confirmed: isConfirmed
+        confirmed: isConfirmed,
       };
 
       // Only include sub_clients_id if it's not null
@@ -685,24 +748,28 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         payload.facilities_id = formData.facilities_id;
       }
 
-      console.log('Payload being sent to Xano (Edit):', payload);
+      console.log("Payload being sent to Xano (Edit):", payload);
       await updateJob(job.id, payload);
-      console.log('Job updated successfully');
+      console.log("Job updated successfully");
 
       // Auto-sync job_cost_entry from updated requirements
       try {
-        const { syncJobCostEntryFromRequirements } = await import('@/lib/api');
+        const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
         // Use start_date from payload (timestamp) or fall back to existing job start_date
-        const startDateForSync = payload.start_date || new Date(job.start_date).getTime();
+        const startDateForSync =
+          payload.start_date || new Date(job.start_date).getTime();
         await syncJobCostEntryFromRequirements(
           job.id,
           payload.requirements as string,
           startDateForSync,
-          payload.facilities_id
+          payload.facilities_id,
         );
-        console.log('[EditJobModal] Job cost entry synced successfully');
+        console.log("[EditJobModal] Job cost entry synced successfully");
       } catch (costError) {
-        console.error('[EditJobModal] Failed to sync job cost entry (non-blocking):', costError);
+        console.error(
+          "[EditJobModal] Failed to sync job cost entry (non-blocking):",
+          costError,
+        );
         // Don't fail job update if cost entry sync fails
       }
 
@@ -719,8 +786,8 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         }
       }, 2000);
     } catch (error) {
-      console.error('Error updating job:', error);
-      alert('Failed to update job. Please try again.');
+      console.error("Error updating job:", error);
+      alert("Failed to update job. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -733,26 +800,26 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
   const handleDelete = async () => {
     if (!job) return;
-    
+
     setDeleting(true);
     try {
       await deleteJob(job.id);
-      
+
       setShowDeleteConfirm(false);
       setShowSuccessToast(true);
-      
+
       // Delay closing to show toast
       setTimeout(() => {
         onClose();
-        
+
         // Call success callback to refresh jobs list
         if (onSuccess) {
           onSuccess();
         }
       }, 500);
     } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
+      console.error("Error deleting job:", error);
+      alert("Failed to delete job. Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -760,14 +827,13 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div
-        className="absolute inset-0 bg-black/30"
-        onClick={handleClose}
-      />
+      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-          <h2 className="text-2xl font-bold text-[var(--dark-blue)]">Edit Job #{job.job_number}</h2>
+          <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
+            Edit Job #{job.job_number}
+          </h2>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowDeleteConfirm(true)}
@@ -787,42 +853,56 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
         {/* Step Indicator */}
         <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
           {[1, 2, 3].map((step) => (
-            <div key={step} className="flex items-center" style={{ flex: step === 3 ? '0 1 auto' : '1 1 0%' }}>
+            <div
+              key={step}
+              className="flex items-center"
+              style={{ flex: step === 3 ? "0 1 auto" : "1 1 0%" }}
+            >
               <div className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                  step === currentStep
-                    ? 'bg-[#EF3340] text-white'
-                    : step < currentStep
-                    ? 'bg-[#EF3340] text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {step < currentStep ? '✓' : step}
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
+                    step === currentStep
+                      ? "bg-[#EF3340] text-white"
+                      : step < currentStep
+                        ? "bg-[#EF3340] text-white"
+                        : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {step < currentStep ? "✓" : step}
                 </div>
                 <div className="ml-3">
-                  <div className={`text-xs font-medium whitespace-nowrap ${
-                    step === currentStep ? 'text-[#EF3340]' : 'text-gray-500'
-                  }`}>
-                    {step === 1 && 'Job Details'}
-                    {step === 2 && 'Requirements'}
-                    {step === 3 && 'Review'}
+                  <div
+                    className={`text-xs font-medium whitespace-nowrap ${
+                      step === currentStep ? "text-[#EF3340]" : "text-gray-500"
+                    }`}
+                  >
+                    {step === 1 && "Job Details"}
+                    {step === 2 && "Requirements"}
+                    {step === 3 && "Review"}
                   </div>
                 </div>
               </div>
               {step < 3 && (
-                <div className={`h-0.5 flex-1 mx-4 ${
-                  step < currentStep ? 'bg-[#EF3340]' : 'bg-gray-200'
-                }`} />
+                <div
+                  className={`h-0.5 flex-1 mx-4 ${
+                    step < currentStep ? "bg-[#EF3340]" : "bg-gray-200"
+                  }`}
+                />
               )}
             </div>
           ))}
         </div>
 
         {/* Form Content */}
-        <form 
-          onSubmit={handleSubmit} 
+        <form
+          onSubmit={handleSubmit}
           onKeyDown={(e) => {
             // Prevent Enter key from submitting form on steps 1 and 2
-            if (e.key === 'Enter' && currentStep !== 3 && e.target instanceof HTMLInputElement) {
+            if (
+              e.key === "Enter" &&
+              currentStep !== 3 &&
+              e.target instanceof HTMLInputElement
+            ) {
               e.preventDefault();
             }
           }}
@@ -896,7 +976,9 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   <FacilityToggle
                     key={`facility-${job.id}-${formData.facilities_id}`}
                     currentFacility={formData.facilities_id}
-                    onFacilityChange={(facility) => setFormData({ ...formData, facilities_id: facility })}
+                    onFacilityChange={(facility) =>
+                      setFormData({ ...formData, facilities_id: facility })
+                    }
                     showAll={false}
                   />
                 </div>
@@ -969,7 +1051,11 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   <input
                     type="text"
                     name="quantity"
-                    value={formData.quantity ? parseInt(formData.quantity).toLocaleString() : ''}
+                    value={
+                      formData.quantity
+                        ? parseInt(formData.quantity).toLocaleString()
+                        : ""
+                    }
                     onChange={handleQuantityChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 73"
@@ -983,17 +1069,22 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-semibold text-[var(--text-dark)]">
-                      Weekly Quantity Split ({formData.weekly_split.length} weeks)
+                      Weekly Quantity Split ({formData.weekly_split.length}{" "}
+                      weeks)
                     </h4>
-                    <div className={`text-sm font-semibold ${
-                      getWeeklySplitDifference() === 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }`}>
-                      Total: {getWeeklySplitSum().toLocaleString()} / {parseInt(formData.quantity || '0').toLocaleString()}
+                    <div
+                      className={`text-sm font-semibold ${
+                        getWeeklySplitDifference() === 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      Total: {getWeeklySplitSum().toLocaleString()} /{" "}
+                      {parseInt(formData.quantity || "0").toLocaleString()}
                       {getWeeklySplitDifference() !== 0 && (
                         <span className="ml-1">
-                          ({getWeeklySplitDifference() > 0 ? '+' : ''}{getWeeklySplitDifference()})
+                          ({getWeeklySplitDifference() > 0 ? "+" : ""}
+                          {getWeeklySplitDifference()})
                         </span>
                       )}
                     </div>
@@ -1014,9 +1105,25 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                                 className="text-xs hover:opacity-70 transition-opacity flex items-center gap-1"
                                 title="Unlock this week to allow auto-redistribution"
                               >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                  <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#2563eb"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="11"
+                                    width="18"
+                                    height="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                                 </svg>
                               </button>
                             )}
@@ -1025,19 +1132,41 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                             <input
                               type="text"
                               value={amount.toLocaleString()}
-                              onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
+                              onChange={(e) =>
+                                handleWeeklySplitChange(index, e.target.value)
+                              }
                               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
                                 isLocked
-                                  ? 'bg-blue-50 border-blue-300 font-semibold pr-8'
-                                  : 'border-[var(--border)]'
+                                  ? "bg-blue-50 border-blue-300 font-semibold pr-8"
+                                  : "border-[var(--border)]"
                               }`}
-                              title={isLocked ? 'This week is locked and won\'t be auto-adjusted' : 'Edit to lock this week'}
+                              title={
+                                isLocked
+                                  ? "This week is locked and won't be auto-adjusted"
+                                  : "Edit to lock this week"
+                              }
                             />
                             {isLocked && (
                               <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#2563eb"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="11"
+                                    width="18"
+                                    height="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                 </svg>
                               </div>
                             )}
@@ -1075,12 +1204,19 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           {/* Step 2: Requirements */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">Job Requirements</h3>
+              <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">
+                Job Requirements
+              </h3>
 
               {formData.requirements.map((requirement, index) => (
-                <div key={index} className="border border-[var(--border)] rounded-lg p-6 space-y-4">
+                <div
+                  key={index}
+                  className="border border-[var(--border)] rounded-lg p-6 space-y-4"
+                >
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-[var(--text-dark)]">Requirement {index + 1}</h4>
+                    <h4 className="font-semibold text-[var(--text-dark)]">
+                      Requirement {index + 1}
+                    </h4>
                     {index > 0 && (
                       <button
                         type="button"
@@ -1095,7 +1231,9 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   {/* Dynamic Requirement Fields */}
                   <DynamicRequirementFields
                     requirement={requirement}
-                    onChange={(field, value) => handleRequirementChange(index, field, value)}
+                    onChange={(field, value) =>
+                      handleRequirementChange(index, field, value)
+                    }
                   />
                 </div>
               ))}
@@ -1114,66 +1252,103 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="bg-[var(--bg-alert-info)] border-l-4 border-[var(--primary-blue)] p-4 rounded">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-2">Job Summary</h3>
+                <h3 className="font-semibold text-[var(--text-dark)] mb-2">
+                  Job Summary
+                </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-[var(--text-light)]">Job #:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_number}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.job_number}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Facility:</span>
                     <span className="ml-2 font-semibold text-[var(--text-dark)]">
-                      {formData.facilities_id === 1 ? 'Bolingbrook' : formData.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                      {formData.facilities_id === 1
+                        ? "Bolingbrook"
+                        : formData.facilities_id === 2
+                          ? "Lemont"
+                          : "N/A"}
                     </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Client:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.client_name}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.client_name}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-light)]">Sub-Client:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.sub_client_name || 'N/A'}</span>
+                    <span className="text-[var(--text-light)]">
+                      Sub-Client:
+                    </span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.sub_client_name || "N/A"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Job Name:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_name || 'N/A'}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.job_name || "N/A"}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-light)]">Service Type:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.service_type}</span>
+                    <span className="text-[var(--text-light)]">
+                      Service Type:
+                    </span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.service_type}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">CSR:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.csr || 'N/A'}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.csr || "N/A"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Quantity:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{parseInt(formData.quantity || '0').toLocaleString()}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {parseInt(formData.quantity || "0").toLocaleString()}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-light)]">Start Date:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.start_date || 'N/A'}</span>
+                    <span className="text-[var(--text-light)]">
+                      Start Date:
+                    </span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.start_date || "N/A"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Due Date:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.due_date || 'N/A'}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.due_date || "N/A"}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-3">Job Requirements & Pricing</h3>
+                <h3 className="font-semibold text-[var(--text-dark)] mb-3">
+                  Job Requirements & Pricing
+                </h3>
                 {formData.requirements.map((req, index) => {
-                  const quantity = parseInt(formData.quantity || '0');
-                  const pricePerM = parseFloat(req.price_per_m || '0');
+                  const quantity = parseInt(formData.quantity || "0");
+                  const pricePerM = parseFloat(req.price_per_m || "0");
                   const requirementTotal = (quantity / 1000) * pricePerM;
                   const processConfig = getProcessTypeConfig(req.process_type);
 
                   return (
-                    <div key={index} className="mb-4 pb-4 border-b border-[var(--border)] last:border-b-0">
+                    <div
+                      key={index}
+                      className="mb-4 pb-4 border-b border-[var(--border)] last:border-b-0"
+                    >
                       <div className="text-sm">
                         <div className="mb-2">
-                          <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
+                          <span className="text-[var(--text-light)]">
+                            Requirement {index + 1}:{" "}
+                          </span>
                           <span className="font-semibold text-[var(--text-dark)]">
                             {processConfig?.label || req.process_type}
                           </span>
@@ -1182,34 +1357,49 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                         {/* Display all fields for this requirement */}
                         <div className="grid grid-cols-2 gap-2 mb-2 ml-4">
                           {processConfig?.fields.map((fieldConfig) => {
-                            const fieldValue = req[fieldConfig.name as keyof typeof req];
+                            const fieldValue =
+                              req[fieldConfig.name as keyof typeof req];
 
                             // Skip if field has no value
-                            if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+                            if (
+                              fieldValue === undefined ||
+                              fieldValue === null ||
+                              fieldValue === ""
+                            ) {
                               return null;
                             }
 
                             // Format the value based on field type
                             let displayValue: string;
-                            if (fieldConfig.type === 'currency') {
-                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            if (fieldConfig.type === "currency") {
+                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                             } else {
                               displayValue = String(fieldValue);
                             }
 
                             return (
                               <div key={fieldConfig.name} className="text-xs">
-                                <span className="text-[var(--text-light)]">{fieldConfig.label}: </span>
-                                <span className="text-[var(--text-dark)] font-medium">{displayValue}</span>
+                                <span className="text-[var(--text-light)]">
+                                  {fieldConfig.label}:{" "}
+                                </span>
+                                <span className="text-[var(--text-dark)] font-medium">
+                                  {displayValue}
+                                </span>
                               </div>
                             );
                           })}
                         </div>
 
                         <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-                          <span className="text-[var(--text-light)]">Subtotal for this requirement:</span>
+                          <span className="text-[var(--text-light)]">
+                            Subtotal for this requirement:
+                          </span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            $
+                            {requirementTotal.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -1220,28 +1410,38 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 {/* Total Price Calculation */}
                 <div className="mt-4 pt-4 border-t-2 border-[var(--primary-blue)]">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[var(--text-dark)] text-lg">Total Job Price:</span>
+                    <span className="font-bold text-[var(--text-dark)] text-lg">
+                      Total Job Price:
+                    </span>
                     <span className="font-bold text-[var(--primary-blue)] text-xl">
-                      ${formData.requirements.reduce((total, req) => {
-                        const quantity = parseInt(formData.quantity || '0');
-                        const pricePerM = parseFloat(req.price_per_m || '0');
-                        return total + ((quantity / 1000) * pricePerM);
-                      }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      $
+                      {formData.requirements
+                        .reduce((total, req) => {
+                          const quantity = parseInt(formData.quantity || "0");
+                          const pricePerM = parseFloat(req.price_per_m || "0");
+                          return total + (quantity / 1000) * pricePerM;
+                        }, 0)
+                        .toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-[var(--text-dark)] mb-3">Schedule Type</h4>
+                <h4 className="font-semibold text-[var(--text-dark)] mb-3">
+                  Schedule Type
+                </h4>
                 <ScheduleToggle
                   isConfirmed={isConfirmed}
                   onScheduleChange={setIsConfirmed}
                 />
                 <p className="text-sm text-[var(--text-light)] mt-3">
                   {isConfirmed
-                    ? '✓ This job will be confirmed and scheduled immediately.'
-                    : 'ℹ This job will be added as a soft schedule and can be confirmed later.'}
+                    ? "✓ This job will be confirmed and scheduled immediately."
+                    : "ℹ This job will be added as a soft schedule and can be confirmed later."}
                 </p>
               </div>
             </div>
@@ -1267,17 +1467,25 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   type="button"
                   onClick={handleNext}
                   disabled={
-                    (currentStep === 1 && (!formData.job_number || !formData.clients_id || !formData.quantity)) ||
-                    (currentStep === 2 && formData.requirements.some(r => {
-                      if (!r.process_type) return true;
-                      const config = getProcessTypeConfig(r.process_type);
-                      if (!config) return true;
-                      return config.fields.some(field => {
-                        if (!field.required) return false;
-                        const value = r[field.name];
-                        return value === undefined || value === null || value === '';
-                      });
-                    }))
+                    (currentStep === 1 &&
+                      (!formData.job_number ||
+                        !formData.clients_id ||
+                        !formData.quantity)) ||
+                    (currentStep === 2 &&
+                      formData.requirements.some((r) => {
+                        if (!r.process_type) return true;
+                        const config = getProcessTypeConfig(r.process_type);
+                        if (!config) return true;
+                        return config.fields.some((field) => {
+                          if (!field.required) return false;
+                          const value = r[field.name];
+                          return (
+                            value === undefined ||
+                            value === null ||
+                            value === ""
+                          );
+                        });
+                      }))
                   }
                   className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1290,7 +1498,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                     setCanSubmit(true);
                     // Use setTimeout to allow state to update before form submission
                     setTimeout(() => {
-                      const form = document.querySelector('form');
+                      const form = document.querySelector("form");
                       if (form) {
                         form.requestSubmit();
                       }
@@ -1299,7 +1507,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                   disabled={submitting}
                   className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Updating Job...' : 'Update Job'}
+                  {submitting ? "Updating Job..." : "Update Job"}
                 </button>
               )}
             </div>
@@ -1317,140 +1525,191 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
       )}
 
       {/* Backward Redistribution Warning Modal */}
-      {showBackwardRedistributeWarning && pendingRedistribution && (() => {
-        const preview = calculateRedistributionPreview();
-        if (!preview) return null;
+      {showBackwardRedistributeWarning &&
+        pendingRedistribution &&
+        (() => {
+          const preview = calculateRedistributionPreview();
+          if (!preview) return null;
 
-        return (
-          <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
-            <div
-              className="absolute inset-0 bg-black/50"
-              onClick={handleBackwardRedistributeCancel}
-            />
-            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full relative z-10 max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="p-6 border-b border-[var(--border)]">
-                <h3 className="text-xl font-bold text-[var(--dark-blue)]">
-                  Adjust Week {pendingRedistribution.weekIndex + 1} Quantity
-                </h3>
-              </div>
-
-              {/* Content */}
-              <div className="p-6 space-y-4">
-                {/* Quantity Input */}
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Week {pendingRedistribution.weekIndex + 1} Quantity
-                  </label>
-                  <input
-                    type="text"
-                    value={tempWeekQuantity ? parseInt(tempWeekQuantity).toLocaleString() : ''}
-                    onChange={handleTempQuantityChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="Enter quantity"
-                    autoFocus
-                  />
+          return (
+            <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={handleBackwardRedistributeCancel}
+              />
+              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full relative z-10 max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="p-6 border-b border-[var(--border)]">
+                  <h3 className="text-xl font-bold text-[var(--dark-blue)]">
+                    Adjust Week {pendingRedistribution.weekIndex + 1} Quantity
+                  </h3>
                 </div>
 
-                {/* Redistribution Info */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="text-sm">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-[var(--text-light)]">Total Job Quantity:</span>
-                      <span className="font-semibold">{parseInt(formData.quantity || '0').toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-light)]">Amount to redistribute:</span>
-                      <span className={`font-semibold ${preview.difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {preview.difference > 0 ? '+' : ''}{preview.difference.toLocaleString()} pieces
-                      </span>
-                    </div>
+                {/* Content */}
+                <div className="p-6 space-y-4">
+                  {/* Quantity Input */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                      Week {pendingRedistribution.weekIndex + 1} Quantity
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        tempWeekQuantity
+                          ? parseInt(tempWeekQuantity).toLocaleString()
+                          : ""
+                      }
+                      onChange={handleTempQuantityChange}
+                      className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                      placeholder="Enter quantity"
+                      autoFocus
+                    />
                   </div>
-                </div>
 
-                {/* Preview or Error Message */}
-                {preview.canRedistribute ? (
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-[var(--text-dark)]">
-                      This will redistribute {Math.abs(preview.difference).toLocaleString()} pieces from:
-                    </p>
-                    <div className="space-y-2">
-                      {preview.preview.map(({ weekIndex, oldValue, newValue }) => (
-                        <div key={weekIndex} className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                          <span className="text-[var(--text-dark)]">Week {weekIndex + 1}:</span>
-                          <span className="font-semibold">
-                            {oldValue.toLocaleString()} → {newValue.toLocaleString()}
-                            <span className={`ml-2 ${newValue - oldValue < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              ({newValue - oldValue > 0 ? '+' : ''}{(newValue - oldValue).toLocaleString()})
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {preview.lockedBefore.length > 0 && (
-                      <p className="text-xs text-[var(--text-light)] italic">
-                        {preview.lockedBefore.length} week(s) before Week {pendingRedistribution.weekIndex + 1} remain locked
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <p className="text-sm text-red-800 font-semibold mb-2">
-                        ⚠️ Cannot redistribute - all previous weeks are locked
-                      </p>
-                      <p className="text-xs text-red-700">
-                        Unlock one or more weeks below to proceed with this adjustment.
-                      </p>
-                    </div>
-
-                    {preview.lockedBefore.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[var(--text-dark)]">Locked weeks:</p>
-                        {preview.lockedBefore.map(({ idx, val }) => (
-                          <div key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2">
-                            <span className="text-sm text-[var(--text-dark)]">
-                              Week {idx + 1}: {val.toLocaleString()} pieces
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUnlockWeekInDialog(idx)}
-                              className="text-xs text-[var(--primary-blue)] hover:opacity-70 transition-opacity flex items-center gap-1 font-semibold"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-                              </svg>
-                              Unlock
-                            </button>
-                          </div>
-                        ))}
+                  {/* Redistribution Info */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-[var(--text-light)]">
+                          Total Job Quantity:
+                        </span>
+                        <span className="font-semibold">
+                          {parseInt(formData.quantity || "0").toLocaleString()}
+                        </span>
                       </div>
-                    )}
+                      <div className="flex justify-between">
+                        <span className="text-[var(--text-light)]">
+                          Amount to redistribute:
+                        </span>
+                        <span
+                          className={`font-semibold ${preview.difference < 0 ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {preview.difference > 0 ? "+" : ""}
+                          {preview.difference.toLocaleString()} pieces
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
-                <button
-                  onClick={handleBackwardRedistributeCancel}
-                  className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBackwardRedistributeConfirm}
-                  disabled={!preview.canRedistribute}
-                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Confirm
-                </button>
+                  {/* Preview or Error Message */}
+                  {preview.canRedistribute ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-[var(--text-dark)]">
+                        This will redistribute{" "}
+                        {Math.abs(preview.difference).toLocaleString()} pieces
+                        from:
+                      </p>
+                      <div className="space-y-2">
+                        {preview.preview.map(
+                          ({ weekIndex, oldValue, newValue }) => (
+                            <div
+                              key={weekIndex}
+                              className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2"
+                            >
+                              <span className="text-[var(--text-dark)]">
+                                Week {weekIndex + 1}:
+                              </span>
+                              <span className="font-semibold">
+                                {oldValue.toLocaleString()} →{" "}
+                                {newValue.toLocaleString()}
+                                <span
+                                  className={`ml-2 ${newValue - oldValue < 0 ? "text-red-600" : "text-green-600"}`}
+                                >
+                                  ({newValue - oldValue > 0 ? "+" : ""}
+                                  {(newValue - oldValue).toLocaleString()})
+                                </span>
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                      {preview.lockedBefore.length > 0 && (
+                        <p className="text-xs text-[var(--text-light)] italic">
+                          {preview.lockedBefore.length} week(s) before Week{" "}
+                          {pendingRedistribution.weekIndex + 1} remain locked
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p className="text-sm text-red-800 font-semibold mb-2">
+                          ⚠️ Cannot redistribute - all previous weeks are locked
+                        </p>
+                        <p className="text-xs text-red-700">
+                          Unlock one or more weeks below to proceed with this
+                          adjustment.
+                        </p>
+                      </div>
+
+                      {preview.lockedBefore.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-[var(--text-dark)]">
+                            Locked weeks:
+                          </p>
+                          {preview.lockedBefore.map(({ idx, val }) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2"
+                            >
+                              <span className="text-sm text-[var(--text-dark)]">
+                                Week {idx + 1}: {val.toLocaleString()} pieces
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUnlockWeekInDialog(idx)}
+                                className="text-xs text-[var(--primary-blue)] hover:opacity-70 transition-opacity flex items-center gap-1 font-semibold"
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#2563eb"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="11"
+                                    width="18"
+                                    height="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                </svg>
+                                Unlock
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
+                  <button
+                    onClick={handleBackwardRedistributeCancel}
+                    className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBackwardRedistributeConfirm}
+                    disabled={!preview.canRedistribute}
+                    className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
@@ -1462,13 +1721,16 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full relative z-10">
             {/* Header */}
             <div className="p-6 border-b border-[var(--border)]">
-              <h3 className="text-xl font-bold text-[var(--dark-blue)]">Confirm Deletion</h3>
+              <h3 className="text-xl font-bold text-[var(--dark-blue)]">
+                Confirm Deletion
+              </h3>
             </div>
 
             {/* Content */}
             <div className="p-6">
               <p className="text-[var(--text-dark)] mb-4">
-                Are you sure you want to delete <span className="font-bold">Job #{job.job_number}</span>?
+                Are you sure you want to delete{" "}
+                <span className="font-bold">Job #{job.job_number}</span>?
               </p>
               <p className="text-[var(--text-light)] text-sm">
                 This action cannot be undone.
@@ -1489,7 +1751,7 @@ export default function EditJobModal({ isOpen, job, onClose, onSuccess }: EditJo
                 disabled={deleting}
                 className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {deleting ? 'Deleting...' : 'Delete Job'}
+                {deleting ? "Deleting..." : "Delete Job"}
               </button>
             </div>
           </div>

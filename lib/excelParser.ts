@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from "xlsx";
 
 /**
  * Represents a row parsed from an Excel file for production entry
@@ -44,10 +44,10 @@ export interface ExcelParseWarning {
  * Expected column names in the Excel file (case-insensitive)
  */
 const EXPECTED_COLUMNS = {
-  jobNumber: ['job number', 'job_number', 'jobnumber', 'job #', 'job'],
-  quantity: ['production quantity', 'quantity', 'qty', 'amount', 'production'],
-  date: ['date', 'production date', 'entry date'],
-  notes: ['notes', 'note', 'comments', 'comment', 'description'],
+  jobNumber: ["job number", "job_number", "jobnumber", "job #", "job"],
+  quantity: ["production quantity", "quantity", "qty", "amount", "production"],
+  date: ["date", "production date", "entry date"],
+  notes: ["notes", "note", "comments", "comment", "description"],
 };
 
 /**
@@ -68,7 +68,7 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
 
     // Parse workbook
     const workbook = XLSX.read(arrayBuffer, {
-      type: 'array',
+      type: "array",
       cellDates: true, // Parse dates as Date objects
       cellNF: false,
       cellText: false,
@@ -79,8 +79,8 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     if (!sheetName) {
       result.errors.push({
         rowIndex: 0,
-        field: 'file',
-        message: 'Excel file contains no sheets',
+        field: "file",
+        message: "Excel file contains no sheets",
       });
       return result;
     }
@@ -97,8 +97,8 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     if (rawData.length === 0) {
       result.errors.push({
         rowIndex: 0,
-        field: 'file',
-        message: 'Excel file is empty',
+        field: "file",
+        message: "Excel file is empty",
       });
       return result;
     }
@@ -108,8 +108,8 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     if (!headerRow || headerRow.length === 0) {
       result.errors.push({
         rowIndex: 1,
-        field: 'headers',
-        message: 'Could not find header row',
+        field: "headers",
+        message: "Could not find header row",
       });
       return result;
     }
@@ -121,16 +121,16 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     if (columnMap.jobNumber === -1) {
       result.errors.push({
         rowIndex: 1,
-        field: 'headers',
-        message: `Missing required column: Job Number. Expected one of: ${EXPECTED_COLUMNS.jobNumber.join(', ')}`,
+        field: "headers",
+        message: `Missing required column: Job Number. Expected one of: ${EXPECTED_COLUMNS.jobNumber.join(", ")}`,
       });
     }
 
     if (columnMap.quantity === -1) {
       result.errors.push({
         rowIndex: 1,
-        field: 'headers',
-        message: `Missing required column: Quantity. Expected one of: ${EXPECTED_COLUMNS.quantity.join(', ')}`,
+        field: "headers",
+        message: `Missing required column: Quantity. Expected one of: ${EXPECTED_COLUMNS.quantity.join(", ")}`,
       });
     }
 
@@ -145,7 +145,10 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
       const excelRowNumber = i + 1; // Excel rows are 1-indexed
 
       // Skip completely empty rows
-      if (!row || row.every(cell => cell === null || cell === undefined || cell === '')) {
+      if (
+        !row ||
+        row.every((cell) => cell === null || cell === undefined || cell === "")
+      ) {
         continue;
       }
 
@@ -155,8 +158,11 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
       } catch (error) {
         result.errors.push({
           rowIndex: excelRowNumber,
-          field: 'row',
-          message: error instanceof Error ? error.message : 'Unknown error parsing row',
+          field: "row",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Unknown error parsing row",
         });
       }
     }
@@ -165,16 +171,15 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
     if (result.data.length === 0 && result.errors.length === 0) {
       result.warnings.push({
         rowIndex: 0,
-        field: 'file',
-        message: 'No data rows found in Excel file',
+        field: "file",
+        message: "No data rows found in Excel file",
       });
     }
-
   } catch (error) {
     result.errors.push({
       rowIndex: 0,
-      field: 'file',
-      message: `Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      field: "file",
+      message: `Failed to parse Excel file: ${error instanceof Error ? error.message : "Unknown error"}`,
     });
   }
 
@@ -203,22 +208,34 @@ function mapColumns(headerRow: unknown[]): {
     const headerStr = String(header).toLowerCase().trim();
 
     // Match job number column
-    if (columnMap.jobNumber === -1 && EXPECTED_COLUMNS.jobNumber.some(col => headerStr.includes(col))) {
+    if (
+      columnMap.jobNumber === -1 &&
+      EXPECTED_COLUMNS.jobNumber.some((col) => headerStr.includes(col))
+    ) {
       columnMap.jobNumber = index;
     }
 
     // Match quantity column
-    if (columnMap.quantity === -1 && EXPECTED_COLUMNS.quantity.some(col => headerStr.includes(col))) {
+    if (
+      columnMap.quantity === -1 &&
+      EXPECTED_COLUMNS.quantity.some((col) => headerStr.includes(col))
+    ) {
       columnMap.quantity = index;
     }
 
     // Match date column
-    if (columnMap.date === -1 && EXPECTED_COLUMNS.date.some(col => headerStr.includes(col))) {
+    if (
+      columnMap.date === -1 &&
+      EXPECTED_COLUMNS.date.some((col) => headerStr.includes(col))
+    ) {
       columnMap.date = index;
     }
 
     // Match notes column
-    if (columnMap.notes === -1 && EXPECTED_COLUMNS.notes.some(col => headerStr.includes(col))) {
+    if (
+      columnMap.notes === -1 &&
+      EXPECTED_COLUMNS.notes.some((col) => headerStr.includes(col))
+    ) {
       columnMap.notes = index;
     }
   });
@@ -231,19 +248,28 @@ function mapColumns(headerRow: unknown[]): {
  */
 function parseRow(
   row: unknown[],
-  columnMap: { jobNumber: number; quantity: number; date: number; notes: number },
-  rowIndex: number
+  columnMap: {
+    jobNumber: number;
+    quantity: number;
+    date: number;
+    notes: number;
+  },
+  rowIndex: number,
 ): ParsedExcelRow {
   const parsedRow: ParsedExcelRow = {
-    jobNumber: '',
+    jobNumber: "",
     quantity: 0,
     rowIndex,
   };
 
   // Parse job number (required)
   const jobNumberValue = row[columnMap.jobNumber];
-  if (jobNumberValue === null || jobNumberValue === undefined || jobNumberValue === '') {
-    throw new Error('Job number is required');
+  if (
+    jobNumberValue === null ||
+    jobNumberValue === undefined ||
+    jobNumberValue === ""
+  ) {
+    throw new Error("Job number is required");
   }
 
   // Convert job number to string first to handle various formats
@@ -251,7 +277,7 @@ function parseRow(
 
   // Handle Excel's automatic number formatting (e.g., "12345" might become 12345)
   // Remove any non-numeric characters except decimal point
-  jobNumberStr = jobNumberStr.replace(/[^0-9.]/g, '');
+  jobNumberStr = jobNumberStr.replace(/[^0-9.]/g, "");
 
   // Try to parse as number
   const jobNumberNum = parseFloat(jobNumberStr);
@@ -260,17 +286,25 @@ function parseRow(
   }
 
   // Store as number if it's a whole number, otherwise as string
-  parsedRow.jobNumber = Number.isInteger(jobNumberNum) ? Math.floor(jobNumberNum) : jobNumberStr;
+  parsedRow.jobNumber = Number.isInteger(jobNumberNum)
+    ? Math.floor(jobNumberNum)
+    : jobNumberStr;
 
   // Parse quantity (required)
   const quantityValue = row[columnMap.quantity];
-  if (quantityValue === null || quantityValue === undefined || quantityValue === '') {
-    throw new Error('Quantity is required');
+  if (
+    quantityValue === null ||
+    quantityValue === undefined ||
+    quantityValue === ""
+  ) {
+    throw new Error("Quantity is required");
   }
 
   const quantity = parseFloat(String(quantityValue));
   if (isNaN(quantity) || quantity < 0) {
-    throw new Error(`Invalid quantity: "${quantityValue}". Must be a positive number`);
+    throw new Error(
+      `Invalid quantity: "${quantityValue}". Must be a positive number`,
+    );
   }
 
   parsedRow.quantity = quantity;
@@ -278,14 +312,16 @@ function parseRow(
   // Parse date (optional)
   if (columnMap.date !== -1) {
     const dateValue = row[columnMap.date];
-    if (dateValue !== null && dateValue !== undefined && dateValue !== '') {
+    if (dateValue !== null && dateValue !== undefined && dateValue !== "") {
       try {
         const parsedDate = parseExcelDate(dateValue);
         if (parsedDate) {
           parsedRow.date = parsedDate;
         }
       } catch {
-        throw new Error(`Invalid date format: "${dateValue}". Expected: YYYY-MM-DD or MM/DD/YYYY`);
+        throw new Error(
+          `Invalid date format: "${dateValue}". Expected: YYYY-MM-DD or MM/DD/YYYY`,
+        );
       }
     }
   }
@@ -293,7 +329,7 @@ function parseRow(
   // Parse notes (optional)
   if (columnMap.notes !== -1) {
     const notesValue = row[columnMap.notes];
-    if (notesValue !== null && notesValue !== undefined && notesValue !== '') {
+    if (notesValue !== null && notesValue !== undefined && notesValue !== "") {
       parsedRow.notes = String(notesValue).trim();
     }
   }
@@ -312,10 +348,12 @@ function parseExcelDate(value: unknown): Date | number | null {
   }
 
   // If it's a number (Excel date serial number)
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     // Excel dates are days since 1900-01-01 (with a leap year bug)
     const excelEpoch = new Date(1900, 0, 1);
-    const date = new Date(excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000);
+    const date = new Date(
+      excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000,
+    );
     return date;
   }
 
@@ -325,7 +363,11 @@ function parseExcelDate(value: unknown): Date | number | null {
   // Try ISO format (YYYY-MM-DD)
   const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) {
-    const date = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+    const date = new Date(
+      parseInt(isoMatch[1]),
+      parseInt(isoMatch[2]) - 1,
+      parseInt(isoMatch[3]),
+    );
     if (!isNaN(date.getTime())) {
       return date;
     }
@@ -334,7 +376,11 @@ function parseExcelDate(value: unknown): Date | number | null {
   // Try US format (MM/DD/YYYY)
   const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (usMatch) {
-    const date = new Date(parseInt(usMatch[3]), parseInt(usMatch[1]) - 1, parseInt(usMatch[2]));
+    const date = new Date(
+      parseInt(usMatch[3]),
+      parseInt(usMatch[1]) - 1,
+      parseInt(usMatch[2]),
+    );
     if (!isNaN(date.getTime())) {
       return date;
     }
@@ -364,15 +410,20 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
 
   // Check file type
   const allowedTypes = [
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-    'application/vnd.ms-excel', // .xls
-    'text/csv', // .csv
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+    "application/vnd.ms-excel", // .xls
+    "text/csv", // .csv
   ];
 
-  const allowedExtensions = ['.xlsx', '.xls', '.csv'];
-  const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+  const allowedExtensions = [".xlsx", ".xls", ".csv"];
+  const fileExtension = file.name
+    .toLowerCase()
+    .substring(file.name.lastIndexOf("."));
 
-  if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+  if (
+    !allowedTypes.includes(file.type) &&
+    !allowedExtensions.includes(fileExtension)
+  ) {
     return {
       valid: false,
       error: `Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv)`,

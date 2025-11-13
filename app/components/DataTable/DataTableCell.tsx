@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { ColumnConfig } from './DataTableTypes';
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { ColumnConfig } from "./DataTableTypes";
 
 interface DataTableCellProps<T> {
   row: T;
@@ -16,14 +16,19 @@ export function DataTableCell<T>({
   value,
   isEditable,
   onSave,
-  onCancel
+  onCancel,
 }: DataTableCellProps<T>) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
+  const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const alignClass = column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left';
+  const alignClass =
+    column.align === "right"
+      ? "text-right"
+      : column.align === "center"
+        ? "text-center"
+        : "text-left";
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -36,10 +41,10 @@ export function DataTableCell<T>({
     if (!isEditable) return;
 
     // Convert value to string for editing
-    let initialValue = value ?? '';
-    if (column.editType === 'currency' && typeof value === 'number') {
+    let initialValue = value ?? "";
+    if (column.editType === "currency" && typeof value === "number") {
       initialValue = value.toString();
-    } else if (column.editType === 'number' && typeof value === 'number') {
+    } else if (column.editType === "number" && typeof value === "number") {
       initialValue = value.toString();
     }
 
@@ -57,7 +62,7 @@ export function DataTableCell<T>({
 
     // Parse value based on type
     let parsedValue: any = editValue;
-    if (column.editType === 'number' || column.editType === 'currency') {
+    if (column.editType === "number" || column.editType === "currency") {
       const num = parseFloat(editValue);
       if (isNaN(num)) {
         return;
@@ -70,7 +75,7 @@ export function DataTableCell<T>({
       await onSave(parsedValue);
       setIsEditing(false);
     } catch (error) {
-      console.error('Error saving cell:', error);
+      console.error("Error saving cell:", error);
     } finally {
       setIsSaving(false);
     }
@@ -78,15 +83,15 @@ export function DataTableCell<T>({
 
   const handleCancel = () => {
     setIsEditing(false);
-    setEditValue('');
+    setEditValue("");
     onCancel?.();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleSave();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       e.preventDefault();
       handleCancel();
     }
@@ -96,7 +101,7 @@ export function DataTableCell<T>({
   if (column.render && !isEditing) {
     return (
       <td
-        className={`px-3 py-2 ${alignClass} ${isEditable ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+        className={`px-3 py-2 ${alignClass} ${isEditable ? "cursor-pointer hover:bg-gray-50" : ""}`}
         onClick={handleStartEdit}
         style={{ width: column.width }}
       >
@@ -108,20 +113,21 @@ export function DataTableCell<T>({
   // Editing mode
   if (isEditing) {
     return (
-      <td
-        className={`px-3 py-2 ${alignClass}`}
-        style={{ width: column.width }}
-      >
+      <td className={`px-3 py-2 ${alignClass}`} style={{ width: column.width }}>
         <input
           ref={inputRef}
-          type={column.editType === 'number' || column.editType === 'currency' ? 'number' : 'text'}
+          type={
+            column.editType === "number" || column.editType === "currency"
+              ? "number"
+              : "text"
+          }
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
           disabled={isSaving}
           className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          step={column.editType === 'currency' ? '0.01' : undefined}
+          step={column.editType === "currency" ? "0.01" : undefined}
         />
       </td>
     );
@@ -129,17 +135,17 @@ export function DataTableCell<T>({
 
   // Display mode
   let displayValue = value;
-  if (column.editType === 'currency' && typeof value === 'number') {
+  if (column.editType === "currency" && typeof value === "number") {
     displayValue = `$${value.toFixed(2)}`;
-  } else if (column.editType === 'number' && typeof value === 'number') {
+  } else if (column.editType === "number" && typeof value === "number") {
     displayValue = value.toLocaleString();
   } else if (value === null || value === undefined) {
-    displayValue = '-';
+    displayValue = "-";
   }
 
   return (
     <td
-      className={`px-3 py-2 ${alignClass} ${isEditable ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+      className={`px-3 py-2 ${alignClass} ${isEditable ? "cursor-pointer hover:bg-gray-50" : ""}`}
       onClick={handleStartEdit}
       style={{ width: column.width }}
     >

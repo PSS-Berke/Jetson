@@ -3,20 +3,20 @@
  * Allows selecting no group, existing group, or creating a new group
  */
 
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { getMachineGroups } from '@/lib/api';
-import type { MachineGroup } from '@/types';
+import React, { useState, useEffect } from "react";
+import { getMachineGroups } from "@/lib/api";
+import type { MachineGroup } from "@/types";
 
 interface MachineGroupSelectorProps {
-  selectedOption: 'none' | 'existing' | 'new';
+  selectedOption: "none" | "existing" | "new";
   existingGroupId: number | null;
   newGroupName: string;
   newGroupDescription: string;
   processTypeKey: string;
   facilitiesId: number | null;
-  onSelectOption: (option: 'none' | 'existing' | 'new') => void;
+  onSelectOption: (option: "none" | "existing" | "new") => void;
   onSelectExistingGroup: (groupId: number) => void;
   onSetNewGroupName: (name: string) => void;
   onSetNewGroupDescription: (description: string) => void;
@@ -48,11 +48,14 @@ export default function MachineGroupSelector({
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await getMachineGroups(processTypeKey, facilitiesId || undefined);
+        const data = await getMachineGroups(
+          processTypeKey,
+          facilitiesId || undefined,
+        );
         setGroups(data);
       } catch (error) {
-        console.error('[MachineGroupSelector] Error loading groups:', error);
-        setLoadError('Failed to load machine groups');
+        console.error("[MachineGroupSelector] Error loading groups:", error);
+        setLoadError("Failed to load machine groups");
       } finally {
         setLoading(false);
       }
@@ -71,20 +74,20 @@ export default function MachineGroupSelector({
 
       {/* Option 1: No Group */}
       <div
-        onClick={() => onSelectOption('none')}
+        onClick={() => onSelectOption("none")}
         className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-          selectedOption === 'none'
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-200 bg-white hover:border-gray-300'
+          selectedOption === "none"
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-200 bg-white hover:border-gray-300"
         }`}
       >
         <div className="flex items-center gap-3">
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-              selectedOption === 'none' ? 'border-blue-500' : 'border-gray-300'
+              selectedOption === "none" ? "border-blue-500" : "border-gray-300"
             }`}
           >
-            {selectedOption === 'none' && (
+            {selectedOption === "none" && (
               <div className="w-3 h-3 rounded-full bg-blue-500" />
             )}
           </div>
@@ -99,20 +102,22 @@ export default function MachineGroupSelector({
 
       {/* Option 2: Existing Group */}
       <div
-        onClick={() => onSelectOption('existing')}
+        onClick={() => onSelectOption("existing")}
         className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-          selectedOption === 'existing'
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-200 bg-white hover:border-gray-300'
+          selectedOption === "existing"
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-200 bg-white hover:border-gray-300"
         }`}
       >
         <div className="flex items-center gap-3 mb-3">
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-              selectedOption === 'existing' ? 'border-blue-500' : 'border-gray-300'
+              selectedOption === "existing"
+                ? "border-blue-500"
+                : "border-gray-300"
             }`}
           >
-            {selectedOption === 'existing' && (
+            {selectedOption === "existing" && (
               <div className="w-3 h-3 rounded-full bg-blue-500" />
             )}
           </div>
@@ -125,10 +130,12 @@ export default function MachineGroupSelector({
         </div>
 
         {/* Existing Groups Dropdown */}
-        {selectedOption === 'existing' && (
+        {selectedOption === "existing" && (
           <div className="ml-8 mt-3">
             {loading ? (
-              <div className="text-sm text-gray-500 italic">Loading groups...</div>
+              <div className="text-sm text-gray-500 italic">
+                Loading groups...
+              </div>
             ) : loadError ? (
               <div className="text-sm text-red-600">{loadError}</div>
             ) : groups.length === 0 ? (
@@ -144,13 +151,17 @@ export default function MachineGroupSelector({
                     onClick={() => onSelectExistingGroup(group.id)}
                     className={`w-full text-left p-3 rounded-md border transition-all ${
                       existingGroupId === group.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
                     }`}
                   >
-                    <div className="font-medium text-gray-900">{group.name}</div>
+                    <div className="font-medium text-gray-900">
+                      {group.name}
+                    </div>
                     {group.description && (
-                      <div className="text-sm text-gray-500 mt-1">{group.description}</div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {group.description}
+                      </div>
                     )}
                     <div className="text-xs text-gray-400 mt-1">
                       {group.machine_ids.length} machine(s)
@@ -161,7 +172,11 @@ export default function MachineGroupSelector({
             )}
             {errors.existingGroupId && (
               <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -177,20 +192,22 @@ export default function MachineGroupSelector({
 
       {/* Option 3: Create New Group */}
       <div
-        onClick={() => onSelectOption('new')}
+        onClick={() => onSelectOption("new")}
         className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-          selectedOption === 'new'
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-200 bg-white hover:border-gray-300'
+          selectedOption === "new"
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-200 bg-white hover:border-gray-300"
         }`}
       >
         <div className="flex items-center gap-3 mb-3">
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-              selectedOption === 'new' ? 'border-blue-500' : 'border-gray-300'
+              selectedOption === "new" ? "border-blue-500" : "border-gray-300"
             }`}
           >
-            {selectedOption === 'new' && <div className="w-3 h-3 rounded-full bg-blue-500" />}
+            {selectedOption === "new" && (
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+            )}
           </div>
           <div className="flex-1">
             <div className="font-medium text-gray-900">Create New Group</div>
@@ -201,10 +218,13 @@ export default function MachineGroupSelector({
         </div>
 
         {/* New Group Form */}
-        {selectedOption === 'new' && (
+        {selectedOption === "new" && (
           <div className="ml-8 mt-3 space-y-3">
             <div>
-              <label htmlFor="newGroupName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="newGroupName"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Group Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -218,7 +238,11 @@ export default function MachineGroupSelector({
               />
               {errors.newGroupName && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -252,10 +276,14 @@ export default function MachineGroupSelector({
       </div>
 
       {/* Selected Group Display */}
-      {selectedOption === 'existing' && selectedGroup && (
+      {selectedOption === "existing" && selectedGroup && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
           <div className="flex items-center gap-2 text-sm">
-            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              className="w-4 h-4 text-green-500"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -263,8 +291,8 @@ export default function MachineGroupSelector({
               />
             </svg>
             <span className="text-green-800">
-              <strong>{selectedGroup.name}</strong> selected ({selectedGroup.machine_ids.length}{' '}
-              machine(s))
+              <strong>{selectedGroup.name}</strong> selected (
+              {selectedGroup.machine_ids.length} machine(s))
             </span>
           </div>
         </div>

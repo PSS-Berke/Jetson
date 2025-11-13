@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
+import { ReactNode } from "react";
 
-export type SortDirection = 'asc' | 'desc' | null;
+export type SortDirection = "asc" | "desc" | null;
 
 export interface ColumnConfig<T = any> {
   key: string;
@@ -8,10 +8,10 @@ export interface ColumnConfig<T = any> {
   sortable?: boolean;
   render?: (value: any, row: T) => ReactNode;
   editable?: boolean;
-  editType?: 'text' | 'number' | 'currency' | 'date';
+  editType?: "text" | "number" | "currency" | "date";
   editValidator?: (value: string) => boolean;
   width?: string;
-  align?: 'left' | 'center' | 'right';
+  align?: "left" | "center" | "right";
   mobileHidden?: boolean;
   getValue?: (row: T) => any; // For nested values like 'client.name'
 }
@@ -20,7 +20,7 @@ export interface BulkAction<T = any> {
   label: string;
   icon?: ReactNode;
   onClick: (selectedRows: T[]) => void | Promise<void>;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
 }
 
@@ -34,8 +34,8 @@ export interface SelectionConfig<T = any> {
 export interface BatchEditColumn {
   key: string;
   label?: string;
-  mode: 'add' | 'set' | 'both';
-  type: 'number' | 'currency';
+  mode: "add" | "set" | "both";
+  type: "number" | "currency";
 }
 
 export interface BatchChange {
@@ -60,8 +60,12 @@ export interface InlineEditConfig<T = any> {
 }
 
 export interface MobileConfig<T = any> {
-  viewMode?: 'cards' | 'table';
-  cardTemplate?: (row: T, isSelected: boolean, onToggle: () => void) => ReactNode;
+  viewMode?: "cards" | "table";
+  cardTemplate?: (
+    row: T,
+    isSelected: boolean,
+    onToggle: () => void,
+  ) => ReactNode;
   visibleColumns?: string[];
 }
 

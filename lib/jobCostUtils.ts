@@ -3,7 +3,7 @@
  * Handles comparison between billing rates (price_per_m) and actual costs
  */
 
-import { ParsedJob } from '@/hooks/useJobs';
+import { ParsedJob } from "@/hooks/useJobs";
 
 // ============================================================================
 // Types
@@ -32,7 +32,7 @@ export interface JobProfitMetrics {
   profit_per_m: number; // billing_rate - actual_cost
   profit_percentage: number; // (profit / billing_rate) * 100
   total_profit: number; // (quantity / 1000) * profit_per_m
-  profit_status: 'excellent' | 'good' | 'warning' | 'loss'; // Color coding
+  profit_status: "excellent" | "good" | "warning" | "loss"; // Color coding
 }
 
 /**
@@ -60,7 +60,7 @@ export interface JobCostComparison {
  */
 export function calculateAverageCostFromRequirements(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  requirements: any[]
+  requirements: any[],
 ): number {
   if (!requirements || requirements.length === 0) {
     return 0;
@@ -68,13 +68,17 @@ export function calculateAverageCostFromRequirements(
 
   // Filter requirements that have valid price_per_m values
   const validPrices = requirements
-    .map(req => {
+    .map((req) => {
       const priceStr = req.price_per_m;
       // Handle "undefined" string, null, undefined, and empty string
-      const isValid = priceStr && priceStr !== 'undefined' && priceStr !== 'null' && priceStr !== '';
+      const isValid =
+        priceStr &&
+        priceStr !== "undefined" &&
+        priceStr !== "null" &&
+        priceStr !== "";
       return isValid ? parseFloat(priceStr) : 0;
     })
-    .filter(price => price > 0);
+    .filter((price) => price > 0);
 
   if (validPrices.length === 0) {
     return 0;
@@ -98,7 +102,8 @@ export function calculateBillingRatePerM(job: ParsedJob): number {
   const totalPricePerM = job.requirements.reduce((total, req) => {
     // Handle "undefined" string, null, undefined, and empty string
     const pricePerMStr = req.price_per_m;
-    const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+    const isValidPrice =
+      pricePerMStr && pricePerMStr !== "undefined" && pricePerMStr !== "null";
     const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
     return total + pricePerM;
   }, 0);
@@ -111,7 +116,7 @@ export function calculateBillingRatePerM(job: ParsedJob): number {
  */
 export function calculateProfitMargin(
   billingRate: number,
-  actualCost: number
+  actualCost: number,
 ): number {
   return billingRate - actualCost;
 }
@@ -121,7 +126,7 @@ export function calculateProfitMargin(
  */
 export function calculateProfitPercentage(
   billingRate: number,
-  actualCost: number
+  actualCost: number,
 ): number {
   if (billingRate === 0) return 0;
   const profit = calculateProfitMargin(billingRate, actualCost);
@@ -133,7 +138,7 @@ export function calculateProfitPercentage(
  */
 export function calculateTotalProfit(
   quantity: number,
-  profitPerM: number
+  profitPerM: number,
 ): number {
   return (quantity / 1000) * profitPerM;
 }
@@ -141,11 +146,13 @@ export function calculateTotalProfit(
 /**
  * Determine profit status for color coding
  */
-export function getProfitStatus(profitPercentage: number): 'excellent' | 'good' | 'warning' | 'loss' {
-  if (profitPercentage < 0) return 'loss';
-  if (profitPercentage < 10) return 'warning';
-  if (profitPercentage < 25) return 'good';
-  return 'excellent';
+export function getProfitStatus(
+  profitPercentage: number,
+): "excellent" | "good" | "warning" | "loss" {
+  if (profitPercentage < 0) return "loss";
+  if (profitPercentage < 10) return "warning";
+  if (profitPercentage < 25) return "good";
+  return "excellent";
 }
 
 /**
@@ -153,11 +160,14 @@ export function getProfitStatus(profitPercentage: number): 'excellent' | 'good' 
  */
 export function calculateJobProfitMetrics(
   job: ParsedJob,
-  actualCostPerM: number
+  actualCostPerM: number,
 ): JobProfitMetrics {
   const billingRate = calculateBillingRatePerM(job);
   const profitPerM = calculateProfitMargin(billingRate, actualCostPerM);
-  const profitPercentage = calculateProfitPercentage(billingRate, actualCostPerM);
+  const profitPercentage = calculateProfitPercentage(
+    billingRate,
+    actualCostPerM,
+  );
   const totalProfit = calculateTotalProfit(job.quantity, profitPerM);
   const profitStatus = getProfitStatus(profitPercentage);
 
@@ -183,12 +193,12 @@ export function mergeJobsWithCostEntries(
   jobs: ParsedJob[],
   costEntries: JobCostEntry[],
   startDate: number,
-  endDate: number
+  endDate: number,
 ): JobCostComparison[] {
   // Group cost entries by job ID
   const entriesByJob = new Map<number, JobCostEntry[]>();
 
-  costEntries.forEach(entry => {
+  costEntries.forEach((entry) => {
     if (entry.date >= startDate && entry.date <= endDate) {
       const entries = entriesByJob.get(entry.job) || [];
       entries.push(entry);
@@ -197,7 +207,7 @@ export function mergeJobsWithCostEntries(
   });
 
   // Create comparison data for each job
-  return jobs.map(job => {
+  return jobs.map((job) => {
     const jobEntries = entriesByJob.get(job.id) || [];
     const billingRate = calculateBillingRatePerM(job);
 
@@ -206,24 +216,30 @@ export function mergeJobsWithCostEntries(
     let lastUpdatedAt: number | undefined = undefined;
 
     if (jobEntries.length > 0) {
-      const totalCost = jobEntries.reduce((sum, entry) => sum + entry.actual_cost_per_m, 0);
+      const totalCost = jobEntries.reduce(
+        (sum, entry) => sum + entry.actual_cost_per_m,
+        0,
+      );
       actualCostPerM = totalCost / jobEntries.length;
 
       // Find most recent entry timestamp
-      lastUpdatedAt = Math.max(...jobEntries.map(e => e.updated_at || e.created_at));
+      lastUpdatedAt = Math.max(
+        ...jobEntries.map((e) => e.updated_at || e.created_at),
+      );
     }
 
     // Calculate profit metrics if we have cost data
-    const profitMetrics = actualCostPerM !== null
-      ? calculateJobProfitMetrics(job, actualCostPerM)
-      : null;
+    const profitMetrics =
+      actualCostPerM !== null
+        ? calculateJobProfitMetrics(job, actualCostPerM)
+        : null;
 
     return {
       job,
       billing_rate_per_m: billingRate,
       actual_cost_per_m: actualCostPerM,
       profit_metrics: profitMetrics,
-      entry_ids: jobEntries.map(e => e.id),
+      entry_ids: jobEntries.map((e) => e.id),
       last_updated_at: lastUpdatedAt,
     };
   });
@@ -237,9 +253,9 @@ export function mergeJobsWithCostEntries(
  * Format currency value
  */
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
@@ -249,29 +265,31 @@ export function formatCurrency(value: number): string {
  * Format percentage value
  */
 export function formatPercentage(value: number): string {
-  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
 /**
  * Format number with commas
  */
 export function formatNumber(value: number): string {
-  return new Intl.NumberFormat('en-US').format(Math.round(value));
+  return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
 
 /**
  * Get color class for profit status
  */
-export function getProfitColorClass(status: 'excellent' | 'good' | 'warning' | 'loss'): string {
+export function getProfitColorClass(
+  status: "excellent" | "good" | "warning" | "loss",
+): string {
   switch (status) {
-    case 'excellent':
-      return 'text-green-700 bg-green-50 border-green-200';
-    case 'good':
-      return 'text-blue-700 bg-blue-50 border-blue-200';
-    case 'warning':
-      return 'text-yellow-700 bg-yellow-50 border-yellow-200';
-    case 'loss':
-      return 'text-red-700 bg-red-50 border-red-200';
+    case "excellent":
+      return "text-green-700 bg-green-50 border-green-200";
+    case "good":
+      return "text-blue-700 bg-blue-50 border-blue-200";
+    case "warning":
+      return "text-yellow-700 bg-yellow-50 border-yellow-200";
+    case "loss":
+      return "text-red-700 bg-red-50 border-red-200";
   }
 }
 
@@ -279,10 +297,10 @@ export function getProfitColorClass(status: 'excellent' | 'good' | 'warning' | '
  * Get text color class for profit values
  */
 export function getProfitTextColor(profitPercentage: number): string {
-  if (profitPercentage < 0) return 'text-red-600';
-  if (profitPercentage < 10) return 'text-yellow-600';
-  if (profitPercentage < 25) return 'text-blue-600';
-  return 'text-green-600';
+  if (profitPercentage < 0) return "text-red-600";
+  if (profitPercentage < 10) return "text-yellow-600";
+  if (profitPercentage < 25) return "text-blue-600";
+  return "text-green-600";
 }
 
 // ============================================================================
@@ -293,7 +311,7 @@ export function getProfitTextColor(profitPercentage: number): string {
  * Calculate aggregate profit metrics for a set of jobs
  */
 export function calculateAggregateProfitMetrics(
-  comparisons: JobCostComparison[]
+  comparisons: JobCostComparison[],
 ): {
   averageProfitPercentage: number;
   totalProfit: number;
@@ -302,28 +320,36 @@ export function calculateAggregateProfitMetrics(
   jobsWithCostData: number;
   jobsWithoutCostData: number;
 } {
-  const withCostData = comparisons.filter(c => c.profit_metrics !== null);
-  const withoutCostData = comparisons.filter(c => c.profit_metrics === null);
+  const withCostData = comparisons.filter((c) => c.profit_metrics !== null);
+  const withoutCostData = comparisons.filter((c) => c.profit_metrics === null);
 
   // Calculate average profit percentage
-  const avgProfitPercentage = withCostData.length > 0
-    ? withCostData.reduce((sum, c) => sum + (c.profit_metrics?.profit_percentage || 0), 0) / withCostData.length
-    : 0;
+  const avgProfitPercentage =
+    withCostData.length > 0
+      ? withCostData.reduce(
+          (sum, c) => sum + (c.profit_metrics?.profit_percentage || 0),
+          0,
+        ) / withCostData.length
+      : 0;
 
   // Calculate total profit
-  const totalProfit = withCostData.reduce((sum, c) => sum + (c.profit_metrics?.total_profit || 0), 0);
+  const totalProfit = withCostData.reduce(
+    (sum, c) => sum + (c.profit_metrics?.total_profit || 0),
+    0,
+  );
 
   // Find most profitable job
-  const mostProfitable = withCostData.length > 0
-    ? withCostData.reduce((best, current) => {
-        const bestProfit = best.profit_metrics?.total_profit || 0;
-        const currentProfit = current.profit_metrics?.total_profit || 0;
-        return currentProfit > bestProfit ? current : best;
-      })
-    : null;
+  const mostProfitable =
+    withCostData.length > 0
+      ? withCostData.reduce((best, current) => {
+          const bestProfit = best.profit_metrics?.total_profit || 0;
+          const currentProfit = current.profit_metrics?.total_profit || 0;
+          return currentProfit > bestProfit ? current : best;
+        })
+      : null;
 
   // Find jobs at risk (profit percentage < 10% or negative)
-  const atRisk = withCostData.filter(c => {
+  const atRisk = withCostData.filter((c) => {
     const profitPct = c.profit_metrics?.profit_percentage || 0;
     return profitPct < 10;
   });

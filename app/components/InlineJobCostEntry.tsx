@@ -1,16 +1,32 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { getJobsInTimeRange } from '@/lib/productionUtils';
-import { calculateBillingRatePerM, formatCurrency, formatPercentage, getProfitTextColor } from '@/lib/jobCostUtils';
-import { getJobCostEntries, batchCreateJobCostEntries, deleteJobCostEntry } from '@/lib/api';
-import Toast from './Toast';
-import Pagination from './Pagination';
-import type { ParsedJob } from '@/hooks/useJobs';
-import type { JobCostEntry } from '@/lib/jobCostUtils';
+import { useState, useEffect, useMemo } from "react";
+import { getJobsInTimeRange } from "@/lib/productionUtils";
+import {
+  calculateBillingRatePerM,
+  formatCurrency,
+  formatPercentage,
+  getProfitTextColor,
+} from "@/lib/jobCostUtils";
+import {
+  getJobCostEntries,
+  batchCreateJobCostEntries,
+  deleteJobCostEntry,
+} from "@/lib/api";
+import Toast from "./Toast";
+import Pagination from "./Pagination";
+import type { ParsedJob } from "@/hooks/useJobs";
+import type { JobCostEntry } from "@/lib/jobCostUtils";
 
-type SortField = 'job_number' | 'job_name' | 'client_name' | 'quantity' | 'billing_rate_per_m' | 'current_cost_per_m' | 'profit_percentage';
-type SortDirection = 'asc' | 'desc';
+type SortField =
+  | "job_number"
+  | "job_name"
+  | "client_name"
+  | "quantity"
+  | "billing_rate_per_m"
+  | "current_cost_per_m"
+  | "profit_percentage";
+type SortDirection = "asc" | "desc";
 
 interface InlineJobCostEntryProps {
   jobs: ParsedJob[];
@@ -45,148 +61,165 @@ export default function InlineJobCostEntry({
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [sortField, setSortField] = useState<SortField>('job_number');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>("job_number");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   // Initialize job entries when date range changes OR when refreshTrigger changes
   useEffect(() => {
-    console.log('[InlineJobCostEntry] Effect triggered:', {
+    console.log("[InlineJobCostEntry] Effect triggered:", {
       jobsLength: jobs.length,
       startDate,
       endDate,
-      facilitiesId
+      facilitiesId,
     });
 
     if (jobs.length > 0) {
       const loadEntriesWithCosts = async () => {
         const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
 
-        console.log('[InlineJobCostEntry] Relevant jobs in time range:', relevantJobs.length);
+        console.log(
+          "[InlineJobCostEntry] Relevant jobs in time range:",
+          relevantJobs.length,
+        );
 
         // Fetch existing cost entries for this period from API
         try {
-          const existingEntries = await getJobCostEntries(facilitiesId, startDate, endDate);
+          const existingEntries = await getJobCostEntries(
+            facilitiesId,
+            startDate,
+            endDate,
+          );
 
-          console.log('[InlineJobCostEntry] Fetched existing entries:', existingEntries.length);
+          console.log(
+            "[InlineJobCostEntry] Fetched existing entries:",
+            existingEntries.length,
+          );
 
           // Create map of job_id to current cost
           const costsMap = new Map<number, number>();
-          existingEntries.forEach(entry => {
+          existingEntries.forEach((entry) => {
             costsMap.set(entry.job, entry.actual_cost_per_m);
           });
 
-            const entries: JobCostEntryData[] = relevantJobs.map((job) => {
-              const billingRate = calculateBillingRatePerM(job);
-              const currentCost = costsMap.get(job.id) || 0;
-              const clientName = job.client?.name || 'Unknown';
-              const fullClientName = job.sub_client 
-                ? `${clientName} / ${job.sub_client.name}`
-                : clientName;
+          const entries: JobCostEntryData[] = relevantJobs.map((job) => {
+            const billingRate = calculateBillingRatePerM(job);
+            const currentCost = costsMap.get(job.id) || 0;
+            const clientName = job.client?.name || "Unknown";
+            const fullClientName = job.sub_client
+              ? `${clientName} / ${job.sub_client.name}`
+              : clientName;
 
-              return {
-                job_id: job.id,
-                job_number: job.job_number,
-                job_name: job.job_name,
-                client_name: fullClientName,
-                quantity: job.quantity,
-                billing_rate_per_m: billingRate,
-                current_cost_per_m: currentCost,
-                add_to_cost: '',
-                set_total_cost: '',
-                notes: '',
-              };
-            });
+            return {
+              job_id: job.id,
+              job_number: job.job_number,
+              job_name: job.job_name,
+              client_name: fullClientName,
+              quantity: job.quantity,
+              billing_rate_per_m: billingRate,
+              current_cost_per_m: currentCost,
+              add_to_cost: "",
+              set_total_cost: "",
+              notes: "",
+            };
+          });
 
-            console.log('[InlineJobCostEntry] Setting job entries:', entries.length);
-            setJobEntries(entries);
-            // Reset to page 1 when entries change
-            setCurrentPage(1);
-          } catch (error) {
-            console.error('[InlineJobCostEntry] Error loading cost entries:', error);
-            // Set entries with zero costs if fetch fails
-            const entries: JobCostEntryData[] = relevantJobs.map((job) => {
-              const billingRate = calculateBillingRatePerM(job);
+          console.log(
+            "[InlineJobCostEntry] Setting job entries:",
+            entries.length,
+          );
+          setJobEntries(entries);
+          // Reset to page 1 when entries change
+          setCurrentPage(1);
+        } catch (error) {
+          console.error(
+            "[InlineJobCostEntry] Error loading cost entries:",
+            error,
+          );
+          // Set entries with zero costs if fetch fails
+          const entries: JobCostEntryData[] = relevantJobs.map((job) => {
+            const billingRate = calculateBillingRatePerM(job);
 
-              return {
-                job_id: job.id,
-                job_number: job.job_number,
-                job_name: job.job_name,
-                client_name: job.client?.name || 'Unknown',
-                quantity: job.quantity,
-                billing_rate_per_m: billingRate,
-                current_cost_per_m: 0,
-                add_to_cost: '',
-                set_total_cost: '',
-                notes: '',
-              };
-            });
-            console.log('[InlineJobCostEntry] Setting job entries (after error):', entries.length);
-            setJobEntries(entries);
-            // Reset to page 1 when entries change
-            setCurrentPage(1);
-          }
-        };
+            return {
+              job_id: job.id,
+              job_number: job.job_number,
+              job_name: job.job_name,
+              client_name: job.client?.name || "Unknown",
+              quantity: job.quantity,
+              billing_rate_per_m: billingRate,
+              current_cost_per_m: 0,
+              add_to_cost: "",
+              set_total_cost: "",
+              notes: "",
+            };
+          });
+          console.log(
+            "[InlineJobCostEntry] Setting job entries (after error):",
+            entries.length,
+          );
+          setJobEntries(entries);
+          // Reset to page 1 when entries change
+          setCurrentPage(1);
+        }
+      };
 
-        loadEntriesWithCosts();
-      } else {
-        console.log('[InlineJobCostEntry] No jobs available');
-      }
-    }, [jobs, startDate, endDate, facilitiesId, refreshTrigger]);
+      loadEntriesWithCosts();
+    } else {
+      console.log("[InlineJobCostEntry] No jobs available");
+    }
+  }, [jobs, startDate, endDate, facilitiesId, refreshTrigger]);
 
   // Clear inputs when exiting batch mode
   useEffect(() => {
     if (!isBatchMode) {
-      const newEntries = jobEntries.map(entry => ({
+      const newEntries = jobEntries.map((entry) => ({
         ...entry,
-        add_to_cost: '',
-        set_total_cost: '',
-        notes: '',
+        add_to_cost: "",
+        set_total_cost: "",
+        notes: "",
       }));
       setJobEntries(newEntries);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBatchMode]);
 
   // Handle input changes
   const handleAddToCostChange = (jobId: number, value: string) => {
-    const validChars = value.replace(/[^\d.]/g, '');
-    const parts = validChars.split('.');
+    const validChars = value.replace(/[^\d.]/g, "");
+    const parts = validChars.split(".");
     if (parts.length > 2) return;
 
-    setJobEntries(prev =>
-      prev.map(entry =>
+    setJobEntries((prev) =>
+      prev.map((entry) =>
         entry.job_id === jobId
-          ? { ...entry, add_to_cost: validChars, set_total_cost: '' }
-          : entry
-      )
+          ? { ...entry, add_to_cost: validChars, set_total_cost: "" }
+          : entry,
+      ),
     );
   };
 
   const handleSetTotalCostChange = (jobId: number, value: string) => {
-    const validChars = value.replace(/[^\d.]/g, '');
-    const parts = validChars.split('.');
+    const validChars = value.replace(/[^\d.]/g, "");
+    const parts = validChars.split(".");
     if (parts.length > 2) return;
 
-    setJobEntries(prev =>
-      prev.map(entry =>
+    setJobEntries((prev) =>
+      prev.map((entry) =>
         entry.job_id === jobId
-          ? { ...entry, set_total_cost: validChars, add_to_cost: '' }
-          : entry
-      )
+          ? { ...entry, set_total_cost: validChars, add_to_cost: "" }
+          : entry,
+      ),
     );
   };
 
   const handleNotesChange = (jobId: number, value: string) => {
-    setJobEntries(prev =>
-      prev.map(entry =>
-        entry.job_id === jobId
-          ? { ...entry, notes: value }
-          : entry
-      )
+    setJobEntries((prev) =>
+      prev.map((entry) =>
+        entry.job_id === jobId ? { ...entry, notes: value } : entry,
+      ),
     );
   };
 
@@ -204,22 +237,29 @@ export default function InlineJobCostEntry({
   const getProfitPreview = (entry: JobCostEntryData) => {
     const newCost = getNewCost(entry);
     const profit = entry.billing_rate_per_m - newCost;
-    const profitPercentage = entry.billing_rate_per_m > 0 ? (profit / entry.billing_rate_per_m) * 100 : 0;
+    const profitPercentage =
+      entry.billing_rate_per_m > 0
+        ? (profit / entry.billing_rate_per_m) * 100
+        : 0;
     return { profit, profitPercentage };
   };
 
   // Handle batch save
   const handleBatchSave = async () => {
     setSubmitting(true);
-    setErrorMessage('');
+    setErrorMessage("");
 
     try {
       const entriesToSubmit = jobEntries
-        .filter((entry) => entry.add_to_cost.trim() !== '' || entry.set_total_cost.trim() !== '')
+        .filter(
+          (entry) =>
+            entry.add_to_cost.trim() !== "" ||
+            entry.set_total_cost.trim() !== "",
+        )
         .map((entry) => {
           let final_cost_per_m: number;
 
-          if (entry.add_to_cost.trim() !== '') {
+          if (entry.add_to_cost.trim() !== "") {
             const addAmount = parseFloat(entry.add_to_cost);
             if (isNaN(addAmount) || addAmount < 0) {
               throw new Error(`Invalid add amount for job ${entry.job_number}`);
@@ -232,7 +272,10 @@ export default function InlineJobCostEntry({
             }
           }
 
-          const costEntry: Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'> = {
+          const costEntry: Omit<
+            JobCostEntry,
+            "id" | "created_at" | "updated_at"
+          > = {
             job: entry.job_id,
             date: Date.now(),
             actual_cost_per_m: final_cost_per_m,
@@ -243,30 +286,40 @@ export default function InlineJobCostEntry({
           return costEntry;
         });
 
-      console.log('[InlineJobCostEntry] Entries to submit:', entriesToSubmit);
+      console.log("[InlineJobCostEntry] Entries to submit:", entriesToSubmit);
 
       if (entriesToSubmit.length === 0) {
-        setErrorMessage('Please enter at least one cost value');
+        setErrorMessage("Please enter at least one cost value");
         setShowErrorToast(true);
         setSubmitting(false);
         return;
       }
 
       // Delete old entries for these jobs first
-      const jobIds = entriesToSubmit.map(e => e.job);
-      const existingEntries = await getJobCostEntries(facilitiesId, startDate, endDate);
-      const entriesToDelete = existingEntries.filter(e => jobIds.includes(e.job));
+      const jobIds = entriesToSubmit.map((e) => e.job);
+      const existingEntries = await getJobCostEntries(
+        facilitiesId,
+        startDate,
+        endDate,
+      );
+      const entriesToDelete = existingEntries.filter((e) =>
+        jobIds.includes(e.job),
+      );
 
       if (entriesToDelete.length > 0) {
-        await Promise.all(entriesToDelete.map(e => deleteJobCostEntry(e.id)));
+        await Promise.all(entriesToDelete.map((e) => deleteJobCostEntry(e.id)));
       }
 
       // Create new entries
       const createdEntries = await batchCreateJobCostEntries(entriesToSubmit);
-      console.log('[InlineJobCostEntry] Successfully created', createdEntries.length, 'entries');
+      console.log(
+        "[InlineJobCostEntry] Successfully created",
+        createdEntries.length,
+        "entries",
+      );
 
       // Trigger refresh to fetch updated costs
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
 
       // Show success
       setShowSuccessToast(true);
@@ -277,8 +330,10 @@ export default function InlineJobCostEntry({
         setIsBatchMode(false);
       }, 2000);
     } catch (error) {
-      console.error('[InlineJobCostEntry] Error submitting:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save cost entries');
+      console.error("[InlineJobCostEntry] Error submitting:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to save cost entries",
+      );
       setShowErrorToast(true);
     } finally {
       setSubmitting(false);
@@ -293,11 +348,11 @@ export default function InlineJobCostEntry({
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       // Toggle direction if clicking the same field
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       // Set new field and reset to ascending
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
@@ -308,46 +363,52 @@ export default function InlineJobCostEntry({
       let bValue: string | number;
 
       switch (sortField) {
-        case 'job_number':
+        case "job_number":
           aValue = a.job_number;
           bValue = b.job_number;
           break;
-        case 'job_name':
+        case "job_name":
           aValue = a.job_name.toLowerCase();
           bValue = b.job_name.toLowerCase();
           break;
-        case 'client_name':
+        case "client_name":
           aValue = a.client_name.toLowerCase();
           bValue = b.client_name.toLowerCase();
           break;
-        case 'quantity':
+        case "quantity":
           aValue = a.quantity;
           bValue = b.quantity;
           break;
-        case 'billing_rate_per_m':
+        case "billing_rate_per_m":
           aValue = a.billing_rate_per_m;
           bValue = b.billing_rate_per_m;
           break;
-        case 'current_cost_per_m':
+        case "current_cost_per_m":
           aValue = a.current_cost_per_m;
           bValue = b.current_cost_per_m;
           break;
-        case 'profit_percentage':
+        case "profit_percentage":
           // Calculate profit percentage for sorting
-          aValue = a.billing_rate_per_m > 0 && a.current_cost_per_m > 0
-            ? ((a.billing_rate_per_m - a.current_cost_per_m) / a.billing_rate_per_m) * 100
-            : 0;
-          bValue = b.billing_rate_per_m > 0 && b.current_cost_per_m > 0
-            ? ((b.billing_rate_per_m - b.current_cost_per_m) / b.billing_rate_per_m) * 100
-            : 0;
+          aValue =
+            a.billing_rate_per_m > 0 && a.current_cost_per_m > 0
+              ? ((a.billing_rate_per_m - a.current_cost_per_m) /
+                  a.billing_rate_per_m) *
+                100
+              : 0;
+          bValue =
+            b.billing_rate_per_m > 0 && b.current_cost_per_m > 0
+              ? ((b.billing_rate_per_m - b.current_cost_per_m) /
+                  b.billing_rate_per_m) *
+                100
+              : 0;
           break;
         default:
           aValue = a.job_number;
           bValue = b.job_number;
       }
 
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
   }, [jobEntries, sortField, sortDirection]);
@@ -367,7 +428,10 @@ export default function InlineJobCostEntry({
   const endIndex = startIndex + itemsPerPage;
   const paginatedEntries = sortedEntries.slice(startIndex, endIndex);
 
-  console.log('[InlineJobCostEntry] Rendering, jobEntries.length:', jobEntries.length);
+  console.log(
+    "[InlineJobCostEntry] Rendering, jobEntries.length:",
+    jobEntries.length,
+  );
 
   // Sort icon component
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -376,7 +440,7 @@ export default function InlineJobCostEntry({
     }
     return (
       <span className="text-blue-600 ml-1">
-        {sortDirection === 'asc' ? '↑' : '↓'}
+        {sortDirection === "asc" ? "↑" : "↓"}
       </span>
     );
   };
@@ -386,7 +450,9 @@ export default function InlineJobCostEntry({
       <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
         <div className="text-center py-8 text-gray-500">
           <p className="mb-2">No jobs found in the selected time period.</p>
-          <p className="text-sm">Adjust your date range to see jobs available for cost tracking.</p>
+          <p className="text-sm">
+            Adjust your date range to see jobs available for cost tracking.
+          </p>
         </div>
       </div>
     );
@@ -399,12 +465,18 @@ export default function InlineJobCostEntry({
         <div>
           {isBatchMode ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-blue-600">Batch Entry Mode</span>
-              <span className="text-xs text-gray-500">Add to current or set new total for each job</span>
+              <span className="text-sm font-semibold text-blue-600">
+                Batch Entry Mode
+              </span>
+              <span className="text-xs text-gray-500">
+                Add to current or set new total for each job
+              </span>
             </div>
           ) : (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Job Cost Entry</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Job Cost Entry
+              </h3>
               <p className="text-sm text-gray-600 mt-1">
                 Enter actual costs per thousand for jobs in this period
               </p>
@@ -426,7 +498,7 @@ export default function InlineJobCostEntry({
                 disabled={submitting}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
-                {submitting ? 'Saving...' : 'Save Changes'}
+                {submitting ? "Saving..." : "Save Changes"}
               </button>
             </>
           ) : (
@@ -446,7 +518,7 @@ export default function InlineJobCostEntry({
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th
-                onClick={() => handleSort('job_number')}
+                onClick={() => handleSort("job_number")}
                 className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -455,7 +527,7 @@ export default function InlineJobCostEntry({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('job_name')}
+                onClick={() => handleSort("job_name")}
                 className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -464,7 +536,7 @@ export default function InlineJobCostEntry({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('client_name')}
+                onClick={() => handleSort("client_name")}
                 className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -473,7 +545,7 @@ export default function InlineJobCostEntry({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('quantity')}
+                onClick={() => handleSort("quantity")}
                 className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-end gap-1">
@@ -482,7 +554,7 @@ export default function InlineJobCostEntry({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('billing_rate_per_m')}
+                onClick={() => handleSort("billing_rate_per_m")}
                 className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-end gap-1">
@@ -491,11 +563,13 @@ export default function InlineJobCostEntry({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('current_cost_per_m')}
+                onClick={() => handleSort("current_cost_per_m")}
                 className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-end gap-1">
-                  {isBatchMode ? 'Current Cost (per/M)' : 'Current Cost (per/M)'}
+                  {isBatchMode
+                    ? "Current Cost (per/M)"
+                    : "Current Cost (per/M)"}
                   <SortIcon field="current_cost_per_m" />
                 </div>
               </th>
@@ -508,7 +582,7 @@ export default function InlineJobCostEntry({
                     Set Total Cost
                   </th>
                   <th
-                    onClick={() => handleSort('profit_percentage')}
+                    onClick={() => handleSort("profit_percentage")}
                     className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px] cursor-pointer hover:bg-gray-100"
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -522,7 +596,7 @@ export default function InlineJobCostEntry({
                 </>
               ) : (
                 <th
-                  onClick={() => handleSort('profit_percentage')}
+                  onClick={() => handleSort("profit_percentage")}
                   className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[130px] cursor-pointer hover:bg-gray-100"
                 >
                   <div className="flex items-center justify-end gap-1">
@@ -539,12 +613,17 @@ export default function InlineJobCostEntry({
               const actualIndex = startIndex + index;
               const hasInput = entry.add_to_cost || entry.set_total_cost;
               const { profitPercentage } = getProfitPreview(entry);
-              const currentProfitPercentage = entry.billing_rate_per_m > 0 && entry.current_cost_per_m > 0
-                ? ((entry.billing_rate_per_m - entry.current_cost_per_m) / entry.billing_rate_per_m) * 100
-                : 0;
+              const currentProfitPercentage =
+                entry.billing_rate_per_m > 0 && entry.current_cost_per_m > 0
+                  ? ((entry.billing_rate_per_m - entry.current_cost_per_m) /
+                      entry.billing_rate_per_m) *
+                    100
+                  : 0;
 
               // Determine which profit % to display in batch mode
-              const displayProfitPercentage = hasInput ? profitPercentage : currentProfitPercentage;
+              const displayProfitPercentage = hasInput
+                ? profitPercentage
+                : currentProfitPercentage;
               const showProfit = hasInput || entry.current_cost_per_m > 0;
 
               return (
@@ -576,7 +655,9 @@ export default function InlineJobCostEntry({
 
                   {/* Current Cost */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">
-                    {entry.current_cost_per_m > 0 ? formatCurrency(entry.current_cost_per_m) : '—'}
+                    {entry.current_cost_per_m > 0
+                      ? formatCurrency(entry.current_cost_per_m)
+                      : "—"}
                   </td>
 
                   {isBatchMode ? (
@@ -586,7 +667,9 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.add_to_cost}
-                          onChange={(e) => handleAddToCostChange(entry.job_id, e.target.value)}
+                          onChange={(e) =>
+                            handleAddToCostChange(entry.job_id, e.target.value)
+                          }
                           placeholder="Add..."
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -597,7 +680,12 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.set_total_cost}
-                          onChange={(e) => handleSetTotalCostChange(entry.job_id, e.target.value)}
+                          onChange={(e) =>
+                            handleSetTotalCostChange(
+                              entry.job_id,
+                              e.target.value,
+                            )
+                          }
                           placeholder="Set..."
                           className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -605,8 +693,16 @@ export default function InlineJobCostEntry({
 
                       {/* Profit Preview */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right">
-                        <span className={showProfit ? getProfitTextColor(displayProfitPercentage) : 'text-gray-400'}>
-                          {showProfit ? formatPercentage(displayProfitPercentage) : '—'}
+                        <span
+                          className={
+                            showProfit
+                              ? getProfitTextColor(displayProfitPercentage)
+                              : "text-gray-400"
+                          }
+                        >
+                          {showProfit
+                            ? formatPercentage(displayProfitPercentage)
+                            : "—"}
                         </span>
                       </td>
 
@@ -615,7 +711,9 @@ export default function InlineJobCostEntry({
                         <input
                           type="text"
                           value={entry.notes}
-                          onChange={(e) => handleNotesChange(entry.job_id, e.target.value)}
+                          onChange={(e) =>
+                            handleNotesChange(entry.job_id, e.target.value)
+                          }
                           placeholder="Optional notes"
                           className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -623,8 +721,16 @@ export default function InlineJobCostEntry({
                     </>
                   ) : (
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right">
-                      <span className={entry.current_cost_per_m > 0 ? getProfitTextColor(currentProfitPercentage) : 'text-gray-400'}>
-                        {entry.current_cost_per_m > 0 ? formatPercentage(currentProfitPercentage) : '—'}
+                      <span
+                        className={
+                          entry.current_cost_per_m > 0
+                            ? getProfitTextColor(currentProfitPercentage)
+                            : "text-gray-400"
+                        }
+                      >
+                        {entry.current_cost_per_m > 0
+                          ? formatPercentage(currentProfitPercentage)
+                          : "—"}
                       </span>
                     </td>
                   )}
@@ -660,7 +766,7 @@ export default function InlineJobCostEntry({
       {/* Error Toast */}
       {showErrorToast && (
         <Toast
-          message={errorMessage || 'Failed to save cost entries'}
+          message={errorMessage || "Failed to save cost entries"}
           type="error"
           onClose={() => setShowErrorToast(false)}
         />

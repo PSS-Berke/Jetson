@@ -1,4 +1,4 @@
-import { BulkAction } from './DataTableTypes';
+import { BulkAction } from "./DataTableTypes";
 
 interface DataTableBulkActionsProps<T> {
   selectedCount: number;
@@ -11,21 +11,21 @@ export function DataTableBulkActions<T>({
   selectedCount,
   selectedRows,
   bulkActions,
-  onClearSelection
+  onClearSelection,
 }: DataTableBulkActionsProps<T>) {
   if (selectedCount === 0) {
     return null;
   }
 
-  const getVariantClass = (variant?: 'primary' | 'secondary' | 'danger') => {
+  const getVariantClass = (variant?: "primary" | "secondary" | "danger") => {
     switch (variant) {
-      case 'danger':
-        return 'bg-red-600 hover:bg-red-700 text-white';
-      case 'secondary':
-        return 'bg-gray-600 hover:bg-gray-700 text-white';
-      case 'primary':
+      case "danger":
+        return "bg-red-600 hover:bg-red-700 text-white";
+      case "secondary":
+        return "bg-gray-600 hover:bg-gray-700 text-white";
+      case "primary":
       default:
-        return 'bg-blue-600 hover:bg-blue-700 text-white';
+        return "bg-blue-600 hover:bg-blue-700 text-white";
     }
   };
 
@@ -33,7 +33,7 @@ export function DataTableBulkActions<T>({
     <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <span className="font-semibold text-blue-900">
-          {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
+          {selectedCount} {selectedCount === 1 ? "item" : "items"} selected
         </span>
         <button
           onClick={onClearSelection}

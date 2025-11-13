@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useRef, useLayoutEffect, useState, useMemo } from 'react';
+import { useRef, useLayoutEffect, useState, useMemo } from "react";
 
 interface FacilityToggleProps {
   currentFacility: number | null;
@@ -8,19 +8,32 @@ interface FacilityToggleProps {
   showAll?: boolean;
 }
 
-export default function FacilityToggle({ currentFacility, onFacilityChange, showAll = true }: FacilityToggleProps) {
-  const facilities = useMemo(() => showAll
-    ? [
-        { value: null, label: 'All' },
-        { value: 1, label: 'Bolingbrook' },
-        { value: 2, label: 'Lemont' }
-      ]
-    : [
-        { value: 1, label: 'Bolingbrook' },
-        { value: 2, label: 'Lemont' }
-      ], [showAll]);
+export default function FacilityToggle({
+  currentFacility,
+  onFacilityChange,
+  showAll = true,
+}: FacilityToggleProps) {
+  const facilities = useMemo(
+    () =>
+      showAll
+        ? [
+            { value: null, label: "All" },
+            { value: 1, label: "Bolingbrook" },
+            { value: 2, label: "Lemont" },
+          ]
+        : [
+            { value: 1, label: "Bolingbrook" },
+            { value: 2, label: "Lemont" },
+          ],
+    [showAll],
+  );
 
-  console.log('FacilityToggle - currentFacility:', currentFacility, 'type:', typeof currentFacility);
+  console.log(
+    "FacilityToggle - currentFacility:",
+    currentFacility,
+    "type:",
+    typeof currentFacility,
+  );
 
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -28,7 +41,9 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = facilities.findIndex(f => f.value === currentFacility);
+      const selectedIndex = facilities.findIndex(
+        (f) => f.value === currentFacility,
+      );
 
       // Reset bubble if no valid selection
       if (selectedIndex === -1) {
@@ -48,7 +63,7 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
 
         setBubbleStyle({
           width: buttonRect.width,
-          left: buttonRect.left - containerRect.left - containerPadding
+          left: buttonRect.left - containerRect.left - containerPadding,
         });
       }
     };
@@ -59,8 +74,8 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
     });
 
     // Update on window resize to handle responsive changes
-    window.addEventListener('resize', updateBubblePosition);
-    return () => window.removeEventListener('resize', updateBubblePosition);
+    window.addEventListener("resize", updateBubblePosition);
+    return () => window.removeEventListener("resize", updateBubblePosition);
   }, [currentFacility, facilities]);
 
   return (
@@ -75,7 +90,7 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
             className="absolute top-1 bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
             style={{
               width: `${bubbleStyle.width}px`,
-              transform: `translateX(${bubbleStyle.left}px)`
+              transform: `translateX(${bubbleStyle.left}px)`,
             }}
           />
         )}
@@ -83,13 +98,15 @@ export default function FacilityToggle({ currentFacility, onFacilityChange, show
         {/* Buttons */}
         {facilities.map((facility, index) => (
           <button
-            key={facility.value === null ? 'all' : facility.value}
-            ref={el => { buttonRefs.current[index] = el; }}
+            key={facility.value === null ? "all" : facility.value}
+            ref={(el) => {
+              buttonRefs.current[index] = el;
+            }}
             onClick={() => onFacilityChange(facility.value)}
             className={`relative z-10 px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               currentFacility === facility.value
-                ? 'text-white'
-                : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
+                ? "text-white"
+                : "text-[var(--text-dark)] hover:text-[var(--primary-blue)]"
             }`}
           >
             {facility.label}

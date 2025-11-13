@@ -15,23 +15,23 @@ A flexible, reusable table component with bulk selection, inline editing, sortin
 ## Basic Usage
 
 ```tsx
-import { DataTable } from '@/app/components/DataTable';
-import { Trash } from 'lucide-react';
+import { DataTable } from "@/app/components/DataTable";
+import { Trash } from "lucide-react";
 
 function MyComponent() {
   const [data, setData] = useState([
-    { id: 1, name: 'Item 1', quantity: 100, status: 'active' },
-    { id: 2, name: 'Item 2', quantity: 200, status: 'inactive' },
+    { id: 1, name: "Item 1", quantity: 100, status: "active" },
+    { id: 2, name: "Item 2", quantity: 200, status: "inactive" },
   ]);
 
   return (
     <DataTable
       data={data}
       columns={[
-        { key: 'id', label: 'ID', sortable: true, width: '80px' },
-        { key: 'name', label: 'Name', sortable: true },
-        { key: 'quantity', label: 'Quantity', sortable: true, align: 'right' },
-        { key: 'status', label: 'Status', sortable: true },
+        { key: "id", label: "ID", sortable: true, width: "80px" },
+        { key: "name", label: "Name", sortable: true },
+        { key: "quantity", label: "Quantity", sortable: true, align: "right" },
+        { key: "status", label: "Status", sortable: true },
       ]}
       pagination={{ enabled: true, pageSize: 25 }}
     />
@@ -42,13 +42,13 @@ function MyComponent() {
 ## Advanced Example: Jobs Table with Bulk Actions
 
 ```tsx
-import { DataTable, BulkAction } from '@/app/components/DataTable';
-import { Trash, Edit, CheckCircle } from 'lucide-react';
-import { bulkDeleteJobs, bulkUpdateJobs } from '@/lib/api';
-import { ParsedJob } from '@/types';
+import { DataTable, BulkAction } from "@/app/components/DataTable";
+import { Trash, Edit, CheckCircle } from "lucide-react";
+import { bulkDeleteJobs, bulkUpdateJobs } from "@/lib/api";
+import { ParsedJob } from "@/types";
 
 function JobsTable() {
-  const { data: jobs } = useSWR<ParsedJob[]>('/jobs', getJobs);
+  const { data: jobs } = useSWR<ParsedJob[]>("/jobs", getJobs);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedJobs, setSelectedJobs] = useState<ParsedJob[]>([]);
 
@@ -56,21 +56,26 @@ function JobsTable() {
     if (!confirm(`Delete ${rows.length} jobs?`)) return;
 
     try {
-      const result = await bulkDeleteJobs(rows.map(j => j.id));
+      const result = await bulkDeleteJobs(rows.map((j) => j.id));
 
       if (result.failures.length > 0) {
-        alert(`Deleted ${result.success} jobs. ${result.failures.length} failed.`);
+        alert(
+          `Deleted ${result.success} jobs. ${result.failures.length} failed.`,
+        );
       } else {
         alert(`Successfully deleted ${result.success} jobs`);
       }
 
-      mutate('/jobs'); // Refresh data
+      mutate("/jobs"); // Refresh data
     } catch (error) {
-      alert('Error deleting jobs');
+      alert("Error deleting jobs");
     }
   };
 
-  const handleBulkStatusChange = async (rows: ParsedJob[], isHardScheduled: boolean) => {
+  const handleBulkStatusChange = async (
+    rows: ParsedJob[],
+    isHardScheduled: boolean,
+  ) => {
     try {
       // Update status field based on your schema
       const updates = {
@@ -79,40 +84,42 @@ function JobsTable() {
       };
 
       const result = await bulkUpdateJobs(
-        rows.map(j => j.id),
-        updates
+        rows.map((j) => j.id),
+        updates,
       );
 
       if (result.failures.length > 0) {
-        alert(`Updated ${result.success.length} jobs. ${result.failures.length} failed.`);
+        alert(
+          `Updated ${result.success.length} jobs. ${result.failures.length} failed.`,
+        );
       } else {
         alert(`Successfully updated ${result.success.length} jobs`);
       }
 
-      mutate('/jobs'); // Refresh data
+      mutate("/jobs"); // Refresh data
     } catch (error) {
-      alert('Error updating jobs');
+      alert("Error updating jobs");
     }
   };
 
   const bulkActions: BulkAction<ParsedJob>[] = [
     {
-      label: 'Set Hard Scheduled',
+      label: "Set Hard Scheduled",
       icon: <CheckCircle className="w-4 h-4" />,
       onClick: (rows) => handleBulkStatusChange(rows, true),
-      variant: 'primary',
+      variant: "primary",
     },
     {
-      label: 'Set Soft Scheduled',
+      label: "Set Soft Scheduled",
       icon: <Edit className="w-4 h-4" />,
       onClick: (rows) => handleBulkStatusChange(rows, false),
-      variant: 'secondary',
+      variant: "secondary",
     },
     {
-      label: 'Delete Selected',
+      label: "Delete Selected",
       icon: <Trash className="w-4 h-4" />,
       onClick: handleBulkDelete,
-      variant: 'danger',
+      variant: "danger",
     },
   ];
 
@@ -121,41 +128,41 @@ function JobsTable() {
       data={jobs || []}
       columns={[
         {
-          key: 'job_number',
-          label: 'Job #',
+          key: "job_number",
+          label: "Job #",
           sortable: true,
-          width: '100px',
-          align: 'left'
+          width: "100px",
+          align: "left",
         },
         {
-          key: 'client.name',
-          label: 'Client',
+          key: "client.name",
+          label: "Client",
           sortable: true,
-          getValue: (row) => row.client?.name || 'N/A'
+          getValue: (row) => row.client?.name || "N/A",
         },
         {
-          key: 'job_name',
-          label: 'Job Name',
-          sortable: true
+          key: "job_name",
+          label: "Job Name",
+          sortable: true,
         },
         {
-          key: 'quantity',
-          label: 'Quantity',
+          key: "quantity",
+          label: "Quantity",
           sortable: true,
-          align: 'right',
-          render: (value) => value.toLocaleString()
+          align: "right",
+          render: (value) => value.toLocaleString(),
         },
         {
-          key: 'start_date',
-          label: 'Start Date',
+          key: "start_date",
+          label: "Start Date",
           sortable: true,
-          render: (value) => new Date(value).toLocaleDateString()
+          render: (value) => new Date(value).toLocaleDateString(),
         },
         {
-          key: 'due_date',
-          label: 'Due Date',
+          key: "due_date",
+          label: "Due Date",
           sortable: true,
-          render: (value) => new Date(value).toLocaleDateString()
+          render: (value) => new Date(value).toLocaleDateString(),
         },
       ]}
       selection={{
@@ -165,15 +172,15 @@ function JobsTable() {
         onSelectionChange: (ids, rows) => {
           setSelectedIds(ids);
           setSelectedJobs(rows);
-        }
+        },
       }}
       pagination={{
         enabled: true,
         pageSize: 50,
-        pageSizeOptions: [25, 50, 100, 200]
+        pageSizeOptions: [25, 50, 100, 200],
       }}
       mobile={{
-        viewMode: 'cards',
+        viewMode: "cards",
         cardTemplate: (job, isSelected, onToggle) => (
           <div>
             <div className="flex justify-between mb-2">
@@ -181,12 +188,18 @@ function JobsTable() {
               <span className="font-bold">#{job.job_number}</span>
             </div>
             <div className="space-y-1">
-              <div><strong>Client:</strong> {job.client?.name}</div>
-              <div><strong>Name:</strong> {job.job_name}</div>
-              <div><strong>Qty:</strong> {job.quantity.toLocaleString()}</div>
+              <div>
+                <strong>Client:</strong> {job.client?.name}
+              </div>
+              <div>
+                <strong>Name:</strong> {job.job_name}
+              </div>
+              <div>
+                <strong>Qty:</strong> {job.quantity.toLocaleString()}
+              </div>
             </div>
           </div>
-        )
+        ),
       }}
       striped
       hover
@@ -202,22 +215,22 @@ function JobsTable() {
 <DataTable
   data={data}
   columns={[
-    { key: 'id', label: 'ID', sortable: true },
+    { key: "id", label: "ID", sortable: true },
     {
-      key: 'actual_quantity',
-      label: 'Actual Quantity',
+      key: "actual_quantity",
+      label: "Actual Quantity",
       sortable: true,
       editable: true,
-      editType: 'number',
-      align: 'right'
+      editType: "number",
+      align: "right",
     },
     {
-      key: 'price',
-      label: 'Price',
+      key: "price",
+      label: "Price",
       sortable: true,
       editable: true,
-      editType: 'currency',
-      align: 'right'
+      editType: "currency",
+      align: "right",
     },
   ]}
   inlineEdit={{
@@ -225,8 +238,8 @@ function JobsTable() {
     onSave: async (rowId, field, value, row) => {
       // Save to API
       await updateProductionEntry(rowId, { [field]: value });
-      mutate('/production'); // Refresh data
-    }
+      mutate("/production"); // Refresh data
+    },
   }}
 />
 ```
@@ -237,17 +250,17 @@ function JobsTable() {
 
 ```typescript
 interface ColumnConfig<T> {
-  key: string;                    // Data field key (supports nested: 'client.name')
-  label: string;                  // Column header text
-  sortable?: boolean;             // Enable sorting
-  render?: (value, row) => ReactNode;  // Custom cell renderer
-  editable?: boolean;             // Enable inline editing
-  editType?: 'text' | 'number' | 'currency' | 'date';
+  key: string; // Data field key (supports nested: 'client.name')
+  label: string; // Column header text
+  sortable?: boolean; // Enable sorting
+  render?: (value, row) => ReactNode; // Custom cell renderer
+  editable?: boolean; // Enable inline editing
+  editType?: "text" | "number" | "currency" | "date";
   editValidator?: (value: string) => boolean;
-  width?: string;                 // Column width (e.g., '100px', '20%')
-  align?: 'left' | 'center' | 'right';
-  mobileHidden?: boolean;         // Hide on mobile card view
-  getValue?: (row: T) => any;     // Custom value getter for nested data
+  width?: string; // Column width (e.g., '100px', '20%')
+  align?: "left" | "center" | "right";
+  mobileHidden?: boolean; // Hide on mobile card view
+  getValue?: (row: T) => any; // Custom value getter for nested data
 }
 ```
 
@@ -256,7 +269,7 @@ interface ColumnConfig<T> {
 ```typescript
 interface SelectionConfig<T> {
   enabled: boolean;
-  selectAllEnabled?: boolean;     // Show "Select All" checkbox
+  selectAllEnabled?: boolean; // Show "Select All" checkbox
   bulkActions?: BulkAction<T>[];
   onSelectionChange?: (selectedIds: number[], selectedRows: T[]) => void;
 }
@@ -265,7 +278,7 @@ interface BulkAction<T> {
   label: string;
   icon?: ReactNode;
   onClick: (selectedRows: T[]) => void | Promise<void>;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
 }
 ```
@@ -276,7 +289,7 @@ interface BulkAction<T> {
 interface PaginationConfig {
   enabled: boolean;
   pageSize: number;
-  pageSizeOptions?: number[];     // Default: [10, 25, 50, 100]
+  pageSizeOptions?: number[]; // Default: [10, 25, 50, 100]
   onPageChange?: (page: number, pageSize: number) => void;
 }
 ```
@@ -285,9 +298,13 @@ interface PaginationConfig {
 
 ```typescript
 interface MobileConfig<T> {
-  viewMode?: 'cards' | 'table';   // Default: 'cards'
-  cardTemplate?: (row: T, isSelected: boolean, onToggle: () => void) => ReactNode;
-  visibleColumns?: string[];      // Limit columns in mobile table view
+  viewMode?: "cards" | "table"; // Default: 'cards'
+  cardTemplate?: (
+    row: T,
+    isSelected: boolean,
+    onToggle: () => void,
+  ) => ReactNode;
+  visibleColumns?: string[]; // Limit columns in mobile table view
 }
 ```
 
@@ -296,7 +313,7 @@ interface MobileConfig<T> {
 ### Bulk Operations
 
 ```typescript
-import { bulkDeleteJobs, bulkUpdateJobs } from '@/lib/api';
+import { bulkDeleteJobs, bulkUpdateJobs } from "@/lib/api";
 
 // Bulk delete
 const result = await bulkDeleteJobs([1, 2, 3, 4, 5]);
@@ -306,7 +323,7 @@ console.log(`Failed: ${result.failures.length}`);
 // Bulk update
 const result = await bulkUpdateJobs(
   [1, 2, 3, 4, 5],
-  { status: 'completed' }  // Updates to apply
+  { status: "completed" }, // Updates to apply
 );
 console.log(`Updated ${result.success.length} jobs`);
 ```

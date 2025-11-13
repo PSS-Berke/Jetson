@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { ParsedJob } from '@/hooks/useJobs';
-import { formatCurrency, formatPercentage } from '@/lib/cfoUtils';
+import React from "react";
+import { ParsedJob } from "@/hooks/useJobs";
+import { formatCurrency, formatPercentage } from "@/lib/cfoUtils";
 
 interface AlertDetailsModalProps {
   isOpen: boolean;
@@ -10,7 +10,18 @@ interface AlertDetailsModalProps {
   title: string;
   description: string;
   jobs: ParsedJob[];
-  type: 'jobs-at-risk' | 'client-concentration' | 'process-concentration' | 'total-clients' | 'top-client' | 'primary-process' | 'revenue-per-job' | 'total-volume' | 'period-growth' | 'profit-margin' | 'job-clustering';
+  type:
+    | "jobs-at-risk"
+    | "client-concentration"
+    | "process-concentration"
+    | "total-clients"
+    | "top-client"
+    | "primary-process"
+    | "revenue-per-job"
+    | "total-volume"
+    | "period-growth"
+    | "profit-margin"
+    | "job-clustering";
   additionalData?: {
     clientName?: string;
     processType?: string;
@@ -49,9 +60,17 @@ export default function AlertDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      aria-labelledby="modal-title"
+      role="dialog"
+      aria-modal="true"
+    >
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
+      <div
+        className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+        onClick={onClose}
+      ></div>
 
       {/* Modal */}
       <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
@@ -60,7 +79,10 @@ export default function AlertDetailsModal({
           <div className="bg-white px-6 pt-6 pb-4 border-b border-gray-200">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900" id="modal-title">
+                <h3
+                  className="text-xl font-semibold text-gray-900"
+                  id="modal-title"
+                >
                   {title}
                 </h3>
                 <p className="mt-2 text-sm text-gray-600">{description}</p>
@@ -76,37 +98,57 @@ export default function AlertDetailsModal({
             {/* Summary Stats */}
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-xs text-gray-500 font-medium">Total Jobs</div>
-                <div className="text-2xl font-bold text-gray-900">{jobs.length}</div>
+                <div className="text-xs text-gray-500 font-medium">
+                  Total Jobs
+                </div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {jobs.length}
+                </div>
               </div>
-              {type === 'jobs-at-risk' && additionalData?.revenueAtRisk && (
+              {type === "jobs-at-risk" && additionalData?.revenueAtRisk && (
                 <div className="bg-red-50 rounded-lg p-3">
-                  <div className="text-xs text-red-700 font-medium">Revenue at Risk</div>
+                  <div className="text-xs text-red-700 font-medium">
+                    Revenue at Risk
+                  </div>
                   <div className="text-2xl font-bold text-red-900">
                     {formatCurrency(additionalData.revenueAtRisk, true)}
                   </div>
                 </div>
               )}
-              {type === 'client-concentration' && additionalData?.concentration && (
-                <div className="bg-orange-50 rounded-lg p-3">
-                  <div className="text-xs text-orange-700 font-medium">Revenue Concentration</div>
-                  <div className="text-2xl font-bold text-orange-900">
-                    {formatPercentage(additionalData.concentration)}
+              {type === "client-concentration" &&
+                additionalData?.concentration && (
+                  <div className="bg-orange-50 rounded-lg p-3">
+                    <div className="text-xs text-orange-700 font-medium">
+                      Revenue Concentration
+                    </div>
+                    <div className="text-2xl font-bold text-orange-900">
+                      {formatPercentage(additionalData.concentration)}
+                    </div>
                   </div>
-                </div>
-              )}
-              {type === 'process-concentration' && additionalData?.concentration && (
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <div className="text-xs text-blue-700 font-medium">Process Concentration</div>
-                  <div className="text-2xl font-bold text-blue-900">
-                    {formatPercentage(additionalData.concentration)}
+                )}
+              {type === "process-concentration" &&
+                additionalData?.concentration && (
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <div className="text-xs text-blue-700 font-medium">
+                      Process Concentration
+                    </div>
+                    <div className="text-2xl font-bold text-blue-900">
+                      {formatPercentage(additionalData.concentration)}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
               <div className="bg-gray-50 rounded-lg p-3">
-                <div className="text-xs text-gray-500 font-medium">Total Revenue</div>
+                <div className="text-xs text-gray-500 font-medium">
+                  Total Revenue
+                </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(jobs.reduce((sum, job) => sum + (parseFloat(job.total_billing) || 0), 0), true)}
+                  {formatCurrency(
+                    jobs.reduce(
+                      (sum, job) => sum + (parseFloat(job.total_billing) || 0),
+                      0,
+                    ),
+                    true,
+                  )}
                 </div>
               </div>
             </div>
@@ -133,7 +175,7 @@ export default function AlertDetailsModal({
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                       Revenue
                     </th>
-                    {type === 'jobs-at-risk' && (
+                    {type === "jobs-at-risk" && (
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Profit %
                       </th>
@@ -152,18 +194,34 @@ export default function AlertDetailsModal({
                           {job.job_name}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                          {job.client?.name || 'Unknown'}
-                          {job.sub_client && <span className="text-gray-400"> / {job.sub_client.name}</span>}
+                          {job.client?.name || "Unknown"}
+                          {job.sub_client && (
+                            <span className="text-gray-400">
+                              {" "}
+                              / {job.sub_client.name}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
                           {job.quantity.toLocaleString()}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                          {formatCurrency(parseFloat(job.total_billing) || 0, true)}
+                          {formatCurrency(
+                            parseFloat(job.total_billing) || 0,
+                            true,
+                          )}
                         </td>
-                        {type === 'jobs-at-risk' && (
+                        {type === "jobs-at-risk" && (
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-right">
-                            <span className={profitPercentage < 20 ? 'text-red-600' : profitPercentage < 30 ? 'text-yellow-600' : 'text-green-600'}>
+                            <span
+                              className={
+                                profitPercentage < 20
+                                  ? "text-red-600"
+                                  : profitPercentage < 30
+                                    ? "text-yellow-600"
+                                    : "text-green-600"
+                              }
+                            >
                               {formatPercentage(profitPercentage)}
                             </span>
                           </td>

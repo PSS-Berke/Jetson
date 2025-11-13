@@ -1,5 +1,5 @@
-import { ColumnConfig, InlineEditConfig } from './DataTableTypes';
-import { DataTableCell } from './DataTableCell';
+import { ColumnConfig, InlineEditConfig } from "./DataTableTypes";
+import { DataTableCell } from "./DataTableCell";
 
 interface DataTableRowProps<T> {
   row: T;
@@ -26,7 +26,7 @@ export function DataTableRow<T>({
   inlineEdit,
   striped,
   hover,
-  index
+  index,
 }: DataTableRowProps<T>) {
   const getValue = (row: T, column: ColumnConfig<T>): any => {
     if (column.getValue) {
@@ -34,7 +34,7 @@ export function DataTableRow<T>({
     }
 
     // Handle nested keys like 'client.name'
-    const keys = column.key.split('.');
+    const keys = column.key.split(".");
     let value: any = row;
     for (const key of keys) {
       value = value?.[key];
@@ -53,7 +53,10 @@ export function DataTableRow<T>({
 
   const isEditable = (column: ColumnConfig<T>) => {
     if (!inlineEdit?.enabled || !column.editable) return false;
-    if (inlineEdit.editableColumns && !inlineEdit.editableColumns.includes(column.key)) {
+    if (
+      inlineEdit.editableColumns &&
+      !inlineEdit.editableColumns.includes(column.key)
+    ) {
       return false;
     }
     return true;
@@ -69,10 +72,10 @@ export function DataTableRow<T>({
     <tr
       className={`
         border-b border-gray-200
-        ${striped && index % 2 === 1 ? 'bg-gray-50' : 'bg-white'}
-        ${hover ? 'hover:bg-blue-50' : ''}
-        ${isSelected ? 'bg-blue-100' : ''}
-        ${onRowClick ? 'cursor-pointer' : ''}
+        ${striped && index % 2 === 1 ? "bg-gray-50" : "bg-white"}
+        ${hover ? "hover:bg-blue-50" : ""}
+        ${isSelected ? "bg-blue-100" : ""}
+        ${onRowClick ? "cursor-pointer" : ""}
       `}
       onClick={() => onRowClick?.(row)}
     >

@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { forwardRef } from 'react';
-import { JobProjection, TimeRange } from '@/hooks/useProjections';
-import PDFHeader from './PDFHeader';
-import PDFSummary from './PDFSummary';
-import PDFTable from './PDFTable';
+import { forwardRef } from "react";
+import { JobProjection, TimeRange } from "@/hooks/useProjections";
+import PDFHeader from "./PDFHeader";
+import PDFSummary from "./PDFSummary";
+import PDFTable from "./PDFTable";
 
 interface ExportablePDFProps {
-  granularity: 'weekly' | 'monthly' | 'quarterly';
+  granularity: "weekly" | "monthly" | "quarterly";
   startDate: Date;
   filters: {
     facility: number | null;
@@ -60,9 +60,9 @@ const ExportablePDF = forwardRef<HTMLDivElement, ExportablePDFProps>(
         />
       </div>
     );
-  }
+  },
 );
 
-ExportablePDF.displayName = 'ExportablePDF';
+ExportablePDF.displayName = "ExportablePDF";
 
 export default ExportablePDF;

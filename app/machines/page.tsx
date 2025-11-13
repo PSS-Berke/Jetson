@@ -1,47 +1,50 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import dynamic from 'next/dynamic';
-import { useUser } from '@/hooks/useUser';
-import { useAuth } from '@/hooks/useAuth';
-import PageHeader from '../components/PageHeader';
-import Link from 'next/link';
+import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useUser } from "@/hooks/useUser";
+import { useAuth } from "@/hooks/useAuth";
+import PageHeader from "../components/PageHeader";
+import Link from "next/link";
 
 // Dynamically import modals - only loaded when opened
-const AddJobModal = dynamic(() => import('../components/AddJobModal'), {
+const AddJobModal = dynamic(() => import("../components/AddJobModal"), {
   ssr: false,
 });
 
-const CreateMachineWizard = dynamic(() => import('../components/CreateMachineWizard'), {
-  ssr: false,
-});
+const CreateMachineWizard = dynamic(
+  () => import("../components/CreateMachineWizard"),
+  {
+    ssr: false,
+  },
+);
 
 const machineTypes = [
   {
-    name: 'Inserters',
-    description: 'High-speed insertion machines',
-    path: '/machines/inserters'
+    name: "Inserters",
+    description: "High-speed insertion machines",
+    path: "/machines/inserters",
   },
   {
-    name: 'Folders',
-    description: 'Document folding equipment',
-    path: '/machines/folders'
+    name: "Folders",
+    description: "Document folding equipment",
+    path: "/machines/folders",
   },
   {
-    name: 'HP Press',
-    description: 'High-performance printing press',
-    path: '/machines/hp-press'
+    name: "HP Press",
+    description: "High-performance printing press",
+    path: "/machines/hp-press",
   },
   {
-    name: 'Inkjetters',
-    description: 'Inkjet printing systems',
-    path: '/machines/inkjetters'
+    name: "Inkjetters",
+    description: "Inkjet printing systems",
+    path: "/machines/inkjetters",
   },
   {
-    name: 'Affixers',
-    description: 'Label and stamp affixing machines',
-    path: '/machines/affixers'
-  }
+    name: "Affixers",
+    description: "Label and stamp affixing machines",
+    path: "/machines/affixers",
+  },
 ];
 
 export default function Machines() {
@@ -83,8 +86,18 @@ export default function Machines() {
             onClick={() => setIsWizardOpen(true)}
             className="px-4 lg:px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md flex items-center gap-2 cursor-pointer relative z-10"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 4v16m8-8H4"
+              ></path>
             </svg>
             <span>Machine</span>
           </button>
@@ -93,11 +106,7 @@ export default function Machines() {
         {/* Machine Type Tiles */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {machineTypes.map((machine) => (
-            <Link
-              key={machine.name}
-              href={machine.path}
-              className="group"
-            >
+            <Link key={machine.name} href={machine.path} className="group">
               <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-6 hover:shadow-md hover:border-[var(--primary-blue)] transition-all duration-200 cursor-pointer h-full">
                 <div className="flex flex-col items-center text-center">
                   <h3 className="text-xl font-semibold text-[var(--dark-blue)] mb-2">
@@ -117,7 +126,10 @@ export default function Machines() {
       </main>
 
       {/* Add Job Modal */}
-      <AddJobModal isOpen={isJobModalOpen} onClose={() => setIsJobModalOpen(false)} />
+      <AddJobModal
+        isOpen={isJobModalOpen}
+        onClose={() => setIsJobModalOpen(false)}
+      />
 
       {/* Create Machine Wizard */}
       <CreateMachineWizard

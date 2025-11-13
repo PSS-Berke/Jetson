@@ -5,35 +5,35 @@
 
 export const colors = {
   // Brand Colors
-  primary: '#2563eb',        // Primary blue
-  primaryDark: '#1e40af',    // Dark blue
+  primary: "#2563eb", // Primary blue
+  primaryDark: "#1e40af", // Dark blue
 
   // Text Colors
-  textDark: '#1e293b',
-  textLight: '#64748b',
+  textDark: "#1e293b",
+  textLight: "#64748b",
 
   // Status Colors
-  success: '#10b981',        // Green
-  warning: '#f59e0b',        // Yellow/Orange
-  error: '#ef4444',          // Red
+  success: "#10b981", // Green
+  warning: "#f59e0b", // Yellow/Orange
+  error: "#ef4444", // Red
 
   // Neutral Colors
-  border: '#e2e8f0',
-  background: '#f8fafc',
-  foreground: '#1e293b',
+  border: "#e2e8f0",
+  background: "#f8fafc",
+  foreground: "#1e293b",
 
   // Background Variants
-  card: '#ffffff',
-  alertCritical: '#fff5f5',
-  alertWarning: '#fffaf0',
-  alertInfo: '#e6f2ff',
+  card: "#ffffff",
+  alertCritical: "#fff5f5",
+  alertWarning: "#fffaf0",
+  alertInfo: "#e6f2ff",
 
   // Gray Scale (for tables and UI elements)
-  gray50: '#f9fafb',
-  gray100: '#f3f4f6',
-  gray200: '#e5e7eb',
-  gray700: '#374151',
-  gray800: '#1f2937',
+  gray50: "#f9fafb",
+  gray100: "#f3f4f6",
+  gray200: "#e5e7eb",
+  gray700: "#374151",
+  gray800: "#1f2937",
 } as const;
 
 /**
@@ -43,21 +43,21 @@ export const capacityThresholds = {
   low: {
     max: 0.5,
     color: colors.success,
-    colorWithAlpha: 'rgba(16, 185, 129, 0.1)',
-    label: 'Low',
+    colorWithAlpha: "rgba(16, 185, 129, 0.1)",
+    label: "Low",
   },
   moderate: {
     min: 0.5,
     max: 0.8,
     color: colors.warning,
-    colorWithAlpha: 'rgba(245, 158, 11, 0.1)',
-    label: 'Moderate',
+    colorWithAlpha: "rgba(245, 158, 11, 0.1)",
+    label: "Moderate",
   },
   high: {
     min: 0.8,
     color: colors.error,
-    colorWithAlpha: 'rgba(239, 68, 68, 0.1)',
-    label: 'High',
+    colorWithAlpha: "rgba(239, 68, 68, 0.1)",
+    label: "High",
   },
 } as const;
 
@@ -97,19 +97,19 @@ export function getCapacityBackgroundColor(utilization: number): string {
  */
 export const capacityClasses = {
   low: {
-    bg: 'bg-green-50',
-    text: 'text-green-700',
-    border: 'border-green-200',
+    bg: "bg-green-50",
+    text: "text-green-700",
+    border: "border-green-200",
   },
   moderate: {
-    bg: 'bg-yellow-50',
-    text: 'text-yellow-700',
-    border: 'border-yellow-200',
+    bg: "bg-yellow-50",
+    text: "text-yellow-700",
+    border: "border-yellow-200",
   },
   high: {
-    bg: 'bg-red-50',
-    text: 'text-red-700',
-    border: 'border-red-200',
+    bg: "bg-red-50",
+    text: "text-red-700",
+    border: "border-red-200",
   },
 } as const;
 

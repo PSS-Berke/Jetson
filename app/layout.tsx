@@ -16,11 +16,11 @@ export const metadata: Metadata = {
   title: "Jetson Capacity Planner",
   description: "Jetson capacity planning and management system",
   icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
   viewport: {
-    width: 'device-width',
+    width: "device-width",
     initialScale: 1,
     maximumScale: 5,
   },

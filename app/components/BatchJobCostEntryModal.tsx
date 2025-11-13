@@ -1,12 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect, FormEvent } from 'react';
-import { getJobsInTimeRange } from '@/lib/productionUtils';
-import { calculateBillingRatePerM, formatCurrency, formatPercentage, getProfitTextColor } from '@/lib/jobCostUtils';
-import { getJobCostEntries, batchCreateJobCostEntries, deleteJobCostEntry } from '@/lib/api';
-import Toast from './Toast';
-import type { ParsedJob } from '@/hooks/useJobs';
-import type { JobCostEntry } from '@/lib/jobCostUtils';
+import { useState, useEffect, FormEvent } from "react";
+import { getJobsInTimeRange } from "@/lib/productionUtils";
+import {
+  calculateBillingRatePerM,
+  formatCurrency,
+  formatPercentage,
+  getProfitTextColor,
+} from "@/lib/jobCostUtils";
+import {
+  getJobCostEntries,
+  batchCreateJobCostEntries,
+  deleteJobCostEntry,
+} from "@/lib/api";
+import Toast from "./Toast";
+import type { ParsedJob } from "@/hooks/useJobs";
+import type { JobCostEntry } from "@/lib/jobCostUtils";
 
 interface BatchJobCostEntryModalProps {
   isOpen: boolean;
@@ -44,7 +53,7 @@ export default function BatchJobCostEntryModal({
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Initialize job entries when modal opens or date range changes OR when refreshTrigger changes
@@ -55,11 +64,15 @@ export default function BatchJobCostEntryModal({
 
         // Fetch existing cost entries for this period from API
         try {
-          const existingEntries = await getJobCostEntries(facilitiesId, startDate, endDate);
+          const existingEntries = await getJobCostEntries(
+            facilitiesId,
+            startDate,
+            endDate,
+          );
 
           // Create map of job_id to current cost
           const costsMap = new Map<number, number>();
-          existingEntries.forEach(entry => {
+          existingEntries.forEach((entry) => {
             costsMap.set(entry.job, entry.actual_cost_per_m);
           });
 
@@ -71,19 +84,22 @@ export default function BatchJobCostEntryModal({
               job_id: job.id,
               job_number: job.job_number,
               job_name: job.job_name,
-              client_name: job.client?.name || 'Unknown',
+              client_name: job.client?.name || "Unknown",
               quantity: job.quantity,
               billing_rate_per_m: billingRate,
               current_cost_per_m: currentCost,
-              add_to_cost: '',
-              set_total_cost: '',
-              notes: '',
+              add_to_cost: "",
+              set_total_cost: "",
+              notes: "",
             };
           });
 
           setJobEntries(entries);
         } catch (error) {
-          console.error('[BatchJobCostEntryModal] Error loading cost entries:', error);
+          console.error(
+            "[BatchJobCostEntryModal] Error loading cost entries:",
+            error,
+          );
           // Set entries with zero costs if fetch fails
           const entries: JobCostEntryData[] = relevantJobs.map((job) => {
             const billingRate = calculateBillingRatePerM(job);
@@ -92,13 +108,13 @@ export default function BatchJobCostEntryModal({
               job_id: job.id,
               job_number: job.job_number,
               job_name: job.job_name,
-              client_name: job.client?.name || 'Unknown',
+              client_name: job.client?.name || "Unknown",
               quantity: job.quantity,
               billing_rate_per_m: billingRate,
               current_cost_per_m: 0,
-              add_to_cost: '',
-              set_total_cost: '',
-              notes: '',
+              add_to_cost: "",
+              set_total_cost: "",
+              notes: "",
             };
           });
           setJobEntries(entries);
@@ -112,27 +128,27 @@ export default function BatchJobCostEntryModal({
   // Handle input changes
   const handleAddToCostChange = (index: number, value: string) => {
     // Allow digits and decimal point
-    const validChars = value.replace(/[^\d.]/g, '');
-    const parts = validChars.split('.');
+    const validChars = value.replace(/[^\d.]/g, "");
+    const parts = validChars.split(".");
     if (parts.length > 2) return;
 
     const newEntries = [...jobEntries];
     newEntries[index].add_to_cost = validChars;
     // Clear set_total_cost when using add_to_cost
-    newEntries[index].set_total_cost = '';
+    newEntries[index].set_total_cost = "";
     setJobEntries(newEntries);
   };
 
   const handleSetTotalCostChange = (index: number, value: string) => {
     // Allow digits and decimal point
-    const validChars = value.replace(/[^\d.]/g, '');
-    const parts = validChars.split('.');
+    const validChars = value.replace(/[^\d.]/g, "");
+    const parts = validChars.split(".");
     if (parts.length > 2) return;
 
     const newEntries = [...jobEntries];
     newEntries[index].set_total_cost = validChars;
     // Clear add_to_cost when using set_total_cost
-    newEntries[index].add_to_cost = '';
+    newEntries[index].add_to_cost = "";
     setJobEntries(newEntries);
   };
 
@@ -156,7 +172,10 @@ export default function BatchJobCostEntryModal({
   const getProfitPreview = (entry: JobCostEntryData) => {
     const newCost = getNewCost(entry);
     const profit = entry.billing_rate_per_m - newCost;
-    const profitPercentage = entry.billing_rate_per_m > 0 ? (profit / entry.billing_rate_per_m) * 100 : 0;
+    const profitPercentage =
+      entry.billing_rate_per_m > 0
+        ? (profit / entry.billing_rate_per_m) * 100
+        : 0;
     return { profit, profitPercentage };
   };
 
@@ -164,17 +183,21 @@ export default function BatchJobCostEntryModal({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    setErrorMessage('');
+    setErrorMessage("");
 
     try {
       // Filter entries with either add_to_cost or set_total_cost entered
       const entriesToSubmit = jobEntries
-        .filter((entry) => entry.add_to_cost.trim() !== '' || entry.set_total_cost.trim() !== '')
+        .filter(
+          (entry) =>
+            entry.add_to_cost.trim() !== "" ||
+            entry.set_total_cost.trim() !== "",
+        )
         .map((entry) => {
           // Calculate the final cost per thousand
           let final_cost_per_m: number;
 
-          if (entry.add_to_cost.trim() !== '') {
+          if (entry.add_to_cost.trim() !== "") {
             // Add mode: add to current cost
             const addAmount = parseFloat(entry.add_to_cost);
             if (isNaN(addAmount) || addAmount < 0) {
@@ -189,7 +212,10 @@ export default function BatchJobCostEntryModal({
             }
           }
 
-          const costEntry: Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'> = {
+          const costEntry: Omit<
+            JobCostEntry,
+            "id" | "created_at" | "updated_at"
+          > = {
             job: entry.job_id,
             date: Date.now(),
             actual_cost_per_m: final_cost_per_m,
@@ -200,30 +226,43 @@ export default function BatchJobCostEntryModal({
           return costEntry;
         });
 
-      console.log('[BatchJobCostEntryModal] Entries to submit:', entriesToSubmit);
+      console.log(
+        "[BatchJobCostEntryModal] Entries to submit:",
+        entriesToSubmit,
+      );
 
       if (entriesToSubmit.length === 0) {
-        setErrorMessage('Please enter at least one cost value');
+        setErrorMessage("Please enter at least one cost value");
         setShowErrorToast(true);
         setSubmitting(false);
         return;
       }
 
       // Delete old entries for these jobs first
-      const jobIds = entriesToSubmit.map(e => e.job);
-      const existingEntries = await getJobCostEntries(facilitiesId, startDate, endDate);
-      const entriesToDelete = existingEntries.filter(e => jobIds.includes(e.job));
+      const jobIds = entriesToSubmit.map((e) => e.job);
+      const existingEntries = await getJobCostEntries(
+        facilitiesId,
+        startDate,
+        endDate,
+      );
+      const entriesToDelete = existingEntries.filter((e) =>
+        jobIds.includes(e.job),
+      );
 
       if (entriesToDelete.length > 0) {
-        await Promise.all(entriesToDelete.map(e => deleteJobCostEntry(e.id)));
+        await Promise.all(entriesToDelete.map((e) => deleteJobCostEntry(e.id)));
       }
 
       // Create new entries
       const createdEntries = await batchCreateJobCostEntries(entriesToSubmit);
-      console.log('[BatchJobCostEntryModal] Successfully created', createdEntries.length, 'entries');
+      console.log(
+        "[BatchJobCostEntryModal] Successfully created",
+        createdEntries.length,
+        "entries",
+      );
 
       // Trigger refresh to fetch updated costs
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
 
       // Show success and trigger callbacks
       setShowSuccessToast(true);
@@ -233,8 +272,10 @@ export default function BatchJobCostEntryModal({
         if (onSuccess) onSuccess();
       }, 2000);
     } catch (error) {
-      console.error('[BatchJobCostEntryModal] Error submitting:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save cost entries');
+      console.error("[BatchJobCostEntryModal] Error submitting:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to save cost entries",
+      );
       setShowErrorToast(true);
     } finally {
       setSubmitting(false);
@@ -248,7 +289,7 @@ export default function BatchJobCostEntryModal({
       // Reset state after animation
       setTimeout(() => {
         setJobEntries([]);
-        setErrorMessage('');
+        setErrorMessage("");
       }, 300);
     }
   };
@@ -257,10 +298,7 @@ export default function BatchJobCostEntryModal({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div
-        className="absolute inset-0 bg-black/30"
-        onClick={handleClose}
-      />
+      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
       <div className="relative bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">
@@ -302,12 +340,17 @@ export default function BatchJobCostEntryModal({
                   const { profitPercentage } = getProfitPreview(entry);
 
                   // Calculate current profit % for existing costs
-                  const currentProfitPercentage = entry.current_cost_per_m > 0 && entry.billing_rate_per_m > 0
-                    ? ((entry.billing_rate_per_m - entry.current_cost_per_m) / entry.billing_rate_per_m) * 100
-                    : 0;
+                  const currentProfitPercentage =
+                    entry.current_cost_per_m > 0 && entry.billing_rate_per_m > 0
+                      ? ((entry.billing_rate_per_m - entry.current_cost_per_m) /
+                          entry.billing_rate_per_m) *
+                        100
+                      : 0;
 
                   // Determine which profit % to display
-                  const displayProfitPercentage = hasInput ? profitPercentage : currentProfitPercentage;
+                  const displayProfitPercentage = hasInput
+                    ? profitPercentage
+                    : currentProfitPercentage;
                   const showProfit = hasInput || entry.current_cost_per_m > 0;
 
                   return (
@@ -317,39 +360,61 @@ export default function BatchJobCostEntryModal({
                     >
                       {/* Job # */}
                       <div>
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Job #: </span>
-                        <span className="text-sm font-medium">{entry.job_number}</span>
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Job #:{" "}
+                        </span>
+                        <span className="text-sm font-medium">
+                          {entry.job_number}
+                        </span>
                       </div>
 
                       {/* Job Name */}
                       <div>
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Job: </span>
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Job:{" "}
+                        </span>
                         <span className="text-sm">{entry.job_name}</span>
                       </div>
 
                       {/* Client */}
                       <div>
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Client: </span>
-                        <span className="text-sm text-gray-600">{entry.client_name}</span>
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Client:{" "}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {entry.client_name}
+                        </span>
                       </div>
 
                       {/* Quantity */}
                       <div className="lg:text-right">
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Quantity: </span>
-                        <span className="text-sm text-gray-500">{entry.quantity.toLocaleString()}</span>
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Quantity:{" "}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {entry.quantity.toLocaleString()}
+                        </span>
                       </div>
 
                       {/* Billing Rate */}
                       <div className="lg:text-right">
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Billing Rate: </span>
-                        <span className="text-sm font-medium text-gray-900">{formatCurrency(entry.billing_rate_per_m)}</span>
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Billing Rate:{" "}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {formatCurrency(entry.billing_rate_per_m)}
+                        </span>
                       </div>
 
                       {/* Current Cost (read-only) */}
                       <div className="lg:text-right">
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Current Cost: </span>
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Current Cost:{" "}
+                        </span>
                         <span className="text-sm font-medium text-gray-700">
-                          {entry.current_cost_per_m > 0 ? formatCurrency(entry.current_cost_per_m) : '—'}
+                          {entry.current_cost_per_m > 0
+                            ? formatCurrency(entry.current_cost_per_m)
+                            : "—"}
                         </span>
                       </div>
 
@@ -361,7 +426,9 @@ export default function BatchJobCostEntryModal({
                         <input
                           type="text"
                           value={entry.add_to_cost}
-                          onChange={(e) => handleAddToCostChange(index, e.target.value)}
+                          onChange={(e) =>
+                            handleAddToCostChange(index, e.target.value)
+                          }
                           placeholder="Add..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -375,7 +442,9 @@ export default function BatchJobCostEntryModal({
                         <input
                           type="text"
                           value={entry.set_total_cost}
-                          onChange={(e) => handleSetTotalCostChange(index, e.target.value)}
+                          onChange={(e) =>
+                            handleSetTotalCostChange(index, e.target.value)
+                          }
                           placeholder="Set..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -383,9 +452,15 @@ export default function BatchJobCostEntryModal({
 
                       {/* Profit Preview */}
                       <div className="lg:text-right">
-                        <span className="lg:hidden font-semibold text-sm text-gray-600">Profit %: </span>
-                        <span className={`text-sm font-semibold ${showProfit ? getProfitTextColor(displayProfitPercentage) : 'text-gray-400'}`}>
-                          {showProfit ? formatPercentage(displayProfitPercentage) : '—'}
+                        <span className="lg:hidden font-semibold text-sm text-gray-600">
+                          Profit %:{" "}
+                        </span>
+                        <span
+                          className={`text-sm font-semibold ${showProfit ? getProfitTextColor(displayProfitPercentage) : "text-gray-400"}`}
+                        >
+                          {showProfit
+                            ? formatPercentage(displayProfitPercentage)
+                            : "—"}
                         </span>
                       </div>
 
@@ -397,7 +472,9 @@ export default function BatchJobCostEntryModal({
                         <input
                           type="text"
                           value={entry.notes}
-                          onChange={(e) => handleNotesChange(index, e.target.value)}
+                          onChange={(e) =>
+                            handleNotesChange(index, e.target.value)
+                          }
                           placeholder="Optional notes"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -424,7 +501,7 @@ export default function BatchJobCostEntryModal({
               disabled={submitting || jobEntries.length === 0}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Saving...' : 'Save Cost Entries'}
+              {submitting ? "Saving..." : "Save Cost Entries"}
             </button>
           </div>
         </form>
@@ -442,7 +519,7 @@ export default function BatchJobCostEntryModal({
       {/* Error Toast */}
       {showErrorToast && (
         <Toast
-          message={errorMessage || 'Failed to save cost entries'}
+          message={errorMessage || "Failed to save cost entries"}
           type="error"
           onClose={() => setShowErrorToast(false)}
         />

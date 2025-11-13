@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { MachineCapacityData } from '@/types/calendar';
-import CapacityIndicator from './CapacityIndicator';
-import { getCapacityStatus } from '@/lib/capacityUtils';
+import { useState } from "react";
+import { MachineCapacityData } from "@/types/calendar";
+import CapacityIndicator from "./CapacityIndicator";
+import { getCapacityStatus } from "@/lib/capacityUtils";
 
 interface MachineCapacityPanelProps {
   machineCapacities: Map<number, MachineCapacityData>;
@@ -14,7 +14,7 @@ interface MachineCapacityPanelProps {
 export default function MachineCapacityPanel({
   machineCapacities,
   onMachineClick,
-  selectedMachineIds = []
+  selectedMachineIds = [],
 }: MachineCapacityPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -22,7 +22,7 @@ export default function MachineCapacityPanel({
 
   // Sort by utilization (highest first)
   const sortedCapacities = capacitiesArray.sort(
-    (a, b) => b.averageUtilization - a.averageUtilization
+    (a, b) => b.averageUtilization - a.averageUtilization,
   );
 
   return (
@@ -36,7 +36,7 @@ export default function MachineCapacityPanel({
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="text-[var(--text-light)] hover:text-[var(--text-dark)] text-xl"
         >
-          {isCollapsed ? '+' : '−'}
+          {isCollapsed ? "+" : "−"}
         </button>
       </div>
 
@@ -49,19 +49,21 @@ export default function MachineCapacityPanel({
             </p>
           ) : (
             <div className="space-y-4">
-              {sortedCapacities.map(capacity => {
-                const isSelected = selectedMachineIds.includes(capacity.machine.id);
+              {sortedCapacities.map((capacity) => {
+                const isSelected = selectedMachineIds.includes(
+                  capacity.machine.id,
+                );
 
                 return (
                   <div
                     key={capacity.machine.id}
                     onClick={() => onMachineClick?.(capacity.machine.id)}
                     className={`p-4 rounded-lg border transition-all ${
-                      onMachineClick ? 'cursor-pointer hover:shadow-md' : ''
+                      onMachineClick ? "cursor-pointer hover:shadow-md" : ""
                     } ${
                       isSelected
-                        ? 'border-[var(--primary-blue)] bg-blue-50'
-                        : 'border-[var(--border)] hover:border-[var(--primary-blue)]'
+                        ? "border-[var(--primary-blue)] bg-blue-50"
+                        : "border-[var(--border)] hover:border-[var(--primary-blue)]"
                     }`}
                   >
                     {/* Machine Info */}
@@ -76,12 +78,12 @@ export default function MachineCapacityPanel({
                       </div>
                       <span
                         className={`px-2 py-1 rounded text-xs font-semibold ${
-                          capacity.machine.status === 'running'
-                            ? 'bg-green-100 text-green-800'
-                            : capacity.machine.status === 'available' ||
-                              capacity.machine.status === 'avalible'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          capacity.machine.status === "running"
+                            ? "bg-green-100 text-green-800"
+                            : capacity.machine.status === "available" ||
+                                capacity.machine.status === "avalible"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
                         {capacity.machine.status}
@@ -104,7 +106,9 @@ export default function MachineCapacityPanel({
                           Peak: {capacity.peakUtilization}%
                           {capacity.peakDate && (
                             <span className="ml-1">
-                              ({new Date(capacity.peakDate).toLocaleDateString()})
+                              (
+                              {new Date(capacity.peakDate).toLocaleDateString()}
+                              )
                             </span>
                           )}
                         </p>

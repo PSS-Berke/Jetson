@@ -1,9 +1,17 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { ParsedJob } from '@/hooks/useJobs';
-import { PROCESS_TYPE_CONFIGS, getProcessTypeColor } from '@/lib/processTypeConfig';
-import { startOfQuarter, endOfQuarter, isWithinInterval, addQuarters } from 'date-fns';
+import { useMemo } from "react";
+import { ParsedJob } from "@/hooks/useJobs";
+import {
+  PROCESS_TYPE_CONFIGS,
+  getProcessTypeColor,
+} from "@/lib/processTypeConfig";
+import {
+  startOfQuarter,
+  endOfQuarter,
+  isWithinInterval,
+  addQuarters,
+} from "date-fns";
 
 interface QuarterlyCalendarViewProps {
   jobs: ParsedJob[];
@@ -27,15 +35,20 @@ interface QuarterData {
 }
 
 // Use config for process types
-const PROCESS_TYPES = PROCESS_TYPE_CONFIGS.map(config => ({
+const PROCESS_TYPES = PROCESS_TYPE_CONFIGS.map((config) => ({
   key: config.key,
-  label: config.label
+  label: config.label,
 }));
 
-export default function QuarterlyCalendarView({ jobs, year, startDate }: QuarterlyCalendarViewProps) {
+export default function QuarterlyCalendarView({
+  jobs,
+  year,
+  startDate,
+}: QuarterlyCalendarViewProps) {
   const quarterlyData = useMemo(() => {
     // Determine the base date for calculating quarters
-    const baseDate = startDate || new Date(year || new Date().getFullYear(), 0, 1);
+    const baseDate =
+      startDate || new Date(year || new Date().getFullYear(), 0, 1);
     const firstQuarterStart = startOfQuarter(baseDate);
 
     // Generate 4 quarters starting from the base quarter
@@ -66,24 +79,33 @@ export default function QuarterlyCalendarView({ jobs, year, startDate }: Quarter
       const jobEnd = new Date(job.due_date);
 
       // Determine which quarters this job spans
-      quarters.forEach(quarterData => {
-        const quarterStart = startOfQuarter(new Date(quarterData.year, (quarterData.quarter - 1) * 3, 1));
+      quarters.forEach((quarterData) => {
+        const quarterStart = startOfQuarter(
+          new Date(quarterData.year, (quarterData.quarter - 1) * 3, 1),
+        );
         const quarterEnd = endOfQuarter(quarterStart);
 
         // Check if job overlaps with this quarter
         const jobOverlaps =
-          isWithinInterval(jobStart, { start: quarterStart, end: quarterEnd }) ||
+          isWithinInterval(jobStart, {
+            start: quarterStart,
+            end: quarterEnd,
+          }) ||
           isWithinInterval(jobEnd, { start: quarterStart, end: quarterEnd }) ||
           (jobStart <= quarterStart && jobEnd >= quarterEnd);
 
         if (jobOverlaps) {
           // Calculate revenue from requirements.price_per_m
-          const revenue = job.requirements?.reduce((total, req) => {
-            const pricePerMStr = req.price_per_m;
-            const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
-            const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
-            return total + ((job.quantity / 1000) * pricePerM);
-          }, 0) || 0;
+          const revenue =
+            job.requirements?.reduce((total, req) => {
+              const pricePerMStr = req.price_per_m;
+              const isValidPrice =
+                pricePerMStr &&
+                pricePerMStr !== "undefined" &&
+                pricePerMStr !== "null";
+              const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+              return total + (job.quantity / 1000) * pricePerM;
+            }, 0) || 0;
           const pieces = job.quantity || 0;
 
           // Get process types from requirements
@@ -92,20 +114,22 @@ export default function QuarterlyCalendarView({ jobs, year, startDate }: Quarter
             if (req.process_type) {
               const normalized = req.process_type.toLowerCase();
               // Normalize variations
-              if (normalized.includes('inkjet') || normalized === 'ij') {
-                processTypes.add('inkjet');
-              } else if (normalized.includes('label')) {
-                processTypes.add('labelApply');
-              } else if (normalized.includes('hp')) {
-                processTypes.add('hpPress');
-              } else if (['insert', 'sort', 'fold', 'laser'].includes(normalized)) {
+              if (normalized.includes("inkjet") || normalized === "ij") {
+                processTypes.add("inkjet");
+              } else if (normalized.includes("label")) {
+                processTypes.add("labelApply");
+              } else if (normalized.includes("hp")) {
+                processTypes.add("hpPress");
+              } else if (
+                ["insert", "sort", "fold", "laser"].includes(normalized)
+              ) {
                 processTypes.add(normalized);
               }
             }
           });
 
           // Add to each process type this job uses
-          processTypes.forEach(processType => {
+          processTypes.forEach((processType) => {
             if (quarterData.processTypes[processType]) {
               quarterData.processTypes[processType].pieces += pieces;
               quarterData.processTypes[processType].revenue += revenue;
@@ -123,16 +147,16 @@ export default function QuarterlyCalendarView({ jobs, year, startDate }: Quarter
   }, [jobs, year, startDate]);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
   };
 
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('en-US').format(value);
+    return new Intl.NumberFormat("en-US").format(value);
   };
 
   return (
@@ -156,7 +180,10 @@ export default function QuarterlyCalendarView({ jobs, year, startDate }: Quarter
           </thead>
           <tbody>
             {PROCESS_TYPES.map((processType) => (
-              <tr key={processType.key} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={processType.key}
+                className="hover:bg-gray-50 transition-colors"
+              >
                 <td
                   className="border border-[var(--border)] px-4 py-3 font-semibold text-sm sticky left-0 bg-white z-10"
                   style={{ color: getProcessTypeColor(processType.key) }}
@@ -177,7 +204,9 @@ export default function QuarterlyCalendarView({ jobs, year, startDate }: Quarter
                           </div>
                           <div
                             className="text-sm font-bold"
-                            style={{ color: getProcessTypeColor(processType.key) }}
+                            style={{
+                              color: getProcessTypeColor(processType.key),
+                            }}
                           >
                             {formatCurrency(data.revenue)}
                           </div>

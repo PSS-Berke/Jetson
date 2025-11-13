@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { DayBreakdown } from '@/types/calendar';
-import { formatCurrency, formatNumber } from '@/lib/calendarUtils';
-import { formatHours } from '@/lib/capacityUtils';
-import { formatDateObject } from '@/lib/dateUtils';
-import CapacityIndicator from './CapacityIndicator';
+import { DayBreakdown } from "@/types/calendar";
+import { formatCurrency, formatNumber } from "@/lib/calendarUtils";
+import { formatHours } from "@/lib/capacityUtils";
+import { formatDateObject } from "@/lib/dateUtils";
+import CapacityIndicator from "./CapacityIndicator";
 
 interface DayDetailsModalProps {
   isOpen: boolean;
@@ -15,22 +15,19 @@ interface DayDetailsModalProps {
 export default function DayDetailsModal({
   isOpen,
   onClose,
-  dayBreakdown
+  dayBreakdown,
 }: DayDetailsModalProps) {
   if (!isOpen || !dayBreakdown) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div
-        className="absolute inset-0 bg-black/30"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
           <div>
             <h2 className="text-lg sm:text-2xl font-bold text-[var(--dark-blue)]">
-              {formatDateObject(dayBreakdown.date, 'EEEE, MMMM dd, yyyy')}
+              {formatDateObject(dayBreakdown.date, "EEEE, MMMM dd, yyyy")}
             </h2>
             <p className="text-xs sm:text-sm text-[var(--text-light)] mt-1">
               Daily Summary & Breakdown
@@ -49,19 +46,25 @@ export default function DayDetailsModal({
           {/* Daily Totals */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
             <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm text-[var(--text-light)] mb-1">Total Pieces</p>
+              <p className="text-sm text-[var(--text-light)] mb-1">
+                Total Pieces
+              </p>
               <p className="text-2xl font-bold text-[var(--dark-blue)]">
                 {formatNumber(dayBreakdown.totalPieces)}
               </p>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
-              <p className="text-sm text-[var(--text-light)] mb-1">Total Revenue</p>
+              <p className="text-sm text-[var(--text-light)] mb-1">
+                Total Revenue
+              </p>
               <p className="text-2xl font-bold text-[var(--success)]">
                 {formatCurrency(dayBreakdown.totalRevenue)}
               </p>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
-              <p className="text-sm text-[var(--text-light)] mb-1">Overall Utilization</p>
+              <p className="text-sm text-[var(--text-light)] mb-1">
+                Overall Utilization
+              </p>
               <p className="text-2xl font-bold text-[var(--primary-blue)]">
                 {dayBreakdown.overallUtilization}%
               </p>
@@ -75,14 +78,18 @@ export default function DayDetailsModal({
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <p className="text-xs text-[var(--text-light)] mb-2">1st Shift (8am-4pm)</p>
+                <p className="text-xs text-[var(--text-light)] mb-2">
+                  1st Shift (8am-4pm)
+                </p>
                 <CapacityIndicator
                   utilizationPercent={dayBreakdown.shift1Utilization}
                   size="sm"
                 />
               </div>
               <div>
-                <p className="text-xs text-[var(--text-light)] mb-2">2nd Shift (4pm-12am)</p>
+                <p className="text-xs text-[var(--text-light)] mb-2">
+                  2nd Shift (4pm-12am)
+                </p>
                 <CapacityIndicator
                   utilizationPercent={dayBreakdown.shift2Utilization}
                   size="sm"
@@ -102,7 +109,7 @@ export default function DayDetailsModal({
               </p>
             ) : (
               <div className="space-y-3">
-                {dayBreakdown.jobs.map(jobDetail => (
+                {dayBreakdown.jobs.map((jobDetail) => (
                   <div
                     key={jobDetail.job.id}
                     className="border border-[var(--border)] rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -110,11 +117,13 @@ export default function DayDetailsModal({
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h4 className="font-semibold text-[var(--text-dark)]">
-                          Job #{jobDetail.job.job_number} - {jobDetail.job.job_name || 'Untitled'}
+                          Job #{jobDetail.job.job_number} -{" "}
+                          {jobDetail.job.job_name || "Untitled"}
                         </h4>
                         <p className="text-sm text-[var(--text-light)]">
                           {jobDetail.job.client.name}
-                          {jobDetail.job.sub_client && ` / ${jobDetail.job.sub_client.name}`}
+                          {jobDetail.job.sub_client &&
+                            ` / ${jobDetail.job.sub_client.name}`}
                         </p>
                       </div>
                       <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
@@ -124,19 +133,25 @@ export default function DayDetailsModal({
 
                     <div className="grid grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-[var(--text-light)] mb-1">Pieces This Day</p>
+                        <p className="text-[var(--text-light)] mb-1">
+                          Pieces This Day
+                        </p>
                         <p className="font-semibold text-[var(--text-dark)]">
                           {formatNumber(jobDetail.piecesThisDay)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[var(--text-light)] mb-1">Revenue This Day</p>
+                        <p className="text-[var(--text-light)] mb-1">
+                          Revenue This Day
+                        </p>
                         <p className="font-semibold text-[var(--text-dark)]">
                           {formatCurrency(jobDetail.revenueThisDay)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[var(--text-light)] mb-1">Hours Required</p>
+                        <p className="text-[var(--text-light)] mb-1">
+                          Hours Required
+                        </p>
                         <p className="font-semibold text-[var(--text-dark)]">
                           {formatHours(jobDetail.hoursThisDay)}
                         </p>
@@ -144,7 +159,7 @@ export default function DayDetailsModal({
                       <div>
                         <p className="text-[var(--text-light)] mb-1">Shifts</p>
                         <p className="font-semibold text-[var(--text-dark)]">
-                          {jobDetail.shifts.join(', ')}
+                          {jobDetail.shifts.join(", ")}
                         </p>
                       </div>
                     </div>
@@ -152,14 +167,17 @@ export default function DayDetailsModal({
                     {/* Assigned Machines */}
                     {jobDetail.machines.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-xs text-[var(--text-light)] mb-2">Assigned Machines:</p>
+                        <p className="text-xs text-[var(--text-light)] mb-2">
+                          Assigned Machines:
+                        </p>
                         <div className="flex flex-wrap gap-2">
-                          {jobDetail.machines.map(machine => (
+                          {jobDetail.machines.map((machine) => (
                             <span
                               key={machine.machineId}
                               className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
                             >
-                              Line {machine.machineLine} ({formatHours(machine.hoursAllocated)})
+                              Line {machine.machineLine} (
+                              {formatHours(machine.hoursAllocated)})
                             </span>
                           ))}
                         </div>
@@ -182,7 +200,7 @@ export default function DayDetailsModal({
               </p>
             ) : (
               <div className="space-y-3">
-                {dayBreakdown.machines.map(machineDetail => (
+                {dayBreakdown.machines.map((machineDetail) => (
                   <div
                     key={machineDetail.machine.id}
                     className="border border-[var(--border)] rounded-lg p-4"
@@ -190,19 +208,22 @@ export default function DayDetailsModal({
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h4 className="font-semibold text-[var(--text-dark)]">
-                          Line {machineDetail.machine.line} - {machineDetail.machine.type}
+                          Line {machineDetail.machine.line} -{" "}
+                          {machineDetail.machine.type}
                         </h4>
                         <p className="text-sm text-[var(--text-light)]">
-                          {formatHours(machineDetail.totalHoursAllocated)} / {formatHours(machineDetail.availableHours)} hours
+                          {formatHours(machineDetail.totalHoursAllocated)} /{" "}
+                          {formatHours(machineDetail.availableHours)} hours
                         </p>
                       </div>
                       <span
                         className={`px-2 py-1 rounded text-xs font-semibold ${
-                          machineDetail.status === 'running'
-                            ? 'bg-green-100 text-green-800'
-                            : machineDetail.status === 'available' || machineDetail.status === 'avalible'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          machineDetail.status === "running"
+                            ? "bg-green-100 text-green-800"
+                            : machineDetail.status === "available" ||
+                                machineDetail.status === "avalible"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
                         {machineDetail.status}

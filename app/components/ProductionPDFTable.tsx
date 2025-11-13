@@ -1,29 +1,41 @@
-import type { ProductionComparison } from '@/types';
+import type { ProductionComparison } from "@/types";
 
 interface ProductionPDFTableProps {
   comparisons: ProductionComparison[];
 }
 
-export default function ProductionPDFTable({ comparisons }: ProductionPDFTableProps) {
+export default function ProductionPDFTable({
+  comparisons,
+}: ProductionPDFTableProps) {
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('en-US').format(value);
+    return new Intl.NumberFormat("en-US").format(value);
   };
 
   const formatPercentage = (value: number) => {
-    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
   };
 
   const getVarianceColor = (percentage: number) => {
-    if (percentage >= 0) return 'text-green-700 bg-green-50';
-    if (percentage > -10) return 'text-yellow-700 bg-yellow-50';
-    return 'text-red-700 bg-red-50';
+    if (percentage >= 0) return "text-green-700 bg-green-50";
+    if (percentage > -10) return "text-yellow-700 bg-yellow-50";
+    return "text-red-700 bg-red-50";
   };
 
   return (
     <div className="pdf-table mb-6">
       <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        <svg
+          className="w-5 h-5 mr-2 text-blue-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+          />
         </svg>
         Production Details
       </h2>
@@ -60,27 +72,37 @@ export default function ProductionPDFTable({ comparisons }: ProductionPDFTablePr
         <tbody>
           {comparisons.length === 0 ? (
             <tr>
-              <td colSpan={8} className="border border-gray-300 px-3 py-8 text-center text-gray-500">
+              <td
+                colSpan={8}
+                className="border border-gray-300 px-3 py-8 text-center text-gray-500"
+              >
                 No production data available
               </td>
             </tr>
           ) : (
             comparisons.map((comparison, index) => (
-              <tr key={comparison.job.id || index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              <tr
+                key={comparison.job.id || index}
+                className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+              >
                 <td className="border border-gray-300 px-2 py-2 text-gray-900 font-medium">
-                  {comparison.job.job_number || 'N/A'}
+                  {comparison.job.job_number || "N/A"}
                 </td>
                 <td className="border border-gray-300 px-2 py-2 text-gray-900">
-                  {comparison.job.job_name || 'Unnamed Job'}
+                  {comparison.job.job_name || "Unnamed Job"}
                 </td>
                 <td className="border border-gray-300 px-2 py-2 text-gray-900">
-                  {comparison.job.client?.name || 'Unknown Client'}
-                  {comparison.job.sub_client && ` / ${comparison.job.sub_client.name}`}
+                  {comparison.job.client?.name || "Unknown Client"}
+                  {comparison.job.sub_client &&
+                    ` / ${comparison.job.sub_client.name}`}
                 </td>
                 <td className="border border-gray-300 px-2 py-2 text-gray-900">
                   {comparison.last_updated_at
-                    ? new Date(comparison.last_updated_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
-                    : '-'}
+                    ? new Date(comparison.last_updated_at).toLocaleDateString(
+                        "en-US",
+                        { month: "numeric", day: "numeric" },
+                      )
+                    : "-"}
                 </td>
                 <td className="border border-gray-300 px-2 py-2 text-right text-gray-900">
                   {formatNumber(comparison.projected_quantity)}
@@ -88,12 +110,17 @@ export default function ProductionPDFTable({ comparisons }: ProductionPDFTablePr
                 <td className="border border-gray-300 px-2 py-2 text-right text-gray-900 font-medium">
                   {formatNumber(comparison.actual_quantity)}
                 </td>
-                <td className={`border border-gray-300 px-2 py-2 text-right font-semibold ${
-                  comparison.variance >= 0 ? 'text-green-700' : 'text-red-700'
-                }`}>
-                  {comparison.variance >= 0 ? '+' : ''}{formatNumber(comparison.variance)}
+                <td
+                  className={`border border-gray-300 px-2 py-2 text-right font-semibold ${
+                    comparison.variance >= 0 ? "text-green-700" : "text-red-700"
+                  }`}
+                >
+                  {comparison.variance >= 0 ? "+" : ""}
+                  {formatNumber(comparison.variance)}
                 </td>
-                <td className={`border border-gray-300 px-2 py-2 text-right font-semibold ${getVarianceColor(comparison.variance_percentage)}`}>
+                <td
+                  className={`border border-gray-300 px-2 py-2 text-right font-semibold ${getVarianceColor(comparison.variance_percentage)}`}
+                >
                   {formatPercentage(comparison.variance_percentage)}
                 </td>
               </tr>
@@ -104,7 +131,9 @@ export default function ProductionPDFTable({ comparisons }: ProductionPDFTablePr
 
       <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
         <div className="flex items-center gap-4">
-          <span className="font-medium">Total records: {comparisons.length}</span>
+          <span className="font-medium">
+            Total records: {comparisons.length}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">

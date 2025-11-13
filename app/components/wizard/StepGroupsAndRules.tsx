@@ -3,17 +3,17 @@
  * Allows joining/creating machine groups and adding rules
  */
 
-'use client';
+"use client";
 
-import React from 'react';
-import MachineGroupSelector from '../MachineGroupSelector';
-import RuleCreationForm from './RuleCreationForm';
-import type { RuleFormData } from '@/hooks/useWizardState';
-import { Trash2 } from 'lucide-react';
+import React from "react";
+import MachineGroupSelector from "../MachineGroupSelector";
+import RuleCreationForm from "./RuleCreationForm";
+import type { RuleFormData } from "@/hooks/useWizardState";
+import { Trash2 } from "lucide-react";
 
 interface StepGroupsAndRulesProps {
   // Group state
-  machineGroupOption: 'none' | 'existing' | 'new';
+  machineGroupOption: "none" | "existing" | "new";
   existingGroupId: number | null;
   newGroupName: string;
   newGroupDescription: string;
@@ -24,7 +24,7 @@ interface StepGroupsAndRulesProps {
   rules: RuleFormData[];
 
   // Group handlers
-  onSelectGroupOption: (option: 'none' | 'existing' | 'new') => void;
+  onSelectGroupOption: (option: "none" | "existing" | "new") => void;
   onSelectExistingGroup: (groupId: number) => void;
   onSetNewGroupName: (name: string) => void;
   onSetNewGroupDescription: (description: string) => void;
@@ -54,33 +54,37 @@ export default function StepGroupsAndRules({
   errors,
 }: StepGroupsAndRulesProps) {
   // Format conditions for display
-  const formatConditions = (conditions: RuleFormData['conditions']): string => {
-    if (conditions.length === 0) return 'No conditions';
+  const formatConditions = (conditions: RuleFormData["conditions"]): string => {
+    if (conditions.length === 0) return "No conditions";
     return conditions
       .map((cond, index) => {
-        const prefix = index > 0 ? ` ${cond.logic} ` : '';
+        const prefix = index > 0 ? ` ${cond.logic} ` : "";
         return `${prefix}${cond.parameter} ${cond.operator} ${cond.value}`;
       })
-      .join('');
+      .join("");
   };
 
   return (
     <div className="space-y-8">
       {/* Step Title */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Machine Groups & Rules</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          Machine Groups & Rules
+        </h2>
         <p className="mt-2 text-sm text-gray-600">
-          Optionally organize this machine into a group and define rules for how parameters affect
-          performance.
+          Optionally organize this machine into a group and define rules for how
+          parameters affect performance.
         </p>
       </div>
 
       {/* Machine Groups Section */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Machine Groups</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Machine Groups
+        </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Group machines together to share common rules and configurations. This is optional but
-          recommended for machines with similar characteristics.
+          Group machines together to share common rules and configurations. This
+          is optional but recommended for machines with similar characteristics.
         </p>
 
         <MachineGroupSelector
@@ -100,10 +104,12 @@ export default function StepGroupsAndRules({
 
       {/* Rules Section */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Rules Configuration</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Rules Configuration
+        </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Define rules that control how machine parameters affect speed and staffing. Rules are
-          optional but useful for modeling complex behavior.
+          Define rules that control how machine parameters affect speed and
+          staffing. Rules are optional but useful for modeling complex behavior.
         </p>
 
         {/* Info about where rules apply */}
@@ -121,20 +127,20 @@ export default function StepGroupsAndRules({
               />
             </svg>
             <div className="flex-1 text-sm text-blue-800">
-              {machineGroupOption === 'none' ? (
+              {machineGroupOption === "none" ? (
                 <p>
-                  <strong>Rules for this machine only:</strong> Rules you create here will apply
-                  only to this specific machine.
+                  <strong>Rules for this machine only:</strong> Rules you create
+                  here will apply only to this specific machine.
                 </p>
-              ) : machineGroupOption === 'existing' ? (
+              ) : machineGroupOption === "existing" ? (
                 <p>
-                  <strong>Shared group rules:</strong> Rules you create here will apply to all
-                  machines in the selected group.
+                  <strong>Shared group rules:</strong> Rules you create here
+                  will apply to all machines in the selected group.
                 </p>
               ) : (
                 <p>
-                  <strong>New group rules:</strong> Rules you create here will apply to all
-                  machines in your new group.
+                  <strong>New group rules:</strong> Rules you create here will
+                  apply to all machines in your new group.
                 </p>
               )}
             </div>
@@ -144,7 +150,9 @@ export default function StepGroupsAndRules({
         {/* Existing Rules List */}
         {rules.length > 0 && (
           <div className="mb-4 space-y-2">
-            <h4 className="text-sm font-medium text-gray-700">Current Rules ({rules.length})</h4>
+            <h4 className="text-sm font-medium text-gray-700">
+              Current Rules ({rules.length})
+            </h4>
             {rules.map((rule, index) => (
               <div
                 key={index}
@@ -152,8 +160,12 @@ export default function StepGroupsAndRules({
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-gray-900">{rule.name}</span>
-                    <span className="text-xs text-gray-500">Priority: {rule.priority}</span>
+                    <span className="font-medium text-gray-900">
+                      {rule.name}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Priority: {rule.priority}
+                    </span>
                   </div>
                   <div className="text-sm text-gray-600 mb-2">
                     <strong>When:</strong> {formatConditions(rule.conditions)}
@@ -162,7 +174,9 @@ export default function StepGroupsAndRules({
                     <span>Speed: {rule.outputs.speed_modifier}%</span>
                     <span>People: {rule.outputs.people_required}</span>
                     {rule.outputs.notes && (
-                      <span className="truncate">Note: {rule.outputs.notes}</span>
+                      <span className="truncate">
+                        Note: {rule.outputs.notes}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -202,9 +216,10 @@ export default function StepGroupsAndRules({
                 />
               </svg>
               <div className="flex-1 text-sm text-gray-600">
-                <strong>Optional:</strong> Rules let you define how machine parameters (like
-                envelope size, pockets, etc.) affect speed and staffing requirements. You can skip
-                this step and add rules later if needed.
+                <strong>Optional:</strong> Rules let you define how machine
+                parameters (like envelope size, pockets, etc.) affect speed and
+                staffing requirements. You can skip this step and add rules
+                later if needed.
               </div>
             </div>
           </div>
@@ -212,10 +227,11 @@ export default function StepGroupsAndRules({
       </div>
 
       {/* Rule Errors */}
-      {Object.keys(errors).some((key) => key.startsWith('rule_')) && (
+      {Object.keys(errors).some((key) => key.startsWith("rule_")) && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-sm text-red-800">
-            <strong>Rule Validation Errors:</strong> Please review the rules above for issues.
+            <strong>Rule Validation Errors:</strong> Please review the rules
+            above for issues.
           </p>
         </div>
       )}
