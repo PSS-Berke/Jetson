@@ -1253,3 +1253,82 @@ export const deleteMachineRule = async (ruleId: number): Promise<void> => {
   });
   console.log("[deleteMachineRule] Rule deleted successfully");
 };
+
+// ============================================================================
+// Variable Combinations API Functions
+// ============================================================================
+
+/**
+ * Get variable combinations (rules) by machine_variables_id
+ * @param machineVariablesId - The machine variables ID
+ * @returns Array of variable combinations
+ */
+export const getVariableCombinations = async (
+  machineVariablesId: number,
+): Promise<any[]> => {
+  console.log(
+    "[getVariableCombinations] Fetching variable combinations for machine_variables_id:",
+    machineVariablesId,
+  );
+  
+  const params = new URLSearchParams();
+  params.append("machine_variables_id", machineVariablesId.toString());
+  
+  const endpoint = `/variable_combinations?${params.toString()}`;
+  
+  const result = await apiFetch<any[]>(endpoint, {
+    method: "GET",
+  });
+  
+  console.log(
+    "[getVariableCombinations] Received",
+    result.length,
+    "variable combinations",
+  );
+  return result;
+};
+
+/**
+ * Create a variable combination (rule) for machine variables
+ * @param ruleData - The rule data with rule_name, conditions, fixed_rate, and speed_modifier
+ * @returns Created variable combination
+ */
+export const createVariableCombination = async (ruleData: {
+  rule_name: string;
+  conditions: Array<{
+    field: string;
+    operator: string;
+    value: string | number;
+    logicalOperator?: string;
+  }>;
+  fixed_rate: number;
+  speed_modifier: number;
+  people_required: number;
+  notes: string;
+  machine_variables_id: number;
+}): Promise<any> => {
+  console.log("[createVariableCombination] Creating variable combination:", ruleData);
+  const result = await apiFetch<any>("/variable_combinations", {
+    method: "POST",
+    body: JSON.stringify(ruleData),
+  });
+  console.log("[createVariableCombination] Variable combination created:", result);
+  return result;
+};
+
+/**
+ * Delete a variable combination (rule) by ID
+ * @param variableCombinationId - The variable combination ID
+ */
+export const deleteVariableCombination = async (
+  variableCombinationId: number,
+): Promise<void> => {
+  console.log(
+    "[deleteVariableCombination] Deleting variable combination:",
+    variableCombinationId,
+  );
+  await apiFetch<void>(`/variable_combinations/${variableCombinationId}`, {
+    method: "DELETE",
+  });
+  console.log("[deleteVariableCombination] Variable combination deleted successfully");
+};

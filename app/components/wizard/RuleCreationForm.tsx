@@ -9,7 +9,7 @@ import React, { useState, useEffect } from "react";
 import type { RuleCondition, RuleOperator, LogicOperator } from "@/types";
 import type { RuleFormData } from "@/hooks/useWizardState";
 import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
-import { getMachineVariablesById } from "@/lib/api";
+import { getMachineVariablesById, createVariableCombination } from "@/lib/api";
 import { Plus, Trash2 } from "lucide-react";
 
 interface RuleCreationFormProps {
@@ -33,6 +33,43 @@ const OPERATOR_OPTIONS: { value: RuleOperator; label: string }[] = [
 
 const PEOPLE_FRACTION_OPTIONS = [0.25, 0.5, 0.75];
 
+// Helper function to transform operator from snake_case to Title Case
+const transformOperator = (operator: string): string => {
+  const operatorMap: Record<string, string> = {
+    equals: "Equals",
+    not_equals: "Not Equals",
+    greater_than: "Greater Than",
+    less_than: "Less Than",
+    greater_than_or_equal: "Greater Than Or Equal",
+    less_than_or_equal: "Less Than Or Equal",
+    between: "Between",
+    in: "In",
+    not_in: "Not In",
+  };
+  return operatorMap[operator] || operator;
+};
+
+// Helper function to transform RuleFormData conditions to API format
+const transformConditions = (conditions: any[]) => {
+  return conditions.map((cond, index) => {
+    const transformed: any = {
+      field: cond.parameter,
+      operator: transformOperator(cond.operator),
+      value: cond.value,
+    };
+    // Add logicalOperator based on the previous condition's logic field
+    // The logic field on a condition indicates how to combine it with the next condition
+    if (index > 0) {
+      const previousCondition = conditions[index - 1];
+      // Include both AND and OR explicitly
+      if (previousCondition.logic) {
+        transformed.logicalOperator = previousCondition.logic;
+      }
+    }
+    return transformed;
+  });
+};
+
 export default function RuleCreationForm({
   processTypeKey,
   machineVariablesId,
@@ -54,6 +91,8 @@ export default function RuleCreationForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [machineVariables, setMachineVariables] = useState<Record<string, any>>({});
   const [selectedFraction, setSelectedFraction] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [basePeopleRequired, setBasePeopleRequired] = useState<number>(1);
 
   // Fetch machine variables when machineVariablesId is available
   useEffect(() => {
@@ -184,9 +223,51 @@ export default function RuleCreationForm({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddRule = () => {
-    if (validateForm()) {
+  const handleAddRule = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    // Validate machineVariablesId is available
+    if (!machineVariablesId) {
+      setErrors({
+        save: "Machine variables ID is required. Please select a process type in step 3.",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Transform conditions to API format
+      const transformedConditions = transformConditions(formData.conditions);
+      
+      // Calculate people_required: base number + selected fraction
+      const peopleRequired = basePeopleRequired + (selectedFraction || 0);
+      
+      // Prepare rule data for API
+      const ruleData = {
+        rule_name: formData.name,
+        conditions: transformedConditions,
+        fixed_rate: formData.outputs.fixed_rate || 0,
+        speed_modifier: formData.outputs.speed_modifier,
+        people_required: peopleRequired,
+        notes: formData.outputs.notes || "",
+        machine_variables_id: machineVariablesId,
+      };
+
+      console.log(
+        "[RuleCreationForm] Saving rule via variable_combinations API:",
+        JSON.stringify(ruleData, null, 2),
+      );
+
+      // Save rule to API
+      await createVariableCombination(ruleData);
+
+      console.log("[RuleCreationForm] Rule saved successfully");
+
+      // Add rule to local state (for display in the wizard)
       onAddRule(formData);
+
       // Reset form
       setFormData({
         name: "",
@@ -201,7 +282,15 @@ export default function RuleCreationForm({
       });
       setErrors({});
       setSelectedFraction(null);
+      setBasePeopleRequired(1);
       setShowForm(false);
+    } catch (error: any) {
+      console.error("[RuleCreationForm] Error saving rule:", error);
+      setErrors({
+        save: error.message || "Failed to save rule. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -219,6 +308,7 @@ export default function RuleCreationForm({
     });
     setErrors({});
     setSelectedFraction(null);
+    setBasePeopleRequired(1);
     setShowForm(false);
   };
 
@@ -430,21 +520,22 @@ export default function RuleCreationForm({
           <div className="flex gap-2">
             <input
               type="number"
-              value={selectedFraction === null ? formData.outputs.people_required : 1}
+              value={basePeopleRequired}
               onChange={(e) => {
-                const newValue = parseFloat(e.target.value);
+                const newValue = parseFloat(e.target.value) || 0;
+                setBasePeopleRequired(newValue);
+                // Update formData with base + fraction
+                const totalPeople = newValue + (selectedFraction || 0);
                 setFormData({
                   ...formData,
                   outputs: {
                     ...formData.outputs,
-                    people_required: newValue,
+                    people_required: totalPeople,
                   },
                 });
-                // Clear selected fraction if user manually changes input
-                setSelectedFraction(null);
               }}
-              min="0.01"
-              step="0.01"
+              min="0"
+              step="1"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
             />
             <div className="flex gap-1">
@@ -453,12 +544,15 @@ export default function RuleCreationForm({
                   key={fraction}
                   type="button"
                   onClick={() => {
-                    setSelectedFraction(fraction);
+                    const newFraction = selectedFraction === fraction ? null : fraction;
+                    setSelectedFraction(newFraction);
+                    // Update formData with base + selected fraction
+                    const totalPeople = basePeopleRequired + (newFraction || 0);
                     setFormData({
                       ...formData,
                       outputs: {
                         ...formData.outputs,
-                        people_required: fraction,
+                        people_required: totalPeople,
                       },
                     });
                   }}
@@ -523,14 +617,22 @@ export default function RuleCreationForm({
         />
       </div>
 
+      {/* Save Error */}
+      {errors.save && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <p className="text-sm text-red-800">{errors.save}</p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-2 pt-2">
         <button
           type="button"
           onClick={handleAddRule}
-          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+          disabled={isSaving}
+          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Add Rule
+          {isSaving ? "Saving..." : "Add Rule"}
         </button>
         <button
           type="button"
