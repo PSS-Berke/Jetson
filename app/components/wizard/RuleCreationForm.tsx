@@ -46,12 +46,14 @@ export default function RuleCreationForm({
     outputs: {
       speed_modifier: 100,
       people_required: 1,
+      fixed_rate: undefined,
       notes: "",
     },
     priority: existingRules.length + 1,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [machineVariables, setMachineVariables] = useState<Record<string, any>>({});
+  const [selectedFraction, setSelectedFraction] = useState<number | null>(null);
 
   // Fetch machine variables when machineVariablesId is available
   useEffect(() => {
@@ -192,11 +194,13 @@ export default function RuleCreationForm({
         outputs: {
           speed_modifier: 100,
           people_required: 1,
+          fixed_rate: undefined,
           notes: "",
         },
         priority: existingRules.length + 2,
       });
       setErrors({});
+      setSelectedFraction(null);
       setShowForm(false);
     }
   };
@@ -208,11 +212,13 @@ export default function RuleCreationForm({
       outputs: {
         speed_modifier: 100,
         people_required: 1,
+        fixed_rate: undefined,
         notes: "",
       },
       priority: existingRules.length + 1,
     });
     setErrors({});
+    setSelectedFraction(null);
     setShowForm(false);
   };
 
@@ -424,16 +430,19 @@ export default function RuleCreationForm({
           <div className="flex gap-2">
             <input
               type="number"
-              value={formData.outputs.people_required}
-              onChange={(e) =>
+              value={selectedFraction === null ? formData.outputs.people_required : 1}
+              onChange={(e) => {
+                const newValue = parseFloat(e.target.value);
                 setFormData({
                   ...formData,
                   outputs: {
                     ...formData.outputs,
-                    people_required: parseFloat(e.target.value),
+                    people_required: newValue,
                   },
-                })
-              }
+                });
+                // Clear selected fraction if user manually changes input
+                setSelectedFraction(null);
+              }}
               min="0.01"
               step="0.01"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
@@ -443,16 +452,21 @@ export default function RuleCreationForm({
                 <button
                   key={fraction}
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setSelectedFraction(fraction);
                     setFormData({
                       ...formData,
                       outputs: {
                         ...formData.outputs,
                         people_required: fraction,
                       },
-                    })
-                  }
-                  className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
+                    });
+                  }}
+                  className={`px-2 py-1 text-xs border rounded transition-colors ${
+                    selectedFraction === fraction
+                      ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
+                      : "border-gray-300 hover:bg-gray-100"
+                  }`}
                 >
                   {fraction}
                 </button>
@@ -464,6 +478,29 @@ export default function RuleCreationForm({
               {errors.people_required}
             </p>
           )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Fixed Rate
+          </label>
+          <input
+            type="number"
+            value={formData.outputs.fixed_rate ?? ""}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                outputs: {
+                  ...formData.outputs,
+                  fixed_rate: e.target.value ? parseFloat(e.target.value) : undefined,
+                },
+              })
+            }
+            min="0"
+            step="0.01"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Enter fixed rate"
+          />
         </div>
       </div>
 
@@ -484,25 +521,6 @@ export default function RuleCreationForm({
           rows={2}
           className="w-full px-3 py-2 border border-gray-300 rounded-md"
         />
-      </div>
-
-      {/* Priority */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Priority
-        </label>
-        <input
-          type="number"
-          value={formData.priority}
-          onChange={(e) =>
-            setFormData({ ...formData, priority: parseInt(e.target.value) })
-          }
-          min="1"
-          className="w-32 px-3 py-2 border border-gray-300 rounded-md"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          Higher priority rules are evaluated first
-        </p>
       </div>
 
       {/* Actions */}

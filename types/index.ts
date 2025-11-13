@@ -228,6 +228,7 @@ export interface RuleCondition {
 export interface RuleOutputs {
   speed_modifier: number; // Percentage of base speed (e.g., 80 = 80% of base speed)
   people_required: number; // Can be fractional (e.g., 0.25, 0.5, 0.75, 1, 2, etc.)
+  fixed_rate?: number; // Fixed rate value
   notes?: string; // Optional explanation of why this rule affects performance
 }
 
