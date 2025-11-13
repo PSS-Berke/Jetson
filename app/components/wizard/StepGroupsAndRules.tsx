@@ -19,6 +19,7 @@ interface StepGroupsAndRulesProps {
   newGroupDescription: string;
   processTypeKey: string;
   facilitiesId: number | null;
+  machineVariablesId: number | null;
 
   // Rules state
   rules: RuleFormData[];
@@ -44,6 +45,7 @@ export default function StepGroupsAndRules({
   newGroupDescription,
   processTypeKey,
   facilitiesId,
+  machineVariablesId,
   rules,
   onSelectGroupOption,
   onSelectExistingGroup,
@@ -196,6 +198,7 @@ export default function StepGroupsAndRules({
         {/* Rule Creation Form */}
         <RuleCreationForm
           processTypeKey={processTypeKey}
+          machineVariablesId={machineVariablesId}
           onAddRule={onAddRule}
           existingRules={rules}
         />

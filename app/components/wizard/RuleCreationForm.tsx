@@ -5,14 +5,16 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { RuleCondition, RuleOperator, LogicOperator } from "@/types";
 import type { RuleFormData } from "@/hooks/useWizardState";
 import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
+import { getMachineVariablesById } from "@/lib/api";
 import { Plus, Trash2 } from "lucide-react";
 
 interface RuleCreationFormProps {
   processTypeKey: string;
+  machineVariablesId: number | null;
   onAddRule: (rule: RuleFormData) => void;
   existingRules: RuleFormData[];
 }
@@ -33,6 +35,7 @@ const PEOPLE_FRACTION_OPTIONS = [0.25, 0.5, 0.75];
 
 export default function RuleCreationForm({
   processTypeKey,
+  machineVariablesId,
   onAddRule,
   existingRules,
 }: RuleCreationFormProps) {
@@ -48,20 +51,68 @@ export default function RuleCreationForm({
     priority: existingRules.length + 1,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [machineVariables, setMachineVariables] = useState<Record<string, any>>({});
+
+  // Fetch machine variables when machineVariablesId is available
+  useEffect(() => {
+    const fetchMachineVariables = async () => {
+      if (machineVariablesId) {
+        try {
+          const data = await getMachineVariablesById(machineVariablesId);
+          if (data && data.variables && typeof data.variables === "object") {
+            setMachineVariables(data.variables);
+          }
+        } catch (error) {
+          console.error("Error fetching machine variables:", error);
+        }
+      }
+    };
+
+    fetchMachineVariables();
+  }, [machineVariablesId]);
 
   const getAvailableParameters = () => {
-    if (!processTypeKey) return [];
-    const processConfig = PROCESS_TYPE_CONFIGS.find(
-      (config) => config.key === processTypeKey,
-    );
-    return (
-      processConfig?.fields.map((field) => ({
-        value: field.name,
-        label: field.label,
-        type: field.type,
-        options: field.options,
-      })) || []
-    );
+    const params: Array<{
+      value: string;
+      label: string;
+      type: string;
+      options?: string[];
+    }> = [];
+
+    // Add parameters from process type config
+    if (processTypeKey) {
+      const processConfig = PROCESS_TYPE_CONFIGS.find(
+        (config) => config.key === processTypeKey,
+      );
+      if (processConfig?.fields) {
+        processConfig.fields.forEach((field) => {
+          params.push({
+            value: field.name,
+            label: field.label,
+            type: field.type,
+            options: field.options,
+          });
+        });
+      }
+    }
+
+    // Add parameters from machine variables (step 3 inputs)
+    if (machineVariables && typeof machineVariables === "object") {
+      Object.keys(machineVariables).forEach((key) => {
+        const variable = machineVariables[key];
+        // Only add if not already in params (avoid duplicates)
+        if (!params.find((p) => p.value === key)) {
+          params.push({
+            value: key,
+            label: variable.label || key,
+            type: variable.type || "text",
+            options: variable.options,
+          });
+        }
+      });
+    }
+
+    return params;
   };
 
   const addCondition = () => {

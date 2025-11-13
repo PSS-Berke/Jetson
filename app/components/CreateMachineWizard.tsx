@@ -504,6 +504,7 @@ export default function CreateMachineWizard({
                   state.process_type_key || state.customProcessTypeName
                 }
                 facilitiesId={state.facilities_id}
+                machineVariablesId={state.machineVariablesId}
                 rules={state.rules}
                 onSelectGroupOption={(option) =>
                   dispatch({ type: "SET_GROUP_OPTION", payload: option })
