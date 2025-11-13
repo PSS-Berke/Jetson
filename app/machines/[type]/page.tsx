@@ -14,7 +14,7 @@ import { getProcessTypeConfig } from '@/lib/processTypeConfig';
 import { createMachine, updateMachine, deleteMachine, getMachineRules } from '@/lib/api';
 import { formatConditions } from '@/lib/rulesEngine';
 import DynamicMachineCapabilityFields from '../../components/DynamicMachineCapabilityFields';
-import { FaPen, FaTrash } from 'react-icons/fa6';
+import { FaPen, FaTrash, FaCopy } from 'react-icons/fa6';
 import { FaTimes, FaSave } from 'react-icons/fa';
 /* import {
   ArrowPathIcon,
@@ -446,6 +446,25 @@ export default function MachineTypePage() {
     }
   };
 
+  const handleCopyMachine = async (machine: Machine) => {
+    try {
+      const { id, created_at, currentJob, ...machineData } = machine;
+      
+      const copiedMachine: Partial<Machine> = {
+        ...machineData,
+        type: machine.type,
+        line: machine.line,
+        capabilities: machine.capabilities ? { ...machine.capabilities } : {},
+      };
+
+      await createMachine(copiedMachine);
+      refetch(filterStatus, filterFacility || undefined);
+    } catch (error) {
+      console.error('Error copying machine:', error);
+      setErrors((prev) => ({ ...prev, general: 'Failed to copy machine. Please try again.' }));
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -601,8 +620,8 @@ export default function MachineTypePage() {
               <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Facility
+                    <th className="pl-2 pr-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider min-w-[200px]">
+                      <span className="pl-[100px]">Facility</span>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
                       Line
@@ -740,7 +759,7 @@ export default function MachineTypePage() {
                         <div className="flex gap-2">
                           <button
                             onClick={handleSaveNewMachine}
-                            className="px-3 py-1 bg-green-400 text-white rounded-md hover:bg-green-500 transition-colors"
+                            className="px-3 py-1 bg-blue-400 text-white rounded-md hover:bg-blue-500 transition-colors"
                           >
                             Save
                           </button>
@@ -764,8 +783,9 @@ export default function MachineTypePage() {
                       <tr key={machine.id} className="relative group">
                         {isEditing && editedMachineFormData ? (
                           <>
-                            <td className="pl-16 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-row gap-1 p-0">
+                            <td className="pl-2 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -786,19 +806,20 @@ export default function MachineTypePage() {
                                   >
                                     <FaTimes size="0.75em" />
                                   </button>
+                                  {/* Facility Input */}
+                                  <select
+                                    name="facilities_id"
+                                    value={editedMachineFormData.facilities_id ?? ''}
+                                    onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
+                                    className={`flex-1 px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.facilities_id ? 'border-red-400' : 'border-gray-300'}`}
+                                  >
+                                    <option value="">Select Facility</option>
+                                    <option value="1">Bolingbrook</option>
+                                    <option value="2">Lemont</option>
+                                  </select>
+                                </div>
+                                {errors.facilities_id && <p className="text-red-500 text-xs">{errors.facilities_id}</p>}
                               </div>
-                              {/* Facility Input */}
-                              <select
-                                name="facilities_id"
-                                value={editedMachineFormData.facilities_id ?? ''}
-                                onChange={(e) => handleEditedMachineInputChange(e, machine.id)}
-                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.facilities_id ? 'border-red-400' : 'border-gray-300'}`}
-                              >
-                                <option value="">Select Facility</option>
-                                <option value="1">Bolingbrook</option>
-                                <option value="2">Lemont</option>
-                              </select>
-                              {errors.facilities_id && <p className="text-red-500 text-xs mt-1">{errors.facilities_id}</p>}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
                               {/* Line Input */}
@@ -901,17 +922,17 @@ export default function MachineTypePage() {
                           </>
                         ) : (
                           <>
-                            <td className="pl-16 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-row gap-1 p-0">
+                            <td className="pl-2 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
+                              <div className="flex items-center gap-2">
                                   <button
                                     onClick={(e) => {
-                                      e.stopPropagation(); // Prevent row click from being triggered
-                                      handleEditClick(machine);
+                                      e.stopPropagation();
+                                      handleCopyMachine(machine);
                                     }}
-                                    className="p-2 bg-orange-100 text-white rounded-md hover:bg-orange-500 transition-colors"
-                                    title="Edit"
+                                    className="p-2 bg-green-100 text-white rounded-md hover:bg-green-500 transition-colors"
+                                    title="Copy"
                                   >
-                                    <FaPen size="0.75em" />
+                                    <FaCopy size="0.75em" />
                                   </button>
                                   <button
                                     onClick={(e) => {
@@ -923,8 +944,20 @@ export default function MachineTypePage() {
                                   >
                                     <FaTrash size="0.75em" />
                                   </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent row click from being triggered
+                                      handleEditClick(machine);
+                                    }}
+                                    className="p-2 bg-orange-100 text-white rounded-md hover:bg-orange-500 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <FaPen size="0.75em" />
+                                  </button>
+                                  <span className="ml-2">
+                                    {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                                  </span>
                               </div>
-                              {machine.facilities_id === 1 ? 'Bolingbrook' : machine.facilities_id === 2 ? 'Lemont' : 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
                               Line {machine.line}
@@ -1026,7 +1059,7 @@ export default function MachineTypePage() {
                     </div>
 
                     {/* Current Job */}
-                    <div className="border-t border-[var(--border)] pt-3">
+                    <div className="border-t border-[var(--border)] pt-3 mb-3">
                       <div className="text-xs text-[var(--text-light)] mb-1">Current Job</div>
                       <div className="text-sm text-[var(--text-dark)]">
                         {machine.currentJob ? (
@@ -1037,6 +1070,43 @@ export default function MachineTypePage() {
                           <span className="text-[var(--text-light)]">No active job</span>
                         )}
                       </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 border-t border-[var(--border)] pt-3" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyMachine(machine);
+                        }}
+                        className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors font-medium flex items-center justify-center gap-2"
+                        title="Copy"
+                      >
+                        <FaCopy size="0.875em" />
+                        Copy
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(machine.id);
+                        }}
+                        className="flex-1 px-3 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors font-medium flex items-center justify-center gap-2"
+                        title="Delete"
+                      >
+                        <FaTrash size="0.875em" />
+                        Delete
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditClick(machine);
+                        }}
+                        className="flex-1 px-3 py-2 bg-orange-100 text-orange-700 rounded-md hover:bg-orange-200 transition-colors font-medium flex items-center justify-center gap-2"
+                        title="Edit"
+                      >
+                        <FaPen size="0.875em" />
+                        Edit
+                      </button>
                     </div>
                   </div>
                 );
