@@ -5,8 +5,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { getMachineGroups } from "@/lib/api";
+import React, { useState } from "react";
 import type { MachineGroup } from "@/types";
 
 interface MachineGroupSelectorProps {
@@ -36,34 +35,9 @@ export default function MachineGroupSelector({
   onSetNewGroupDescription,
   errors,
 }: MachineGroupSelectorProps) {
-  const [groups, setGroups] = useState<MachineGroup[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  // Load available groups when process type or facility changes
-  useEffect(() => {
-    if (!processTypeKey) return;
-
-    const loadGroups = async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const data = await getMachineGroups(
-          processTypeKey,
-          facilitiesId || undefined,
-        );
-        setGroups(data);
-      } catch (error) {
-        console.error("[MachineGroupSelector] Error loading groups:", error);
-        setLoadError("Failed to load machine groups");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadGroups();
-  }, [processTypeKey, facilitiesId]);
-
+  const [groups] = useState<MachineGroup[]>([]);
+  const [loading] = useState(false);
+  const [loadError] = useState<string | null>(null);
   const selectedGroup = groups.find((g) => g.id === existingGroupId);
 
   return (

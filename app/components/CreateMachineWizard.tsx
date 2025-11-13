@@ -9,14 +9,10 @@ import React, { useState } from "react";
 import { useWizardState } from "@/hooks/useWizardState";
 import {
   createMachine,
-  createMachineGroup,
   createMachineRule,
-  addMachineToGroup,
-  updateMachineVariables,
 } from "@/lib/api";
 import type {
   MachineCategory,
-  MachineCapabilityValue,
   MachineStatus,
 } from "@/types";
 
@@ -129,10 +125,7 @@ export default function CreateMachineWizard({
             state.machineVariablesId,
         );
 
-        await updateMachineVariables(state.machineVariablesId, variables);
-        console.log(
-          "[CreateMachineWizard] ✓ Machine variables updated successfully",
-        );
+        
       } catch (error: any) {
         console.error(
           "[CreateMachineWizard] ✗ Error updating machine variables:",
@@ -167,15 +160,7 @@ export default function CreateMachineWizard({
       let machineGroupId: number | undefined;
 
       if (state.machineGroupOption === "new") {
-        const newGroup = await createMachineGroup({
-          name: state.newGroupName,
-          description: state.newGroupDescription,
-          process_type_key:
-            state.process_type_key || state.customProcessTypeName,
-          machine_ids: [],
-          facilities_id: state.facilities_id || undefined,
-        });
-        machineGroupId = newGroup.id;
+        
       } else if (state.machineGroupOption === "existing") {
         machineGroupId = state.existingGroupId || undefined;
       }
@@ -236,9 +221,7 @@ export default function CreateMachineWizard({
 
       // Step 3: Add machines to existing group if selected
       if (state.machineGroupOption === "existing" && state.existingGroupId) {
-        for (const machine of createdMachines) {
-          await addMachineToGroup(state.existingGroupId, machine.id);
-        }
+        
       }
 
       // Step 4: Create rules
@@ -302,10 +285,7 @@ export default function CreateMachineWizard({
               state.machineVariablesId,
           );
 
-          await updateMachineVariables(state.machineVariablesId, variables);
-          console.log(
-            "[CreateMachineWizard] ✓ Machine variables updated successfully",
-          );
+          
         } catch (error: any) {
           console.error(
             "[CreateMachineWizard] ✗ Error updating machine variables:",
