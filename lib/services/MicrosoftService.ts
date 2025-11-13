@@ -15,9 +15,9 @@ export const apiExchangeMSCodeForToken = (
   });
 };
 
-export const apiGetCompanies = () => {
-  return ApiService.fetchDataWithAxios<MicrosoftCompany[]>({
-    url: "/api:AZZYF_3C/companies",
+export const apiRequestOauthUrl = () => {
+  return ApiService.fetchDataWithAxios<{ oauth_url: string }>({
+    url: "/api:jAlgvpTr/auth",
     method: "get",
   });
 };
@@ -39,4 +39,3 @@ export const apiDeleteCompany = (id: number) => {
     method: "delete",
   });
 };
-
