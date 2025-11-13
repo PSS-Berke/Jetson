@@ -16,62 +16,76 @@ import {
   getUnixTime,
   getQuarter,
   startOfQuarter,
-  endOfQuarter
-} from 'date-fns';
+  endOfQuarter,
+} from "date-fns";
 
 /**
  * Format a Unix timestamp to a readable date string
  */
-export const formatDate = (timestamp: number, formatString: string = 'MMM dd, yyyy'): string => {
+export const formatDate = (
+  timestamp: number,
+  formatString: string = "MMM dd, yyyy",
+): string => {
   return format(fromUnixTime(timestamp), formatString);
 };
 
 /**
  * Format a Date object to a readable string
  */
-export const formatDateObject = (date: Date, formatString: string = 'MMM dd, yyyy'): string => {
+export const formatDateObject = (
+  date: Date,
+  formatString: string = "MMM dd, yyyy",
+): string => {
   return format(date, formatString);
 };
 
 /**
  * Get start and end of month for a given date
  */
-export const getMonthRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const getMonthRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   return {
     start: startOfMonth(date),
-    end: endOfMonth(date)
+    end: endOfMonth(date),
   };
 };
 
 /**
  * Get start and end of week for a given date
  */
-export const getWeekRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const getWeekRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   return {
     start: startOfWeek(date),
-    end: endOfWeek(date)
+    end: endOfWeek(date),
   };
 };
 
 /**
  * Get a 30-day range starting from the Sunday of the week containing the given date
  */
-export const get30DayRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const get30DayRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   const start = startOfWeek(date, { weekStartsOn: 0 }); // 0 = Sunday
   const end = addDays(start, 29); // 30 days total (0-29)
   return {
     start,
-    end
+    end,
   };
 };
 
 /**
  * Get start and end of day for a given date
  */
-export const getDayRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const getDayRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   return {
     start: startOfDay(date),
-    end: endOfDay(date)
+    end: endOfDay(date),
   };
 };
 
@@ -85,7 +99,10 @@ export const getDaysBetween = (startDate: Date, endDate: Date): Date[] => {
 /**
  * Calculate number of days between two dates
  */
-export const calculateDaysDifference = (startDate: Date, endDate: Date): number => {
+export const calculateDaysDifference = (
+  startDate: Date,
+  endDate: Date,
+): number => {
   return differenceInDays(endDate, startDate) + 1; // +1 to include both start and end dates
 };
 
@@ -115,7 +132,11 @@ export const dateToTimestamp = (date: Date): number => {
 /**
  * Check if a date falls within a date range
  */
-export const isDateInRange = (date: Date, startDate: Date, endDate: Date): boolean => {
+export const isDateInRange = (
+  date: Date,
+  startDate: Date,
+  endDate: Date,
+): boolean => {
   return isWithinInterval(date, { start: startDate, end: endDate });
 };
 
@@ -123,7 +144,7 @@ export const isDateInRange = (date: Date, startDate: Date, endDate: Date): boole
  * Get shift time ranges for a given date
  */
 export interface ShiftTime {
-  name: '1st' | '2nd';
+  name: "1st" | "2nd";
   start: Date;
   end: Date;
   hours: number;
@@ -134,17 +155,17 @@ export const getShiftTimes = (date: Date): ShiftTime[] => {
 
   return [
     {
-      name: '1st',
+      name: "1st",
       start: addDays(baseDate, 0).setHours(8, 0, 0, 0) as unknown as Date,
       end: addDays(baseDate, 0).setHours(16, 0, 0, 0) as unknown as Date,
-      hours: 8
+      hours: 8,
     },
     {
-      name: '2nd',
+      name: "2nd",
       start: addDays(baseDate, 0).setHours(16, 0, 0, 0) as unknown as Date,
       end: addDays(baseDate, 1).setHours(0, 0, 0, 0) as unknown as Date,
-      hours: 8
-    }
+      hours: 8,
+    },
   ];
 };
 
@@ -159,7 +180,7 @@ export const TOTAL_HOURS_PER_DAY = HOURS_PER_SHIFT * SHIFTS_PER_DAY; // 16 hours
  * Format date for display in calendar
  */
 export const formatCalendarDate = (date: Date): string => {
-  return format(date, 'yyyy-MM-dd');
+  return format(date, "yyyy-MM-dd");
 };
 
 /**
@@ -173,7 +194,7 @@ export const parseCalendarDate = (dateString: string): Date => {
  * Get date key for grouping (YYYY-MM-DD format)
  */
 export const getDateKey = (date: Date): string => {
-  return format(startOfDay(date), 'yyyy-MM-dd');
+  return format(startOfDay(date), "yyyy-MM-dd");
 };
 
 /**
@@ -186,10 +207,12 @@ export const isSameDay = (date1: Date, date2: Date): boolean => {
 /**
  * Get start and end of quarter for a given date
  */
-export const getQuarterRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const getQuarterRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   return {
     start: startOfQuarter(date),
-    end: endOfQuarter(date)
+    end: endOfQuarter(date),
   };
 };
 
@@ -198,7 +221,7 @@ export const getQuarterRange = (date: Date = new Date()): { start: Date; end: Da
  */
 export const getQuarterLabel = (date: Date): string => {
   const quarter = getQuarter(date);
-  const year = format(date, 'yyyy');
+  const year = format(date, "yyyy");
   return `Q${quarter} ${year}`;
 };
 
@@ -212,7 +235,10 @@ export interface MonthRange {
   label: string;
 }
 
-export const generateMonthRanges = (startDate: Date, count: number = 3): MonthRange[] => {
+export const generateMonthRanges = (
+  startDate: Date,
+  count: number = 3,
+): MonthRange[] => {
   const ranges: MonthRange[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -223,7 +249,7 @@ export const generateMonthRanges = (startDate: Date, count: number = 3): MonthRa
       monthNumber: i + 1,
       startDate: monthStart,
       endDate: monthEnd,
-      label: format(monthStart, 'MMM yyyy') // e.g., "Jan 2025"
+      label: format(monthStart, "MMM yyyy"), // e.g., "Jan 2025"
     });
   }
 
@@ -240,7 +266,10 @@ export interface QuarterRange {
   label: string;
 }
 
-export const generateQuarterRanges = (startDate: Date, count: number = 4): QuarterRange[] => {
+export const generateQuarterRanges = (
+  startDate: Date,
+  count: number = 4,
+): QuarterRange[] => {
   const ranges: QuarterRange[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -251,7 +280,7 @@ export const generateQuarterRanges = (startDate: Date, count: number = 4): Quart
       quarterNumber: i + 1,
       startDate: quarterStart,
       endDate: quarterEnd,
-      label: getQuarterLabel(quarterStart)
+      label: getQuarterLabel(quarterStart),
     });
   }
 
@@ -262,12 +291,14 @@ export const generateQuarterRanges = (startDate: Date, count: number = 4): Quart
  * Get full range spanning 4 quarters starting from a given date
  * This is useful for fetching all jobs needed for quarterly view
  */
-export const getQuarterlyViewRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const getQuarterlyViewRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   const firstQuarterStart = startOfQuarter(date);
   const lastQuarterEnd = endOfQuarter(addMonths(firstQuarterStart, 9)); // 3 months * 3 = 9 months ahead
   return {
     start: firstQuarterStart,
-    end: lastQuarterEnd
+    end: lastQuarterEnd,
   };
 };
 
@@ -275,11 +306,13 @@ export const getQuarterlyViewRange = (date: Date = new Date()): { start: Date; e
  * Get full range spanning 5 weeks starting from a given date
  * This is useful for fetching all jobs needed for weekly view
  */
-export const getWeeklyViewRange = (date: Date = new Date()): { start: Date; end: Date } => {
+export const getWeeklyViewRange = (
+  date: Date = new Date(),
+): { start: Date; end: Date } => {
   const firstWeekStart = startOfWeek(date);
   const lastWeekEnd = endOfWeek(addDays(firstWeekStart, 28)); // 7 days * 4 = 28 days ahead (5 weeks total)
   return {
     start: firstWeekStart,
-    end: lastWeekEnd
+    end: lastWeekEnd,
   };
 };

@@ -1,5 +1,5 @@
-import React from 'react';
-import { ExecutiveAlert } from '@/lib/cfoUtils';
+import React from "react";
+import { ExecutiveAlert } from "@/lib/cfoUtils";
 
 interface CFOExecutiveAlertsProps {
   alerts: ExecutiveAlert[];
@@ -8,48 +8,49 @@ interface CFOExecutiveAlertsProps {
 
 export default function CFOExecutiveAlerts({
   alerts,
-  title = 'Executive Alerts',
+  title = "Executive Alerts",
 }: CFOExecutiveAlertsProps) {
-
   // Get color classes for severity
-  const getSeverityColors = (severity: 'critical' | 'warning' | 'info') => {
+  const getSeverityColors = (severity: "critical" | "warning" | "info") => {
     switch (severity) {
-      case 'critical':
+      case "critical":
         return {
-          border: 'border-red-300',
-          bg: 'bg-red-50',
-          text: 'text-red-900',
-          subtext: 'text-red-700',
-          badge: 'bg-red-100 text-red-800',
+          border: "border-red-300",
+          bg: "bg-red-50",
+          text: "text-red-900",
+          subtext: "text-red-700",
+          badge: "bg-red-100 text-red-800",
         };
-      case 'warning':
+      case "warning":
         return {
-          border: 'border-yellow-300',
-          bg: 'bg-yellow-50',
-          text: 'text-yellow-900',
-          subtext: 'text-yellow-700',
-          badge: 'bg-yellow-100 text-yellow-800',
+          border: "border-yellow-300",
+          bg: "bg-yellow-50",
+          text: "text-yellow-900",
+          subtext: "text-yellow-700",
+          badge: "bg-yellow-100 text-yellow-800",
         };
-      case 'info':
+      case "info":
         return {
-          border: 'border-green-300',
-          bg: 'bg-green-50',
-          text: 'text-green-900',
-          subtext: 'text-green-700',
-          badge: 'bg-green-100 text-green-800',
+          border: "border-green-300",
+          bg: "bg-green-50",
+          text: "text-green-900",
+          subtext: "text-green-700",
+          badge: "bg-green-100 text-green-800",
         };
     }
   };
 
   // Get severity label
-  const getSeverityLabel = (severity: 'critical' | 'warning' | 'info'): string => {
+  const getSeverityLabel = (
+    severity: "critical" | "warning" | "info",
+  ): string => {
     switch (severity) {
-      case 'critical':
-        return 'CRITICAL';
-      case 'warning':
-        return 'WARNING';
-      case 'info':
-        return 'INFO';
+      case "critical":
+        return "CRITICAL";
+      case "warning":
+        return "WARNING";
+      case "info":
+        return "INFO";
     }
   };
 
@@ -58,27 +59,33 @@ export default function CFOExecutiveAlerts({
       <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-500">Risk indicators and notifications</p>
+          <p className="text-sm text-gray-500">
+            Risk indicators and notifications
+          </p>
         </div>
         <div className="text-center py-12">
           <p className="text-lg font-medium text-gray-900">All Clear</p>
-          <p className="text-sm text-gray-500 mt-2">No critical alerts or warnings at this time</p>
+          <p className="text-sm text-gray-500 mt-2">
+            No critical alerts or warnings at this time
+          </p>
         </div>
       </div>
     );
   }
 
   // Group alerts by severity
-  const criticalAlerts = alerts.filter(a => a.severity === 'critical');
-  const warningAlerts = alerts.filter(a => a.severity === 'warning');
-  const infoAlerts = alerts.filter(a => a.severity === 'info');
+  const criticalAlerts = alerts.filter((a) => a.severity === "critical");
+  const warningAlerts = alerts.filter((a) => a.severity === "warning");
+  const infoAlerts = alerts.filter((a) => a.severity === "info");
 
   return (
     <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-500">Risk indicators and notifications</p>
+          <p className="text-sm text-gray-500">
+            Risk indicators and notifications
+          </p>
         </div>
 
         {/* Alert Summary Badge */}
@@ -118,7 +125,9 @@ export default function CFOExecutiveAlerts({
                     <h4 className={`text-sm font-semibold ${colors.text}`}>
                       {alert.title}
                     </h4>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors.badge} flex-shrink-0`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors.badge} flex-shrink-0`}
+                    >
                       {getSeverityLabel(alert.severity)}
                     </span>
                   </div>
@@ -132,7 +141,9 @@ export default function CFOExecutiveAlerts({
                   <div className="space-y-1">
                     {alert.impact && (
                       <div className="flex items-start gap-2">
-                        <span className={`text-xs font-medium ${colors.subtext} min-w-[60px]`}>
+                        <span
+                          className={`text-xs font-medium ${colors.subtext} min-w-[60px]`}
+                        >
                           Impact:
                         </span>
                         <span className={`text-xs ${colors.subtext}`}>
@@ -143,7 +154,9 @@ export default function CFOExecutiveAlerts({
 
                     {alert.action && (
                       <div className="flex items-start gap-2">
-                        <span className={`text-xs font-medium ${colors.subtext} min-w-[60px]`}>
+                        <span
+                          className={`text-xs font-medium ${colors.subtext} min-w-[60px]`}
+                        >
                           Action:
                         </span>
                         <span className={`text-xs ${colors.subtext} italic`}>
@@ -164,15 +177,19 @@ export default function CFOExecutiveAlerts({
         <div className="text-sm text-gray-600">
           {criticalAlerts.length > 0 ? (
             <p className="font-medium text-red-700">
-              {criticalAlerts.length} critical issue{criticalAlerts.length > 1 ? 's' : ''} requiring immediate attention
+              {criticalAlerts.length} critical issue
+              {criticalAlerts.length > 1 ? "s" : ""} requiring immediate
+              attention
             </p>
           ) : warningAlerts.length > 0 ? (
             <p className="font-medium text-yellow-700">
-              {warningAlerts.length} warning{warningAlerts.length > 1 ? 's' : ''} to monitor
+              {warningAlerts.length} warning
+              {warningAlerts.length > 1 ? "s" : ""} to monitor
             </p>
           ) : (
             <p className="font-medium text-green-700">
-              No critical issues. {infoAlerts.length} informational update{infoAlerts.length > 1 ? 's' : ''}
+              No critical issues. {infoAlerts.length} informational update
+              {infoAlerts.length > 1 ? "s" : ""}
             </p>
           )}
         </div>

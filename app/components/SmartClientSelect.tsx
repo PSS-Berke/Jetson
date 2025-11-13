@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { getToken } from '@/lib/api';
+import { useState, useEffect, useRef } from "react";
+import { getToken } from "@/lib/api";
 
 interface Client {
   id: number;
@@ -16,36 +16,47 @@ interface SmartClientSelectProps {
   initialClientName?: string;
 }
 
-export default function SmartClientSelect({ value, onChange, required = false, initialClientName }: SmartClientSelectProps) {
+export default function SmartClientSelect({
+  value,
+  onChange,
+  required = false,
+  initialClientName,
+}: SmartClientSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
+  const [newClientName, setNewClientName] = useState("");
   const [addingClient, setAddingClient] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  console.log('SmartClientSelect - Props:', { value, initialClientName, selectedClient });
+  console.log("SmartClientSelect - Props:", {
+    value,
+    initialClientName,
+    selectedClient,
+  });
 
   // Fetch clients from API
-  const fetchClients = async (search: string = '') => {
+  const fetchClients = async (search: string = "") => {
     setLoading(true);
     try {
       const token = getToken();
-      const url = new URL('https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients');
+      const url = new URL(
+        "https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients",
+      );
       if (search) {
-        url.searchParams.append('search', search);
+        url.searchParams.append("search", search);
       }
 
       const response = await fetch(url.toString(), {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -53,10 +64,14 @@ export default function SmartClientSelect({ value, onChange, required = false, i
         const data = await response.json();
         setClients(data);
       } else {
-        console.error('Error fetching clients:', response.status, await response.text());
+        console.error(
+          "Error fetching clients:",
+          response.status,
+          await response.text(),
+        );
       }
     } catch (error) {
-      console.error('Error fetching clients:', error);
+      console.error("Error fetching clients:", error);
     } finally {
       setLoading(false);
     }
@@ -67,8 +82,15 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     if (value && value > 0 && initialClientName) {
       // Only update if the selected client doesn't match the value
       if (!selectedClient || selectedClient.id !== value) {
-        console.log('Setting initial client:', { id: value, name: initialClientName }); // Debug
-        setSelectedClient({ id: value, name: initialClientName, created_at: 0 });
+        console.log("Setting initial client:", {
+          id: value,
+          name: initialClientName,
+        }); // Debug
+        setSelectedClient({
+          id: value,
+          name: initialClientName,
+          created_at: 0,
+        });
       }
     } else if (!value) {
       setSelectedClient(null);
@@ -91,22 +113,29 @@ export default function SmartClientSelect({ value, onChange, required = false, i
 
         try {
           const token = getToken();
-          const response = await fetch(`https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients/${value}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
+          const response = await fetch(
+            `https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients/${value}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             },
-          });
+          );
 
           if (response.ok) {
             const client = await response.json();
-            console.log('Fetched client:', client); // Debug log
+            console.log("Fetched client:", client); // Debug log
             setSelectedClient(client);
           } else {
-            console.error('Error fetching client:', response.status, await response.text());
+            console.error(
+              "Error fetching client:",
+              response.status,
+              await response.text(),
+            );
           }
         } catch (error) {
-          console.error('Error fetching client:', error);
+          console.error("Error fetching client:", error);
         }
       } else if (value === null) {
         setSelectedClient(null);
@@ -127,13 +156,16 @@ export default function SmartClientSelect({ value, onChange, required = false, i
   // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Handle client selection
@@ -141,7 +173,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     setSelectedClient(client);
     onChange(client.id, client.name);
     setIsOpen(false);
-    setSearchQuery('');
+    setSearchQuery("");
   };
 
   // Handle adding new client
@@ -151,14 +183,17 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     setAddingClient(true);
     try {
       const token = getToken();
-      const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+      const response = await fetch(
+        "https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name: newClientName }),
         },
-        body: JSON.stringify({ name: newClientName }),
-      });
+      );
 
       if (response.ok) {
         const newClient = await response.json();
@@ -166,14 +201,18 @@ export default function SmartClientSelect({ value, onChange, required = false, i
         setSelectedClient(newClient);
         onChange(newClient.id, newClient.name);
         setIsAddModalOpen(false);
-        setNewClientName('');
+        setNewClientName("");
         // Refresh the clients list
         fetchClients(searchQuery);
       } else {
-        console.error('Error adding client:', response.status, await response.text());
+        console.error(
+          "Error adding client:",
+          response.status,
+          await response.text(),
+        );
       }
     } catch (error) {
-      console.error('Error adding client:', error);
+      console.error("Error adding client:", error);
     } finally {
       setAddingClient(false);
     }
@@ -186,48 +225,51 @@ export default function SmartClientSelect({ value, onChange, required = false, i
     setDeletingClient(true);
     try {
       const token = getToken();
-      const response = await fetch(`https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients/${clientToDelete.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
+      const response = await fetch(
+        `https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients/${clientToDelete.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (response.ok) {
         // If the deleted client was selected, clear selection
         if (selectedClient?.id === clientToDelete.id) {
           setSelectedClient(null);
-          onChange(0, '');
+          onChange(0, "");
         }
         // Close the modal
         setIsDeleteModalOpen(false);
         setClientToDelete(null);
         // Refresh the clients list
         fetchClients(searchQuery);
-        alert('Client deleted successfully!');
+        alert("Client deleted successfully!");
       } else {
         const errorText = await response.text();
-        console.error('Error deleting client:', response.status, errorText);
+        console.error("Error deleting client:", response.status, errorText);
 
         // Provide helpful error messages based on the error code
         if (response.status === 404) {
           alert(
-            'Delete functionality is not available.\n\n' +
-            'The DELETE endpoint for clients has not been configured in your Xano backend.\n\n' +
-            'To enable client deletion, you need to:\n' +
-            '1. Log into your Xano workspace\n' +
-            '2. Go to the API for clients (api:a2ap84-I)\n' +
-            '3. Add a DELETE endpoint for /clients/{id}\n' +
-            '4. Configure it to delete the client record\n\n' +
-            'Contact your backend administrator for assistance.'
+            "Delete functionality is not available.\n\n" +
+              "The DELETE endpoint for clients has not been configured in your Xano backend.\n\n" +
+              "To enable client deletion, you need to:\n" +
+              "1. Log into your Xano workspace\n" +
+              "2. Go to the API for clients (api:a2ap84-I)\n" +
+              "3. Add a DELETE endpoint for /clients/{id}\n" +
+              "4. Configure it to delete the client record\n\n" +
+              "Contact your backend administrator for assistance.",
           );
         } else {
-          alert(`Error deleting client: ${errorText || 'Unknown error'}`);
+          alert(`Error deleting client: ${errorText || "Unknown error"}`);
         }
       }
     } catch (error) {
-      console.error('Error deleting client:', error);
-      alert('Error deleting client. Please try again.');
+      console.error("Error deleting client:", error);
+      alert("Error deleting client. Please try again.");
     } finally {
       setDeletingClient(false);
     }
@@ -247,7 +289,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
         <div className="flex-1 relative">
           <input
             type="text"
-            value={selectedClient ? selectedClient.name : ''}
+            value={selectedClient ? selectedClient.name : ""}
             onClick={() => setIsOpen(!isOpen)}
             readOnly
             className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] cursor-pointer"
@@ -282,9 +324,13 @@ export default function SmartClientSelect({ value, onChange, required = false, i
           {/* Client List */}
           <div className="overflow-y-auto flex-1">
             {loading ? (
-              <div className="p-4 text-center text-[var(--text-light)]">Loading...</div>
+              <div className="p-4 text-center text-[var(--text-light)]">
+                Loading...
+              </div>
             ) : clients.length === 0 ? (
-              <div className="p-4 text-center text-[var(--text-light)]">No clients found</div>
+              <div className="p-4 text-center text-[var(--text-light)]">
+                No clients found
+              </div>
             ) : (
               clients.map((client) => (
                 <div
@@ -331,17 +377,19 @@ export default function SmartClientSelect({ value, onChange, required = false, i
             className="absolute inset-0 bg-black/30"
             onClick={() => {
               setIsAddModalOpen(false);
-              setNewClientName('');
+              setNewClientName("");
             }}
           />
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full relative z-10">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-              <h2 className="text-xl font-bold text-[var(--dark-blue)]">Add New Client</h2>
+              <h2 className="text-xl font-bold text-[var(--dark-blue)]">
+                Add New Client
+              </h2>
               <button
                 onClick={() => {
                   setIsAddModalOpen(false);
-                  setNewClientName('');
+                  setNewClientName("");
                 }}
                 className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
               >
@@ -362,7 +410,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
                   className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                   placeholder="Enter client name..."
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       handleAddClient();
                     }
                   }}
@@ -376,7 +424,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
                 type="button"
                 onClick={() => {
                   setIsAddModalOpen(false);
-                  setNewClientName('');
+                  setNewClientName("");
                 }}
                 className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
               >
@@ -388,7 +436,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
                 disabled={!newClientName.trim() || addingClient}
                 className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {addingClient ? 'Adding...' : 'Add Client'}
+                {addingClient ? "Adding..." : "Add Client"}
               </button>
             </div>
           </div>
@@ -423,10 +471,12 @@ export default function SmartClientSelect({ value, onChange, required = false, i
             {/* Content */}
             <div className="p-6">
               <p className="text-[var(--text-dark)] mb-2">
-                Are you sure you want to delete the client <strong>{clientToDelete.name}</strong>?
+                Are you sure you want to delete the client{" "}
+                <strong>{clientToDelete.name}</strong>?
               </p>
               <p className="text-sm text-red-600">
-                Warning: This action cannot be undone. All jobs associated with this client may be affected.
+                Warning: This action cannot be undone. All jobs associated with
+                this client may be affected.
               </p>
             </div>
 
@@ -448,7 +498,7 @@ export default function SmartClientSelect({ value, onChange, required = false, i
                 disabled={deletingClient}
                 className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {deletingClient ? 'Deleting...' : 'Delete Client'}
+                {deletingClient ? "Deleting..." : "Delete Client"}
               </button>
             </div>
           </div>

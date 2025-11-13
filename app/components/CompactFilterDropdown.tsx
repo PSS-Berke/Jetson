@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from "react";
 
 interface CompactFilterDropdownProps {
   label: string;
@@ -23,23 +23,26 @@ export default function CompactFilterDropdown({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen]);
 
   const handleToggle = (id: number | string) => {
     if (selected.includes(id)) {
-      onChange(selected.filter(item => item !== id));
+      onChange(selected.filter((item) => item !== id));
     } else {
       onChange([...selected, id]);
     }
@@ -63,19 +66,26 @@ export default function CompactFilterDropdown({
           </span>
         )}
         <svg
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </button>
 
       {isOpen && (
         <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 z-50 max-h-64 overflow-y-auto">
           {options.length === 0 ? (
-            <div className="px-4 py-2 text-sm text-[var(--text-light)]">No options available</div>
+            <div className="px-4 py-2 text-sm text-[var(--text-light)]">
+              No options available
+            </div>
           ) : (
             <>
               <button
@@ -85,7 +95,7 @@ export default function CompactFilterDropdown({
                 Clear All
               </button>
               <div className="border-t border-[var(--border)] my-1"></div>
-              {options.map(option => (
+              {options.map((option) => (
                 <label
                   key={option.id}
                   className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
@@ -96,7 +106,9 @@ export default function CompactFilterDropdown({
                     onChange={() => handleToggle(option.id)}
                     className="mr-2"
                   />
-                  <span className="text-sm text-[var(--text-dark)]">{option.name}</span>
+                  <span className="text-sm text-[var(--text-dark)]">
+                    {option.name}
+                  </span>
                 </label>
               ))}
             </>

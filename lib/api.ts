@@ -1,4 +1,4 @@
-import Cookies from 'js-cookie';
+import Cookies from "js-cookie";
 import type {
   Machine,
   Job,
@@ -8,22 +8,26 @@ import type {
   AuthResponse,
   ProductionEntry,
   MachineRule,
-  MachineGroup
-} from '@/types';
-import type { JobCostEntry } from '@/lib/jobCostUtils';
-import { calculateAverageCostFromRequirements } from '@/lib/jobCostUtils';
+  MachineGroup,
+} from "@/types";
+import type { JobCostEntry } from "@/lib/jobCostUtils";
+import { calculateAverageCostFromRequirements } from "@/lib/jobCostUtils";
 
-const AUTH_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:spcRzPtb';
-const API_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb';
-const JOBS_BASE_URL = 'https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6';
-const TOKEN_KEY = 'auth_token';
+const AUTH_BASE_URL = "https://xnpm-iauo-ef2d.n7e.xano.io/api:spcRzPtb";
+const API_BASE_URL = "https://xnpm-iauo-ef2d.n7e.xano.io/api:DMF6LqEb";
+const JOBS_BASE_URL = "https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6";
+const TOKEN_KEY = "auth_token";
 
 // Re-export types for backwards compatibility
 export type { Machine, Job, User };
 
 // Store token in cookies only
 export const setToken = (token: string): void => {
-  Cookies.set(TOKEN_KEY, token, { expires: 7, secure: true, sameSite: 'strict' });
+  Cookies.set(TOKEN_KEY, token, {
+    expires: 7,
+    secure: true,
+    sameSite: "strict",
+  });
 };
 
 // Get token from cookies
@@ -40,31 +44,36 @@ export const removeToken = (): void => {
 const apiFetch = async <T = unknown>(
   endpoint: string,
   options: RequestInit = {},
-  baseType: 'auth' | 'api' | 'jobs' = 'api'
+  baseType: "auth" | "api" | "jobs" = "api",
 ): Promise<T> => {
   const token = getToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
 
   // Attach Bearer token if available
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const baseUrl = baseType === 'auth' ? AUTH_BASE_URL : baseType === 'jobs' ? JOBS_BASE_URL : API_BASE_URL;
-  
+  const baseUrl =
+    baseType === "auth"
+      ? AUTH_BASE_URL
+      : baseType === "jobs"
+        ? JOBS_BASE_URL
+        : API_BASE_URL;
+
   // Debug logging for jobs endpoint
-  if (endpoint.includes('/jobs')) {
-    console.log('[apiFetch] Jobs request:', {
+  if (endpoint.includes("/jobs")) {
+    console.log("[apiFetch] Jobs request:", {
       url: `${baseUrl}${endpoint}`,
       method: options.method,
       body: options.body,
-      headers
+      headers,
     });
   }
-  
+
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
@@ -72,70 +81,82 @@ const apiFetch = async <T = unknown>(
 
   if (!response.ok) {
     let error: any;
-    let errorText: string = '';
+    let errorText: string = "";
     try {
       errorText = await response.text();
-      console.log('[apiFetch] Raw error response:', errorText);
+      console.log("[apiFetch] Raw error response:", errorText);
       try {
         error = JSON.parse(errorText);
       } catch {
-        error = { message: errorText || 'Request failed' };
+        error = { message: errorText || "Request failed" };
       }
     } catch {
-      error = { message: 'Request failed' };
+      error = { message: "Request failed" };
     }
 
     // Suppress error logging for endpoints that may not be configured yet
-    const isProductionEndpoint = endpoint.includes('/production_entry');
-    const isJobCostEndpoint = endpoint.includes('/job_cost_entry');
-    const isMachineRulesEndpoint = endpoint.includes('/machine_rules');
-    const isMachineGroupsEndpoint = endpoint.includes('/machine_groups');
+    const isProductionEndpoint = endpoint.includes("/production_entry");
+    const isJobCostEndpoint = endpoint.includes("/job_cost_entry");
+    const isMachineRulesEndpoint = endpoint.includes("/machine_rules");
+    const isMachineGroupsEndpoint = endpoint.includes("/machine_groups");
 
     // Log error details for debugging (unless it's an expected endpoint error)
-    if (!isProductionEndpoint && !isJobCostEndpoint && !isMachineRulesEndpoint && !isMachineGroupsEndpoint) {
-      console.error('[API Error]', {
+    if (
+      !isProductionEndpoint &&
+      !isJobCostEndpoint &&
+      !isMachineRulesEndpoint &&
+      !isMachineGroupsEndpoint
+    ) {
+      console.error("[API Error]", {
         endpoint,
         baseType,
-        fullUrl: `${baseType === 'auth' ? AUTH_BASE_URL : baseType === 'jobs' ? JOBS_BASE_URL : API_BASE_URL}${endpoint}`,
+        fullUrl: `${baseType === "auth" ? AUTH_BASE_URL : baseType === "jobs" ? JOBS_BASE_URL : API_BASE_URL}${endpoint}`,
         status: response.status,
         statusText: response.statusText,
         error,
         errorString: JSON.stringify(error, null, 2),
         requestBody: options.body,
-        requestBodyParsed: options.body ? JSON.parse(options.body as string) : null
+        requestBodyParsed: options.body
+          ? JSON.parse(options.body as string)
+          : null,
       });
     }
 
     // Handle unauthorized/expired token
-    if (response.status === 401 || error.code === 'ERROR_CODE_UNAUTHORIZED') {
+    if (response.status === 401 || error.code === "ERROR_CODE_UNAUTHORIZED") {
       removeToken();
       // Only redirect on client side
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
       }
     }
 
     // Extract more detailed error message
-    const errorMessage = error.message || error.error || error.detail || `HTTP ${response.status}`;
+    const errorMessage =
+      error.message || error.error || error.detail || `HTTP ${response.status}`;
     throw new Error(errorMessage);
   }
 
   const responseData = await response.json();
-  
+
   // Debug logging for jobs endpoint
-  if (endpoint.includes('/jobs')) {
-    console.log('[apiFetch] Jobs response:', responseData);
+  if (endpoint.includes("/jobs")) {
+    console.log("[apiFetch] Jobs response:", responseData);
   }
-  
+
   return responseData;
 };
 
 // Login user
 export const login = async (credentials: LoginCredentials): Promise<User> => {
-  const data = await apiFetch<AuthResponse>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  }, 'auth');
+  const data = await apiFetch<AuthResponse>(
+    "/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify(credentials),
+    },
+    "auth",
+  );
 
   if (data.authToken) {
     setToken(data.authToken);
@@ -146,19 +167,27 @@ export const login = async (credentials: LoginCredentials): Promise<User> => {
 
 // Signup (admin creates new user)
 export const signup = async (userData: SignupData): Promise<User> => {
-  const data = await apiFetch<User>('/auth/signup', {
-    method: 'POST',
-    body: JSON.stringify(userData),
-  }, 'auth');
+  const data = await apiFetch<User>(
+    "/auth/signup",
+    {
+      method: "POST",
+      body: JSON.stringify(userData),
+    },
+    "auth",
+  );
 
   return data;
 };
 
 // Get current user
 export const getMe = async (): Promise<User> => {
-  const data = await apiFetch<User>('/auth/me', {
-    method: 'GET',
-  }, 'auth');
+  const data = await apiFetch<User>(
+    "/auth/me",
+    {
+      method: "GET",
+    },
+    "auth",
+  );
 
   return data;
 };
@@ -170,97 +199,135 @@ export const logout = (): void => {
 
 // Generic API object with common HTTP methods
 export const api = {
-  get: async <T = unknown>(endpoint: string, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
-    return apiFetch<T>(endpoint, { method: 'GET' }, baseType);
+  get: async <T = unknown>(
+    endpoint: string,
+    baseType: "auth" | "api" | "jobs" = "api",
+  ): Promise<T> => {
+    return apiFetch<T>(endpoint, { method: "GET" }, baseType);
   },
-  
-  post: async <T = unknown>(endpoint: string, data: unknown, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
-    return apiFetch<T>(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }, baseType);
+
+  post: async <T = unknown>(
+    endpoint: string,
+    data: unknown,
+    baseType: "auth" | "api" | "jobs" = "api",
+  ): Promise<T> => {
+    return apiFetch<T>(
+      endpoint,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      baseType,
+    );
   },
-  
-  put: async <T = unknown>(endpoint: string, data: unknown, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
-    return apiFetch<T>(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }, baseType);
+
+  put: async <T = unknown>(
+    endpoint: string,
+    data: unknown,
+    baseType: "auth" | "api" | "jobs" = "api",
+  ): Promise<T> => {
+    return apiFetch<T>(
+      endpoint,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      },
+      baseType,
+    );
   },
-  
-  patch: async <T = unknown>(endpoint: string, data: unknown, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
-    return apiFetch<T>(endpoint, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }, baseType);
+
+  patch: async <T = unknown>(
+    endpoint: string,
+    data: unknown,
+    baseType: "auth" | "api" | "jobs" = "api",
+  ): Promise<T> => {
+    return apiFetch<T>(
+      endpoint,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      baseType,
+    );
   },
-  
-  delete: async <T = unknown>(endpoint: string, baseType: 'auth' | 'api' | 'jobs' = 'api'): Promise<T> => {
-    return apiFetch<T>(endpoint, { method: 'DELETE' }, baseType);
+
+  delete: async <T = unknown>(
+    endpoint: string,
+    baseType: "auth" | "api" | "jobs" = "api",
+  ): Promise<T> => {
+    return apiFetch<T>(endpoint, { method: "DELETE" }, baseType);
   },
 };
 
 // Get all machines
-export const getMachines = async (status?: string, facilitiesId?: number): Promise<Machine[]> => {
+export const getMachines = async (
+  status?: string,
+  facilitiesId?: number,
+): Promise<Machine[]> => {
   const params = new URLSearchParams();
 
   // Only append status parameter if it has a value
-  if (status && status !== '') {
-    params.append('status', status);
+  if (status && status !== "") {
+    params.append("status", status);
   }
 
   // Only append facilities_id parameter if it has a value
   if (facilitiesId && facilitiesId > 0) {
-    params.append('facilities_id', facilitiesId.toString());
+    params.append("facilities_id", facilitiesId.toString());
   }
 
   const queryString = params.toString();
-  const endpoint = queryString ? `/machines?${queryString}` : '/machines';
+  const endpoint = queryString ? `/machines?${queryString}` : "/machines";
 
   const data = await apiFetch<any[]>(endpoint, {
-    method: 'GET',
+    method: "GET",
   });
 
   // Transform API response to match Machine interface
-  return data.map(machine => ({
+  return data.map((machine) => ({
     ...machine,
     line: machine.name ? parseInt(machine.name) : machine.line || 0,
     capabilities: machine.details || machine.capabilities || {},
     speed_hr: machine.speed_hr ? parseFloat(machine.speed_hr) : undefined,
-    shiftCapacity: machine.shiftCapacity ? parseFloat(machine.shiftCapacity) : undefined,
+    shiftCapacity: machine.shiftCapacity
+      ? parseFloat(machine.shiftCapacity)
+      : undefined,
     // Infer process_type_key from machine type if not provided
-    process_type_key: machine.process_type_key || inferProcessTypeKey(machine.type),
+    process_type_key:
+      machine.process_type_key || inferProcessTypeKey(machine.type),
   }));
 };
 
 // Helper function to infer process_type_key from machine type
 const inferProcessTypeKey = (type: string): string => {
   const typeMap: { [key: string]: string } = {
-    'insert': 'insert',
-    'inserter': 'insert',
-    'inserters': 'insert',
-    'folder': 'fold',
-    'folders': 'fold',
-    'fold': 'fold',
-    'hp press': 'laser',
-    'laser': 'laser',
-    'inkjet': 'inkjet',
-    'inkjetter': 'inkjet',
-    'inkjetters': 'inkjet',
-    'affix': 'affix',
-    'affixer': 'affix',
-    'affixers': 'affix',
+    insert: "insert",
+    inserter: "insert",
+    inserters: "insert",
+    folder: "fold",
+    folders: "fold",
+    fold: "fold",
+    "hp press": "laser",
+    laser: "laser",
+    inkjet: "inkjet",
+    inkjetter: "inkjet",
+    inkjetters: "inkjet",
+    affix: "affix",
+    affixer: "affix",
+    affixers: "affix",
   };
-  
+
   const normalizedType = type.toLowerCase().trim();
-  return typeMap[normalizedType] || 'insert'; // Default to 'insert' if unknown
+  return typeMap[normalizedType] || "insert"; // Default to 'insert' if unknown
 };
 
 // Create a new machine
-export const createMachine = async (machineData: Omit<Machine, 'id' | 'created_at'>): Promise<Machine> => {
-  console.log('[createMachine] Creating machine:', machineData);
-  console.log('[createMachine] Capabilities object:', machineData.capabilities);
-  
+export const createMachine = async (
+  machineData: Omit<Machine, "id" | "created_at">,
+): Promise<Machine> => {
+  console.log("[createMachine] Creating machine:", machineData);
+  console.log("[createMachine] Capabilities object:", machineData.capabilities);
+
   // Transform frontend data to API format that Xano expects
   // Based on Xano's expected format:
   // - quantity should be 1 (For Loop will execute once to create one machine)
@@ -269,58 +336,80 @@ export const createMachine = async (machineData: Omit<Machine, 'id' | 'created_a
   // - Include all expected fields with defaults
   const apiData: Record<string, any> = {
     quantity: 1, // For Loop executes this many times - we want to create 1 machine
-    line: machineData.line?.toString() || '',
-    type: machineData.type || '',
-    speed_hr: machineData.speed_hr?.toString() || '0',
-    status: machineData.status || 'available',
+    line: machineData.line?.toString() || "",
+    type: machineData.type || "",
+    speed_hr: machineData.speed_hr?.toString() || "0",
+    status: machineData.status || "available",
     facilities_id: machineData.facilities_id || 0,
-    paper_size: '',
-    shift_capacity: machineData.shiftCapacity?.toString() || '',
+    paper_size: "",
+    shift_capacity: machineData.shiftCapacity?.toString() || "",
     jobs_id: 0,
     pockets: 0,
     details: machineData.capabilities || {},
   };
-  
+
   // Add process_type_key if provided
   if (machineData.process_type_key) {
     apiData.process_type_key = machineData.process_type_key;
   }
-  
-  console.log('[createMachine] Request body:', JSON.stringify(apiData, null, 2));
-  console.log('[createMachine] Request body (parsed):', apiData);
-  
-  const result = await apiFetch<any>('/machines', {
-    method: 'POST',
+
+  console.log(
+    "[createMachine] Request body:",
+    JSON.stringify(apiData, null, 2),
+  );
+  console.log("[createMachine] Request body (parsed):", apiData);
+
+  const result = await apiFetch<any>("/machines", {
+    method: "POST",
     body: JSON.stringify(apiData),
   });
-  console.log('[createMachine] Response:', result);
-  
+  console.log("[createMachine] Response:", result);
+
   // Xano returns machines1 (from For Loop) - it might be an array or single object
   // Extract the machine data from the response
   let machineResult: any;
   if (result.machines1) {
     // If machines1 is an array, take the first element (since quantity=1)
-    machineResult = Array.isArray(result.machines1) ? result.machines1[0] : result.machines1;
+    machineResult = Array.isArray(result.machines1)
+      ? result.machines1[0]
+      : result.machines1;
   } else {
     // Fallback to result itself if machines1 doesn't exist
     machineResult = result;
   }
-  
+
   // Transform API response to frontend format
   return {
     ...machineResult,
-    line: machineResult.line ? (typeof machineResult.line === 'number' ? machineResult.line : parseInt(machineResult.line)) : 0,
+    line: machineResult.line
+      ? typeof machineResult.line === "number"
+        ? machineResult.line
+        : parseInt(machineResult.line)
+      : 0,
     capabilities: machineResult.details || machineResult.capabilities || {},
-    speed_hr: machineResult.speed_hr ? (typeof machineResult.speed_hr === 'number' ? machineResult.speed_hr : parseFloat(machineResult.speed_hr)) : 0,
-    process_type_key: machineResult.process_type_key || inferProcessTypeKey(machineResult.type),
+    speed_hr: machineResult.speed_hr
+      ? typeof machineResult.speed_hr === "number"
+        ? machineResult.speed_hr
+        : parseFloat(machineResult.speed_hr)
+      : 0,
+    process_type_key:
+      machineResult.process_type_key || inferProcessTypeKey(machineResult.type),
   };
 };
 
 // Update an existing machine
-export const updateMachine = async (machineId: number, machineData: Partial<Machine>): Promise<Machine> => {
-  console.log('[updateMachine] Updating machine:', machineId, 'with data:', machineData);
-  console.log('[updateMachine] Capabilities object:', machineData.capabilities);
-  
+export const updateMachine = async (
+  machineId: number,
+  machineData: Partial<Machine>,
+): Promise<Machine> => {
+  console.log(
+    "[updateMachine] Updating machine:",
+    machineId,
+    "with data:",
+    machineData,
+  );
+  console.log("[updateMachine] Capabilities object:", machineData.capabilities);
+
   // Transform frontend data to API format
   const apiData: any = { ...machineData };
   if (machineData.line !== undefined) {
@@ -329,78 +418,105 @@ export const updateMachine = async (machineId: number, machineData: Partial<Mach
   if (machineData.capabilities !== undefined) {
     apiData.details = machineData.capabilities;
   }
-  
-  console.log('[updateMachine] Request body:', JSON.stringify(apiData, null, 2));
+
+  console.log(
+    "[updateMachine] Request body:",
+    JSON.stringify(apiData, null, 2),
+  );
   const result = await apiFetch<any>(`/machines/${machineId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(apiData),
   });
-  console.log('[updateMachine] Response:', result);
-  
+  console.log("[updateMachine] Response:", result);
+
   // Transform API response to frontend format
   return {
     ...result,
     line: result.name ? parseInt(result.name) : result.line || 0,
     capabilities: result.details || result.capabilities || {},
     speed_hr: result.speed_hr ? parseInt(result.speed_hr) : 0,
-    process_type_key: result.process_type_key || inferProcessTypeKey(result.type),
+    process_type_key:
+      result.process_type_key || inferProcessTypeKey(result.type),
   };
 };
 
 // Delete a machine
 export const deleteMachine = async (machineId: number): Promise<void> => {
-  console.log('[deleteMachine] Deleting machine:', machineId);
+  console.log("[deleteMachine] Deleting machine:", machineId);
   await apiFetch<void>(`/machines/${machineId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 };
 
 // Get all jobs
 export const getJobs = async (facilitiesId?: number): Promise<Job[]> => {
-  console.log('[getJobs] Called with facilitiesId:', facilitiesId, 'Type:', typeof facilitiesId);
-  
+  console.log(
+    "[getJobs] Called with facilitiesId:",
+    facilitiesId,
+    "Type:",
+    typeof facilitiesId,
+  );
+
   const params = new URLSearchParams();
 
   if (facilitiesId !== undefined && facilitiesId !== null) {
-    params.append('facilities_id', facilitiesId.toString());
-    console.log('[getJobs] Added facilities_id to params:', facilitiesId);
+    params.append("facilities_id", facilitiesId.toString());
+    console.log("[getJobs] Added facilities_id to params:", facilitiesId);
   } else {
-    console.log('[getJobs] No facilities_id added (was undefined or null)');
+    console.log("[getJobs] No facilities_id added (was undefined or null)");
   }
 
   const queryString = params.toString();
-  const endpoint = queryString ? `/jobs?${queryString}` : '/jobs';
+  const endpoint = queryString ? `/jobs?${queryString}` : "/jobs";
   const fullUrl = `${JOBS_BASE_URL}${endpoint}`;
-  
-  console.log('[getJobs] Full URL:', fullUrl);
-  console.log('[getJobs] Endpoint:', endpoint);
 
-  return apiFetch<Job[]>(endpoint, {
-    method: 'GET',
-  }, 'jobs');
+  console.log("[getJobs] Full URL:", fullUrl);
+  console.log("[getJobs] Endpoint:", endpoint);
+
+  return apiFetch<Job[]>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
 };
 
 // Update a job
-export const updateJob = async (jobId: number, jobData: Partial<Job>): Promise<Job> => {
-  return apiFetch<Job>(`/jobs/${jobId}`, {
-    method: 'PATCH',
-    body: JSON.stringify(jobData),
-  }, 'jobs');
+export const updateJob = async (
+  jobId: number,
+  jobData: Partial<Job>,
+): Promise<Job> => {
+  return apiFetch<Job>(
+    `/jobs/${jobId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(jobData),
+    },
+    "jobs",
+  );
 };
 
 // Delete a job
 export const deleteJob = async (jobId: number): Promise<void> => {
-  await apiFetch<void>(`/jobs/${jobId}`, {
-    method: 'DELETE',
-  }, 'jobs');
+  await apiFetch<void>(
+    `/jobs/${jobId}`,
+    {
+      method: "DELETE",
+    },
+    "jobs",
+  );
 };
 
 // Batch create multiple jobs
 // Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in chunks
 export const batchCreateJobs = async (
   jobs: Partial<Job>[],
-  onProgress?: (completed: number, total: number) => void
-): Promise<{ success: Job[]; failures: { job: Partial<Job>; error: string }[] }> => {
+  onProgress?: (completed: number, total: number) => void,
+): Promise<{
+  success: Job[];
+  failures: { job: Partial<Job>; error: string }[];
+}> => {
   const CHUNK_SIZE = 25; // Process 25 jobs at a time to avoid overwhelming the API
   const success: Job[] = [];
   const failures: { job: Partial<Job>; error: string }[] = [];
@@ -411,30 +527,43 @@ export const batchCreateJobs = async (
     const chunkResults = await Promise.allSettled(
       chunk.map(async (job) => {
         try {
-          console.log(`[batchCreateJobs] Creating job with clients_id:`, job.clients_id);
-          const createdJob = await apiFetch<Job>('/jobs', {
-            method: 'POST',
-            body: JSON.stringify(job),
-          }, 'jobs');
+          console.log(
+            `[batchCreateJobs] Creating job with clients_id:`,
+            job.clients_id,
+          );
+          const createdJob = await apiFetch<Job>(
+            "/jobs",
+            {
+              method: "POST",
+              body: JSON.stringify(job),
+            },
+            "jobs",
+          );
           console.log(`[batchCreateJobs] Created job response:`, {
             id: createdJob.id,
             job_number: createdJob.job_number,
             clients_id: createdJob.clients_id,
             client: createdJob.client,
-            sub_client: createdJob.sub_client
+            sub_client: createdJob.sub_client,
           });
           return createdJob;
         } catch (error) {
-          throw { job, error: error instanceof Error ? error.message : 'Unknown error' };
+          throw {
+            job,
+            error: error instanceof Error ? error.message : "Unknown error",
+          };
         }
-      })
+      }),
     );
 
     chunkResults.forEach((result) => {
-      if (result.status === 'fulfilled') {
+      if (result.status === "fulfilled") {
         success.push(result.value);
       } else {
-        const failureData = result.reason as { job: Partial<Job>; error: string };
+        const failureData = result.reason as {
+          job: Partial<Job>;
+          error: string;
+        };
         failures.push(failureData);
       }
     });
@@ -456,70 +585,105 @@ export const batchCreateJobs = async (
 export const getProductionEntries = async (
   facilitiesId?: number,
   startDate?: number,
-  endDate?: number
+  endDate?: number,
 ): Promise<ProductionEntry[]> => {
   const params = new URLSearchParams();
 
   if (facilitiesId !== undefined && facilitiesId !== null) {
-    params.append('facilities_id', facilitiesId.toString());
+    params.append("facilities_id", facilitiesId.toString());
   }
 
   if (startDate !== undefined && startDate !== null) {
-    params.append('start_date', startDate.toString());
+    params.append("start_date", startDate.toString());
   }
 
   if (endDate !== undefined && endDate !== null) {
-    params.append('end_date', endDate.toString());
+    params.append("end_date", endDate.toString());
   }
 
   const queryString = params.toString();
-  const endpoint = queryString ? `/production_entry?${queryString}` : '/production_entry';
+  const endpoint = queryString
+    ? `/production_entry?${queryString}`
+    : "/production_entry";
 
-  console.log('[getProductionEntries] Fetching from:', endpoint);
-  const result = await apiFetch<ProductionEntry[]>(endpoint, {
-    method: 'GET',
-  }, 'jobs');
-  console.log('[getProductionEntries] Received', result.length, 'entries:', result);
+  console.log("[getProductionEntries] Fetching from:", endpoint);
+  const result = await apiFetch<ProductionEntry[]>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+  console.log(
+    "[getProductionEntries] Received",
+    result.length,
+    "entries:",
+    result,
+  );
   return result;
 };
 
 // Add a new production entry
-export const addProductionEntry = async (data: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'>): Promise<ProductionEntry> => {
-  console.log('[addProductionEntry] Submitting entry:', data);
-  const result = await apiFetch<ProductionEntry>('/production_entry', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }, 'jobs');
-  console.log('[addProductionEntry] Response:', result);
+export const addProductionEntry = async (
+  data: Omit<ProductionEntry, "id" | "created_at" | "updated_at">,
+): Promise<ProductionEntry> => {
+  console.log("[addProductionEntry] Submitting entry:", data);
+  const result = await apiFetch<ProductionEntry>(
+    "/production_entry",
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+    "jobs",
+  );
+  console.log("[addProductionEntry] Response:", result);
   return result;
 };
 
 // Update an existing production entry
-export const updateProductionEntry = async (production_entry_id: number, data: Partial<ProductionEntry>): Promise<ProductionEntry> => {
-  console.log('[updateProductionEntry] Updating entry:', production_entry_id, 'with data:', data);
-  const result = await apiFetch<ProductionEntry>(`/production_entry/${production_entry_id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }, 'jobs');
-  console.log('[updateProductionEntry] Response:', result);
+export const updateProductionEntry = async (
+  production_entry_id: number,
+  data: Partial<ProductionEntry>,
+): Promise<ProductionEntry> => {
+  console.log(
+    "[updateProductionEntry] Updating entry:",
+    production_entry_id,
+    "with data:",
+    data,
+  );
+  const result = await apiFetch<ProductionEntry>(
+    `/production_entry/${production_entry_id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    },
+    "jobs",
+  );
+  console.log("[updateProductionEntry] Response:", result);
   return result;
 };
 
 // Delete a production entry
-export const deleteProductionEntry = async (production_entry_id: number): Promise<void> => {
-  await apiFetch<void>(`/production_entry/${production_entry_id}`, {
-    method: 'DELETE',
-  }, 'jobs');
+export const deleteProductionEntry = async (
+  production_entry_id: number,
+): Promise<void> => {
+  await apiFetch<void>(
+    `/production_entry/${production_entry_id}`,
+    {
+      method: "DELETE",
+    },
+    "jobs",
+  );
 };
 
 // Batch create multiple production entries
 // Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in parallel
 export const batchCreateProductionEntries = async (
-  entries: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'>[]
+  entries: Omit<ProductionEntry, "id" | "created_at" | "updated_at">[],
 ): Promise<ProductionEntry[]> => {
   // Create all entries in parallel for much faster performance
   const createdEntries = await Promise.all(
-    entries.map(entry => addProductionEntry(entry))
+    entries.map((entry) => addProductionEntry(entry)),
   );
 
   return createdEntries;
@@ -533,80 +697,111 @@ export const batchCreateProductionEntries = async (
 export const getJobCostEntries = async (
   facilitiesId?: number,
   startDate?: number,
-  endDate?: number
+  endDate?: number,
 ): Promise<JobCostEntry[]> => {
   const params = new URLSearchParams();
 
   if (facilitiesId !== undefined && facilitiesId !== null) {
-    params.append('facilities_id', facilitiesId.toString());
+    params.append("facilities_id", facilitiesId.toString());
   }
 
   if (startDate !== undefined && startDate !== null) {
-    params.append('start_date', startDate.toString());
+    params.append("start_date", startDate.toString());
   }
 
   if (endDate !== undefined && endDate !== null) {
-    params.append('end_date', endDate.toString());
+    params.append("end_date", endDate.toString());
   }
 
   const queryString = params.toString();
-  const endpoint = queryString ? `/job_cost_entry?${queryString}` : '/job_cost_entry';
+  const endpoint = queryString
+    ? `/job_cost_entry?${queryString}`
+    : "/job_cost_entry";
 
-  console.log('[getJobCostEntries] Fetching from:', endpoint);
-  const result = await apiFetch<JobCostEntry[]>(endpoint, {
-    method: 'GET',
-  }, 'jobs');
-  console.log('[getJobCostEntries] Received', result.length, 'entries:', result);
+  console.log("[getJobCostEntries] Fetching from:", endpoint);
+  const result = await apiFetch<JobCostEntry[]>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+  console.log(
+    "[getJobCostEntries] Received",
+    result.length,
+    "entries:",
+    result,
+  );
   return result;
 };
 
 // Add a new job cost entry
 export const addJobCostEntry = async (
-  data: Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'>
+  data: Omit<JobCostEntry, "id" | "created_at" | "updated_at">,
 ): Promise<JobCostEntry> => {
-  console.log('[addJobCostEntry] Submitting entry:', data);
-  const result = await apiFetch<JobCostEntry>('/job_cost_entry', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }, 'jobs');
-  console.log('[addJobCostEntry] Response:', result);
+  console.log("[addJobCostEntry] Submitting entry:", data);
+  const result = await apiFetch<JobCostEntry>(
+    "/job_cost_entry",
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+    "jobs",
+  );
+  console.log("[addJobCostEntry] Response:", result);
   return result;
 };
 
 // Update an existing job cost entry
 export const updateJobCostEntry = async (
   id: number,
-  data: Partial<Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'>>
+  data: Partial<Omit<JobCostEntry, "id" | "created_at" | "updated_at">>,
 ): Promise<JobCostEntry> => {
-  console.log('[updateJobCostEntry] Updating entry:', id, 'with data:', data);
-  const result = await apiFetch<JobCostEntry>(`/job_cost_entry/${id}`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }, 'jobs');
-  console.log('[updateJobCostEntry] Response:', result);
+  console.log("[updateJobCostEntry] Updating entry:", id, "with data:", data);
+  const result = await apiFetch<JobCostEntry>(
+    `/job_cost_entry/${id}`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+    "jobs",
+  );
+  console.log("[updateJobCostEntry] Response:", result);
   return result;
 };
 
 // Delete a job cost entry
 export const deleteJobCostEntry = async (id: number): Promise<void> => {
-  console.log('[deleteJobCostEntry] Deleting entry:', id);
-  await apiFetch<void>(`/job_cost_entry/${id}`, {
-    method: 'DELETE',
-  }, 'jobs');
-  console.log('[deleteJobCostEntry] Entry deleted successfully');
+  console.log("[deleteJobCostEntry] Deleting entry:", id);
+  await apiFetch<void>(
+    `/job_cost_entry/${id}`,
+    {
+      method: "DELETE",
+    },
+    "jobs",
+  );
+  console.log("[deleteJobCostEntry] Entry deleted successfully");
 };
 
 // Batch create multiple job cost entries
 // Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in parallel
 export const batchCreateJobCostEntries = async (
-  entries: Omit<JobCostEntry, 'id' | 'created_at' | 'updated_at'>[]
+  entries: Omit<JobCostEntry, "id" | "created_at" | "updated_at">[],
 ): Promise<JobCostEntry[]> => {
-  console.log('[batchCreateJobCostEntries] Creating', entries.length, 'entries in parallel');
+  console.log(
+    "[batchCreateJobCostEntries] Creating",
+    entries.length,
+    "entries in parallel",
+  );
   // Create all entries in parallel for much faster performance
   const createdEntries = await Promise.all(
-    entries.map(entry => addJobCostEntry(entry))
+    entries.map((entry) => addJobCostEntry(entry)),
   );
-  console.log('[batchCreateJobCostEntries] Successfully created', createdEntries.length, 'entries');
+  console.log(
+    "[batchCreateJobCostEntries] Successfully created",
+    createdEntries.length,
+    "entries",
+  );
   return createdEntries;
 };
 
@@ -620,8 +815,11 @@ export const batchCreateJobCostEntries = async (
  * @returns Object with success and failure counts
  */
 export const bulkDeleteJobs = async (
-  jobIds: number[]
-): Promise<{ success: number; failures: { jobId: number; error: string }[] }> => {
+  jobIds: number[],
+): Promise<{
+  success: number;
+  failures: { jobId: number; error: string }[];
+}> => {
   const failures: { jobId: number; error: string }[] = [];
   let successCount = 0;
 
@@ -632,13 +830,16 @@ export const bulkDeleteJobs = async (
         await deleteJob(jobId);
         return jobId;
       } catch (error) {
-        throw { jobId, error: error instanceof Error ? error.message : 'Unknown error' };
+        throw {
+          jobId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
       }
-    })
+    }),
   );
 
   results.forEach((result) => {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       successCount++;
     } else {
       const failureData = result.reason as { jobId: number; error: string };
@@ -646,7 +847,9 @@ export const bulkDeleteJobs = async (
     }
   });
 
-  console.log(`[bulkDeleteJobs] Deleted ${successCount} of ${jobIds.length} jobs`);
+  console.log(
+    `[bulkDeleteJobs] Deleted ${successCount} of ${jobIds.length} jobs`,
+  );
   return { success: successCount, failures };
 };
 
@@ -658,8 +861,11 @@ export const bulkDeleteJobs = async (
  */
 export const bulkUpdateJobs = async (
   jobIds: number[],
-  updates: Partial<Job>
-): Promise<{ success: Job[]; failures: { jobId: number; error: string }[] }> => {
+  updates: Partial<Job>,
+): Promise<{
+  success: Job[];
+  failures: { jobId: number; error: string }[];
+}> => {
   const failures: { jobId: number; error: string }[] = [];
   const success: Job[] = [];
 
@@ -670,13 +876,16 @@ export const bulkUpdateJobs = async (
         const updatedJob = await updateJob(jobId, updates);
         return updatedJob;
       } catch (error) {
-        throw { jobId, error: error instanceof Error ? error.message : 'Unknown error' };
+        throw {
+          jobId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
       }
-    })
+    }),
   );
 
   results.forEach((result) => {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       success.push(result.value);
     } else {
       const failureData = result.reason as { jobId: number; error: string };
@@ -684,7 +893,9 @@ export const bulkUpdateJobs = async (
     }
   });
 
-  console.log(`[bulkUpdateJobs] Updated ${success.length} of ${jobIds.length} jobs`);
+  console.log(
+    `[bulkUpdateJobs] Updated ${success.length} of ${jobIds.length} jobs`,
+  );
   return { success, failures };
 };
 
@@ -699,19 +910,24 @@ export const bulkUpdateJobs = async (
  * @param processType - The process type (e.g., 'insert', 'fold', 'laser')
  * @returns Array of machine variable configurations
  */
-export const getMachineVariables = async (processType: string): Promise<any[]> => {
-  console.log('[getMachineVariables] Fetching variables for process type:', processType);
+export const getMachineVariables = async (
+  processType: string,
+): Promise<any[]> => {
+  console.log(
+    "[getMachineVariables] Fetching variables for process type:",
+    processType,
+  );
 
   const params = new URLSearchParams();
-  params.append('process_type', processType);
+  params.append("process_type", processType);
 
   const endpoint = `/machine_variables?${params.toString()}`;
 
   const result = await apiFetch<any[]>(endpoint, {
-    method: 'GET',
+    method: "GET",
   });
 
-  console.log('[getMachineVariables] Response:', result);
+  console.log("[getMachineVariables] Response:", result);
   return result;
 };
 
@@ -720,13 +936,13 @@ export const getMachineVariables = async (processType: string): Promise<any[]> =
  * @returns Array of machine variable definitions
  */
 export const getAllMachineVariables = async (): Promise<any[]> => {
-  console.log('[getAllMachineVariables] Fetching all machine variables');
+  console.log("[getAllMachineVariables] Fetching all machine variables");
 
-  const result = await apiFetch<any[]>('/machine_variables', {
-    method: 'GET',
+  const result = await apiFetch<any[]>("/machine_variables", {
+    method: "GET",
   });
 
-  console.log('[getAllMachineVariables] Response:', result);
+  console.log("[getAllMachineVariables] Response:", result);
   return result;
 };
 
@@ -735,14 +951,22 @@ export const getAllMachineVariables = async (): Promise<any[]> => {
  * @param machineVariablesId - The ID of the machine variables record
  * @returns Machine variables configuration
  */
-export const getMachineVariablesById = async (machineVariablesId: number): Promise<any> => {
-  console.log('[getMachineVariablesById] Fetching machine variables by ID:', machineVariablesId);
+export const getMachineVariablesById = async (
+  machineVariablesId: number,
+): Promise<any> => {
+  console.log(
+    "[getMachineVariablesById] Fetching machine variables by ID:",
+    machineVariablesId,
+  );
 
-  const result = await apiFetch<any>(`/machine_variables/${machineVariablesId}`, {
-    method: 'GET',
-  });
+  const result = await apiFetch<any>(
+    `/machine_variables/${machineVariablesId}`,
+    {
+      method: "GET",
+    },
+  );
 
-  console.log('[getMachineVariablesById] Response:', result);
+  console.log("[getMachineVariablesById] Response:", result);
   return result;
 };
 
@@ -754,13 +978,13 @@ export const getMachineVariablesById = async (machineVariablesId: number): Promi
  */
 export const updateMachineVariables = async (
   machineVariablesId: number,
-  variables: Record<string, any>
+  variables: Record<string, any>,
 ): Promise<any> => {
-  console.log('[updateMachineVariables] Updating machine variables:', { 
-    machineVariablesId, 
+  console.log("[updateMachineVariables] Updating machine variables:", {
+    machineVariablesId,
     variables,
     endpoint: `/machine_variables/${machineVariablesId}`,
-    fullUrl: `${API_BASE_URL}/machine_variables/${machineVariablesId}`
+    fullUrl: `${API_BASE_URL}/machine_variables/${machineVariablesId}`,
   });
 
   try {
@@ -769,22 +993,28 @@ export const updateMachineVariables = async (
       variables: variables,
     };
 
-    console.log('[updateMachineVariables] Request body:', JSON.stringify(requestBody, null, 2));
+    console.log(
+      "[updateMachineVariables] Request body:",
+      JSON.stringify(requestBody, null, 2),
+    );
 
-    const result = await apiFetch<any>(`/machine_variables/${machineVariablesId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(requestBody),
-    });
+    const result = await apiFetch<any>(
+      `/machine_variables/${machineVariablesId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(requestBody),
+      },
+    );
 
-    console.log('[updateMachineVariables] Response:', result);
+    console.log("[updateMachineVariables] Response:", result);
     return result;
   } catch (error: any) {
-    console.error('[updateMachineVariables] Error details:', {
+    console.error("[updateMachineVariables] Error details:", {
       machineVariablesId,
       endpoint: `/machine_variables/${machineVariablesId}`,
       fullUrl: `${API_BASE_URL}/machine_variables/${machineVariablesId}`,
       error: error.message,
-      errorObject: error
+      errorObject: error,
     });
     throw error;
   }
@@ -808,18 +1038,24 @@ export const syncJobCostEntryFromRequirements = async (
   jobId: number,
   requirements: string | any[], // eslint-disable-line @typescript-eslint/no-explicit-any
   startDate: string | number,
-  facilitiesId?: number
+  facilitiesId?: number,
 ): Promise<JobCostEntry | null> => {
   try {
-    console.log('[syncJobCostEntryFromRequirements] Starting sync for job:', jobId);
+    console.log(
+      "[syncJobCostEntryFromRequirements] Starting sync for job:",
+      jobId,
+    );
 
     // Parse requirements if it's a string
     let requirementsArray: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (typeof requirements === 'string') {
+    if (typeof requirements === "string") {
       try {
         requirementsArray = JSON.parse(requirements);
       } catch (e) {
-        console.error('[syncJobCostEntryFromRequirements] Failed to parse requirements:', e);
+        console.error(
+          "[syncJobCostEntryFromRequirements] Failed to parse requirements:",
+          e,
+        );
         return null;
       }
     } else {
@@ -830,42 +1066,60 @@ export const syncJobCostEntryFromRequirements = async (
     const averageCost = calculateAverageCostFromRequirements(requirementsArray);
 
     if (averageCost === 0) {
-      console.log('[syncJobCostEntryFromRequirements] No valid price_per_m found in requirements');
+      console.log(
+        "[syncJobCostEntryFromRequirements] No valid price_per_m found in requirements",
+      );
       return null;
     }
 
     // Convert start date to timestamp if it's a string
     let dateTimestamp: number;
-    if (typeof startDate === 'string') {
+    if (typeof startDate === "string") {
       dateTimestamp = new Date(startDate).getTime();
     } else {
       dateTimestamp = startDate;
     }
 
-    console.log('[syncJobCostEntryFromRequirements] Calculated average cost:', averageCost);
+    console.log(
+      "[syncJobCostEntryFromRequirements] Calculated average cost:",
+      averageCost,
+    );
 
     // Check if a job_cost_entry already exists for this job and date range
     // We'll look for entries within a day of the start date to avoid duplicates
     const dayStart = dateTimestamp;
-    const dayEnd = dateTimestamp + (24 * 60 * 60 * 1000);
+    const dayEnd = dateTimestamp + 24 * 60 * 60 * 1000;
 
     try {
-      const existingEntries = await getJobCostEntries(facilitiesId, dayStart, dayEnd);
-      const existingEntry = existingEntries.find(entry => entry.job === jobId);
+      const existingEntries = await getJobCostEntries(
+        facilitiesId,
+        dayStart,
+        dayEnd,
+      );
+      const existingEntry = existingEntries.find(
+        (entry) => entry.job === jobId,
+      );
 
       if (existingEntry) {
         // Update existing entry
-        console.log('[syncJobCostEntryFromRequirements] Updating existing entry:', existingEntry.id);
+        console.log(
+          "[syncJobCostEntryFromRequirements] Updating existing entry:",
+          existingEntry.id,
+        );
         const updated = await updateJobCostEntry(existingEntry.id, {
           actual_cost_per_m: averageCost,
-          notes: existingEntry.notes || 'Auto-synced from requirements',
+          notes: existingEntry.notes || "Auto-synced from requirements",
         });
-        console.log('[syncJobCostEntryFromRequirements] Entry updated successfully');
+        console.log(
+          "[syncJobCostEntryFromRequirements] Entry updated successfully",
+        );
         return updated;
       }
     } catch {
       // If fetching existing entries fails, continue to create new one
-      console.log('[syncJobCostEntryFromRequirements] Could not fetch existing entries, will create new');
+      console.log(
+        "[syncJobCostEntryFromRequirements] Could not fetch existing entries, will create new",
+      );
     }
 
     // Create new entry
@@ -873,14 +1127,20 @@ export const syncJobCostEntryFromRequirements = async (
       job: jobId,
       date: dateTimestamp,
       actual_cost_per_m: averageCost,
-      notes: 'Auto-synced from requirements',
+      notes: "Auto-synced from requirements",
       facilities_id: facilitiesId,
     });
 
-    console.log('[syncJobCostEntryFromRequirements] New entry created:', newEntry.id);
+    console.log(
+      "[syncJobCostEntryFromRequirements] New entry created:",
+      newEntry.id,
+    );
     return newEntry;
   } catch (error) {
-    console.error('[syncJobCostEntryFromRequirements] Error syncing job cost entry:', error);
+    console.error(
+      "[syncJobCostEntryFromRequirements] Error syncing job cost entry:",
+      error,
+    );
     // Don't throw - we don't want to fail job creation/update if cost entry sync fails
     return null;
   }
@@ -900,30 +1160,32 @@ export const syncJobCostEntryFromRequirements = async (
 export const getMachineRules = async (
   processTypeKey?: string,
   machineId?: number,
-  active?: boolean
+  active?: boolean,
 ): Promise<MachineRule[]> => {
   const params = new URLSearchParams();
 
   if (processTypeKey) {
-    params.append('process_type_key', processTypeKey);
+    params.append("process_type_key", processTypeKey);
   }
 
   if (machineId !== undefined && machineId !== null) {
-    params.append('machine_id', machineId.toString());
+    params.append("machine_id", machineId.toString());
   }
 
   if (active !== undefined) {
-    params.append('active', active.toString());
+    params.append("active", active.toString());
   }
 
   const queryString = params.toString();
-  const endpoint = queryString ? `/machine_rules?${queryString}` : '/machine_rules';
+  const endpoint = queryString
+    ? `/machine_rules?${queryString}`
+    : "/machine_rules";
 
-  console.log('[getMachineRules] Fetching rules from:', endpoint);
+  console.log("[getMachineRules] Fetching rules from:", endpoint);
   const result = await apiFetch<MachineRule[]>(endpoint, {
-    method: 'GET',
+    method: "GET",
   });
-  console.log('[getMachineRules] Received', result.length, 'rules');
+  console.log("[getMachineRules] Received", result.length, "rules");
   return result;
 };
 
@@ -933,9 +1195,9 @@ export const getMachineRules = async (
  * @returns Machine rule
  */
 export const getMachineRule = async (ruleId: number): Promise<MachineRule> => {
-  console.log('[getMachineRule] Fetching rule:', ruleId);
+  console.log("[getMachineRule] Fetching rule:", ruleId);
   return apiFetch<MachineRule>(`/machine_rules/${ruleId}`, {
-    method: 'GET',
+    method: "GET",
   });
 };
 
@@ -945,14 +1207,14 @@ export const getMachineRule = async (ruleId: number): Promise<MachineRule> => {
  * @returns Created machine rule
  */
 export const createMachineRule = async (
-  ruleData: Omit<MachineRule, 'id' | 'created_at' | 'updated_at'>
+  ruleData: Omit<MachineRule, "id" | "created_at" | "updated_at">,
 ): Promise<MachineRule> => {
-  console.log('[createMachineRule] Creating rule:', ruleData);
-  const result = await apiFetch<MachineRule>('/machine_rules', {
-    method: 'POST',
+  console.log("[createMachineRule] Creating rule:", ruleData);
+  const result = await apiFetch<MachineRule>("/machine_rules", {
+    method: "POST",
     body: JSON.stringify(ruleData),
   });
-  console.log('[createMachineRule] Rule created with ID:', result.id);
+  console.log("[createMachineRule] Rule created with ID:", result.id);
   return result;
 };
 
@@ -964,14 +1226,19 @@ export const createMachineRule = async (
  */
 export const updateMachineRule = async (
   ruleId: number,
-  ruleData: Partial<Omit<MachineRule, 'id' | 'created_at' | 'updated_at'>>
+  ruleData: Partial<Omit<MachineRule, "id" | "created_at" | "updated_at">>,
 ): Promise<MachineRule> => {
-  console.log('[updateMachineRule] Updating rule:', ruleId, 'with data:', ruleData);
+  console.log(
+    "[updateMachineRule] Updating rule:",
+    ruleId,
+    "with data:",
+    ruleData,
+  );
   const result = await apiFetch<MachineRule>(`/machine_rules/${ruleId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(ruleData),
   });
-  console.log('[updateMachineRule] Rule updated successfully');
+  console.log("[updateMachineRule] Rule updated successfully");
   return result;
 };
 
@@ -980,11 +1247,11 @@ export const updateMachineRule = async (
  * @param ruleId - The rule ID
  */
 export const deleteMachineRule = async (ruleId: number): Promise<void> => {
-  console.log('[deleteMachineRule] Deleting rule:', ruleId);
+  console.log("[deleteMachineRule] Deleting rule:", ruleId);
   await apiFetch<void>(`/machine_rules/${ruleId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
-  console.log('[deleteMachineRule] Rule deleted successfully');
+  console.log("[deleteMachineRule] Rule deleted successfully");
 };
 
 // ============================================================================
@@ -999,26 +1266,28 @@ export const deleteMachineRule = async (ruleId: number): Promise<void> => {
  */
 export const getMachineGroups = async (
   processTypeKey?: string,
-  facilitiesId?: number
+  facilitiesId?: number,
 ): Promise<MachineGroup[]> => {
   const params = new URLSearchParams();
 
   if (processTypeKey) {
-    params.append('process_type_key', processTypeKey);
+    params.append("process_type_key", processTypeKey);
   }
 
   if (facilitiesId !== undefined && facilitiesId !== null) {
-    params.append('facilities_id', facilitiesId.toString());
+    params.append("facilities_id", facilitiesId.toString());
   }
 
   const queryString = params.toString();
-  const endpoint = queryString ? `/machine_groups?${queryString}` : '/machine_groups';
+  const endpoint = queryString
+    ? `/machine_groups?${queryString}`
+    : "/machine_groups";
 
-  console.log('[getMachineGroups] Fetching groups from:', endpoint);
+  console.log("[getMachineGroups] Fetching groups from:", endpoint);
   const result = await apiFetch<MachineGroup[]>(endpoint, {
-    method: 'GET',
+    method: "GET",
   });
-  console.log('[getMachineGroups] Received', result.length, 'groups');
+  console.log("[getMachineGroups] Received", result.length, "groups");
   return result;
 };
 
@@ -1027,10 +1296,12 @@ export const getMachineGroups = async (
  * @param groupId - The group ID
  * @returns Machine group
  */
-export const getMachineGroup = async (groupId: number): Promise<MachineGroup> => {
-  console.log('[getMachineGroup] Fetching group:', groupId);
+export const getMachineGroup = async (
+  groupId: number,
+): Promise<MachineGroup> => {
+  console.log("[getMachineGroup] Fetching group:", groupId);
   return apiFetch<MachineGroup>(`/machine_groups/${groupId}`, {
-    method: 'GET',
+    method: "GET",
   });
 };
 
@@ -1040,14 +1311,14 @@ export const getMachineGroup = async (groupId: number): Promise<MachineGroup> =>
  * @returns Created machine group
  */
 export const createMachineGroup = async (
-  groupData: Omit<MachineGroup, 'id' | 'created_at' | 'updated_at'>
+  groupData: Omit<MachineGroup, "id" | "created_at" | "updated_at">,
 ): Promise<MachineGroup> => {
-  console.log('[createMachineGroup] Creating group:', groupData);
-  const result = await apiFetch<MachineGroup>('/machine_groups', {
-    method: 'POST',
+  console.log("[createMachineGroup] Creating group:", groupData);
+  const result = await apiFetch<MachineGroup>("/machine_groups", {
+    method: "POST",
     body: JSON.stringify(groupData),
   });
-  console.log('[createMachineGroup] Group created with ID:', result.id);
+  console.log("[createMachineGroup] Group created with ID:", result.id);
   return result;
 };
 
@@ -1059,14 +1330,19 @@ export const createMachineGroup = async (
  */
 export const updateMachineGroup = async (
   groupId: number,
-  groupData: Partial<Omit<MachineGroup, 'id' | 'created_at' | 'updated_at'>>
+  groupData: Partial<Omit<MachineGroup, "id" | "created_at" | "updated_at">>,
 ): Promise<MachineGroup> => {
-  console.log('[updateMachineGroup] Updating group:', groupId, 'with data:', groupData);
+  console.log(
+    "[updateMachineGroup] Updating group:",
+    groupId,
+    "with data:",
+    groupData,
+  );
   const result = await apiFetch<MachineGroup>(`/machine_groups/${groupId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(groupData),
   });
-  console.log('[updateMachineGroup] Group updated successfully');
+  console.log("[updateMachineGroup] Group updated successfully");
   return result;
 };
 
@@ -1075,11 +1351,11 @@ export const updateMachineGroup = async (
  * @param groupId - The group ID
  */
 export const deleteMachineGroup = async (groupId: number): Promise<void> => {
-  console.log('[deleteMachineGroup] Deleting group:', groupId);
+  console.log("[deleteMachineGroup] Deleting group:", groupId);
   await apiFetch<void>(`/machine_groups/${groupId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
-  console.log('[deleteMachineGroup] Group deleted successfully');
+  console.log("[deleteMachineGroup] Group deleted successfully");
 };
 
 /**
@@ -1090,9 +1366,14 @@ export const deleteMachineGroup = async (groupId: number): Promise<void> => {
  */
 export const addMachineToGroup = async (
   groupId: number,
-  machineId: number
+  machineId: number,
 ): Promise<MachineGroup> => {
-  console.log('[addMachineToGroup] Adding machine', machineId, 'to group', groupId);
+  console.log(
+    "[addMachineToGroup] Adding machine",
+    machineId,
+    "to group",
+    groupId,
+  );
   const group = await getMachineGroup(groupId);
   const updatedMachineIds = [...group.machine_ids, machineId];
 
@@ -1109,11 +1390,16 @@ export const addMachineToGroup = async (
  */
 export const removeMachineFromGroup = async (
   groupId: number,
-  machineId: number
+  machineId: number,
 ): Promise<MachineGroup> => {
-  console.log('[removeMachineFromGroup] Removing machine', machineId, 'from group', groupId);
+  console.log(
+    "[removeMachineFromGroup] Removing machine",
+    machineId,
+    "from group",
+    groupId,
+  );
   const group = await getMachineGroup(groupId);
-  const updatedMachineIds = group.machine_ids.filter(id => id !== machineId);
+  const updatedMachineIds = group.machine_ids.filter((id) => id !== machineId);
 
   return updateMachineGroup(groupId, {
     machine_ids: updatedMachineIds,

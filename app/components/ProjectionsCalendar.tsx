@@ -1,9 +1,16 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { startOfWeek, addDays, format, isSameDay, startOfMonth, isSameMonth } from 'date-fns';
-import { ParsedJob } from '@/hooks/useJobs';
-import { timestampToDate, getDateKey } from '@/lib/dateUtils';
+import { useMemo } from "react";
+import {
+  startOfWeek,
+  addDays,
+  format,
+  isSameDay,
+  startOfMonth,
+  isSameMonth,
+} from "date-fns";
+import { ParsedJob } from "@/hooks/useJobs";
+import { timestampToDate, getDateKey } from "@/lib/dateUtils";
 
 interface ProjectionsCalendarProps {
   jobs: ParsedJob[];
@@ -22,13 +29,16 @@ interface DayData {
   isCurrentMonth: boolean;
 }
 
-export default function ProjectionsCalendar({ jobs, startDate = new Date() }: ProjectionsCalendarProps) {
-  console.log('==========================================');
-  console.log('[ProjectionsCalendar] COMPONENT IS RENDERING');
-  console.log('[ProjectionsCalendar] Received jobs:', jobs.length);
-  console.log('[ProjectionsCalendar] First job sample:', jobs[0]);
-  console.log('[ProjectionsCalendar] Start date:', startDate);
-  console.log('==========================================');
+export default function ProjectionsCalendar({
+  jobs,
+  startDate = new Date(),
+}: ProjectionsCalendarProps) {
+  console.log("==========================================");
+  console.log("[ProjectionsCalendar] COMPONENT IS RENDERING");
+  console.log("[ProjectionsCalendar] Received jobs:", jobs.length);
+  console.log("[ProjectionsCalendar] First job sample:", jobs[0]);
+  console.log("[ProjectionsCalendar] Start date:", startDate);
+  console.log("==========================================");
 
   // Calculate calendar grid (5 weeks)
   const calendarDays = useMemo(() => {
@@ -43,7 +53,7 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
         date,
         jobs: [],
         totalQuantity: 0,
-        isCurrentMonth: isSameMonth(date, startDate)
+        isCurrentMonth: isSameMonth(date, startDate),
       });
     }
 
@@ -53,18 +63,20 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
   // Map jobs to calendar days using daily_split
   const calendarWithJobs = useMemo(() => {
     const daysMap = new Map<string, DayData>();
-    
+
     // Initialize map with calendar days
-    calendarDays.forEach(day => {
+    calendarDays.forEach((day) => {
       daysMap.set(getDateKey(day.date), { ...day, jobs: [] });
     });
 
-    console.log('[ProjectionsCalendar] Processing', jobs.length, 'jobs');
+    console.log("[ProjectionsCalendar] Processing", jobs.length, "jobs");
 
     // Process each job
     jobs.forEach((job) => {
       if (!job.start_date || !job.due_date) {
-        console.log(`[ProjectionsCalendar] Job ${job.job_number} missing dates`);
+        console.log(
+          `[ProjectionsCalendar] Job ${job.job_number} missing dates`,
+        );
         return;
       }
 
@@ -78,18 +90,28 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
         quantity: job.quantity,
         hasDailySplit: !!dailySplit,
         dailySplitLength: dailySplit?.length,
-        dailySplit: dailySplit
+        dailySplit: dailySplit,
       });
 
-      if (!dailySplit || !Array.isArray(dailySplit) || dailySplit.length === 0) {
+      if (
+        !dailySplit ||
+        !Array.isArray(dailySplit) ||
+        dailySplit.length === 0
+      ) {
         // If no daily_split, distribute evenly across all days
-        const totalDays = Math.ceil((jobEnd.getTime() - jobStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const totalDays =
+          Math.ceil(
+            (jobEnd.getTime() - jobStart.getTime()) / (1000 * 60 * 60 * 24),
+          ) + 1;
         const quantityPerDay = job.quantity / totalDays;
 
-        console.log(`[ProjectionsCalendar] Job ${job.job_number} using even distribution:`, {
-          totalDays,
-          quantityPerDay
-        });
+        console.log(
+          `[ProjectionsCalendar] Job ${job.job_number} using even distribution:`,
+          {
+            totalDays,
+            quantityPerDay,
+          },
+        );
 
         for (let i = 0; i < totalDays; i++) {
           const date = addDays(jobStart, i);
@@ -99,7 +121,7 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
           if (dayData) {
             dayData.jobs.push({
               job,
-              quantity: quantityPerDay
+              quantity: quantityPerDay,
             });
             dayData.totalQuantity += quantityPerDay;
           }
@@ -107,8 +129,11 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
       } else {
         // Use daily_split to determine quantities for each day
         // Flatten the 2D array and place items sequentially starting from start_date
-        console.log(`[ProjectionsCalendar] Job ${job.job_number} using daily_split:`, dailySplit);
-        
+        console.log(
+          `[ProjectionsCalendar] Job ${job.job_number} using daily_split:`,
+          dailySplit,
+        );
+
         let dayOffset = 0;
         dailySplit.forEach((week) => {
           week.forEach((dayQuantity) => {
@@ -118,17 +143,20 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
               const dateKey = getDateKey(date);
               const dayData = daysMap.get(dateKey);
 
-              console.log(`[ProjectionsCalendar] Job ${job.job_number} day ${dayOffset}:`, {
-                date: format(date, 'yyyy-MM-dd'),
-                dateKey,
-                quantity: dayQuantity,
-                foundInMap: !!dayData
-              });
+              console.log(
+                `[ProjectionsCalendar] Job ${job.job_number} day ${dayOffset}:`,
+                {
+                  date: format(date, "yyyy-MM-dd"),
+                  dateKey,
+                  quantity: dayQuantity,
+                  foundInMap: !!dayData,
+                },
+              );
 
               if (dayData) {
                 dayData.jobs.push({
                   job,
-                  quantity: dayQuantity
+                  quantity: dayQuantity,
                 });
                 dayData.totalQuantity += dayQuantity;
               }
@@ -139,38 +167,45 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
       }
     });
 
-    const result = Array.from(daysMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
-    const daysWithJobs = result.filter(d => d.jobs.length > 0);
-    console.log('[ProjectionsCalendar] Days with jobs:', daysWithJobs.length);
-    console.log('[ProjectionsCalendar] First day with jobs:', daysWithJobs[0]);
+    const result = Array.from(daysMap.values()).sort(
+      (a, b) => a.date.getTime() - b.date.getTime(),
+    );
+    const daysWithJobs = result.filter((d) => d.jobs.length > 0);
+    console.log("[ProjectionsCalendar] Days with jobs:", daysWithJobs.length);
+    console.log("[ProjectionsCalendar] First day with jobs:", daysWithJobs[0]);
 
     return result;
   }, [calendarDays, jobs]);
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const daysWithJobs = calendarWithJobs.filter(d => d.jobs.length > 0).length;
+  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const daysWithJobs = calendarWithJobs.filter((d) => d.jobs.length > 0).length;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4">
       {/* Debug Info */}
       <div className="bg-gray-100 border border-gray-300 rounded p-3 mb-4">
-        <div className="text-sm font-semibold text-gray-700 mb-2">Debug Info:</div>
+        <div className="text-sm font-semibold text-gray-700 mb-2">
+          Debug Info:
+        </div>
         <div className="text-xs text-gray-600 space-y-1">
           <div>Jobs received: {jobs.length}</div>
           <div>Calendar days generated: {calendarWithJobs.length}</div>
           <div>Days with jobs: {daysWithJobs}</div>
-          <div>Displaying month: {format(startDate, 'MMMM yyyy')}</div>
+          <div>Displaying month: {format(startDate, "MMMM yyyy")}</div>
           {jobs.length > 0 && (
             <>
               <div className="mt-2 font-semibold">First 3 jobs:</div>
-              {jobs.slice(0, 3).map(job => {
-                const start = job.start_date ? timestampToDate(job.start_date) : null;
+              {jobs.slice(0, 3).map((job) => {
+                const start = job.start_date
+                  ? timestampToDate(job.start_date)
+                  : null;
                 const end = job.due_date ? timestampToDate(job.due_date) : null;
                 return (
                   <div key={job.id} className="ml-2">
-                    #{job.job_number}: {start ? format(start, 'MM/dd/yy') : 'N/A'} to {end ? format(end, 'MM/dd/yy') : 'N/A'} |
-                    Qty: {job.quantity} |
-                    Split: {job.daily_split ? 'Yes' : 'No'}
+                    #{job.job_number}:{" "}
+                    {start ? format(start, "MM/dd/yy") : "N/A"} to{" "}
+                    {end ? format(end, "MM/dd/yy") : "N/A"} | Qty:{" "}
+                    {job.quantity} | Split: {job.daily_split ? "Yes" : "No"}
                   </div>
                 );
               })}
@@ -181,7 +216,7 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
 
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-[var(--dark-blue)]">
-          Job Calendar - {format(startDate, 'MMMM yyyy')}
+          Job Calendar - {format(startDate, "MMMM yyyy")}
         </h3>
         <div className="text-sm text-gray-600">
           {jobs.length} total jobs | {daysWithJobs} days with jobs
@@ -197,22 +232,40 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
       {jobs.length > 0 && daysWithJobs === 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
           <div className="text-center text-gray-700">
-            <p className="font-semibold mb-2">No jobs scheduled for {format(startDate, 'MMMM yyyy')}</p>
-            <p className="text-sm mb-2">Found {jobs.length} jobs total, but none fall in this month.</p>
+            <p className="font-semibold mb-2">
+              No jobs scheduled for {format(startDate, "MMMM yyyy")}
+            </p>
+            <p className="text-sm mb-2">
+              Found {jobs.length} jobs total, but none fall in this month.
+            </p>
             <details className="mt-2 text-left">
-              <summary className="cursor-pointer text-blue-600 hover:text-blue-800">View job date ranges</summary>
+              <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
+                View job date ranges
+              </summary>
               <div className="mt-2 max-h-60 overflow-y-auto text-xs">
-                {jobs.slice(0, 10).map(job => {
-                  const start = job.start_date ? timestampToDate(job.start_date) : null;
-                  const end = job.due_date ? timestampToDate(job.due_date) : null;
+                {jobs.slice(0, 10).map((job) => {
+                  const start = job.start_date
+                    ? timestampToDate(job.start_date)
+                    : null;
+                  const end = job.due_date
+                    ? timestampToDate(job.due_date)
+                    : null;
                   return (
                     <div key={job.id} className="py-1 border-b border-gray-200">
-                      Job #{job.job_number}: {start ? format(start, 'MMM d, yyyy') : 'No start'} - {end ? format(end, 'MMM d, yyyy') : 'No end'}
-                      {job.daily_split ? ' (has daily_split)' : ' (no daily_split)'}
+                      Job #{job.job_number}:{" "}
+                      {start ? format(start, "MMM d, yyyy") : "No start"} -{" "}
+                      {end ? format(end, "MMM d, yyyy") : "No end"}
+                      {job.daily_split
+                        ? " (has daily_split)"
+                        : " (no daily_split)"}
                     </div>
                   );
                 })}
-                {jobs.length > 10 && <div className="py-1 text-gray-500">... and {jobs.length - 10} more</div>}
+                {jobs.length > 10 && (
+                  <div className="py-1 text-gray-500">
+                    ... and {jobs.length - 10} more
+                  </div>
+                )}
               </div>
             </details>
           </div>
@@ -221,7 +274,7 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
 
       <div className="grid grid-cols-7 gap-1">
         {/* Week day headers */}
-        {weekDays.map(day => (
+        {weekDays.map((day) => (
           <div
             key={day}
             className="text-center text-sm font-semibold text-[var(--text-light)] py-2 bg-gray-50 rounded"
@@ -239,29 +292,30 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
               key={index}
               className={`min-h-[120px] border rounded-lg p-2 ${
                 !dayData.isCurrentMonth
-                  ? 'bg-gray-50 opacity-50'
+                  ? "bg-gray-50 opacity-50"
                   : isToday
-                  ? 'bg-blue-50 border-blue-300'
-                  : 'bg-white border-gray-200'
+                    ? "bg-blue-50 border-blue-300"
+                    : "bg-white border-gray-200"
               }`}
             >
               {/* Date header */}
               <div
                 className={`text-sm font-semibold mb-1 ${
                   isToday
-                    ? 'text-blue-700'
+                    ? "text-blue-700"
                     : !dayData.isCurrentMonth
-                    ? 'text-gray-400'
-                    : 'text-[var(--text-dark)]'
+                      ? "text-gray-400"
+                      : "text-[var(--text-dark)]"
                 }`}
               >
-                {format(dayData.date, 'd')}
+                {format(dayData.date, "d")}
               </div>
 
               {/* Total quantity for the day */}
               {dayData.totalQuantity > 0 && (
                 <div className="text-xs font-semibold text-blue-600 mb-2">
-                  Total: {Math.round(dayData.totalQuantity).toLocaleString()} pcs
+                  Total: {Math.round(dayData.totalQuantity).toLocaleString()}{" "}
+                  pcs
                 </div>
               )}
 
@@ -304,4 +358,3 @@ export default function ProjectionsCalendar({ jobs, startDate = new Date() }: Pr
     </div>
   );
 }
-

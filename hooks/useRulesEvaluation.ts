@@ -3,9 +3,12 @@
  * Provides real-time speed and staffing calculations based on job parameters
  */
 
-import { useState, useEffect } from 'react';
-import type { Machine, RuleEvaluationResult } from '@/types';
-import { evaluateRulesForMachine, evaluateRulesForMachineObject } from '@/lib/rulesEngine';
+import { useState, useEffect } from "react";
+import type { Machine, RuleEvaluationResult } from "@/types";
+import {
+  evaluateRulesForMachine,
+  evaluateRulesForMachineObject,
+} from "@/lib/rulesEngine";
 
 /**
  * Evaluate rules for a machine with given parameters
@@ -13,7 +16,7 @@ import { evaluateRulesForMachine, evaluateRulesForMachineObject } from '@/lib/ru
  */
 export function useRulesEvaluation(
   machine: Machine | null,
-  parameters: Record<string, any>
+  parameters: Record<string, any>,
 ): {
   result: RuleEvaluationResult | null;
   loading: boolean;
@@ -40,11 +43,14 @@ export function useRulesEvaluation(
       setError(null);
 
       try {
-        const evaluation = await evaluateRulesForMachineObject(machine, parameters);
+        const evaluation = await evaluateRulesForMachineObject(
+          machine,
+          parameters,
+        );
         setResult(evaluation);
       } catch (err) {
-        console.error('[useRulesEvaluation] Error evaluating rules:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error'));
+        console.error("[useRulesEvaluation] Error evaluating rules:", err);
+        setError(err instanceof Error ? err : new Error("Unknown error"));
         setResult(null);
       } finally {
         setLoading(false);
@@ -64,7 +70,7 @@ export function useRulesEvaluation(
 export function useRulesEvaluationByProcessType(
   processTypeKey: string | null,
   baseSpeed: number,
-  parameters: Record<string, any>
+  parameters: Record<string, any>,
 ): {
   result: RuleEvaluationResult | null;
   loading: boolean;
@@ -94,12 +100,15 @@ export function useRulesEvaluationByProcessType(
         const evaluation = await evaluateRulesForMachine(
           processTypeKey,
           baseSpeed,
-          parameters
+          parameters,
         );
         setResult(evaluation);
       } catch (err) {
-        console.error('[useRulesEvaluationByProcessType] Error evaluating rules:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error'));
+        console.error(
+          "[useRulesEvaluationByProcessType] Error evaluating rules:",
+          err,
+        );
+        setError(err instanceof Error ? err : new Error("Unknown error"));
         setResult(null);
       } finally {
         setLoading(false);

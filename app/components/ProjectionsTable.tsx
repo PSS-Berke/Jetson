@@ -1,16 +1,30 @@
-'use client';
+"use client";
 
-import { useState, memo, useMemo, useEffect, useRef } from 'react';
-import { ParsedJob } from '@/hooks/useJobs';
-import { JobProjection, ServiceTypeSummary } from '@/hooks/useProjections';
-import { formatQuantity, TimeRange, ProcessProjection, expandJobProjectionsToProcesses } from '@/lib/projectionUtils';
-import JobDetailsModal from './JobDetailsModal';
-import ProcessTypeBadge from './ProcessTypeBadge';
-import { Trash, Lock, Unlock, ChevronDown } from 'lucide-react';
-import { bulkDeleteJobs, bulkUpdateJobs } from '@/lib/api';
+import { useState, memo, useMemo, useEffect, useRef } from "react";
+import { ParsedJob } from "@/hooks/useJobs";
+import { JobProjection, ServiceTypeSummary } from "@/hooks/useProjections";
+import {
+  formatQuantity,
+  TimeRange,
+  ProcessProjection,
+  expandJobProjectionsToProcesses,
+} from "@/lib/projectionUtils";
+import JobDetailsModal from "./JobDetailsModal";
+import ProcessTypeBadge from "./ProcessTypeBadge";
+import { Trash, Lock, Unlock, ChevronDown } from "lucide-react";
+import { bulkDeleteJobs, bulkUpdateJobs } from "@/lib/api";
 
-type SortField = 'job_number' | 'client' | 'sub_client' | 'process_type' | 'description' | 'quantity' | 'start_date' | 'due_date' | 'total';
-type SortDirection = 'asc' | 'desc';
+type SortField =
+  | "job_number"
+  | "client"
+  | "sub_client"
+  | "process_type"
+  | "description"
+  | "quantity"
+  | "start_date"
+  | "due_date"
+  | "total";
+type SortDirection = "asc" | "desc";
 
 interface ProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
@@ -21,542 +35,686 @@ interface ProjectionsTableProps {
     grandTotal: number;
   };
   onRefresh: () => void;
-  mobileViewMode?: 'cards' | 'table';
+  mobileViewMode?: "cards" | "table";
   globalTimeScrollIndex?: number;
   onGlobalTimeScrollIndexChange?: (index: number) => void;
-  dataDisplayMode?: 'pieces' | 'revenue';
-  viewMode?: 'jobs' | 'processes';
-  processViewMode?: 'consolidated' | 'expanded';
+  dataDisplayMode?: "pieces" | "revenue";
+  viewMode?: "jobs" | "processes";
+  processViewMode?: "consolidated" | "expanded";
 }
 
 // Memoized desktop table row component
-const ProjectionTableRow = memo(({
-  projection,
-  timeRanges,
-  onJobClick,
-  dataDisplayMode,
-  isSelected,
-  onToggleSelect
-}: {
-  projection: JobProjection;
-  timeRanges: TimeRange[];
-  onJobClick: (job: ParsedJob) => void;
-  dataDisplayMode: 'pieces' | 'revenue';
-  isSelected: boolean;
-  onToggleSelect: () => void;
-}) => {
-  const job = projection.job;
+const ProjectionTableRow = memo(
+  ({
+    projection,
+    timeRanges,
+    onJobClick,
+    dataDisplayMode,
+    isSelected,
+    onToggleSelect,
+  }: {
+    projection: JobProjection;
+    timeRanges: TimeRange[];
+    onJobClick: (job: ParsedJob) => void;
+    dataDisplayMode: "pieces" | "revenue";
+    isSelected: boolean;
+    onToggleSelect: () => void;
+  }) => {
+    const job = projection.job;
 
-  return (
-    <tr
-      key={job.id}
-      className={`cursor-pointer ${isSelected ? 'bg-blue-100' : ''}`}
-      onClick={() => onJobClick(job)}
-    >
-      <td
-        className="px-2 py-2 w-12"
-        onClick={(e) => e.stopPropagation()}
+    return (
+      <tr
+        key={job.id}
+        className={`cursor-pointer ${isSelected ? "bg-blue-100" : ""}`}
+        onClick={() => onJobClick(job)}
       >
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={onToggleSelect}
-          className="w-4 h-4 cursor-pointer"
-        />
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
-        {job.job_number}
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-        {job.client?.name || 'Unknown'}
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-        {job.sub_client?.name || '-'}
-      </td>
-      <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
-        <div className="flex flex-wrap gap-1">
-          {job.requirements && job.requirements.length > 0 ? (
-            // Get unique process types from requirements
-            [...new Set(job.requirements.map(req => req.process_type).filter(Boolean))].map((processType, idx) => (
-              <ProcessTypeBadge key={idx} processType={processType as string} />
-            ))
-          ) : (
-            <span className="text-gray-400 text-xs">No processes</span>
-          )}
-        </div>
-      </td>
-      <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
-        {job.description || 'N/A'}
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
-        {job.quantity.toLocaleString()}
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
-        {job.start_date ? new Date(job.start_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' }) : 'N/A'}
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
-        {job.due_date ? new Date(job.due_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' }) : 'N/A'}
-      </td>
-      {timeRanges.map((range, index) => {
-        const quantity = projection.weeklyQuantities.get(range.label) || 0;
-        const revenue = projection.weeklyRevenues.get(range.label) || 0;
-        const displayValue = dataDisplayMode === 'revenue'
-          ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-          : formatQuantity(quantity);
-
-        return (
-          <td
-            key={range.label}
-            className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
-              index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
-            }`}
-          >
-            {displayValue}
-          </td>
-        );
-      })}
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-        {dataDisplayMode === 'revenue'
-          ? projection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-          : formatQuantity(projection.totalQuantity)}
-      </td>
-    </tr>
-  );
-});
-
-ProjectionTableRow.displayName = 'ProjectionTableRow';
-
-// Memoized process table row component
-const ProcessProjectionTableRow = memo(({
-  processProjection,
-  timeRanges,
-  isFirstInGroup,
-  onJobClick,
-  dataDisplayMode,
-  isSelected,
-  onToggleSelect
-}: {
-  processProjection: ProcessProjection;
-  timeRanges: TimeRange[];
-  isFirstInGroup: boolean;
-  onJobClick: (job: ParsedJob) => void;
-  dataDisplayMode: 'pieces' | 'revenue';
-  isSelected: boolean;
-  onToggleSelect: () => void;
-}) => {
-  const job = processProjection.job;
-
-  return (
-    <tr
-      key={`${job.id}-${processProjection.processType}`}
-      className={`cursor-pointer border-l-4 ${
-        isSelected ? 'bg-blue-100 border-l-blue-500' : 'border-l-gray-300'
-      } ${isFirstInGroup ? 'border-t-2 border-t-gray-400' : ''}`}
-      onClick={() => onJobClick(job)}
-    >
-      {/* Checkbox - only show on first row of group */}
-      <td
-        className="px-2 py-2 w-12"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {isFirstInGroup && (
+        <td className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={isSelected}
             onChange={onToggleSelect}
             className="w-4 h-4 cursor-pointer"
           />
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
+          {job.job_number}
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+          {job.client?.name || "Unknown"}
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
+          {job.sub_client?.name || "-"}
+        </td>
+        <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
+          <div className="flex flex-wrap gap-1">
+            {job.requirements && job.requirements.length > 0 ? (
+              // Get unique process types from requirements
+              [
+                ...new Set(
+                  job.requirements
+                    .map((req) => req.process_type)
+                    .filter(Boolean),
+                ),
+              ].map((processType, idx) => (
+                <ProcessTypeBadge
+                  key={idx}
+                  processType={processType as string}
+                />
+              ))
+            ) : (
+              <span className="text-gray-400 text-xs">No processes</span>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
+          {job.description || "N/A"}
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
+          {job.quantity.toLocaleString()}
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+          {job.start_date
+            ? new Date(job.start_date).toLocaleDateString("en-US", {
+                month: "numeric",
+                day: "numeric",
+                year: "2-digit",
+              })
+            : "N/A"}
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+          {job.due_date
+            ? new Date(job.due_date).toLocaleDateString("en-US", {
+                month: "numeric",
+                day: "numeric",
+                year: "2-digit",
+              })
+            : "N/A"}
+        </td>
+        {timeRanges.map((range, index) => {
+          const quantity = projection.weeklyQuantities.get(range.label) || 0;
+          const revenue = projection.weeklyRevenues.get(range.label) || 0;
+          const displayValue =
+            dataDisplayMode === "revenue"
+              ? revenue.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+              : formatQuantity(quantity);
+
+          return (
+            <td
+              key={range.label}
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+              }`}
+            >
+              {displayValue}
+            </td>
+          );
+        })}
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
+          {dataDisplayMode === "revenue"
+            ? projection.totalRevenue.toLocaleString("en-US", {
+                style: "currency",
+                currency: "USD",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })
+            : formatQuantity(projection.totalQuantity)}
+        </td>
+      </tr>
+    );
+  },
+);
+
+ProjectionTableRow.displayName = "ProjectionTableRow";
+
+// Memoized process table row component
+const ProcessProjectionTableRow = memo(
+  ({
+    processProjection,
+    timeRanges,
+    isFirstInGroup,
+    onJobClick,
+    dataDisplayMode,
+    isSelected,
+    onToggleSelect,
+  }: {
+    processProjection: ProcessProjection;
+    timeRanges: TimeRange[];
+    isFirstInGroup: boolean;
+    onJobClick: (job: ParsedJob) => void;
+    dataDisplayMode: "pieces" | "revenue";
+    isSelected: boolean;
+    onToggleSelect: () => void;
+  }) => {
+    const job = processProjection.job;
+
+    return (
+      <tr
+        key={`${job.id}-${processProjection.processType}`}
+        className={`cursor-pointer border-l-4 ${
+          isSelected ? "bg-blue-100 border-l-blue-500" : "border-l-gray-300"
+        } ${isFirstInGroup ? "border-t-2 border-t-gray-400" : ""}`}
+        onClick={() => onJobClick(job)}
+      >
+        {/* Checkbox - only show on first row of group */}
+        <td className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
+          {isFirstInGroup && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              className="w-4 h-4 cursor-pointer"
+            />
+          )}
+        </td>
+
+        {/* Job details - only show on first row */}
+        {isFirstInGroup ? (
+          <>
+            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
+              {job.job_number}
+            </td>
+            <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+              {job.client?.name || "Unknown"}
+            </td>
+            <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
+              {job.sub_client?.name || "-"}
+            </td>
+          </>
+        ) : (
+          <>
+            <td className="px-2 py-2"></td>
+            <td className="px-2 py-2"></td>
+            <td className="px-2 py-2"></td>
+          </>
         )}
-      </td>
 
-      {/* Job details - only show on first row */}
-      {isFirstInGroup ? (
-        <>
-          <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
-            {job.job_number}
-          </td>
-          <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-            {job.client?.name || 'Unknown'}
-          </td>
-          <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-            {job.sub_client?.name || '-'}
-          </td>
-        </>
-      ) : (
-        <>
-          <td className="px-2 py-2"></td>
-          <td className="px-2 py-2"></td>
-          <td className="px-2 py-2"></td>
-        </>
-      )}
+        {/* Process Type - single badge */}
+        <td className="px-2 py-2 text-xs text-[var(--text-dark)] pl-6">
+          <ProcessTypeBadge processType={processProjection.processType} />
+        </td>
 
-      {/* Process Type - single badge */}
-      <td className="px-2 py-2 text-xs text-[var(--text-dark)] pl-6">
-        <ProcessTypeBadge processType={processProjection.processType} />
-      </td>
+        {/* Description - only on first row */}
+        <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
+          {isFirstInGroup ? job.description || "N/A" : ""}
+        </td>
 
-      {/* Description - only on first row */}
-      <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
-        {isFirstInGroup ? (job.description || 'N/A') : ''}
-      </td>
+        {/* Quantity - per process */}
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
+          {processProjection.totalQuantity.toLocaleString()}
+        </td>
 
-      {/* Quantity - per process */}
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
-        {processProjection.totalQuantity.toLocaleString()}
-      </td>
+        {/* Dates - only on first row */}
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+          {isFirstInGroup && job.start_date
+            ? new Date(job.start_date).toLocaleDateString("en-US", {
+                month: "numeric",
+                day: "numeric",
+                year: "2-digit",
+              })
+            : ""}
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+          {isFirstInGroup && job.due_date
+            ? new Date(job.due_date).toLocaleDateString("en-US", {
+                month: "numeric",
+                day: "numeric",
+                year: "2-digit",
+              })
+            : ""}
+        </td>
 
-      {/* Dates - only on first row */}
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
-        {isFirstInGroup && job.start_date
-          ? new Date(job.start_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
-          : ''}
-      </td>
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
-        {isFirstInGroup && job.due_date
-          ? new Date(job.due_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
-          : ''}
-      </td>
+        {/* Time period columns - per process */}
+        {timeRanges.map((range, index) => {
+          const quantity =
+            processProjection.weeklyQuantities.get(range.label) || 0;
+          const revenue =
+            processProjection.weeklyRevenues.get(range.label) || 0;
+          const displayValue =
+            dataDisplayMode === "revenue"
+              ? revenue.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+              : formatQuantity(quantity);
 
-      {/* Time period columns - per process */}
-      {timeRanges.map((range, index) => {
-        const quantity = processProjection.weeklyQuantities.get(range.label) || 0;
-        const revenue = processProjection.weeklyRevenues.get(range.label) || 0;
-        const displayValue = dataDisplayMode === 'revenue'
-          ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-          : formatQuantity(quantity);
+          return (
+            <td
+              key={range.label}
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+              }`}
+            >
+              {displayValue}
+            </td>
+          );
+        })}
 
-        return (
-          <td
-            key={range.label}
-            className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
-              index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
-            }`}
-          >
-            {displayValue}
-          </td>
-        );
-      })}
+        {/* Total - per process */}
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
+          {dataDisplayMode === "revenue"
+            ? processProjection.totalRevenue.toLocaleString("en-US", {
+                style: "currency",
+                currency: "USD",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })
+            : formatQuantity(processProjection.totalQuantity)}
+        </td>
+      </tr>
+    );
+  },
+);
 
-      {/* Total - per process */}
-      <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-        {dataDisplayMode === 'revenue'
-          ? processProjection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-          : formatQuantity(processProjection.totalQuantity)}
-      </td>
-    </tr>
-  );
-});
-
-ProcessProjectionTableRow.displayName = 'ProcessProjectionTableRow';
+ProcessProjectionTableRow.displayName = "ProcessProjectionTableRow";
 
 // Memoized mobile card component
-const ProjectionMobileCard = memo(({
-  projection,
-  timeRanges,
-  onJobClick,
-  scrollPositions,
-  onScrollPositionChange,
-  dataDisplayMode,
-  isSelected,
-  onToggleSelect
-}: {
-  projection: JobProjection;
-  timeRanges: TimeRange[];
-  onJobClick: (job: ParsedJob) => void;
-  scrollPositions: Map<number, number>;
-  onScrollPositionChange: (jobId: number, index: number) => void;
-  dataDisplayMode: 'pieces' | 'revenue';
-  isSelected: boolean;
-  onToggleSelect: () => void;
-}) => {
-  const job = projection.job;
-  const [localScrollIndex, setLocalScrollIndex] = useState(scrollPositions.get(job.id) || 0);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+const ProjectionMobileCard = memo(
+  ({
+    projection,
+    timeRanges,
+    onJobClick,
+    scrollPositions,
+    onScrollPositionChange,
+    dataDisplayMode,
+    isSelected,
+    onToggleSelect,
+  }: {
+    projection: JobProjection;
+    timeRanges: TimeRange[];
+    onJobClick: (job: ParsedJob) => void;
+    scrollPositions: Map<number, number>;
+    onScrollPositionChange: (jobId: number, index: number) => void;
+    dataDisplayMode: "pieces" | "revenue";
+    isSelected: boolean;
+    onToggleSelect: () => void;
+  }) => {
+    const job = projection.job;
+    const [localScrollIndex, setLocalScrollIndex] = useState(
+      scrollPositions.get(job.id) || 0,
+    );
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  const VISIBLE_PERIODS = 6;
-  const MIN_SWIPE_DISTANCE = 50;
+    const VISIBLE_PERIODS = 6;
+    const MIN_SWIPE_DISTANCE = 50;
 
-  const handleScrollPrevious = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newIndex = Math.max(0, localScrollIndex - 1);
-    setLocalScrollIndex(newIndex);
-    onScrollPositionChange(job.id, newIndex);
-  };
-
-  const handleScrollNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newIndex = Math.min(timeRanges.length - VISIBLE_PERIODS, localScrollIndex + 1);
-    setLocalScrollIndex(newIndex);
-    onScrollPositionChange(job.id, newIndex);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > MIN_SWIPE_DISTANCE;
-    const isRightSwipe = distance < -MIN_SWIPE_DISTANCE;
-
-    if (isLeftSwipe && localScrollIndex < timeRanges.length - VISIBLE_PERIODS) {
-      const newIndex = localScrollIndex + 1;
+    const handleScrollPrevious = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const newIndex = Math.max(0, localScrollIndex - 1);
       setLocalScrollIndex(newIndex);
       onScrollPositionChange(job.id, newIndex);
-    }
+    };
 
-    if (isRightSwipe && localScrollIndex > 0) {
-      const newIndex = localScrollIndex - 1;
+    const handleScrollNext = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const newIndex = Math.min(
+        timeRanges.length - VISIBLE_PERIODS,
+        localScrollIndex + 1,
+      );
       setLocalScrollIndex(newIndex);
       onScrollPositionChange(job.id, newIndex);
-    }
-  };
+    };
 
-  const visibleTimeRanges = timeRanges.slice(localScrollIndex, localScrollIndex + VISIBLE_PERIODS);
+    const handleTouchStart = (e: React.TouchEvent) => {
+      setTouchEnd(null);
+      setTouchStart(e.targetTouches[0].clientX);
+    };
 
-  return (
-    <div
-      key={job.id}
-      className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-md transition-shadow ${
-        isSelected ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-500' : 'border-[var(--border)]'
-      }`}
-      onClick={() => onJobClick(job)}
-    >
-      {/* Selection Checkbox */}
-      <div className="mb-3 pb-3 border-b border-gray-200">
-        <label
-          className="flex items-center gap-2 cursor-pointer"
+    const handleTouchMove = (e: React.TouchEvent) => {
+      setTouchEnd(e.targetTouches[0].clientX);
+    };
+
+    const handleTouchEnd = () => {
+      if (!touchStart || !touchEnd) return;
+
+      const distance = touchStart - touchEnd;
+      const isLeftSwipe = distance > MIN_SWIPE_DISTANCE;
+      const isRightSwipe = distance < -MIN_SWIPE_DISTANCE;
+
+      if (
+        isLeftSwipe &&
+        localScrollIndex < timeRanges.length - VISIBLE_PERIODS
+      ) {
+        const newIndex = localScrollIndex + 1;
+        setLocalScrollIndex(newIndex);
+        onScrollPositionChange(job.id, newIndex);
+      }
+
+      if (isRightSwipe && localScrollIndex > 0) {
+        const newIndex = localScrollIndex - 1;
+        setLocalScrollIndex(newIndex);
+        onScrollPositionChange(job.id, newIndex);
+      }
+    };
+
+    const visibleTimeRanges = timeRanges.slice(
+      localScrollIndex,
+      localScrollIndex + VISIBLE_PERIODS,
+    );
+
+    return (
+      <div
+        key={job.id}
+        className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-md transition-shadow ${
+          isSelected
+            ? "ring-2 ring-blue-500 bg-blue-50 border-blue-500"
+            : "border-[var(--border)]"
+        }`}
+        onClick={() => onJobClick(job)}
+      >
+        {/* Selection Checkbox */}
+        <div className="mb-3 pb-3 border-b border-gray-200">
+          <label
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              className="w-4 h-4"
+            />
+            <span className="text-sm text-gray-600">Select</span>
+          </label>
+        </div>
+
+        {/* Job Header */}
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="text-sm font-semibold text-[var(--text-dark)]">
+              Job #{job.job_number}
+            </div>
+            <div className="text-xs text-[var(--text-light)] mt-1">
+              {job.client?.name || "Unknown"}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-[var(--text-light)]">
+              {dataDisplayMode === "revenue"
+                ? "Total Revenue"
+                : "Total Quantity"}
+            </div>
+            <div className="text-sm font-bold text-[var(--text-dark)]">
+              {dataDisplayMode === "revenue"
+                ? projection.totalRevenue.toLocaleString("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })
+                : formatQuantity(projection.totalQuantity)}
+            </div>
+          </div>
+        </div>
+
+        {/* Job Description */}
+        <div className="mb-3">
+          <div className="text-sm text-[var(--text-dark)] line-clamp-2">
+            {job.description || "N/A"}
+          </div>
+        </div>
+
+        {/* Process Types */}
+        <div className="mb-3">
+          <div className="text-xs text-[var(--text-light)] mb-1">
+            Process Types
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {job.requirements && job.requirements.length > 0 ? (
+              [
+                ...new Set(
+                  job.requirements
+                    .map((req) => req.process_type)
+                    .filter(Boolean),
+                ),
+              ].map((processType, idx) => (
+                <ProcessTypeBadge
+                  key={idx}
+                  processType={processType as string}
+                />
+              ))
+            ) : (
+              <span className="text-gray-400 text-xs">No processes</span>
+            )}
+          </div>
+        </div>
+
+        {/* Job Details Grid */}
+        <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+          <div>
+            <div className="text-xs text-[var(--text-light)]">Quantity</div>
+            <div className="font-medium text-[var(--text-dark)]">
+              {job.quantity.toLocaleString()}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-[var(--text-light)]">Start Date</div>
+            <div className="text-[var(--text-dark)]">
+              {job.start_date
+                ? new Date(job.start_date).toLocaleDateString()
+                : "N/A"}
+            </div>
+          </div>
+          <div className="col-span-2">
+            <div className="text-xs text-[var(--text-light)]">End Date</div>
+            <div className="text-[var(--text-dark)]">
+              {job.due_date
+                ? new Date(job.due_date).toLocaleDateString()
+                : "N/A"}
+            </div>
+          </div>
+        </div>
+
+        {/* Time Range Breakdown with navigation */}
+        {timeRanges.length > 0 && (
+          <div
+            className="border-t border-[var(--border)] pt-3"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-[var(--text-light)]">
+                Period Breakdown
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleScrollPrevious}
+                  disabled={localScrollIndex === 0}
+                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous periods"
+                >
+                  <svg
+                    className="w-4 h-4 text-[var(--text-dark)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                </button>
+                <span className="text-xs text-[var(--text-light)] min-w-[60px] text-center">
+                  {localScrollIndex + 1}-
+                  {Math.min(
+                    localScrollIndex + VISIBLE_PERIODS,
+                    timeRanges.length,
+                  )}{" "}
+                  of {timeRanges.length}
+                </span>
+                <button
+                  onClick={handleScrollNext}
+                  disabled={
+                    localScrollIndex + VISIBLE_PERIODS >= timeRanges.length
+                  }
+                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next periods"
+                >
+                  <svg
+                    className="w-4 h-4 text-[var(--text-dark)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              {visibleTimeRanges.map((range) => {
+                const quantity =
+                  projection.weeklyQuantities.get(range.label) || 0;
+                const revenue = projection.weeklyRevenues.get(range.label) || 0;
+                const hasValue =
+                  dataDisplayMode === "revenue" ? revenue > 0 : quantity > 0;
+                const displayValue =
+                  dataDisplayMode === "revenue"
+                    ? revenue.toLocaleString("en-US", {
+                        style: "currency",
+                        currency: "USD",
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })
+                    : formatQuantity(quantity);
+
+                return hasValue ? (
+                  <div key={range.label} className="text-center">
+                    <div className="text-[var(--text-light)] text-[10px]">
+                      {range.label}
+                    </div>
+                    <div className="font-medium text-[var(--text-dark)]">
+                      {displayValue}
+                    </div>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
+ProjectionMobileCard.displayName = "ProjectionMobileCard";
+
+// Memoized mobile table row component
+const MobileTableRow = memo(
+  ({
+    projection,
+    visibleTimeRanges,
+    onJobClick,
+    dataDisplayMode,
+    isSelected,
+    onToggleSelect,
+  }: {
+    projection: JobProjection;
+    visibleTimeRanges: TimeRange[];
+    onJobClick: (job: ParsedJob) => void;
+    dataDisplayMode: "pieces" | "revenue";
+    isSelected: boolean;
+    onToggleSelect: () => void;
+  }) => {
+    const job = projection.job;
+
+    return (
+      <tr
+        className={`cursor-pointer border-b border-[var(--border)] hover:bg-gray-50 ${isSelected ? "bg-blue-100" : ""}`}
+        onClick={() => onJobClick(job)}
+      >
+        <td
+          className="px-2 py-2 w-12 sticky left-0 bg-white"
           onClick={(e) => e.stopPropagation()}
         >
           <input
             type="checkbox"
             checked={isSelected}
             onChange={onToggleSelect}
-            className="w-4 h-4"
+            className="w-4 h-4 cursor-pointer"
           />
-          <span className="text-sm text-gray-600">Select</span>
-        </label>
-      </div>
+        </td>
+        <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]">
+          {job.job_number}
+        </td>
+        <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
+          {job.client?.name || "Unknown"}
+        </td>
+        {visibleTimeRanges.map((range, index) => {
+          const quantity = projection.weeklyQuantities.get(range.label) || 0;
+          const revenue = projection.weeklyRevenues.get(range.label) || 0;
+          const displayValue =
+            dataDisplayMode === "revenue"
+              ? revenue.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })
+              : formatQuantity(quantity);
 
-      {/* Job Header */}
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <div className="text-sm font-semibold text-[var(--text-dark)]">
-            Job #{job.job_number}
-          </div>
-          <div className="text-xs text-[var(--text-light)] mt-1">
-            {job.client?.name || 'Unknown'}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-xs text-[var(--text-light)]">
-            {dataDisplayMode === 'revenue' ? 'Total Revenue' : 'Total Quantity'}
-          </div>
-          <div className="text-sm font-bold text-[var(--text-dark)]">
-            {dataDisplayMode === 'revenue'
-              ? projection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-              : formatQuantity(projection.totalQuantity)}
-          </div>
-        </div>
-      </div>
+          return (
+            <td
+              key={range.label}
+              className={`px-2 py-2 text-xs text-center font-medium text-[var(--text-dark)] ${
+                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+              }`}
+            >
+              {displayValue}
+            </td>
+          );
+        })}
+        <td className="px-2 py-2 text-xs text-center font-bold text-[var(--text-dark)] sticky right-0 bg-white">
+          {dataDisplayMode === "revenue"
+            ? projection.totalRevenue.toLocaleString("en-US", {
+                style: "currency",
+                currency: "USD",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })
+            : formatQuantity(projection.totalQuantity)}
+        </td>
+      </tr>
+    );
+  },
+);
 
-      {/* Job Description */}
-      <div className="mb-3">
-        <div className="text-sm text-[var(--text-dark)] line-clamp-2">
-          {job.description || 'N/A'}
-        </div>
-      </div>
-
-      {/* Process Types */}
-      <div className="mb-3">
-        <div className="text-xs text-[var(--text-light)] mb-1">Process Types</div>
-        <div className="flex flex-wrap gap-1">
-          {job.requirements && job.requirements.length > 0 ? (
-            [...new Set(job.requirements.map(req => req.process_type).filter(Boolean))].map((processType, idx) => (
-              <ProcessTypeBadge key={idx} processType={processType as string} />
-            ))
-          ) : (
-            <span className="text-gray-400 text-xs">No processes</span>
-          )}
-        </div>
-      </div>
-
-      {/* Job Details Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
-        <div>
-          <div className="text-xs text-[var(--text-light)]">Quantity</div>
-          <div className="font-medium text-[var(--text-dark)]">
-            {job.quantity.toLocaleString()}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-[var(--text-light)]">Start Date</div>
-          <div className="text-[var(--text-dark)]">
-            {job.start_date ? new Date(job.start_date).toLocaleDateString() : 'N/A'}
-          </div>
-        </div>
-        <div className="col-span-2">
-          <div className="text-xs text-[var(--text-light)]">End Date</div>
-          <div className="text-[var(--text-dark)]">
-            {job.due_date ? new Date(job.due_date).toLocaleDateString() : 'N/A'}
-          </div>
-        </div>
-      </div>
-
-      {/* Time Range Breakdown with navigation */}
-      {timeRanges.length > 0 && (
-        <div
-          className="border-t border-[var(--border)] pt-3"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-[var(--text-light)]">Period Breakdown</div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleScrollPrevious}
-                disabled={localScrollIndex === 0}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="Previous periods"
-              >
-                <svg className="w-4 h-4 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <span className="text-xs text-[var(--text-light)] min-w-[60px] text-center">
-                {localScrollIndex + 1}-{Math.min(localScrollIndex + VISIBLE_PERIODS, timeRanges.length)} of {timeRanges.length}
-              </span>
-              <button
-                onClick={handleScrollNext}
-                disabled={localScrollIndex + VISIBLE_PERIODS >= timeRanges.length}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="Next periods"
-              >
-                <svg className="w-4 h-4 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            {visibleTimeRanges.map(range => {
-              const quantity = projection.weeklyQuantities.get(range.label) || 0;
-              const revenue = projection.weeklyRevenues.get(range.label) || 0;
-              const hasValue = dataDisplayMode === 'revenue' ? revenue > 0 : quantity > 0;
-              const displayValue = dataDisplayMode === 'revenue'
-                ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-                : formatQuantity(quantity);
-
-              return hasValue ? (
-                <div key={range.label} className="text-center">
-                  <div className="text-[var(--text-light)] text-[10px]">{range.label}</div>
-                  <div className="font-medium text-[var(--text-dark)]">{displayValue}</div>
-                </div>
-              ) : null;
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-});
-
-ProjectionMobileCard.displayName = 'ProjectionMobileCard';
-
-// Memoized mobile table row component
-const MobileTableRow = memo(({
-  projection,
-  visibleTimeRanges,
-  onJobClick,
-  dataDisplayMode,
-  isSelected,
-  onToggleSelect
-}: {
-  projection: JobProjection;
-  visibleTimeRanges: TimeRange[];
-  onJobClick: (job: ParsedJob) => void;
-  dataDisplayMode: 'pieces' | 'revenue';
-  isSelected: boolean;
-  onToggleSelect: () => void;
-}) => {
-  const job = projection.job;
-
-  return (
-    <tr
-      className={`cursor-pointer border-b border-[var(--border)] hover:bg-gray-50 ${isSelected ? 'bg-blue-100' : ''}`}
-      onClick={() => onJobClick(job)}
-    >
-      <td
-        className="px-2 py-2 w-12 sticky left-0 bg-white"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={onToggleSelect}
-          className="w-4 h-4 cursor-pointer"
-        />
-      </td>
-      <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]">
-        {job.job_number}
-      </td>
-      <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
-        {job.client?.name || 'Unknown'}
-      </td>
-      {visibleTimeRanges.map((range, index) => {
-        const quantity = projection.weeklyQuantities.get(range.label) || 0;
-        const revenue = projection.weeklyRevenues.get(range.label) || 0;
-        const displayValue = dataDisplayMode === 'revenue'
-          ? revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-          : formatQuantity(quantity);
-
-        return (
-          <td
-            key={range.label}
-            className={`px-2 py-2 text-xs text-center font-medium text-[var(--text-dark)] ${
-              index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
-            }`}
-          >
-            {displayValue}
-          </td>
-        );
-      })}
-      <td className="px-2 py-2 text-xs text-center font-bold text-[var(--text-dark)] sticky right-0 bg-white">
-        {dataDisplayMode === 'revenue'
-          ? projection.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-          : formatQuantity(projection.totalQuantity)}
-      </td>
-    </tr>
-  );
-});
-
-MobileTableRow.displayName = 'MobileTableRow';
+MobileTableRow.displayName = "MobileTableRow";
 
 export default function ProjectionsTable({
   timeRanges,
   jobProjections,
   onRefresh,
-  mobileViewMode = 'cards',
+  mobileViewMode = "cards",
   globalTimeScrollIndex = 0,
   onGlobalTimeScrollIndexChange,
-  dataDisplayMode = 'pieces',
-  viewMode = 'jobs',
-  processViewMode = 'consolidated',
+  dataDisplayMode = "pieces",
+  viewMode = "jobs",
+  processViewMode = "consolidated",
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('job_number');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [cardScrollPositions, setCardScrollPositions] = useState<Map<number, number>>(new Map());
+  const [sortField, setSortField] = useState<SortField>("job_number");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [cardScrollPositions, setCardScrollPositions] = useState<
+    Map<number, number>
+  >(new Map());
 
   // Selection state
   const [selectedJobIds, setSelectedJobIds] = useState<Set<number>>(new Set());
@@ -564,7 +722,9 @@ export default function ProjectionsTable({
   // Bulk actions menu state
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<'hard' | 'soft' | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<"hard" | "soft" | null>(
+    null,
+  );
   const bulkMenuRef = useRef<HTMLDivElement>(null);
 
   // Delete confirmation modal state
@@ -573,7 +733,7 @@ export default function ProjectionsTable({
 
   // Transform data for process view
   const displayProjections = useMemo(() => {
-    if (viewMode === 'processes' && processViewMode === 'expanded') {
+    if (viewMode === "processes" && processViewMode === "expanded") {
       return expandJobProjectionsToProcesses(jobProjections);
     }
     return jobProjections;
@@ -584,21 +744,25 @@ export default function ProjectionsTable({
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (bulkMenuRef.current && !bulkMenuRef.current.contains(event.target as Node)) {
+      if (
+        bulkMenuRef.current &&
+        !bulkMenuRef.current.contains(event.target as Node)
+      ) {
         setShowBulkMenu(false);
         setShowStatusSubmenu(false);
       }
     };
 
     if (showBulkMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showBulkMenu]);
 
   // Selection handlers
   const handleToggleSelect = (jobId: number) => {
-    setSelectedJobIds(prev => {
+    setSelectedJobIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(jobId)) {
         newSet.delete(jobId);
@@ -611,7 +775,7 @@ export default function ProjectionsTable({
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(sortedJobProjections.map(p => p.job.id));
+      const allIds = new Set(sortedJobProjections.map((p) => p.job.id));
       setSelectedJobIds(allIds);
     } else {
       setSelectedJobIds(new Set());
@@ -642,9 +806,13 @@ export default function ProjectionsTable({
       setIsDeleting(false);
 
       if (result.failures.length > 0) {
-        alert(`Deleted ${result.success} of ${count} jobs. ${result.failures.length} failed.`);
+        alert(
+          `Deleted ${result.success} of ${count} jobs. ${result.failures.length} failed.`,
+        );
       } else {
-        alert(`Successfully deleted ${result.success} job${result.success > 1 ? 's' : ''}`);
+        alert(
+          `Successfully deleted ${result.success} job${result.success > 1 ? "s" : ""}`,
+        );
       }
 
       setSelectedJobIds(new Set());
@@ -652,8 +820,8 @@ export default function ProjectionsTable({
     } catch (error) {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
-      alert('Error deleting jobs. Please try again.');
-      console.error('Bulk delete error:', error);
+      alert("Error deleting jobs. Please try again.");
+      console.error("Bulk delete error:", error);
     }
   };
 
@@ -667,7 +835,7 @@ export default function ProjectionsTable({
     setShowBulkMenu(false);
     setShowStatusSubmenu(false);
 
-    const shouldLock = selectedStatus === 'hard';
+    const shouldLock = selectedStatus === "hard";
     await handleBulkLockWeeks(shouldLock);
 
     setSelectedStatus(null);
@@ -675,15 +843,21 @@ export default function ProjectionsTable({
 
   const handleBulkLockWeeks = async (shouldLock: boolean) => {
     const count = selectedJobIds.size;
-    const action = shouldLock ? 'lock' : 'unlock';
+    const action = shouldLock ? "lock" : "unlock";
 
-    if (!confirm(`Are you sure you want to ${action} ${count} selected job${count > 1 ? 's' : ''}?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to ${action} ${count} selected job${count > 1 ? "s" : ""}?`,
+      )
+    ) {
       return;
     }
 
     try {
       // Get the selected jobs to update their locked_weeks arrays
-      const selectedJobs = sortedJobProjections.filter(p => selectedJobIds.has(p.job.id));
+      const selectedJobs = sortedJobProjections.filter((p) =>
+        selectedJobIds.has(p.job.id),
+      );
 
       const updates = await Promise.allSettled(
         selectedJobs.map(async (projection) => {
@@ -693,16 +867,24 @@ export default function ProjectionsTable({
           const locked_weeks = new Array(weeksCount).fill(shouldLock);
 
           return bulkUpdateJobs([job.id], { locked_weeks });
-        })
+        }),
       );
 
-      const successCount = updates.filter(r => r.status === 'fulfilled').length;
-      const failureCount = updates.filter(r => r.status === 'rejected').length;
+      const successCount = updates.filter(
+        (r) => r.status === "fulfilled",
+      ).length;
+      const failureCount = updates.filter(
+        (r) => r.status === "rejected",
+      ).length;
 
       if (failureCount > 0) {
-        alert(`${action === 'lock' ? 'Locked' : 'Unlocked'} ${successCount} of ${count} jobs. ${failureCount} failed.`);
+        alert(
+          `${action === "lock" ? "Locked" : "Unlocked"} ${successCount} of ${count} jobs. ${failureCount} failed.`,
+        );
       } else {
-        alert(`Successfully ${action === 'lock' ? 'locked' : 'unlocked'} ${successCount} job${successCount > 1 ? 's' : ''}`);
+        alert(
+          `Successfully ${action === "lock" ? "locked" : "unlocked"} ${successCount} job${successCount > 1 ? "s" : ""}`,
+        );
       }
 
       setSelectedJobIds(new Set());
@@ -724,7 +906,7 @@ export default function ProjectionsTable({
   };
 
   const handleCardScrollPositionChange = (jobId: number, index: number) => {
-    setCardScrollPositions(prev => {
+    setCardScrollPositions((prev) => {
       const newMap = new Map(prev);
       newMap.set(jobId, index);
       return newMap;
@@ -738,52 +920,58 @@ export default function ProjectionsTable({
   };
 
   const handleGlobalScrollNext = () => {
-    if (onGlobalTimeScrollIndexChange && globalTimeScrollIndex < timeRanges.length - VISIBLE_PERIODS) {
+    if (
+      onGlobalTimeScrollIndexChange &&
+      globalTimeScrollIndex < timeRanges.length - VISIBLE_PERIODS
+    ) {
       onGlobalTimeScrollIndexChange(globalTimeScrollIndex + 1);
     }
   };
 
   // Calculate visible time ranges for mobile table view
-  const mobileTableVisibleRanges = timeRanges.slice(globalTimeScrollIndex, globalTimeScrollIndex + VISIBLE_PERIODS);
+  const mobileTableVisibleRanges = timeRanges.slice(
+    globalTimeScrollIndex,
+    globalTimeScrollIndex + VISIBLE_PERIODS,
+  );
 
   // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
   // Sort projections (handles both jobs and processes)
   const sortedJobProjections = useMemo(() => {
-    if (viewMode === 'processes' && processViewMode === 'expanded') {
+    if (viewMode === "processes" && processViewMode === "expanded") {
       const processProjections = displayProjections as ProcessProjection[];
       return [...processProjections].sort((a, b) => {
         let compareValue = 0;
 
         // Allow sorting by different fields in expanded process view
         switch (sortField) {
-          case 'process_type':
+          case "process_type":
             // Primary sort by process type
             compareValue = a.processType.localeCompare(b.processType);
             if (compareValue !== 0) {
-              return sortDirection === 'asc' ? compareValue : -compareValue;
+              return sortDirection === "asc" ? compareValue : -compareValue;
             }
             // Secondary sort by job number
             return a.jobNumber - b.jobNumber;
 
-          case 'job_number':
+          case "job_number":
             compareValue = a.jobNumber - b.jobNumber;
             if (compareValue !== 0) {
-              return sortDirection === 'asc' ? compareValue : -compareValue;
+              return sortDirection === "asc" ? compareValue : -compareValue;
             }
             // Secondary sort by process type
             return a.processType.localeCompare(b.processType);
 
-          case 'quantity':
-          case 'total':
+          case "quantity":
+          case "total":
             compareValue = a.totalQuantity - b.totalQuantity;
             break;
 
@@ -795,7 +983,7 @@ export default function ProjectionsTable({
         }
 
         if (compareValue !== 0) {
-          return sortDirection === 'asc' ? compareValue : -compareValue;
+          return sortDirection === "asc" ? compareValue : -compareValue;
         }
         return 0;
       });
@@ -810,35 +998,35 @@ export default function ProjectionsTable({
       const bJob = b as JobProjection;
 
       switch (sortField) {
-        case 'job_number':
+        case "job_number":
           aValue = aJob.job.job_number;
           bValue = bJob.job.job_number;
           break;
-        case 'client':
-          aValue = aJob.job.client?.name.toLowerCase() || '';
-          bValue = bJob.job.client?.name.toLowerCase() || '';
+        case "client":
+          aValue = aJob.job.client?.name.toLowerCase() || "";
+          bValue = bJob.job.client?.name.toLowerCase() || "";
           break;
-        case 'sub_client':
-          aValue = aJob.job.sub_client?.name.toLowerCase() || '';
-          bValue = bJob.job.sub_client?.name.toLowerCase() || '';
+        case "sub_client":
+          aValue = aJob.job.sub_client?.name.toLowerCase() || "";
+          bValue = bJob.job.sub_client?.name.toLowerCase() || "";
           break;
-        case 'description':
-          aValue = aJob.job.description?.toLowerCase() || '';
-          bValue = bJob.job.description?.toLowerCase() || '';
+        case "description":
+          aValue = aJob.job.description?.toLowerCase() || "";
+          bValue = bJob.job.description?.toLowerCase() || "";
           break;
-        case 'quantity':
+        case "quantity":
           aValue = aJob.job.quantity;
           bValue = bJob.job.quantity;
           break;
-        case 'start_date':
+        case "start_date":
           aValue = aJob.job.start_date || 0;
           bValue = bJob.job.start_date || 0;
           break;
-        case 'due_date':
+        case "due_date":
           aValue = aJob.job.due_date || 0;
           bValue = bJob.job.due_date || 0;
           break;
-        case 'total':
+        case "total":
           aValue = aJob.totalQuantity;
           bValue = bJob.totalQuantity;
           break;
@@ -847,8 +1035,8 @@ export default function ProjectionsTable({
           bValue = bJob.job.job_number;
       }
 
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
   }, [displayProjections, sortField, sortDirection, viewMode, processViewMode]);
@@ -856,12 +1044,16 @@ export default function ProjectionsTable({
   // Render sort icon
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <span className="text-gray-400">⇅</span>;
-    return <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+    return <span>{sortDirection === "asc" ? "↑" : "↓"}</span>;
   };
 
   // Calculate selection state
-  const allSelected = sortedJobProjections.length > 0 && sortedJobProjections.every(p => selectedJobIds.has(p.job.id));
-  const someSelected = sortedJobProjections.some(p => selectedJobIds.has(p.job.id));
+  const allSelected =
+    sortedJobProjections.length > 0 &&
+    sortedJobProjections.every((p) => selectedJobIds.has(p.job.id));
+  const someSelected = sortedJobProjections.some((p) =>
+    selectedJobIds.has(p.job.id),
+  );
   const selectAllIndeterminate = someSelected && !allSelected;
 
   return (
@@ -871,7 +1063,8 @@ export default function ProjectionsTable({
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-blue-900">
-              {selectedJobIds.size} {selectedJobIds.size === 1 ? 'job' : 'jobs'} selected
+              {selectedJobIds.size} {selectedJobIds.size === 1 ? "job" : "jobs"}{" "}
+              selected
             </span>
             <button
               onClick={handleClearSelection}
@@ -886,7 +1079,9 @@ export default function ProjectionsTable({
               className="px-4 py-2 rounded font-medium text-sm flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors"
             >
               Bulk Actions
-              <ChevronDown className={`w-4 h-4 transition-transform ${showBulkMenu ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${showBulkMenu ? "rotate-180" : ""}`}
+              />
             </button>
 
             {/* Dropdown Menu */}
@@ -902,7 +1097,9 @@ export default function ProjectionsTable({
                       <Lock className="w-4 h-4" />
                       Change Status
                     </span>
-                    <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showStatusSubmenu ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-4 h-4 text-gray-500 transition-transform ${showStatusSubmenu ? "rotate-180" : ""}`}
+                    />
                   </button>
 
                   {/* Status Submenu */}
@@ -914,8 +1111,10 @@ export default function ProjectionsTable({
                             type="radio"
                             name="status"
                             value="hard"
-                            checked={selectedStatus === 'hard'}
-                            onChange={(e) => setSelectedStatus(e.target.value as 'hard')}
+                            checked={selectedStatus === "hard"}
+                            onChange={(e) =>
+                              setSelectedStatus(e.target.value as "hard")
+                            }
                             className="w-4 h-4 text-blue-600"
                           />
                           <span className="text-sm text-gray-700 flex items-center gap-2">
@@ -928,8 +1127,10 @@ export default function ProjectionsTable({
                             type="radio"
                             name="status"
                             value="soft"
-                            checked={selectedStatus === 'soft'}
-                            onChange={(e) => setSelectedStatus(e.target.value as 'soft')}
+                            checked={selectedStatus === "soft"}
+                            onChange={(e) =>
+                              setSelectedStatus(e.target.value as "soft")
+                            }
                             className="w-4 h-4 text-blue-600"
                           />
                           <span className="text-sm text-gray-700 flex items-center gap-2">
@@ -955,7 +1156,9 @@ export default function ProjectionsTable({
                   className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center gap-2 rounded-b-lg"
                 >
                   <Trash className="w-4 h-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-600">Delete Selected</span>
+                  <span className="text-sm font-medium text-red-600">
+                    Delete Selected
+                  </span>
                 </button>
               </div>
             )}
@@ -983,7 +1186,7 @@ export default function ProjectionsTable({
                 />
               </th>
               <th
-                onClick={() => handleSort('job_number')}
+                onClick={() => handleSort("job_number")}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -991,7 +1194,7 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('client')}
+                onClick={() => handleSort("client")}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -999,7 +1202,7 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('sub_client')}
+                onClick={() => handleSort("sub_client")}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -1007,21 +1210,29 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => viewMode === 'processes' && processViewMode === 'expanded' ? handleSort('process_type') : undefined}
+                onClick={() =>
+                  viewMode === "processes" && processViewMode === "expanded"
+                    ? handleSort("process_type")
+                    : undefined
+                }
                 className={`px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-                  viewMode === 'processes' && processViewMode === 'expanded' ? 'cursor-pointer hover:bg-gray-100' : ''
+                  viewMode === "processes" && processViewMode === "expanded"
+                    ? "cursor-pointer hover:bg-gray-100"
+                    : ""
                 }`}
               >
-                {viewMode === 'processes' && processViewMode === 'expanded' ? (
+                {viewMode === "processes" && processViewMode === "expanded" ? (
                   <div className="flex items-center gap-1">
                     Process <SortIcon field="process_type" />
                   </div>
+                ) : viewMode === "processes" ? (
+                  "Process"
                 ) : (
-                  viewMode === 'processes' ? 'Process' : 'Processes'
+                  "Processes"
                 )}
               </th>
               <th
-                onClick={() => handleSort('description')}
+                onClick={() => handleSort("description")}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
@@ -1029,7 +1240,7 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('quantity')}
+                onClick={() => handleSort("quantity")}
                 className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-center gap-1">
@@ -1037,7 +1248,7 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('start_date')}
+                onClick={() => handleSort("start_date")}
                 className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-center gap-1">
@@ -1045,7 +1256,7 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort('due_date')}
+                onClick={() => handleSort("due_date")}
                 className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-center gap-1">
@@ -1056,14 +1267,14 @@ export default function ProjectionsTable({
                 <th
                   key={range.label}
                   className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-                    index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
+                    index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
                   }`}
                 >
                   {range.label}
                 </th>
               ))}
               <th
-                onClick={() => handleSort('total')}
+                onClick={() => handleSort("total")}
                 className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-center gap-1">
@@ -1076,30 +1287,39 @@ export default function ProjectionsTable({
           <tbody className="divide-y divide-[var(--border)]">
             {sortedJobProjections.length === 0 ? (
               <tr>
-                <td colSpan={10 + timeRanges.length} className="px-4 py-8 text-center text-[var(--text-light)]">
+                <td
+                  colSpan={10 + timeRanges.length}
+                  className="px-4 py-8 text-center text-[var(--text-light)]"
+                >
                   No jobs found for the selected criteria
                 </td>
               </tr>
-            ) : viewMode === 'processes' && processViewMode === 'expanded' ? (
+            ) : viewMode === "processes" && processViewMode === "expanded" ? (
               // Expanded Process view - each process on its own line, sortable
-              (sortedJobProjections as ProcessProjection[]).map((processProjection, index, array) => {
-                // Determine if this is the first row for this job (for visual grouping)
-                const isFirstInGroup = index === 0 ||
-                  processProjection.jobId !== (array[index - 1] as ProcessProjection).jobId;
+              (sortedJobProjections as ProcessProjection[]).map(
+                (processProjection, index, array) => {
+                  // Determine if this is the first row for this job (for visual grouping)
+                  const isFirstInGroup =
+                    index === 0 ||
+                    processProjection.jobId !==
+                      (array[index - 1] as ProcessProjection).jobId;
 
-                return (
-                  <ProcessProjectionTableRow
-                    key={`${processProjection.jobId}-${processProjection.processType}`}
-                    processProjection={processProjection}
-                    timeRanges={timeRanges}
-                    isFirstInGroup={isFirstInGroup}
-                    onJobClick={handleJobClick}
-                    dataDisplayMode={dataDisplayMode}
-                    isSelected={selectedJobIds.has(processProjection.jobId)}
-                    onToggleSelect={() => handleToggleSelect(processProjection.jobId)}
-                  />
-                );
-              })
+                  return (
+                    <ProcessProjectionTableRow
+                      key={`${processProjection.jobId}-${processProjection.processType}`}
+                      processProjection={processProjection}
+                      timeRanges={timeRanges}
+                      isFirstInGroup={isFirstInGroup}
+                      onJobClick={handleJobClick}
+                      dataDisplayMode={dataDisplayMode}
+                      isSelected={selectedJobIds.has(processProjection.jobId)}
+                      onToggleSelect={() =>
+                        handleToggleSelect(processProjection.jobId)
+                      }
+                    />
+                  );
+                },
+              )
             ) : (
               // Jobs view or Consolidated view (standard jobs table)
               (sortedJobProjections as JobProjection[]).map((projection) => (
@@ -1121,10 +1341,12 @@ export default function ProjectionsTable({
       {/* Mobile View */}
       <div className="md:hidden">
         {/* Global Time Navigation for Mobile */}
-        {mobileViewMode === 'table' && timeRanges.length > VISIBLE_PERIODS && (
+        {mobileViewMode === "table" && timeRanges.length > VISIBLE_PERIODS && (
           <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-3 mb-4">
             <div className="flex items-center justify-between">
-              <div className="text-xs text-[var(--text-light)]">Showing Periods</div>
+              <div className="text-xs text-[var(--text-light)]">
+                Showing Periods
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleGlobalScrollPrevious}
@@ -1132,21 +1354,48 @@ export default function ProjectionsTable({
                   className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   aria-label="Previous periods"
                 >
-                  <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  <svg
+                    className="w-5 h-5 text-[var(--text-dark)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
                   </svg>
                 </button>
                 <span className="text-sm font-medium text-[var(--text-dark)] min-w-[80px] text-center">
-                  {globalTimeScrollIndex + 1}-{Math.min(globalTimeScrollIndex + VISIBLE_PERIODS, timeRanges.length)} of {timeRanges.length}
+                  {globalTimeScrollIndex + 1}-
+                  {Math.min(
+                    globalTimeScrollIndex + VISIBLE_PERIODS,
+                    timeRanges.length,
+                  )}{" "}
+                  of {timeRanges.length}
                 </span>
                 <button
                   onClick={handleGlobalScrollNext}
-                  disabled={globalTimeScrollIndex + VISIBLE_PERIODS >= timeRanges.length}
+                  disabled={
+                    globalTimeScrollIndex + VISIBLE_PERIODS >= timeRanges.length
+                  }
                   className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   aria-label="Next periods"
                 >
-                  <svg className="w-5 h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg
+                    className="w-5 h-5 text-[var(--text-dark)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </button>
               </div>
@@ -1155,7 +1404,7 @@ export default function ProjectionsTable({
         )}
 
         {/* Mobile Table View */}
-        {mobileViewMode === 'table' ? (
+        {mobileViewMode === "table" ? (
           <div className="bg-white rounded-lg shadow-sm border border-[var(--border)] overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-[var(--border)]">
@@ -1183,7 +1432,7 @@ export default function ProjectionsTable({
                     <th
                       key={range.label}
                       className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase ${
-                        index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
+                        index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
                       }`}
                     >
                       {range.label}
@@ -1197,7 +1446,10 @@ export default function ProjectionsTable({
               <tbody>
                 {sortedJobProjections.length === 0 ? (
                   <tr>
-                    <td colSpan={6 + VISIBLE_PERIODS} className="px-4 py-8 text-center text-[var(--text-light)]">
+                    <td
+                      colSpan={6 + VISIBLE_PERIODS}
+                      className="px-4 py-8 text-center text-[var(--text-light)]"
+                    >
                       No jobs found for the selected criteria
                     </td>
                   </tr>
@@ -1210,7 +1462,9 @@ export default function ProjectionsTable({
                       onJobClick={handleJobClick}
                       dataDisplayMode={dataDisplayMode}
                       isSelected={selectedJobIds.has(projection.job.id)}
-                      onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                      onToggleSelect={() =>
+                        handleToggleSelect(projection.job.id)
+                      }
                     />
                   ))
                 )}
@@ -1261,13 +1515,19 @@ export default function ProjectionsTable({
                   <Trash className="w-6 h-6 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete Jobs</h3>
-                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Delete Jobs
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    This action cannot be undone
+                  </p>
                 </div>
               </div>
 
               <p className="text-gray-700 mb-6">
-                Are you sure you want to delete <span className="font-semibold">{selectedJobIds.size}</span> selected job{selectedJobIds.size > 1 ? 's' : ''}?
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">{selectedJobIds.size}</span>{" "}
+                selected job{selectedJobIds.size > 1 ? "s" : ""}?
               </p>
 
               <div className="flex gap-3 justify-end">
@@ -1285,16 +1545,33 @@ export default function ProjectionsTable({
                 >
                   {isDeleting ? (
                     <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg
+                        className="animate-spin h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
                       </svg>
                       Deleting...
                     </>
                   ) : (
                     <>
                       <Trash className="w-4 h-4" />
-                      Delete {selectedJobIds.size} Job{selectedJobIds.size > 1 ? 's' : ''}
+                      Delete {selectedJobIds.size} Job
+                      {selectedJobIds.size > 1 ? "s" : ""}
                     </>
                   )}
                 </button>

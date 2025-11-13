@@ -3,10 +3,10 @@
  * Shows calculated speed and people required based on job parameters
  */
 
-'use client';
+"use client";
 
-import React from 'react';
-import type { RuleEvaluationResult } from '@/types';
+import React from "react";
+import type { RuleEvaluationResult } from "@/types";
 
 interface RulesEvaluationDisplayProps {
   result: RuleEvaluationResult | null;
@@ -19,11 +19,13 @@ export default function RulesEvaluationDisplay({
   result,
   loading,
   error,
-  className = '',
+  className = "",
 }: RulesEvaluationDisplayProps) {
   if (loading) {
     return (
-      <div className={`bg-blue-50 border border-blue-200 rounded-lg p-3 ${className}`}>
+      <div
+        className={`bg-blue-50 border border-blue-200 rounded-lg p-3 ${className}`}
+      >
         <div className="flex items-center gap-2 text-blue-700">
           <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
             <circle
@@ -48,7 +50,9 @@ export default function RulesEvaluationDisplay({
 
   if (error) {
     return (
-      <div className={`bg-red-50 border border-red-200 rounded-lg p-3 ${className}`}>
+      <div
+        className={`bg-red-50 border border-red-200 rounded-lg p-3 ${className}`}
+      >
         <div className="text-red-700 text-sm">
           <strong>Error:</strong> {error.message}
         </div>
@@ -66,14 +70,17 @@ export default function RulesEvaluationDisplay({
   return (
     <div
       className={`border rounded-lg p-4 ${className} ${
-        hasRule
-          ? 'bg-green-50 border-green-200'
-          : 'bg-gray-50 border-gray-200'
+        hasRule ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
         {hasRule ? (
-          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-5 h-5 text-green-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -82,7 +89,12 @@ export default function RulesEvaluationDisplay({
             />
           </svg>
         ) : (
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-5 h-5 text-gray-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -91,8 +103,10 @@ export default function RulesEvaluationDisplay({
             />
           </svg>
         )}
-        <h4 className={`font-semibold ${hasRule ? 'text-green-900' : 'text-gray-900'}`}>
-          {hasRule ? 'Rule Applied' : 'No Rules Applied'}
+        <h4
+          className={`font-semibold ${hasRule ? "text-green-900" : "text-gray-900"}`}
+        >
+          {hasRule ? "Rule Applied" : "No Rules Applied"}
         </h4>
       </div>
 
@@ -106,7 +120,9 @@ export default function RulesEvaluationDisplay({
                 {result.baseSpeed}/hr
               </span>
             )}
-            <span className={`font-semibold ${hasRule ? 'text-green-700' : 'text-gray-700'}`}>
+            <span
+              className={`font-semibold ${hasRule ? "text-green-700" : "text-gray-700"}`}
+            >
               {result.calculatedSpeed.toLocaleString()}/hr
             </span>
           </div>
@@ -115,8 +131,11 @@ export default function RulesEvaluationDisplay({
         {/* People Required */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-700">People Required:</span>
-          <span className={`font-semibold ${hasRule ? 'text-green-700' : 'text-gray-700'}`}>
-            {result.peopleRequired} {result.peopleRequired === 1 ? 'person' : 'people'}
+          <span
+            className={`font-semibold ${hasRule ? "text-green-700" : "text-gray-700"}`}
+          >
+            {result.peopleRequired}{" "}
+            {result.peopleRequired === 1 ? "person" : "people"}
           </span>
         </div>
 

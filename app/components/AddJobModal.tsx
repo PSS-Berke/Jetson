@@ -1,14 +1,13 @@
+"use client";
 
-'use client';
-
-import { useState, FormEvent, useEffect } from 'react';
-import SmartClientSelect from './SmartClientSelect';
-import FacilityToggle from './FacilityToggle';
-import ScheduleToggle from './ScheduleToggle';
-import DynamicRequirementFields from './DynamicRequirementFields';
-import { getToken } from '@/lib/api';
-import { getProcessTypeConfig } from '@/lib/processTypeConfig';
-import Toast from './Toast';
+import { useState, FormEvent, useEffect } from "react";
+import SmartClientSelect from "./SmartClientSelect";
+import FacilityToggle from "./FacilityToggle";
+import ScheduleToggle from "./ScheduleToggle";
+import DynamicRequirementFields from "./DynamicRequirementFields";
+import { getToken } from "@/lib/api";
+import { getProcessTypeConfig } from "@/lib/processTypeConfig";
+import Toast from "./Toast";
 
 interface AddJobModalProps {
   isOpen: boolean;
@@ -49,48 +48,53 @@ interface JobFormData {
   total_billing: string;
 }
 
-export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalProps) {
+export default function AddJobModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: AddJobModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [canSubmit, setCanSubmit] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false); // true = Schedule, false = Soft Schedule
-  const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] = useState(false);
+  const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
+    useState(false);
   const [pendingRedistribution, setPendingRedistribution] = useState<{
     weekIndex: number;
     newValue: number;
   } | null>(null);
-  const [tempWeekQuantity, setTempWeekQuantity] = useState<string>('');
+  const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
   const [formData, setFormData] = useState<JobFormData>({
-    job_number: '',
+    job_number: "",
     clients_id: null,
-    client_name: '',
+    client_name: "",
     sub_clients_id: null,
-    sub_client_name: '',
-    job_name: '',
-    description: '',
-    quantity: '',
-    csr: '',
-    prgm: '',
+    sub_client_name: "",
+    job_name: "",
+    description: "",
+    quantity: "",
+    csr: "",
+    prgm: "",
     facilities_id: null,
-    start_date: '',
-    due_date: '',
-    service_type: 'insert',
-    pockets: '2',
+    start_date: "",
+    due_date: "",
+    service_type: "insert",
+    pockets: "2",
     machines_id: [],
     requirements: [
       {
-        process_type: '',
-        price_per_m: ''
-      }
+        process_type: "",
+        price_per_m: "",
+      },
     ],
     weekly_split: [],
     locked_weeks: [],
-    price_per_m: '',
-    add_on_charges: '',
-    ext_price: '',
-    total_billing: ''
+    price_per_m: "",
+    add_on_charges: "",
+    ext_price: "",
+    total_billing: "",
   });
 
   // Calculate weeks and split quantity when dates or quantity changes
@@ -102,12 +106,18 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
       if (!isNaN(quantity) && quantity > 0 && dueDate >= startDate) {
         // Calculate number of weeks (ceiling to capture partial weeks)
-        const daysDiff = Math.ceil((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const daysDiff =
+          Math.ceil(
+            (dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+          ) + 1;
         const weeks = Math.ceil(daysDiff / 7);
 
         if (weeks > 0) {
           // Only recalculate from scratch if weekly_split is empty or length changed
-          if (formData.weekly_split.length === 0 || formData.weekly_split.length !== weeks) {
+          if (
+            formData.weekly_split.length === 0 ||
+            formData.weekly_split.length !== weeks
+          ) {
             // Split quantity evenly across weeks
             const baseAmount = Math.floor(quantity / weeks);
             const remainder = quantity % weeks;
@@ -123,34 +133,48 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
             // Initialize locked_weeks as all false
             const newLockedWeeks = Array(weeks).fill(false);
 
-            setFormData(prev => ({ ...prev, weekly_split: newSplit, locked_weeks: newLockedWeeks }));
+            setFormData((prev) => ({
+              ...prev,
+              weekly_split: newSplit,
+              locked_weeks: newLockedWeeks,
+            }));
           }
         }
       }
     }
-  }, [formData.start_date, formData.due_date, formData.quantity, formData.weekly_split.length]);
+  }, [
+    formData.start_date,
+    formData.due_date,
+    formData.quantity,
+    formData.weekly_split.length,
+  ]);
 
   // Handle quantity changes when weekly_split already exists - respect locked weeks
   useEffect(() => {
     if (formData.weekly_split.length > 0 && formData.quantity) {
       const totalQuantity = parseInt(formData.quantity) || 0;
-      const currentTotal = formData.weekly_split.reduce((sum, val) => sum + val, 0);
+      const currentTotal = formData.weekly_split.reduce(
+        (sum, val) => sum + val,
+        0,
+      );
       const difference = totalQuantity - currentTotal;
 
       // Only redistribute if there's a difference and we have unlocked weeks
       if (difference !== 0) {
-        setFormData(prev => {
+        setFormData((prev) => {
           const newSplit = [...prev.weekly_split];
           const lockedWeeks = prev.locked_weeks;
 
           // Get indices of all unlocked weeks
           const unlockedIndices = newSplit
             .map((_, idx) => idx)
-            .filter(idx => !lockedWeeks[idx]);
+            .filter((idx) => !lockedWeeks[idx]);
 
           if (unlockedIndices.length > 0) {
             // Calculate base adjustment per unlocked week
-            const baseAdjustment = Math.floor(difference / unlockedIndices.length);
+            const baseAdjustment = Math.floor(
+              difference / unlockedIndices.length,
+            );
             const remainder = difference % unlockedIndices.length;
 
             // Apply adjustments to unlocked weeks
@@ -178,32 +202,36 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
 
     // Cleanup function to restore scroll on unmount
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Remove commas from the input value before storing
-    const cleanedValue = e.target.value.replace(/,/g, '');
+    const cleanedValue = e.target.value.replace(/,/g, "");
     setFormData({
       ...formData,
-      quantity: cleanedValue
+      quantity: cleanedValue,
     });
   };
 
@@ -211,7 +239,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     setFormData({
       ...formData,
       clients_id: clientId,
-      client_name: clientName
+      client_name: clientName,
     });
   };
 
@@ -219,48 +247,61 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     setFormData({
       ...formData,
       sub_clients_id: clientId,
-      sub_client_name: clientName
+      sub_client_name: clientName,
     });
   };
 
-  const handleRequirementChange = (requirementIndex: number, field: keyof Requirement, value: string | number) => {
-    setFormData(prev => ({
+  const handleRequirementChange = (
+    requirementIndex: number,
+    field: keyof Requirement,
+    value: string | number,
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       requirements: prev.requirements.map((req, idx) =>
-        idx === requirementIndex ? { ...req, [field]: value } : req
-      )
+        idx === requirementIndex ? { ...req, [field]: value } : req,
+      ),
     }));
   };
 
   const addRequirement = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      requirements: [...prev.requirements, {
-        process_type: '',
-        price_per_m: ''
-      }]
+      requirements: [
+        ...prev.requirements,
+        {
+          process_type: "",
+          price_per_m: "",
+        },
+      ],
     }));
   };
 
   const removeRequirement = (requirementIndex: number) => {
     if (formData.requirements.length > 1) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        requirements: prev.requirements.filter((_, idx) => idx !== requirementIndex)
+        requirements: prev.requirements.filter(
+          (_, idx) => idx !== requirementIndex,
+        ),
       }));
     }
   };
 
   const handleWeeklySplitChange = (weekIndex: number, value: string) => {
     // Remove commas from the input value before parsing
-    const cleanedValue = value.replace(/,/g, '');
+    const cleanedValue = value.replace(/,/g, "");
     const newValue = parseInt(cleanedValue) || 0;
 
     performRedistribution(weekIndex, newValue, false);
   };
 
-  const performRedistribution = (weekIndex: number, newValue: number, allowBackward: boolean) => {
-    setFormData(prev => {
+  const performRedistribution = (
+    weekIndex: number,
+    newValue: number,
+    allowBackward: boolean,
+  ) => {
+    setFormData((prev) => {
       const totalQuantity = parseInt(prev.quantity) || 0;
       const newSplit = [...prev.weekly_split];
       const newLockedWeeks = [...prev.locked_weeks];
@@ -278,7 +319,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         // Get indices of unlocked weeks AFTER the changed week
         const unlockedWeeksAfter = newSplit
           .map((_, idx) => idx)
-          .filter(idx => idx > weekIndex && !newLockedWeeks[idx]);
+          .filter((idx) => idx > weekIndex && !newLockedWeeks[idx]);
 
         // If no unlocked weeks after, check if we should redistribute backward
         if (unlockedWeeksAfter.length === 0 && !allowBackward) {
@@ -295,12 +336,14 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
           // Get all unlocked weeks (forward and backward)
           targetWeekIndices = newSplit
             .map((_, idx) => idx)
-            .filter(idx => idx !== weekIndex && !newLockedWeeks[idx]);
+            .filter((idx) => idx !== weekIndex && !newLockedWeeks[idx]);
         }
 
         if (targetWeekIndices.length > 0) {
           // Calculate base adjustment per week
-          const baseAdjustment = Math.floor(difference / targetWeekIndices.length);
+          const baseAdjustment = Math.floor(
+            difference / targetWeekIndices.length,
+          );
           const remainder = difference % targetWeekIndices.length;
 
           // Apply adjustments to target weeks
@@ -325,23 +368,23 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
   const handleBackwardRedistributeConfirm = () => {
     if (pendingRedistribution) {
-      const cleanedValue = tempWeekQuantity.replace(/,/g, '');
+      const cleanedValue = tempWeekQuantity.replace(/,/g, "");
       const finalValue = parseInt(cleanedValue) || 0;
       performRedistribution(pendingRedistribution.weekIndex, finalValue, true);
       setPendingRedistribution(null);
-      setTempWeekQuantity('');
+      setTempWeekQuantity("");
     }
     setShowBackwardRedistributeWarning(false);
   };
 
   const handleBackwardRedistributeCancel = () => {
     setPendingRedistribution(null);
-    setTempWeekQuantity('');
+    setTempWeekQuantity("");
     setShowBackwardRedistributeWarning(false);
   };
 
   const handleUnlockWeek = (weekIndex: number) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const newLockedWeeks = [...prev.locked_weeks];
       newLockedWeeks[weekIndex] = false;
       return { ...prev, locked_weeks: newLockedWeeks };
@@ -354,7 +397,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   };
 
   const handleTempQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const cleanedValue = e.target.value.replace(/,/g, '');
+    const cleanedValue = e.target.value.replace(/,/g, "");
     setTempWeekQuantity(cleanedValue);
   };
 
@@ -362,7 +405,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const calculateRedistributionPreview = () => {
     if (!pendingRedistribution) return null;
 
-    const cleanedValue = tempWeekQuantity.replace(/,/g, '');
+    const cleanedValue = tempWeekQuantity.replace(/,/g, "");
     const proposedValue = parseInt(cleanedValue) || 0;
     const totalQuantity = parseInt(formData.quantity) || 0;
     const weekIndex = pendingRedistribution.weekIndex;
@@ -377,7 +420,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     // Get unlocked weeks before the adjusted week
     const unlockedBefore = formData.weekly_split
       .map((_, idx) => idx)
-      .filter(idx => idx < weekIndex && !formData.locked_weeks[idx]);
+      .filter((idx) => idx < weekIndex && !formData.locked_weeks[idx]);
 
     const lockedBefore = formData.weekly_split
       .map((val, idx) => ({ idx, val }))
@@ -386,7 +429,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
     const canRedistribute = unlockedBefore.length > 0;
 
     // Calculate preview of changes
-    const preview: { weekIndex: number; oldValue: number; newValue: number; }[] = [];
+    const preview: { weekIndex: number; oldValue: number; newValue: number }[] =
+      [];
 
     if (canRedistribute) {
       const baseAdjustment = Math.floor(difference / unlockedBefore.length);
@@ -408,7 +452,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       lockedBefore,
       canRedistribute,
       preview,
-      hasNegativeValues: preview.some(p => p.newValue < 0)
+      hasNegativeValues: preview.some((p) => p.newValue < 0),
     };
   };
 
@@ -424,50 +468,75 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   const handleNext = () => {
     // Validate step 1 - job number, client ID, and facility are required
     if (currentStep === 1) {
-      console.log('[AddJobModal] Validation - facilities_id:', formData.facilities_id);
-      if (!formData.job_number || !formData.clients_id || !formData.facilities_id) {
-        alert('Please fill in job number, client name, and facility');
+      console.log(
+        "[AddJobModal] Validation - facilities_id:",
+        formData.facilities_id,
+      );
+      if (
+        !formData.job_number ||
+        !formData.clients_id ||
+        !formData.facilities_id
+      ) {
+        alert("Please fill in job number, client name, and facility");
         return;
       }
       // Validate weekly split if present
-      if (formData.weekly_split.length > 0 && getWeeklySplitDifference() !== 0) {
-        alert('Weekly split total must equal the total quantity');
+      if (
+        formData.weekly_split.length > 0 &&
+        getWeeklySplitDifference() !== 0
+      ) {
+        alert("Weekly split total must equal the total quantity");
         return;
       }
     }
 
     // Validate step 2 - all requirements must have required fields based on their process type
     if (currentStep === 2) {
-      const allRequirementsValid = formData.requirements.every((r, reqIndex) => {
-        if (!r.process_type) {
-          console.log(`[AddJobModal] Requirement ${reqIndex + 1}: Missing process_type`);
-          return false;
-        }
+      const allRequirementsValid = formData.requirements.every(
+        (r, reqIndex) => {
+          if (!r.process_type) {
+            console.log(
+              `[AddJobModal] Requirement ${reqIndex + 1}: Missing process_type`,
+            );
+            return false;
+          }
 
-        // For dynamic fields (fetched from API), we only validate that process_type is set
-        // The actual field validation is handled by the dynamic form component
-        // We check if there's at least one additional field filled besides process_type
-        const fieldCount = Object.keys(r).filter(key => 
-          key !== 'process_type' && 
-          r[key] !== undefined && 
-          r[key] !== null && 
-          r[key] !== ''
-        ).length;
+          // For dynamic fields (fetched from API), we only validate that process_type is set
+          // The actual field validation is handled by the dynamic form component
+          // We check if there's at least one additional field filled besides process_type
+          const fieldCount = Object.keys(r).filter(
+            (key) =>
+              key !== "process_type" &&
+              r[key] !== undefined &&
+              r[key] !== null &&
+              r[key] !== "",
+          ).length;
 
-        if (fieldCount === 0) {
-          console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): No fields filled`);
-          return false;
-        }
+          if (fieldCount === 0) {
+            console.log(
+              `[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): No fields filled`,
+            );
+            return false;
+          }
 
-        console.log(`[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): Valid with ${fieldCount} fields filled`, r);
-        return true;
-      });
+          console.log(
+            `[AddJobModal] Requirement ${reqIndex + 1} (${r.process_type}): Valid with ${fieldCount} fields filled`,
+            r,
+          );
+          return true;
+        },
+      );
 
-      console.log(`[AddJobModal] All requirements valid:`, allRequirementsValid);
+      console.log(
+        `[AddJobModal] All requirements valid:`,
+        allRequirementsValid,
+      );
       console.log(`[AddJobModal] Requirements data:`, formData.requirements);
 
       if (!allRequirementsValid) {
-        alert('Please select a process type and fill in at least one field for each requirement');
+        alert(
+          "Please select a process type and fill in at least one field for each requirement",
+        );
         return;
       }
     }
@@ -490,18 +559,18 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
   /**
    * Convert weekly split into daily breakdown for each week
    * Returns a 2D array where each inner array represents 7 days of a week [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
-   * 
+   *
    * Example:
    * If job starts on Wednesday and has weekly_split = [5000, 7000]
    * Week 1 (Wed-Sun): [0, 0, 1000, 1000, 1000, 1000, 1000] - 5000 split across 5 days
    * Week 2 (Mon-Sun): [1000, 1000, 1000, 1000, 1000, 1000, 1000] - 7000 split across 7 days
-   * 
+   *
    * Result: [[0, 0, 1000, 1000, 1000, 1000, 1000], [1000, 1000, 1000, 1000, 1000, 1000, 1000]]
    */
   const convertWeeklySplitToDailyBreakdown = (
     weeklySplit: number[],
     startDate: string,
-    dueDate: string
+    dueDate: string,
   ): number[][] => {
     if (!startDate || !dueDate || weeklySplit.length === 0) {
       return [];
@@ -518,16 +587,19 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
       // Calculate the start and end date for this week
       const weekStartDate = new Date(start);
-      weekStartDate.setDate(start.getDate() + (weekIndex * 7));
-      
+      weekStartDate.setDate(start.getDate() + weekIndex * 7);
+
       const weekEndDate = new Date(weekStartDate);
       weekEndDate.setDate(weekStartDate.getDate() + 6);
 
       // Determine which days in this week are active
       const actualStartDate = weekIndex === 0 ? start : weekStartDate;
-      const actualEndDate = weekIndex === weeklySplit.length - 1 
-        ? (due < weekEndDate ? due : weekEndDate)
-        : weekEndDate;
+      const actualEndDate =
+        weekIndex === weeklySplit.length - 1
+          ? due < weekEndDate
+            ? due
+            : weekEndDate
+          : weekEndDate;
 
       // Count active days in this week
       const activeDays: number[] = [];
@@ -574,8 +646,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       // Calculate total billing from requirements
       const quantity = parseInt(formData.quantity);
       const calculatedRevenue = formData.requirements.reduce((total, req) => {
-        const pricePerM = parseFloat(req.price_per_m || '0');
-        return total + ((quantity / 1000) * pricePerM);
+        const pricePerM = parseFloat(req.price_per_m || "0");
+        return total + (quantity / 1000) * pricePerM;
       }, 0);
 
       const addOnCharges = parseFloat(formData.add_on_charges) || 0;
@@ -593,11 +665,17 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       const dailyBreakdown = convertWeeklySplitToDailyBreakdown(
         formData.weekly_split,
         formData.start_date,
-        formData.due_date
+        formData.due_date,
       );
 
-      console.log('[AddJobModal] Weekly split converted to daily breakdown:', dailyBreakdown);
-      console.log('[AddJobModal] Daily breakdown format example:', JSON.stringify(dailyBreakdown, null, 2));
+      console.log(
+        "[AddJobModal] Weekly split converted to daily breakdown:",
+        dailyBreakdown,
+      );
+      console.log(
+        "[AddJobModal] Daily breakdown format example:",
+        JSON.stringify(dailyBreakdown, null, 2),
+      );
 
       // Prepare the payload according to the API specification
       const payload: Record<string, unknown> = {
@@ -620,7 +698,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         daily_split: dailyBreakdown,
         weekly_split: formData.weekly_split,
         locked_weeks: formData.locked_weeks,
-        confirmed: isConfirmed
+        confirmed: isConfirmed,
       };
 
       // Only include dates if they are valid timestamps (not 0 or undefined)
@@ -636,44 +714,68 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         payload.facilities_id = formData.facilities_id;
       }
 
-      console.log('[AddJobModal] Requirements before stringify:', formData.requirements);
-      console.log('[AddJobModal] Requirements after stringify:', JSON.stringify(formData.requirements));
-      console.log('[AddJobModal] facilities_id in formData:', formData.facilities_id);
-      console.log('[AddJobModal] facilities_id in payload:', payload.facilities_id);
-      console.log('[AddJobModal] Full payload being sent to Xano:', payload);
-      console.log('[AddJobModal] JSON stringified payload:', JSON.stringify(payload, null, 2));
+      console.log(
+        "[AddJobModal] Requirements before stringify:",
+        formData.requirements,
+      );
+      console.log(
+        "[AddJobModal] Requirements after stringify:",
+        JSON.stringify(formData.requirements),
+      );
+      console.log(
+        "[AddJobModal] facilities_id in formData:",
+        formData.facilities_id,
+      );
+      console.log(
+        "[AddJobModal] facilities_id in payload:",
+        payload.facilities_id,
+      );
+      console.log("[AddJobModal] Full payload being sent to Xano:", payload);
+      console.log(
+        "[AddJobModal] JSON stringified payload:",
+        JSON.stringify(payload, null, 2),
+      );
 
-      const response = await fetch('https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        "https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Xano API Error:', errorData);
+        console.error("Xano API Error:", errorData);
         throw new Error(`Failed to create job: ${JSON.stringify(errorData)}`);
       }
 
       const responseData = await response.json();
-      console.log('Xano API Response:', responseData);
-      console.log('[AddJobModal] facilities_id in API response:', responseData.facilities_id);
+      console.log("Xano API Response:", responseData);
+      console.log(
+        "[AddJobModal] facilities_id in API response:",
+        responseData.facilities_id,
+      );
 
       // Auto-sync job_cost_entry from requirements
       try {
-        const { syncJobCostEntryFromRequirements } = await import('@/lib/api');
+        const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
         await syncJobCostEntryFromRequirements(
           responseData.id,
           formData.requirements,
           formData.start_date,
-          formData.facilities_id || undefined
+          formData.facilities_id || undefined,
         );
-        console.log('[AddJobModal] Job cost entry synced successfully');
+        console.log("[AddJobModal] Job cost entry synced successfully");
       } catch (costError) {
-        console.error('[AddJobModal] Failed to sync job cost entry (non-blocking):', costError);
+        console.error(
+          "[AddJobModal] Failed to sync job cost entry (non-blocking):",
+          costError,
+        );
         // Don't fail job creation if cost entry sync fails
       }
 
@@ -683,37 +785,37 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
       // Reset form and close modal
       setFormData({
-        job_number: '',
+        job_number: "",
         clients_id: null,
-        client_name: '',
+        client_name: "",
         sub_clients_id: null,
-        sub_client_name: '',
-        job_name: '',
-        description: '',
-        quantity: '',
-        csr: '',
-        prgm: '',
+        sub_client_name: "",
+        job_name: "",
+        description: "",
+        quantity: "",
+        csr: "",
+        prgm: "",
         facilities_id: null,
-        start_date: '',
-        due_date: '',
-        service_type: 'insert',
-        pockets: '2',
+        start_date: "",
+        due_date: "",
+        service_type: "insert",
+        pockets: "2",
         machines_id: [],
         requirements: [
           {
-            process_type: '',
-            paper_size: '',
+            process_type: "",
+            paper_size: "",
             pockets: 0,
             shifts_id: 0,
-            price_per_m: ''
-          }
+            price_per_m: "",
+          },
         ],
         weekly_split: [],
         locked_weeks: [],
-        price_per_m: '',
-        add_on_charges: '',
-        ext_price: '',
-        total_billing: ''
+        price_per_m: "",
+        add_on_charges: "",
+        ext_price: "",
+        total_billing: "",
       });
       setCurrentStep(1);
 
@@ -727,8 +829,8 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         }
       }, 500);
     } catch (error) {
-      console.error('Error creating job:', error);
-      alert('Failed to create job. Please try again.');
+      console.error("Error creating job:", error);
+      alert("Failed to create job. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -741,14 +843,13 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div
-        className="absolute inset-0 bg-black/30"
-        onClick={handleClose}
-      />
+      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
-          <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">Add New Job</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
+            Add New Job
+          </h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
@@ -760,38 +861,55 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
         {/* Step Indicator */}
         <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
           {[1, 2, 3].map((step) => (
-            <div key={step} className="flex items-center" style={{ flex: step === 3 ? '0 1 auto' : '1 1 0%' }}>
+            <div
+              key={step}
+              className="flex items-center"
+              style={{ flex: step === 3 ? "0 1 auto" : "1 1 0%" }}
+            >
               <div className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                  step === currentStep
-                    ? 'bg-[#EF3340] text-white'
-                    : step < currentStep
-                    ? 'bg-[#2E3192] text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {step < currentStep ? '✓' : step}
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
+                    step === currentStep
+                      ? "bg-[#EF3340] text-white"
+                      : step < currentStep
+                        ? "bg-[#2E3192] text-white"
+                        : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {step < currentStep ? "✓" : step}
                 </div>
                 <div className="ml-3">
-                  <div className={`text-xs font-medium whitespace-nowrap ${
-                    step === currentStep ? 'text-[#EF3340]' : step < currentStep ? 'text-[#2E3192]' : 'text-gray-500'
-                  }`}>
-                    {step === 1 && 'Job Details'}
-                    {step === 2 && 'Requirements'}
-                    {step === 3 && 'Review'}
+                  <div
+                    className={`text-xs font-medium whitespace-nowrap ${
+                      step === currentStep
+                        ? "text-[#EF3340]"
+                        : step < currentStep
+                          ? "text-[#2E3192]"
+                          : "text-gray-500"
+                    }`}
+                  >
+                    {step === 1 && "Job Details"}
+                    {step === 2 && "Requirements"}
+                    {step === 3 && "Review"}
                   </div>
                 </div>
               </div>
               {step < 3 && (
-                <div className={`h-0.5 flex-1 mx-4 ${
-                  step < currentStep ? 'bg-[#2E3192]' : 'bg-gray-200'
-                }`} />
+                <div
+                  className={`h-0.5 flex-1 mx-4 ${
+                    step < currentStep ? "bg-[#2E3192]" : "bg-gray-200"
+                  }`}
+                />
               )}
             </div>
           ))}
         </div>
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-4 sm:p-6"
+        >
           {/* Step 1: Job Details */}
           {currentStep === 1 && (
             <div className="space-y-4">
@@ -855,7 +973,9 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   </label>
                   <FacilityToggle
                     currentFacility={formData.facilities_id}
-                    onFacilityChange={(facility) => setFormData({ ...formData, facilities_id: facility })}
+                    onFacilityChange={(facility) =>
+                      setFormData({ ...formData, facilities_id: facility })
+                    }
                     showAll={false}
                   />
                 </div>
@@ -928,7 +1048,11 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   <input
                     type="text"
                     name="quantity"
-                    value={formData.quantity ? parseInt(formData.quantity).toLocaleString() : ''}
+                    value={
+                      formData.quantity
+                        ? parseInt(formData.quantity).toLocaleString()
+                        : ""
+                    }
                     onChange={handleQuantityChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 73"
@@ -942,17 +1066,22 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-semibold text-[var(--text-dark)]">
-                      Weekly Quantity Split ({formData.weekly_split.length} weeks)
+                      Weekly Quantity Split ({formData.weekly_split.length}{" "}
+                      weeks)
                     </h4>
-                    <div className={`text-sm font-semibold ${
-                      getWeeklySplitDifference() === 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }`}>
-                      Total: {getWeeklySplitSum().toLocaleString()} / {parseInt(formData.quantity || '0').toLocaleString()}
+                    <div
+                      className={`text-sm font-semibold ${
+                        getWeeklySplitDifference() === 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      Total: {getWeeklySplitSum().toLocaleString()} /{" "}
+                      {parseInt(formData.quantity || "0").toLocaleString()}
                       {getWeeklySplitDifference() !== 0 && (
                         <span className="ml-1">
-                          ({getWeeklySplitDifference() > 0 ? '+' : ''}{getWeeklySplitDifference()})
+                          ({getWeeklySplitDifference() > 0 ? "+" : ""}
+                          {getWeeklySplitDifference()})
                         </span>
                       )}
                     </div>
@@ -973,9 +1102,25 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                                 className="text-xs hover:opacity-70 transition-opacity flex items-center gap-1"
                                 title="Unlock this week to allow auto-redistribution"
                               >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                  <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#2563eb"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="11"
+                                    width="18"
+                                    height="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                                 </svg>
                               </button>
                             )}
@@ -984,19 +1129,41 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                             <input
                               type="text"
                               value={amount.toLocaleString()}
-                              onChange={(e) => handleWeeklySplitChange(index, e.target.value)}
+                              onChange={(e) =>
+                                handleWeeklySplitChange(index, e.target.value)
+                              }
                               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
                                 isLocked
-                                  ? 'bg-blue-50 border-blue-300 font-semibold pr-8'
-                                  : 'border-[var(--border)]'
+                                  ? "bg-blue-50 border-blue-300 font-semibold pr-8"
+                                  : "border-[var(--border)]"
                               }`}
-                              title={isLocked ? 'This week is locked and won\'t be auto-adjusted' : 'Edit to lock this week'}
+                              title={
+                                isLocked
+                                  ? "This week is locked and won't be auto-adjusted"
+                                  : "Edit to lock this week"
+                              }
                             />
                             {isLocked && (
                               <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#2563eb"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="11"
+                                    width="18"
+                                    height="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                 </svg>
                               </div>
                             )}
@@ -1034,13 +1201,20 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
           {/* Step 2: Requirements */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">Job Requirements</h3>
+              <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">
+                Job Requirements
+              </h3>
 
               {formData.requirements.map((requirement, index) => (
-                <div key={index} className="border border-[var(--border)] rounded-lg p-6 space-y-4">
+                <div
+                  key={index}
+                  className="border border-[var(--border)] rounded-lg p-6 space-y-4"
+                >
                   {/* Requirement Header */}
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-[var(--text-dark)]">Requirement {index + 1}</h4>
+                    <h4 className="font-semibold text-[var(--text-dark)]">
+                      Requirement {index + 1}
+                    </h4>
                     {index > 0 && (
                       <button
                         type="button"
@@ -1055,7 +1229,9 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   {/* Dynamic Requirement Fields */}
                   <DynamicRequirementFields
                     requirement={requirement}
-                    onChange={(field, value) => handleRequirementChange(index, field, value)}
+                    onChange={(field, value) =>
+                      handleRequirementChange(index, field, value)
+                    }
                   />
                 </div>
               ))}
@@ -1075,62 +1251,95 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="bg-[var(--bg-alert-info)] border-l-4 border-[var(--primary-blue)] p-4 rounded">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-2">Job Summary</h3>
+                <h3 className="font-semibold text-[var(--text-dark)] mb-2">
+                  Job Summary
+                </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-[var(--text-light)]">Job #:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_number}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.job_number}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Facility:</span>
                     <span className="ml-2 font-semibold text-[var(--text-dark)]">
-                      {formData.facilities_id === 1 ? 'Bolingbrook' : formData.facilities_id === 2 ? 'Lemont' : 'N/A'}
+                      {formData.facilities_id === 1
+                        ? "Bolingbrook"
+                        : formData.facilities_id === 2
+                          ? "Lemont"
+                          : "N/A"}
                     </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Client:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.client_name}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.client_name}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Job Name:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.job_name || 'N/A'}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.job_name || "N/A"}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-light)]">Service Type:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.service_type}</span>
+                    <span className="text-[var(--text-light)]">
+                      Service Type:
+                    </span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.service_type}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">CSR:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.csr || 'N/A'}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.csr || "N/A"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Quantity:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{parseInt(formData.quantity || '0').toLocaleString()}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {parseInt(formData.quantity || "0").toLocaleString()}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-light)]">Start Date:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.start_date || 'N/A'}</span>
+                    <span className="text-[var(--text-light)]">
+                      Start Date:
+                    </span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.start_date || "N/A"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[var(--text-light)]">Due Date:</span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">{formData.due_date || 'N/A'}</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.due_date || "N/A"}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-3">Job Requirements & Pricing</h3>
+                <h3 className="font-semibold text-[var(--text-dark)] mb-3">
+                  Job Requirements & Pricing
+                </h3>
                 {formData.requirements.map((req, index) => {
-                  const quantity = parseInt(formData.quantity || '0');
-                  const pricePerM = parseFloat(req.price_per_m || '0');
+                  const quantity = parseInt(formData.quantity || "0");
+                  const pricePerM = parseFloat(req.price_per_m || "0");
                   const requirementTotal = (quantity / 1000) * pricePerM;
                   const processConfig = getProcessTypeConfig(req.process_type);
 
                   return (
-                    <div key={index} className="mb-4 pb-4 border-b border-[var(--border)] last:border-b-0">
+                    <div
+                      key={index}
+                      className="mb-4 pb-4 border-b border-[var(--border)] last:border-b-0"
+                    >
                       <div className="text-sm">
                         <div className="mb-2">
-                          <span className="text-[var(--text-light)]">Requirement {index + 1}: </span>
+                          <span className="text-[var(--text-light)]">
+                            Requirement {index + 1}:{" "}
+                          </span>
                           <span className="font-semibold text-[var(--text-dark)]">
                             {processConfig?.label || req.process_type}
                           </span>
@@ -1139,34 +1348,49 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                         {/* Display all fields for this requirement */}
                         <div className="grid grid-cols-2 gap-2 mb-2 ml-4">
                           {processConfig?.fields.map((fieldConfig) => {
-                            const fieldValue = req[fieldConfig.name as keyof typeof req];
+                            const fieldValue =
+                              req[fieldConfig.name as keyof typeof req];
 
                             // Skip if field has no value
-                            if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+                            if (
+                              fieldValue === undefined ||
+                              fieldValue === null ||
+                              fieldValue === ""
+                            ) {
                               return null;
                             }
 
                             // Format the value based on field type
                             let displayValue: string;
-                            if (fieldConfig.type === 'currency') {
-                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            if (fieldConfig.type === "currency") {
+                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                             } else {
                               displayValue = String(fieldValue);
                             }
 
                             return (
                               <div key={fieldConfig.name} className="text-xs">
-                                <span className="text-[var(--text-light)]">{fieldConfig.label}: </span>
-                                <span className="text-[var(--text-dark)] font-medium">{displayValue}</span>
+                                <span className="text-[var(--text-light)]">
+                                  {fieldConfig.label}:{" "}
+                                </span>
+                                <span className="text-[var(--text-dark)] font-medium">
+                                  {displayValue}
+                                </span>
                               </div>
                             );
                           })}
                         </div>
 
                         <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-                          <span className="text-[var(--text-light)]">Subtotal for this requirement:</span>
+                          <span className="text-[var(--text-light)]">
+                            Subtotal for this requirement:
+                          </span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            ${requirementTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            $
+                            {requirementTotal.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -1177,28 +1401,38 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                 {/* Total Price Calculation */}
                 <div className="mt-4 pt-4 border-t-2 border-[var(--primary-blue)]">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[var(--text-dark)] text-lg">Total Job Price:</span>
+                    <span className="font-bold text-[var(--text-dark)] text-lg">
+                      Total Job Price:
+                    </span>
                     <span className="font-bold text-[var(--primary-blue)] text-xl">
-                      ${formData.requirements.reduce((total, req) => {
-                        const quantity = parseInt(formData.quantity || '0');
-                        const pricePerM = parseFloat(req.price_per_m || '0');
-                        return total + ((quantity / 1000) * pricePerM);
-                      }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      $
+                      {formData.requirements
+                        .reduce((total, req) => {
+                          const quantity = parseInt(formData.quantity || "0");
+                          const pricePerM = parseFloat(req.price_per_m || "0");
+                          return total + (quantity / 1000) * pricePerM;
+                        }, 0)
+                        .toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-[var(--text-dark)] mb-3">Schedule Type</h4>
+                <h4 className="font-semibold text-[var(--text-dark)] mb-3">
+                  Schedule Type
+                </h4>
                 <ScheduleToggle
                   isConfirmed={isConfirmed}
                   onScheduleChange={setIsConfirmed}
                 />
                 <p className="text-sm text-[var(--text-light)] mt-3">
                   {isConfirmed
-                    ? '✓ This job will be confirmed and scheduled immediately.'
-                    : 'ℹ This job will be added as a soft schedule and can be confirmed later.'}
+                    ? "✓ This job will be confirmed and scheduled immediately."
+                    : "ℹ This job will be added as a soft schedule and can be confirmed later."}
                 </p>
               </div>
             </div>
@@ -1224,18 +1458,23 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   type="button"
                   onClick={handleNext}
                   disabled={
-                    (currentStep === 1 && (!formData.job_number || !formData.clients_id || !formData.quantity)) ||
-                    (currentStep === 2 && formData.requirements.some(r => {
-                      if (!r.process_type) return true;
-                      // Check if at least one field besides process_type is filled
-                      const fieldCount = Object.keys(r).filter(key => 
-                        key !== 'process_type' && 
-                        r[key] !== undefined && 
-                        r[key] !== null && 
-                        r[key] !== ''
-                      ).length;
-                      return fieldCount === 0;
-                    }))
+                    (currentStep === 1 &&
+                      (!formData.job_number ||
+                        !formData.clients_id ||
+                        !formData.quantity)) ||
+                    (currentStep === 2 &&
+                      formData.requirements.some((r) => {
+                        if (!r.process_type) return true;
+                        // Check if at least one field besides process_type is filled
+                        const fieldCount = Object.keys(r).filter(
+                          (key) =>
+                            key !== "process_type" &&
+                            r[key] !== undefined &&
+                            r[key] !== null &&
+                            r[key] !== "",
+                        ).length;
+                        return fieldCount === 0;
+                      }))
                   }
                   className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1248,7 +1487,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                     setCanSubmit(true);
                     // Use setTimeout to allow state to update before form submission
                     setTimeout(() => {
-                      const form = document.querySelector('form');
+                      const form = document.querySelector("form");
                       if (form) {
                         form.requestSubmit();
                       }
@@ -1257,7 +1496,7 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
                   disabled={submitting}
                   className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Creating Job...' : 'Submit Job'}
+                  {submitting ? "Creating Job..." : "Submit Job"}
                 </button>
               )}
             </div>
@@ -1266,140 +1505,191 @@ export default function AddJobModal({ isOpen, onClose, onSuccess }: AddJobModalP
       </div>
 
       {/* Backward Redistribution Warning Modal */}
-      {showBackwardRedistributeWarning && pendingRedistribution && (() => {
-        const preview = calculateRedistributionPreview();
-        if (!preview) return null;
+      {showBackwardRedistributeWarning &&
+        pendingRedistribution &&
+        (() => {
+          const preview = calculateRedistributionPreview();
+          if (!preview) return null;
 
-        return (
-          <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
-            <div
-              className="absolute inset-0 bg-black/50"
-              onClick={handleBackwardRedistributeCancel}
-            />
-            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full relative z-10 max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="p-6 border-b border-[var(--border)]">
-                <h3 className="text-xl font-bold text-[var(--dark-blue)]">
-                  Adjust Week {pendingRedistribution.weekIndex + 1} Quantity
-                </h3>
-              </div>
-
-              {/* Content */}
-              <div className="p-6 space-y-4">
-                {/* Quantity Input */}
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Week {pendingRedistribution.weekIndex + 1} Quantity
-                  </label>
-                  <input
-                    type="text"
-                    value={tempWeekQuantity ? parseInt(tempWeekQuantity).toLocaleString() : ''}
-                    onChange={handleTempQuantityChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="Enter quantity"
-                    autoFocus
-                  />
+          return (
+            <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={handleBackwardRedistributeCancel}
+              />
+              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full relative z-10 max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="p-6 border-b border-[var(--border)]">
+                  <h3 className="text-xl font-bold text-[var(--dark-blue)]">
+                    Adjust Week {pendingRedistribution.weekIndex + 1} Quantity
+                  </h3>
                 </div>
 
-                {/* Redistribution Info */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="text-sm">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-[var(--text-light)]">Total Job Quantity:</span>
-                      <span className="font-semibold">{parseInt(formData.quantity || '0').toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-light)]">Amount to redistribute:</span>
-                      <span className={`font-semibold ${preview.difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {preview.difference > 0 ? '+' : ''}{preview.difference.toLocaleString()} pieces
-                      </span>
-                    </div>
+                {/* Content */}
+                <div className="p-6 space-y-4">
+                  {/* Quantity Input */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                      Week {pendingRedistribution.weekIndex + 1} Quantity
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        tempWeekQuantity
+                          ? parseInt(tempWeekQuantity).toLocaleString()
+                          : ""
+                      }
+                      onChange={handleTempQuantityChange}
+                      className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                      placeholder="Enter quantity"
+                      autoFocus
+                    />
                   </div>
-                </div>
 
-                {/* Preview or Error Message */}
-                {preview.canRedistribute ? (
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-[var(--text-dark)]">
-                      This will redistribute {Math.abs(preview.difference).toLocaleString()} pieces from:
-                    </p>
-                    <div className="space-y-2">
-                      {preview.preview.map(({ weekIndex, oldValue, newValue }) => (
-                        <div key={weekIndex} className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                          <span className="text-[var(--text-dark)]">Week {weekIndex + 1}:</span>
-                          <span className="font-semibold">
-                            {oldValue.toLocaleString()} → {newValue.toLocaleString()}
-                            <span className={`ml-2 ${newValue - oldValue < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              ({newValue - oldValue > 0 ? '+' : ''}{(newValue - oldValue).toLocaleString()})
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {preview.lockedBefore.length > 0 && (
-                      <p className="text-xs text-[var(--text-light)] italic">
-                        {preview.lockedBefore.length} week(s) before Week {pendingRedistribution.weekIndex + 1} remain locked
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <p className="text-sm text-red-800 font-semibold mb-2">
-                        ⚠️ Cannot redistribute - all previous weeks are locked
-                      </p>
-                      <p className="text-xs text-red-700">
-                        Unlock one or more weeks below to proceed with this adjustment.
-                      </p>
-                    </div>
-
-                    {preview.lockedBefore.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[var(--text-dark)]">Locked weeks:</p>
-                        {preview.lockedBefore.map(({ idx, val }) => (
-                          <div key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2">
-                            <span className="text-sm text-[var(--text-dark)]">
-                              Week {idx + 1}: {val.toLocaleString()} pieces
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUnlockWeekInDialog(idx)}
-                              className="text-xs text-[var(--primary-blue)] hover:opacity-70 transition-opacity flex items-center gap-1 font-semibold"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-                              </svg>
-                              Unlock
-                            </button>
-                          </div>
-                        ))}
+                  {/* Redistribution Info */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-[var(--text-light)]">
+                          Total Job Quantity:
+                        </span>
+                        <span className="font-semibold">
+                          {parseInt(formData.quantity || "0").toLocaleString()}
+                        </span>
                       </div>
-                    )}
+                      <div className="flex justify-between">
+                        <span className="text-[var(--text-light)]">
+                          Amount to redistribute:
+                        </span>
+                        <span
+                          className={`font-semibold ${preview.difference < 0 ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {preview.difference > 0 ? "+" : ""}
+                          {preview.difference.toLocaleString()} pieces
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
-                <button
-                  onClick={handleBackwardRedistributeCancel}
-                  className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBackwardRedistributeConfirm}
-                  disabled={!preview.canRedistribute}
-                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Confirm
-                </button>
+                  {/* Preview or Error Message */}
+                  {preview.canRedistribute ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-[var(--text-dark)]">
+                        This will redistribute{" "}
+                        {Math.abs(preview.difference).toLocaleString()} pieces
+                        from:
+                      </p>
+                      <div className="space-y-2">
+                        {preview.preview.map(
+                          ({ weekIndex, oldValue, newValue }) => (
+                            <div
+                              key={weekIndex}
+                              className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2"
+                            >
+                              <span className="text-[var(--text-dark)]">
+                                Week {weekIndex + 1}:
+                              </span>
+                              <span className="font-semibold">
+                                {oldValue.toLocaleString()} →{" "}
+                                {newValue.toLocaleString()}
+                                <span
+                                  className={`ml-2 ${newValue - oldValue < 0 ? "text-red-600" : "text-green-600"}`}
+                                >
+                                  ({newValue - oldValue > 0 ? "+" : ""}
+                                  {(newValue - oldValue).toLocaleString()})
+                                </span>
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                      {preview.lockedBefore.length > 0 && (
+                        <p className="text-xs text-[var(--text-light)] italic">
+                          {preview.lockedBefore.length} week(s) before Week{" "}
+                          {pendingRedistribution.weekIndex + 1} remain locked
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p className="text-sm text-red-800 font-semibold mb-2">
+                          ⚠️ Cannot redistribute - all previous weeks are locked
+                        </p>
+                        <p className="text-xs text-red-700">
+                          Unlock one or more weeks below to proceed with this
+                          adjustment.
+                        </p>
+                      </div>
+
+                      {preview.lockedBefore.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-[var(--text-dark)]">
+                            Locked weeks:
+                          </p>
+                          {preview.lockedBefore.map(({ idx, val }) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2"
+                            >
+                              <span className="text-sm text-[var(--text-dark)]">
+                                Week {idx + 1}: {val.toLocaleString()} pieces
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUnlockWeekInDialog(idx)}
+                                className="text-xs text-[var(--primary-blue)] hover:opacity-70 transition-opacity flex items-center gap-1 font-semibold"
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="#2563eb"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="11"
+                                    width="18"
+                                    height="11"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                </svg>
+                                Unlock
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
+                  <button
+                    onClick={handleBackwardRedistributeCancel}
+                    className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBackwardRedistributeConfirm}
+                    disabled={!preview.canRedistribute}
+                    className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Success Toast */}
       {showSuccessToast && createdJobNumber && (

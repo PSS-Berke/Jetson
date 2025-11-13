@@ -1,16 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { useMachines } from '@/hooks/useMachines';
-import { useCalendarJobs } from '@/hooks/useCalendarJobs';
-import { useMachineCapacity } from '@/hooks/useMachineCapacity';
-import { CalendarViewType } from '@/types/calendar';
-import { getMonthRange, getWeeklyViewRange, getQuarterlyViewRange } from '@/lib/dateUtils';
-import { ParsedJob } from '@/hooks/useJobs';
-import CalendarView from './CalendarView';
-import QuarterlyCalendarView from './QuarterlyCalendarView';
-import WeeklyCalendarView from './WeeklyCalendarView';
-import EditJobModal from './EditJobModal';
+import { useState, useMemo, useEffect } from "react";
+import { useMachines } from "@/hooks/useMachines";
+import { useCalendarJobs } from "@/hooks/useCalendarJobs";
+import { useMachineCapacity } from "@/hooks/useMachineCapacity";
+import { CalendarViewType } from "@/types/calendar";
+import {
+  getMonthRange,
+  getWeeklyViewRange,
+  getQuarterlyViewRange,
+} from "@/lib/dateUtils";
+import { ParsedJob } from "@/hooks/useJobs";
+import CalendarView from "./CalendarView";
+import QuarterlyCalendarView from "./QuarterlyCalendarView";
+import WeeklyCalendarView from "./WeeklyCalendarView";
+import EditJobModal from "./EditJobModal";
 
 interface EmbeddedCalendarProps {
   startDate?: Date;
@@ -18,10 +22,10 @@ interface EmbeddedCalendarProps {
   selectedClients?: number[];
   selectedServiceTypes?: string[];
   searchQuery?: string;
-  scheduleFilter?: 'all' | 'confirmed' | 'soft';
-  filterMode?: 'and' | 'or';
+  scheduleFilter?: "all" | "confirmed" | "soft";
+  filterMode?: "and" | "or";
   height?: number;
-  viewType?: CalendarViewType | 'quarterly';
+  viewType?: CalendarViewType | "quarterly";
 }
 
 export default function EmbeddedCalendar({
@@ -29,11 +33,11 @@ export default function EmbeddedCalendar({
   selectedFacility,
   selectedClients = [],
   selectedServiceTypes = [],
-  searchQuery = '',
-  scheduleFilter = 'all',
-  filterMode = 'and',
+  searchQuery = "",
+  scheduleFilter = "all",
+  filterMode = "and",
   height = 500,
-  viewType = 'month',
+  viewType = "month",
 }: EmbeddedCalendarProps) {
   const [currentDate, setCurrentDate] = useState(startDate || new Date());
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
@@ -49,11 +53,11 @@ export default function EmbeddedCalendar({
   // Get date range based on view type
   const dateRange = useMemo(() => {
     switch (viewType) {
-      case 'month':
+      case "month":
         return getMonthRange(currentDate); // Show full calendar month
-      case 'week':
+      case "week":
         return getWeeklyViewRange(currentDate); // Fetch 5 weeks of data
-      case 'quarterly':
+      case "quarterly":
         return getQuarterlyViewRange(currentDate); // Fetch 4 quarters of data
       default:
         return getMonthRange(currentDate);
@@ -63,7 +67,11 @@ export default function EmbeddedCalendar({
   // Fetch data
   const { machines, isLoading: machinesLoading } = useMachines();
 
-  const { filteredJobs, events, isLoading: jobsLoading } = useCalendarJobs({
+  const {
+    filteredJobs,
+    events,
+    isLoading: jobsLoading,
+  } = useCalendarJobs({
     machines,
     facilityId: selectedFacility,
     startDate: dateRange.start,
@@ -137,29 +145,31 @@ export default function EmbeddedCalendar({
       {/* Header */}
       <div className="px-6 py-4 border-b border-[var(--border)] bg-gray-50">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--dark-blue)]">Calendar View</h3>
+          <h3 className="text-lg font-bold text-[var(--dark-blue)]">
+            Calendar View
+          </h3>
         </div>
       </div>
 
       {/* Calendar Content */}
       <div className="p-4">
         {isLoading ? (
-          <div className="flex items-center justify-center" style={{ height: `${height}px` }}>
+          <div
+            className="flex items-center justify-center"
+            style={{ height: `${height}px` }}
+          >
             <div className="text-[var(--text-light)]">Loading calendar...</div>
           </div>
-        ) : viewType === 'quarterly' ? (
+        ) : viewType === "quarterly" ? (
           <QuarterlyCalendarView
             jobs={filteredJobs}
             year={currentDate.getFullYear()}
             startDate={currentDate}
           />
-        ) : viewType === 'week' ? (
-          <WeeklyCalendarView
-            jobs={filteredJobs}
-            startDate={currentDate}
-          />
+        ) : viewType === "week" ? (
+          <WeeklyCalendarView jobs={filteredJobs} startDate={currentDate} />
         ) : (
-          <div style={{ minHeight: `${height}px`, height: 'auto' }}>
+          <div style={{ minHeight: `${height}px`, height: "auto" }}>
             <CalendarView
               events={events}
               dailySummaries={dailySummaries}

@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { DataTableProps, SortDirection } from './DataTableTypes';
-import { DataTableHeader } from './DataTableHeader';
-import { DataTableRow } from './DataTableRow';
-import { DataTableBulkActions } from './DataTableBulkActions';
-import { DataTablePagination } from './DataTablePagination';
-import { DataTableMobileCard } from './DataTableMobileCard';
+import { useState, useMemo, useEffect } from "react";
+import { DataTableProps, SortDirection } from "./DataTableTypes";
+import { DataTableHeader } from "./DataTableHeader";
+import { DataTableRow } from "./DataTableRow";
+import { DataTableBulkActions } from "./DataTableBulkActions";
+import { DataTablePagination } from "./DataTablePagination";
+import { DataTableMobileCard } from "./DataTableMobileCard";
 
 export function DataTable<T extends Record<string, any>>({
   data,
@@ -20,18 +20,24 @@ export function DataTable<T extends Record<string, any>>({
   defaultSort,
   onSortChange,
   onRowClick,
-  className = '',
+  className = "",
   striped = true,
   hover = true,
-  emptyMessage = 'No data available',
-  loading = false
+  emptyMessage = "No data available",
+  loading = false,
 }: DataTableProps<T>) {
   // Selection state
-  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(
+    new Set(),
+  );
 
   // Sorting state
-  const [sortField, setSortField] = useState<string | null>(defaultSort?.field || null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSort?.direction || null);
+  const [sortField, setSortField] = useState<string | null>(
+    defaultSort?.field || null,
+  );
+  const [sortDirection, setSortDirection] = useState<SortDirection>(
+    defaultSort?.direction || null,
+  );
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,8 +52,8 @@ export function DataTable<T extends Record<string, any>>({
       setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Helper to get nested value
@@ -57,7 +63,7 @@ export function DataTable<T extends Record<string, any>>({
       return column.getValue(row);
     }
 
-    const keys = key.split('.');
+    const keys = key.split(".");
     let value: any = row;
     for (const k of keys) {
       value = value?.[k];
@@ -78,15 +84,15 @@ export function DataTable<T extends Record<string, any>>({
       if (bValue === null || bValue === undefined) return -1;
 
       let comparison = 0;
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
+      if (typeof aValue === "string" && typeof bValue === "string") {
         comparison = aValue.localeCompare(bValue);
-      } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+      } else if (typeof aValue === "number" && typeof bValue === "number") {
         comparison = aValue - bValue;
       } else {
         comparison = String(aValue).localeCompare(String(bValue));
       }
 
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
   }, [data, sortField, sortDirection]);
 
@@ -99,7 +105,9 @@ export function DataTable<T extends Record<string, any>>({
     return sortedData.slice(start, end);
   }, [sortedData, currentPage, pageSize, pagination?.enabled]);
 
-  const totalPages = pagination?.enabled ? Math.ceil(sortedData.length / pageSize) : 1;
+  const totalPages = pagination?.enabled
+    ? Math.ceil(sortedData.length / pageSize)
+    : 1;
 
   // Selection handlers
   const handleToggleSelect = (rowId: number | string) => {
@@ -113,7 +121,10 @@ export function DataTable<T extends Record<string, any>>({
 
     if (selection?.onSelectionChange) {
       const selectedRows = data.filter((row) => newSelected.has(getRowId(row)));
-      selection.onSelectionChange(Array.from(newSelected) as number[], selectedRows);
+      selection.onSelectionChange(
+        Array.from(newSelected) as number[],
+        selectedRows,
+      );
     }
   };
 
@@ -123,7 +134,10 @@ export function DataTable<T extends Record<string, any>>({
       setSelectedIds(allIds);
 
       if (selection?.onSelectionChange) {
-        selection.onSelectionChange(Array.from(allIds) as number[], paginatedData);
+        selection.onSelectionChange(
+          Array.from(allIds) as number[],
+          paginatedData,
+        );
       }
     } else {
       setSelectedIds(new Set());
@@ -142,12 +156,12 @@ export function DataTable<T extends Record<string, any>>({
 
   // Sorting handler
   const handleSort = (field: string) => {
-    let newDirection: SortDirection = 'asc';
+    let newDirection: SortDirection = "asc";
 
     if (sortField === field) {
-      if (sortDirection === 'asc') {
-        newDirection = 'desc';
-      } else if (sortDirection === 'desc') {
+      if (sortDirection === "asc") {
+        newDirection = "desc";
+      } else if (sortDirection === "desc") {
         newDirection = null;
         setSortField(null);
       }
@@ -174,8 +188,12 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   // Calculate selection state
-  const allSelected = paginatedData.length > 0 && paginatedData.every((row) => selectedIds.has(getRowId(row)));
-  const someSelected = paginatedData.some((row) => selectedIds.has(getRowId(row)));
+  const allSelected =
+    paginatedData.length > 0 &&
+    paginatedData.every((row) => selectedIds.has(getRowId(row)));
+  const someSelected = paginatedData.some((row) =>
+    selectedIds.has(getRowId(row)),
+  );
   const selectAllIndeterminate = someSelected && !allSelected;
 
   const selectedRows = useMemo(() => {
@@ -201,7 +219,7 @@ export function DataTable<T extends Record<string, any>>({
   }
 
   // Mobile card view
-  if (isMobile && mobile?.viewMode === 'cards') {
+  if (isMobile && mobile?.viewMode === "cards") {
     return (
       <div className={className}>
         {selection?.enabled && selection.bulkActions && (

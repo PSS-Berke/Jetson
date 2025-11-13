@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { CalendarFilters } from '@/types/calendar';
+import { useState, useEffect, useCallback } from "react";
+import { CalendarFilters } from "@/types/calendar";
 
-const STORAGE_KEY = 'calendar_filters';
+const STORAGE_KEY = "calendar_filters";
 
 interface UseCalendarFiltersReturn {
   filters: CalendarFilters;
@@ -25,7 +25,7 @@ const defaultFilters: CalendarFilters = {
   selectedServiceTypes: [],
   selectedCSRs: [],
   selectedProgramCadences: [],
-  dateRange: undefined
+  dateRange: undefined,
 };
 
 /**
@@ -44,13 +44,13 @@ export const useCalendarFilters = (): UseCalendarFiltersReturn => {
         if (parsed.dateRange) {
           parsed.dateRange = {
             start: new Date(parsed.dateRange.start),
-            end: new Date(parsed.dateRange.end)
+            end: new Date(parsed.dateRange.end),
           };
         }
         setFilters(parsed);
       }
     } catch (error) {
-      console.error('Error loading calendar filters:', error);
+      console.error("Error loading calendar filters:", error);
     }
   }, []);
 
@@ -59,45 +59,48 @@ export const useCalendarFilters = (): UseCalendarFiltersReturn => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
     } catch (error) {
-      console.error('Error saving calendar filters:', error);
+      console.error("Error saving calendar filters:", error);
     }
   }, [filters]);
 
   const setSelectedMachines = useCallback((machines: number[]) => {
-    setFilters(prev => ({ ...prev, selectedMachines: machines }));
+    setFilters((prev) => ({ ...prev, selectedMachines: machines }));
   }, []);
 
   const setSelectedClients = useCallback((clients: number[]) => {
-    setFilters(prev => ({ ...prev, selectedClients: clients }));
+    setFilters((prev) => ({ ...prev, selectedClients: clients }));
   }, []);
 
   const setSelectedServiceTypes = useCallback((types: string[]) => {
-    setFilters(prev => ({ ...prev, selectedServiceTypes: types }));
+    setFilters((prev) => ({ ...prev, selectedServiceTypes: types }));
   }, []);
 
   const setSelectedCSRs = useCallback((csrs: string[]) => {
-    setFilters(prev => ({ ...prev, selectedCSRs: csrs }));
+    setFilters((prev) => ({ ...prev, selectedCSRs: csrs }));
   }, []);
 
   const setSelectedProgramCadences = useCallback((cadences: string[]) => {
-    setFilters(prev => ({ ...prev, selectedProgramCadences: cadences }));
+    setFilters((prev) => ({ ...prev, selectedProgramCadences: cadences }));
   }, []);
 
-  const setDateRange = useCallback((range: { start: Date; end: Date } | undefined) => {
-    setFilters(prev => ({ ...prev, dateRange: range }));
-  }, []);
+  const setDateRange = useCallback(
+    (range: { start: Date; end: Date } | undefined) => {
+      setFilters((prev) => ({ ...prev, dateRange: range }));
+    },
+    [],
+  );
 
   const clearFilters = useCallback(() => {
     setFilters(defaultFilters);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
-      console.error('Error clearing calendar filters:', error);
+      console.error("Error clearing calendar filters:", error);
     }
   }, []);
 
   const toggleMachine = useCallback((machineId: number) => {
-    setFilters(prev => {
+    setFilters((prev) => {
       const machines = [...prev.selectedMachines];
       const index = machines.indexOf(machineId);
       if (index > -1) {
@@ -110,11 +113,11 @@ export const useCalendarFilters = (): UseCalendarFiltersReturn => {
   }, []);
 
   const selectAllMachines = useCallback((allMachineIds: number[]) => {
-    setFilters(prev => ({ ...prev, selectedMachines: allMachineIds }));
+    setFilters((prev) => ({ ...prev, selectedMachines: allMachineIds }));
   }, []);
 
   const selectNoMachines = useCallback(() => {
-    setFilters(prev => ({ ...prev, selectedMachines: [] }));
+    setFilters((prev) => ({ ...prev, selectedMachines: [] }));
   }, []);
 
   return {
@@ -128,6 +131,6 @@ export const useCalendarFilters = (): UseCalendarFiltersReturn => {
     clearFilters,
     toggleMachine,
     selectAllMachines,
-    selectNoMachines
+    selectNoMachines,
   };
 };

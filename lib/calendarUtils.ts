@@ -1,4 +1,4 @@
-import { ParsedJob } from '@/hooks/useJobs';
+import { ParsedJob } from "@/hooks/useJobs";
 import {
   CalendarEvent,
   DailySummary,
@@ -8,13 +8,9 @@ import {
   MachineCapacityData,
   MachineCapacityDay,
   Machine,
-  JobMachineAllocation
-} from '@/types/calendar';
-import {
-  timestampToDate,
-  getDaysBetween,
-  getDateKey
-} from './dateUtils';
+  JobMachineAllocation,
+} from "@/types/calendar";
+import { timestampToDate, getDaysBetween, getDateKey } from "./dateUtils";
 import {
   calculateMultiMachineTimeEstimate,
   distributeHoursAcrossMachines,
@@ -23,26 +19,24 @@ import {
   calculateDailyPieces,
   calculateDailyMachineCapacity,
   calculateUtilizationPercent,
-  getUtilizationColorVar
-} from './capacityUtils';
+  getUtilizationColorVar,
+} from "./capacityUtils";
 
 /**
  * Transform jobs into calendar events aggregated by service type and date
  */
-export const transformJobsToEvents = (
-  jobs: ParsedJob[]
-): CalendarEvent[] => {
+export const transformJobsToEvents = (jobs: ParsedJob[]): CalendarEvent[] => {
   // Group jobs by service type and date
   const serviceTypeByDate = new Map<string, Map<string, ParsedJob[]>>();
 
-  jobs.forEach(job => {
+  jobs.forEach((job) => {
     const startDate = timestampToDate(job.start_date);
     const endDate = timestampToDate(job.due_date);
     const jobDays = getDaysBetween(startDate, endDate);
-    const serviceType = job.service_type || 'Unknown';
+    const serviceType = job.service_type || "Unknown";
 
     // Add job to each day it spans
-    jobDays.forEach(day => {
+    jobDays.forEach((day) => {
       const dateKey = getDateKey(day);
 
       if (!serviceTypeByDate.has(dateKey)) {
@@ -69,8 +63,12 @@ export const transformJobsToEvents = (
       let totalPieces = 0;
       let totalRevenue = 0;
 
-      jobs.forEach(job => {
-        const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
+      jobs.forEach((job) => {
+        const dailyPieces = calculateDailyPieces(
+          job.quantity,
+          job.start_date,
+          job.due_date,
+        );
         const dailyRevenue = calculateDailyRevenue(job);
         totalPieces += dailyPieces;
         totalRevenue += dailyRevenue;
@@ -87,7 +85,7 @@ export const transformJobsToEvents = (
         jobCount: jobs.length,
         jobs,
         color: getServiceTypeColor(serviceType),
-        allDay: true
+        allDay: true,
       });
     });
   });
@@ -102,13 +100,13 @@ export const calculateDailySummaries = (
   jobs: ParsedJob[],
   _machines: Machine[],
   startDate: Date,
-  endDate: Date
+  endDate: Date,
 ): Map<string, DailySummary> => {
   const summaries = new Map<string, DailySummary>();
   const days = getDaysBetween(startDate, endDate);
 
   // Initialize all days
-  days.forEach(day => {
+  days.forEach((day) => {
     const dateKey = getDateKey(day);
     summaries.set(dateKey, {
       date: day,
@@ -125,18 +123,22 @@ export const calculateDailySummaries = (
         labelApply: 0,
         fold: 0,
         laser: 0,
-        hpPress: 0
-      }
+        hpPress: 0,
+      },
     });
   });
 
   // Accumulate data from jobs
-  jobs.forEach(job => {
+  jobs.forEach((job) => {
     const jobStart = timestampToDate(job.start_date);
     const jobEnd = timestampToDate(job.due_date);
     const jobDays = getDaysBetween(jobStart, jobEnd);
 
-    const dailyPieces = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
+    const dailyPieces = calculateDailyPieces(
+      job.quantity,
+      job.start_date,
+      job.due_date,
+    );
     const dailyRevenue = calculateDailyRevenue(job);
 
     // Get process types from requirements
@@ -147,9 +149,12 @@ export const calculateDailySummaries = (
       }
     });
 
-    console.log(`[CalendarUtils] Job ${job.job_number}: quantity=${job.quantity}, dailyPieces=${dailyPieces}, processTypes=`, Array.from(processTypes));
+    console.log(
+      `[CalendarUtils] Job ${job.job_number}: quantity=${job.quantity}, dailyPieces=${dailyPieces}, processTypes=`,
+      Array.from(processTypes),
+    );
 
-    jobDays.forEach(day => {
+    jobDays.forEach((day) => {
       const dateKey = getDateKey(day);
       const summary = summaries.get(dateKey);
       if (summary) {
@@ -158,31 +163,31 @@ export const calculateDailySummaries = (
         summary.jobCount += 1;
 
         // Add daily pieces to each process type this job uses
-        processTypes.forEach(processType => {
+        processTypes.forEach((processType) => {
           switch (processType) {
-            case 'insert':
+            case "insert":
               summary.processTypeCounts.insert += dailyPieces;
               break;
-            case 'sort':
+            case "sort":
               summary.processTypeCounts.sort += dailyPieces;
               break;
-            case 'inkjet':
-            case 'ij':
-            case 'ink jet':
+            case "inkjet":
+            case "ij":
+            case "ink jet":
               summary.processTypeCounts.inkjet += dailyPieces;
               break;
-            case 'label/apply':
-            case 'l/a':
-            case 'label/affix':
+            case "label/apply":
+            case "l/a":
+            case "label/affix":
               summary.processTypeCounts.labelApply += dailyPieces;
               break;
-            case 'fold':
+            case "fold":
               summary.processTypeCounts.fold += dailyPieces;
               break;
-            case 'laser':
+            case "laser":
               summary.processTypeCounts.laser += dailyPieces;
               break;
-            case 'hp press':
+            case "hp press":
               summary.processTypeCounts.hpPress += dailyPieces;
               break;
           }
@@ -191,11 +196,14 @@ export const calculateDailySummaries = (
     });
   });
 
-  console.log('[CalendarUtils] Final daily summaries:', Array.from(summaries.entries()).map(([key, val]) => ({
-    date: key,
-    totalPieces: val.totalPieces,
-    processTypeCounts: val.processTypeCounts
-  })));
+  console.log(
+    "[CalendarUtils] Final daily summaries:",
+    Array.from(summaries.entries()).map(([key, val]) => ({
+      date: key,
+      totalPieces: val.totalPieces,
+      processTypeCounts: val.processTypeCounts,
+    })),
+  );
 
   return summaries;
 };
@@ -207,16 +215,16 @@ export const calculateMachineCapacities = (
   jobs: ParsedJob[],
   machines: Machine[],
   startDate: Date,
-  endDate: Date
+  endDate: Date,
 ): Map<number, MachineCapacityData> => {
   const capacityData = new Map<number, MachineCapacityData>();
 
-  machines.forEach(machine => {
+  machines.forEach((machine) => {
     const dailyCapacity = new Map<string, MachineCapacityDay>();
     const days = getDaysBetween(startDate, endDate);
 
     // Initialize each day for this machine
-    days.forEach(day => {
+    days.forEach((day) => {
       const dateKey = getDateKey(day);
       dailyCapacity.set(dateKey, {
         date: day,
@@ -225,33 +233,37 @@ export const calculateMachineCapacities = (
         availableHours: calculateDailyMachineCapacity(machine),
         utilizationPercent: 0,
         jobs: [],
-        color: 'var(--success)'
+        color: "var(--success)",
       });
     });
 
     // Calculate allocated hours from jobs
-    jobs.forEach(job => {
+    jobs.forEach((job) => {
       // Check if this job uses this machine
-      const jobUsesMachine = job.machines.some(jm => jm.id === machine.id);
+      const jobUsesMachine = job.machines.some((jm) => jm.id === machine.id);
       if (!jobUsesMachine) return;
 
-      const jobMachines = machines.filter(m =>
-        job.machines.some(jm => jm.id === m.id)
+      const jobMachines = machines.filter((m) =>
+        job.machines.some((jm) => jm.id === m.id),
       );
 
       // Calculate time estimate
-      const timeEstimate = job.time_estimate ||
+      const timeEstimate =
+        job.time_estimate ||
         calculateMultiMachineTimeEstimate(job.quantity, jobMachines);
 
       // Distribute hours across machines
-      const hoursPerMachine = distributeHoursAcrossMachines(timeEstimate, jobMachines);
+      const hoursPerMachine = distributeHoursAcrossMachines(
+        timeEstimate,
+        jobMachines,
+      );
       const machineHours = hoursPerMachine.get(machine.id) || 0;
 
       // Distribute across days
       const hoursPerDay = distributeHoursAcrossDays(
         machineHours,
         job.start_date,
-        job.due_date
+        job.due_date,
       );
 
       // Add to daily capacity
@@ -263,7 +275,7 @@ export const calculateMachineCapacities = (
             jobNumber: job.job_number,
             jobName: job.job_name,
             clientName: job.client.name,
-            hours
+            hours,
           });
         }
       });
@@ -277,7 +289,7 @@ export const calculateMachineCapacities = (
     dailyCapacity.forEach((dayData, dateKey) => {
       dayData.utilizationPercent = calculateUtilizationPercent(
         dayData.allocatedHours,
-        dayData.availableHours
+        dayData.availableHours,
       );
       dayData.color = getUtilizationColorVar(dayData.utilizationPercent);
 
@@ -297,7 +309,7 @@ export const calculateMachineCapacities = (
       totalUtilization,
       averageUtilization: Math.round(averageUtilization),
       peakUtilization,
-      peakDate
+      peakDate,
     });
   });
 
@@ -310,14 +322,14 @@ export const calculateMachineCapacities = (
 export const getDayBreakdown = (
   date: Date,
   jobs: ParsedJob[],
-  machines: Machine[]
+  machines: Machine[],
 ): DayBreakdown => {
   const dateKey = getDateKey(date);
   const jobDetails: JobDayDetail[] = [];
   const machineDetails = new Map<number, MachineDayDetail>();
 
   // Initialize machine details
-  machines.forEach(machine => {
+  machines.forEach((machine) => {
     machineDetails.set(machine.id, {
       machine,
       totalHoursAllocated: 0,
@@ -326,8 +338,8 @@ export const getDayBreakdown = (
       jobs: [],
       shift1Hours: 0,
       shift2Hours: 0,
-      color: 'var(--success)',
-      status: machine.status
+      color: "var(--success)",
+      status: machine.status,
     });
   });
 
@@ -335,27 +347,39 @@ export const getDayBreakdown = (
   let totalRevenue = 0;
 
   // Process each job that falls on this date
-  jobs.forEach(job => {
+  jobs.forEach((job) => {
     const jobStart = timestampToDate(job.start_date);
     const jobEnd = timestampToDate(job.due_date);
     const jobDays = getDaysBetween(jobStart, jobEnd);
 
     // Check if job is active on this date
-    const isActiveOnDate = jobDays.some(d => getDateKey(d) === dateKey);
+    const isActiveOnDate = jobDays.some((d) => getDateKey(d) === dateKey);
     if (!isActiveOnDate) return;
 
-    const jobMachines = machines.filter(m =>
-      job.machines.some(jm => jm.id === m.id)
+    const jobMachines = machines.filter((m) =>
+      job.machines.some((jm) => jm.id === m.id),
     );
 
-    const timeEstimate = job.time_estimate ||
+    const timeEstimate =
+      job.time_estimate ||
       calculateMultiMachineTimeEstimate(job.quantity, jobMachines);
 
-    const hoursPerMachine = distributeHoursAcrossMachines(timeEstimate, jobMachines);
-    const hoursPerDay = distributeHoursAcrossDays(timeEstimate, job.start_date, job.due_date);
+    const hoursPerMachine = distributeHoursAcrossMachines(
+      timeEstimate,
+      jobMachines,
+    );
+    const hoursPerDay = distributeHoursAcrossDays(
+      timeEstimate,
+      job.start_date,
+      job.due_date,
+    );
     const hoursThisDay = hoursPerDay.get(dateKey) || 0;
 
-    const piecesThisDay = calculateDailyPieces(job.quantity, job.start_date, job.due_date);
+    const piecesThisDay = calculateDailyPieces(
+      job.quantity,
+      job.start_date,
+      job.due_date,
+    );
     const revenueThisDay = calculateDailyRevenue(job);
 
     totalPieces += piecesThisDay;
@@ -363,14 +387,14 @@ export const getDayBreakdown = (
 
     // Build machine allocations for this job
     const machineAllocations: JobMachineAllocation[] = [];
-    job.machines.forEach(jm => {
+    job.machines.forEach((jm) => {
       const hours = hoursPerMachine.get(jm.id) || 0;
       const dailyHours = hours / jobDays.length;
 
       machineAllocations.push({
         machineId: jm.id,
         machineLine: jm.line,
-        hoursAllocated: dailyHours
+        hoursAllocated: dailyHours,
       });
 
       // Update machine details
@@ -381,7 +405,7 @@ export const getDayBreakdown = (
           jobNumber: job.job_number,
           jobName: job.job_name,
           clientName: job.client.name,
-          hours: dailyHours
+          hours: dailyHours,
         });
 
         // For simplicity, distribute equally across shifts
@@ -395,8 +419,8 @@ export const getDayBreakdown = (
       piecesThisDay,
       revenueThisDay,
       hoursThisDay,
-      shifts: ['both'], // Simplified - could be enhanced based on requirements
-      machines: machineAllocations
+      shifts: ["both"], // Simplified - could be enhanced based on requirements
+      machines: machineAllocations,
     });
   });
 
@@ -405,10 +429,10 @@ export const getDayBreakdown = (
   let totalAllocated = 0;
   let totalAvailable = 0;
 
-  machineDetails.forEach(detail => {
+  machineDetails.forEach((detail) => {
     detail.utilizationPercent = calculateUtilizationPercent(
       detail.totalHoursAllocated,
-      detail.availableHours
+      detail.availableHours,
     );
     detail.color = getUtilizationColorVar(detail.utilizationPercent);
 
@@ -418,9 +442,18 @@ export const getDayBreakdown = (
     machineDetailsArray.push(detail);
   });
 
-  const overallUtilization = calculateUtilizationPercent(totalAllocated, totalAvailable);
-  const shift1Utilization = calculateUtilizationPercent(totalAllocated / 2, totalAvailable / 2);
-  const shift2Utilization = calculateUtilizationPercent(totalAllocated / 2, totalAvailable / 2);
+  const overallUtilization = calculateUtilizationPercent(
+    totalAllocated,
+    totalAvailable,
+  );
+  const shift1Utilization = calculateUtilizationPercent(
+    totalAllocated / 2,
+    totalAvailable / 2,
+  );
+  const shift2Utilization = calculateUtilizationPercent(
+    totalAllocated / 2,
+    totalAvailable / 2,
+  );
 
   return {
     date,
@@ -431,7 +464,7 @@ export const getDayBreakdown = (
     machines: machineDetailsArray,
     overallUtilization,
     shift1Utilization,
-    shift2Utilization
+    shift2Utilization,
   };
 };
 
@@ -440,19 +473,19 @@ export const getDayBreakdown = (
  */
 export const getServiceTypeColor = (serviceType: string): string => {
   const colors: { [key: string]: string } = {
-    'Insert': '#3B82F6',        // Blue
-    'Sort': '#10B981',          // Green
-    'Inkjet': '#F59E0B',        // Orange
-    'IJ': '#F59E0B',            // Orange (legacy support)
-    'Label/Apply': '#8B5CF6',   // Purple
-    'L/A': '#8B5CF6',           // Purple (legacy support)
-    'Fold': '#EC4899',          // Pink
-    'Laser': '#EF4444',         // Red
-    'HP Press': '#14B8A6',      // Teal
-    'Unknown': '#6B7280'        // Gray
+    Insert: "#3B82F6", // Blue
+    Sort: "#10B981", // Green
+    Inkjet: "#F59E0B", // Orange
+    IJ: "#F59E0B", // Orange (legacy support)
+    "Label/Apply": "#8B5CF6", // Purple
+    "L/A": "#8B5CF6", // Purple (legacy support)
+    Fold: "#EC4899", // Pink
+    Laser: "#EF4444", // Red
+    "HP Press": "#14B8A6", // Teal
+    Unknown: "#6B7280", // Gray
   };
 
-  return colors[serviceType] || '#6366F1'; // Default to indigo if not found
+  return colors[serviceType] || "#6366F1"; // Default to indigo if not found
 };
 
 /**
@@ -460,34 +493,34 @@ export const getServiceTypeColor = (serviceType: string): string => {
  */
 export const getProcessTypeColor = (processType: string): string => {
   const colors: { [key: string]: string } = {
-    'insert': '#3B82F6',        // Blue
-    'sort': '#10B981',          // Green
-    'inkjet': '#F59E0B',        // Orange
-    'labelApply': '#8B5CF6',    // Purple
-    'fold': '#EC4899',          // Pink
-    'laser': '#EF4444',         // Red
-    'hpPress': '#14B8A6'        // Teal
+    insert: "#3B82F6", // Blue
+    sort: "#10B981", // Green
+    inkjet: "#F59E0B", // Orange
+    labelApply: "#8B5CF6", // Purple
+    fold: "#EC4899", // Pink
+    laser: "#EF4444", // Red
+    hpPress: "#14B8A6", // Teal
   };
 
-  return colors[processType] || '#6B7280'; // Default to gray if not found
+  return colors[processType] || "#6B7280"; // Default to gray if not found
 };
 
 /**
  * Get a color for a job based on various factors (legacy, kept for compatibility)
  */
 export const getJobColor = (job: ParsedJob): string => {
-  return getServiceTypeColor(job.service_type || 'Unknown');
+  return getServiceTypeColor(job.service_type || "Unknown");
 };
 
 /**
  * Format currency for display
  */
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(amount);
 };
 
@@ -495,5 +528,5 @@ export const formatCurrency = (amount: number): string => {
  * Format large numbers for display
  */
 export const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat('en-US').format(Math.round(num));
+  return new Intl.NumberFormat("en-US").format(Math.round(num));
 };

@@ -1,5 +1,9 @@
-import type { TimeRange, JobProjection, ServiceTypeSummary } from '@/lib/projectionUtils';
-import { formatQuantity } from '@/lib/projectionUtils';
+import type {
+  TimeRange,
+  JobProjection,
+  ServiceTypeSummary,
+} from "@/lib/projectionUtils";
+import { formatQuantity } from "@/lib/projectionUtils";
 
 interface ProjectionsPDFTableProps {
   timeRanges: TimeRange[];
@@ -17,12 +21,14 @@ export default function ProjectionsPDFTable({
   // grandTotals,
 }: ProjectionsPDFTableProps) {
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('en-US').format(value);
+    return new Intl.NumberFormat("en-US").format(value);
   };
 
   return (
     <div className="pdf-table mb-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Projections Detail</h2>
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        Job Projections Detail
+      </h2>
 
       {/* Main Jobs Table */}
       <table className="w-full border-collapse border border-gray-300 text-[10px] mb-6">
@@ -53,7 +59,7 @@ export default function ProjectionsPDFTable({
               <th
                 key={idx}
                 className={`border border-gray-300 px-2 py-2 text-center font-semibold text-gray-700 ${
-                  idx % 2 === 0 ? 'bg-gray-200' : 'bg-gray-100'
+                  idx % 2 === 0 ? "bg-gray-200" : "bg-gray-100"
                 }`}
               >
                 {range.label}
@@ -67,7 +73,10 @@ export default function ProjectionsPDFTable({
         <tbody>
           {jobProjections.length === 0 ? (
             <tr>
-              <td colSpan={8 + timeRanges.length} className="border border-gray-300 px-2 py-4 text-center text-gray-500">
+              <td
+                colSpan={8 + timeRanges.length}
+                className="border border-gray-300 px-2 py-4 text-center text-gray-500"
+              >
                 No projection data available
               </td>
             </tr>
@@ -75,42 +84,63 @@ export default function ProjectionsPDFTable({
             jobProjections.map((projection, index) => {
               const job = projection.job;
               // Get unique process types
-              const processTypes = job.requirements && job.requirements.length > 0
-                ? [...new Set(job.requirements.map(req => req.process_type).filter(Boolean))]
-                : [];
+              const processTypes =
+                job.requirements && job.requirements.length > 0
+                  ? [
+                      ...new Set(
+                        job.requirements
+                          .map((req) => req.process_type)
+                          .filter(Boolean),
+                      ),
+                    ]
+                  : [];
 
               return (
-                <tr key={job.id || index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <tr
+                  key={job.id || index}
+                  className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                >
                   <td className="border border-gray-300 px-2 py-2 text-gray-900 font-medium">
                     {job.job_number}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900">
-                    {job.client?.name || 'Unknown'}
+                    {job.client?.name || "Unknown"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900 min-w-[80px] max-w-[100px]">
                     <div className="break-words whitespace-normal leading-tight">
-                      {processTypes.length > 0 ? processTypes.join(', ') : '-'}
+                      {processTypes.length > 0 ? processTypes.join(", ") : "-"}
                     </div>
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900 max-w-[150px] truncate">
-                    {job.description || 'N/A'}
+                    {job.description || "N/A"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-center text-gray-900">
                     {job.quantity.toLocaleString()}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-center text-gray-900">
-                    {job.start_date ? new Date(job.start_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : 'N/A'}
+                    {job.start_date
+                      ? new Date(job.start_date).toLocaleDateString("en-US", {
+                          month: "numeric",
+                          day: "numeric",
+                        })
+                      : "N/A"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-center text-gray-900">
-                    {job.due_date ? new Date(job.due_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : 'N/A'}
+                    {job.due_date
+                      ? new Date(job.due_date).toLocaleDateString("en-US", {
+                          month: "numeric",
+                          day: "numeric",
+                        })
+                      : "N/A"}
                   </td>
                   {timeRanges.map((range, idx) => {
-                    const quantity = projection.weeklyQuantities.get(range.label) || 0;
+                    const quantity =
+                      projection.weeklyQuantities.get(range.label) || 0;
                     return (
                       <td
                         key={idx}
                         className={`border border-gray-300 px-2 py-2 text-center text-gray-900 font-medium ${
-                          idx % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'
+                          idx % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
                         }`}
                       >
                         {formatQuantity(quantity)}
@@ -139,7 +169,10 @@ export default function ProjectionsPDFTable({
               Process Type
             </th>
             {timeRanges.map((range, idx) => (
-              <th key={idx} className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700">
+              <th
+                key={idx}
+                className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700"
+              >
                 {range.label}
               </th>
             ))}
@@ -151,34 +184,47 @@ export default function ProjectionsPDFTable({
         <tbody>
           {/* Calculate process type quantities by period */}
           {(() => {
-            const processTypeData: { [key: string]: { byPeriod: Map<string, number>; total: number } } = {
-              'Insert': { byPeriod: new Map(), total: 0 },
-              'Sort': { byPeriod: new Map(), total: 0 },
-              'Inkjet': { byPeriod: new Map(), total: 0 },
-              'Label/Apply': { byPeriod: new Map(), total: 0 },
-              'Fold': { byPeriod: new Map(), total: 0 },
-              'Laser': { byPeriod: new Map(), total: 0 },
-              'HP Press': { byPeriod: new Map(), total: 0 },
+            const processTypeData: {
+              [key: string]: { byPeriod: Map<string, number>; total: number };
+            } = {
+              Insert: { byPeriod: new Map(), total: 0 },
+              Sort: { byPeriod: new Map(), total: 0 },
+              Inkjet: { byPeriod: new Map(), total: 0 },
+              "Label/Apply": { byPeriod: new Map(), total: 0 },
+              Fold: { byPeriod: new Map(), total: 0 },
+              Laser: { byPeriod: new Map(), total: 0 },
+              "HP Press": { byPeriod: new Map(), total: 0 },
             };
 
             // Aggregate quantities by process type and period
-            jobProjections.forEach(projection => {
+            jobProjections.forEach((projection) => {
               const job = projection.job;
               if (job.requirements) {
-                job.requirements.forEach(req => {
+                job.requirements.forEach((req) => {
                   if (req.process_type) {
                     const processType = req.process_type;
                     if (!processTypeData[processType]) {
-                      processTypeData[processType] = { byPeriod: new Map(), total: 0 };
+                      processTypeData[processType] = {
+                        byPeriod: new Map(),
+                        total: 0,
+                      };
                     }
 
-                    timeRanges.forEach(range => {
-                      const quantity = projection.weeklyQuantities.get(range.label) || 0;
-                      const currentPeriodTotal = processTypeData[processType].byPeriod.get(range.label) || 0;
-                      processTypeData[processType].byPeriod.set(range.label, currentPeriodTotal + quantity);
+                    timeRanges.forEach((range) => {
+                      const quantity =
+                        projection.weeklyQuantities.get(range.label) || 0;
+                      const currentPeriodTotal =
+                        processTypeData[processType].byPeriod.get(
+                          range.label,
+                        ) || 0;
+                      processTypeData[processType].byPeriod.set(
+                        range.label,
+                        currentPeriodTotal + quantity,
+                      );
                     });
 
-                    processTypeData[processType].total += projection.totalQuantity;
+                    processTypeData[processType].total +=
+                      projection.totalQuantity;
                   }
                 });
               }
@@ -187,12 +233,18 @@ export default function ProjectionsPDFTable({
             return Object.entries(processTypeData)
               .filter(([, data]) => data.total > 0)
               .map(([processType, data], index) => (
-                <tr key={processType} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <tr
+                  key={processType}
+                  className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                >
                   <td className="border border-gray-300 px-3 py-2 font-medium text-gray-900">
                     {processType}
                   </td>
                   {timeRanges.map((range, idx) => (
-                    <td key={idx} className="border border-gray-300 px-3 py-2 text-right text-gray-900">
+                    <td
+                      key={idx}
+                      className="border border-gray-300 px-3 py-2 text-right text-gray-900"
+                    >
                       {formatNumber(data.byPeriod.get(range.label) || 0)}
                     </td>
                   ))}

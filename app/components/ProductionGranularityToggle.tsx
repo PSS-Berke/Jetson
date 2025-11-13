@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useRef, useLayoutEffect, useState } from 'react';
+import { useRef, useLayoutEffect, useState } from "react";
 
-type GranularityType = 'day' | 'week' | 'month';
+type GranularityType = "day" | "week" | "month";
 
 interface ProductionGranularityToggleProps {
   currentGranularity: GranularityType;
@@ -11,12 +11,12 @@ interface ProductionGranularityToggleProps {
 
 export default function ProductionGranularityToggle({
   currentGranularity,
-  onGranularityChange
+  onGranularityChange,
 }: ProductionGranularityToggleProps) {
   const granularities: { value: GranularityType; label: string }[] = [
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' }
+    { value: "day", label: "Day" },
+    { value: "week", label: "Week" },
+    { value: "month", label: "Month" },
   ];
 
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -25,7 +25,9 @@ export default function ProductionGranularityToggle({
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = granularities.findIndex(g => g.value === currentGranularity);
+      const selectedIndex = granularities.findIndex(
+        (g) => g.value === currentGranularity,
+      );
 
       // Reset bubble if no valid selection
       if (selectedIndex === -1) {
@@ -45,7 +47,7 @@ export default function ProductionGranularityToggle({
 
         setBubbleStyle({
           width: buttonRect.width,
-          left: buttonRect.left - containerRect.left - containerPadding
+          left: buttonRect.left - containerRect.left - containerPadding,
         });
       }
     };
@@ -53,9 +55,9 @@ export default function ProductionGranularityToggle({
     updateBubblePosition();
 
     // Update on window resize to handle responsive changes
-    window.addEventListener('resize', updateBubblePosition);
-    return () => window.removeEventListener('resize', updateBubblePosition);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.addEventListener("resize", updateBubblePosition);
+    return () => window.removeEventListener("resize", updateBubblePosition);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGranularity]);
 
   return (
@@ -70,7 +72,7 @@ export default function ProductionGranularityToggle({
             className="absolute top-1 bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
             style={{
               width: `${bubbleStyle.width}px`,
-              transform: `translateX(${bubbleStyle.left}px)`
+              transform: `translateX(${bubbleStyle.left}px)`,
             }}
           />
         )}
@@ -79,12 +81,14 @@ export default function ProductionGranularityToggle({
         {granularities.map((granularity, index) => (
           <button
             key={granularity.value}
-            ref={el => { buttonRefs.current[index] = el; }}
+            ref={(el) => {
+              buttonRefs.current[index] = el;
+            }}
             onClick={() => onGranularityChange(granularity.value)}
             className={`relative z-10 px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               currentGranularity === granularity.value
-                ? 'text-white'
-                : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
+                ? "text-white"
+                : "text-[var(--text-dark)] hover:text-[var(--primary-blue)]"
             }`}
           >
             {granularity.label}

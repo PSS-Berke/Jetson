@@ -1,17 +1,23 @@
-'use client';
+"use client";
 
-import { useRef, useLayoutEffect, useState, useMemo } from 'react';
+import { useRef, useLayoutEffect, useState, useMemo } from "react";
 
 interface ScheduleToggleProps {
   isConfirmed: boolean;
   onScheduleChange: (isConfirmed: boolean) => void;
 }
 
-export default function ScheduleToggle({ isConfirmed, onScheduleChange }: ScheduleToggleProps) {
-  const scheduleOptions = useMemo(() => [
-    { value: false, label: 'Soft Schedule', color: '#2E3192' },
-    { value: true, label: 'Schedule', color: '#EF3340' }
-  ], []);
+export default function ScheduleToggle({
+  isConfirmed,
+  onScheduleChange,
+}: ScheduleToggleProps) {
+  const scheduleOptions = useMemo(
+    () => [
+      { value: false, label: "Soft Schedule", color: "#2E3192" },
+      { value: true, label: "Schedule", color: "#EF3340" },
+    ],
+    [],
+  );
 
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -19,7 +25,9 @@ export default function ScheduleToggle({ isConfirmed, onScheduleChange }: Schedu
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = scheduleOptions.findIndex(opt => opt.value === isConfirmed);
+      const selectedIndex = scheduleOptions.findIndex(
+        (opt) => opt.value === isConfirmed,
+      );
 
       if (selectedIndex === -1) {
         setBubbleStyle({ width: 0, left: 0 });
@@ -38,7 +46,7 @@ export default function ScheduleToggle({ isConfirmed, onScheduleChange }: Schedu
 
         setBubbleStyle({
           width: buttonRect.width,
-          left: buttonRect.left - containerRect.left - containerPadding
+          left: buttonRect.left - containerRect.left - containerPadding,
         });
       }
     };
@@ -49,12 +57,14 @@ export default function ScheduleToggle({ isConfirmed, onScheduleChange }: Schedu
     });
 
     // Update on window resize to handle responsive changes
-    window.addEventListener('resize', updateBubblePosition);
-    return () => window.removeEventListener('resize', updateBubblePosition);
+    window.addEventListener("resize", updateBubblePosition);
+    return () => window.removeEventListener("resize", updateBubblePosition);
   }, [isConfirmed, scheduleOptions]);
 
   // Determine the current color based on selection
-  const currentColor = scheduleOptions.find(opt => opt.value === isConfirmed)?.color || '#2E3192';
+  const currentColor =
+    scheduleOptions.find((opt) => opt.value === isConfirmed)?.color ||
+    "#2E3192";
 
   return (
     <div className="flex flex-col gap-2">
@@ -70,7 +80,7 @@ export default function ScheduleToggle({ isConfirmed, onScheduleChange }: Schedu
             style={{
               width: `${bubbleStyle.width}px`,
               transform: `translateX(${bubbleStyle.left}px)`,
-              backgroundColor: currentColor
+              backgroundColor: currentColor,
             }}
           />
         )}
@@ -79,13 +89,15 @@ export default function ScheduleToggle({ isConfirmed, onScheduleChange }: Schedu
         {scheduleOptions.map((option, index) => (
           <button
             key={option.label}
-            ref={el => { buttonRefs.current[index] = el; }}
+            ref={(el) => {
+              buttonRefs.current[index] = el;
+            }}
             type="button"
             onClick={() => onScheduleChange(option.value)}
             className={`relative z-10 px-4 sm:px-4 lg:px-6 py-2.5 sm:py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               isConfirmed === option.value
-                ? 'text-white'
-                : 'text-[var(--text-dark)] hover:opacity-70'
+                ? "text-white"
+                : "text-[var(--text-dark)] hover:opacity-70"
             }`}
           >
             {option.label}

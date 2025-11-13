@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   // AreaChart,
   Area,
@@ -10,9 +10,9 @@ import {
   Legend,
   Line,
   ComposedChart,
-} from 'recharts';
-import { RevenueByPeriod, formatCurrency } from '@/lib/cfoUtils';
-import CFOClientSortToggle, { ClientSortType } from './CFOClientSortToggle';
+} from "recharts";
+import { RevenueByPeriod, formatCurrency } from "@/lib/cfoUtils";
+import CFOClientSortToggle, { ClientSortType } from "./CFOClientSortToggle";
 
 interface CFORevenueChartProps {
   currentPeriodData: RevenueByPeriod[];
@@ -23,17 +23,24 @@ interface CFORevenueChartProps {
 export default function CFORevenueChart({
   currentPeriodData,
   previousPeriodData,
-  title = 'Revenue Trend',
+  title = "Revenue Trend",
 }: CFORevenueChartProps) {
-  const [viewMode, setViewMode] = useState<ClientSortType>('revenue');
+  const [viewMode, setViewMode] = useState<ClientSortType>("revenue");
 
   // Get the current metric display name and data key
-  const metricName = viewMode === 'revenue' ? 'Revenue' : viewMode === 'volume' ? 'Volume' : 'Profit';
+  const metricName =
+    viewMode === "revenue"
+      ? "Revenue"
+      : viewMode === "volume"
+        ? "Volume"
+        : "Profit";
 
   // Merge current and previous period data for comparison
   const chartData = useMemo(() => {
     return currentPeriodData.map((current, index) => {
-      const previous = previousPeriodData ? previousPeriodData[index] : undefined;
+      const previous = previousPeriodData
+        ? previousPeriodData[index]
+        : undefined;
 
       return {
         period: current.period,
@@ -53,11 +60,11 @@ export default function CFORevenueChart({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getCurrentValue = (data: any) => {
     switch (viewMode) {
-      case 'revenue':
+      case "revenue":
         return data.currentRevenue;
-      case 'volume':
+      case "volume":
         return data.currentVolume;
-      case 'profit':
+      case "profit":
         return data.currentProfit;
       default:
         return data.currentRevenue;
@@ -67,11 +74,11 @@ export default function CFORevenueChart({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getPreviousValue = (data: any) => {
     switch (viewMode) {
-      case 'revenue':
+      case "revenue":
         return data.previousRevenue;
-      case 'volume':
+      case "volume":
         return data.previousVolume;
-      case 'profit':
+      case "profit":
         return data.previousProfit;
       default:
         return data.previousRevenue;
@@ -88,13 +95,13 @@ export default function CFORevenueChart({
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {payload.map((entry: any, index: number) => {
             const data = entry.payload;
-            const isCurrent = entry.name === 'current';
+            const isCurrent = entry.name === "current";
 
-            let displayValue = '';
-            if (viewMode === 'volume') {
+            let displayValue = "";
+            if (viewMode === "volume") {
               displayValue = isCurrent
-                ? data.currentVolume.toLocaleString() + ' pcs'
-                : data.previousVolume.toLocaleString() + ' pcs';
+                ? data.currentVolume.toLocaleString() + " pcs"
+                : data.previousVolume.toLocaleString() + " pcs";
             } else {
               displayValue = formatCurrency(entry.value);
             }
@@ -102,8 +109,8 @@ export default function CFORevenueChart({
             return (
               <div key={index} className="text-sm">
                 <span style={{ color: entry.color }} className="font-medium">
-                  {isCurrent ? 'Current Period' : 'Previous Period'}:
-                </span>{' '}
+                  {isCurrent ? "Current Period" : "Previous Period"}:
+                </span>{" "}
                 <span className="font-semibold">{displayValue}</span>
                 <span className="text-gray-500 ml-2">
                   ({isCurrent ? data.currentJobs : data.previousJobs} jobs)
@@ -119,7 +126,7 @@ export default function CFORevenueChart({
 
   // Format Y-axis ticks based on view mode
   const formatYAxis = (value: number) => {
-    if (viewMode === 'volume') {
+    if (viewMode === "volume") {
       // Format volume as number with commas
       if (value >= 1000000) {
         return `${(value / 1000000).toFixed(1)}M`;
@@ -149,12 +156,14 @@ export default function CFORevenueChart({
     return currValue > maxValue ? curr : max;
   }, chartData[0]);
 
-  const peakValue = Math.max(...chartData.map(d => getCurrentValue(d)));
-  const avgValue = chartData.reduce((sum, d) => sum + getCurrentValue(d), 0) / chartData.length;
+  const peakValue = Math.max(...chartData.map((d) => getCurrentValue(d)));
+  const avgValue =
+    chartData.reduce((sum, d) => sum + getCurrentValue(d), 0) /
+    chartData.length;
 
   const formatValue = (value: number) => {
-    if (viewMode === 'volume') {
-      return value.toLocaleString() + ' pcs';
+    if (viewMode === "volume") {
+      return value.toLocaleString() + " pcs";
     }
     return formatCurrency(value);
   };
@@ -164,9 +173,14 @@ export default function CFORevenueChart({
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-500">{metricName} projections across time periods</p>
+          <p className="text-sm text-gray-500">
+            {metricName} projections across time periods
+          </p>
         </div>
-        <CFOClientSortToggle currentSort={viewMode} onSortChange={setViewMode} />
+        <CFOClientSortToggle
+          currentSort={viewMode}
+          onSortChange={setViewMode}
+        />
       </div>
 
       <ResponsiveContainer width="100%" height={350}>
@@ -184,19 +198,19 @@ export default function CFORevenueChart({
           <XAxis
             dataKey="period"
             stroke="#6b7280"
-            style={{ fontSize: '12px' }}
+            style={{ fontSize: "12px" }}
           />
           <YAxis
             stroke="#6b7280"
-            style={{ fontSize: '12px' }}
+            style={{ fontSize: "12px" }}
             tickFormatter={formatYAxis}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend
-            wrapperStyle={{ paddingTop: '20px' }}
+            wrapperStyle={{ paddingTop: "20px" }}
             formatter={(value) => {
-              if (value === 'current') return 'Current Period';
-              if (value === 'previous') return 'Previous Period';
+              if (value === "current") return "Current Period";
+              if (value === "previous") return "Previous Period";
               return value;
             }}
           />
@@ -210,7 +224,7 @@ export default function CFORevenueChart({
               stroke="#9ca3af"
               strokeWidth={2}
               strokeDasharray="5 5"
-              dot={{ fill: '#9ca3af', r: 4 }}
+              dot={{ fill: "#9ca3af", r: 4 }}
               activeDot={{ r: 6 }}
             />
           )}
@@ -224,7 +238,7 @@ export default function CFORevenueChart({
             strokeWidth={3}
             fillOpacity={1}
             fill="url(#colorCurrent)"
-            dot={{ fill: '#3b82f6', r: 5 }}
+            dot={{ fill: "#3b82f6", r: 5 }}
             activeDot={{ r: 7 }}
           />
         </ComposedChart>
@@ -235,7 +249,7 @@ export default function CFORevenueChart({
         <div>
           <div className="text-xs text-gray-500">Peak Period</div>
           <div className="text-sm font-semibold text-gray-900">
-            {peakPeriod?.period || 'N/A'}
+            {peakPeriod?.period || "N/A"}
           </div>
         </div>
         <div>

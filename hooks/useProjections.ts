@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useJobs, type ParsedJob } from './useJobs';
+import { useMemo, useState, useEffect } from "react";
+import { useJobs, type ParsedJob } from "./useJobs";
 import {
   generateWeekRanges,
   calculateJobProjections,
@@ -12,34 +12,39 @@ import {
   type JobProjection,
   type ServiceTypeSummary,
   type TimeRange,
-} from '@/lib/projectionUtils';
-import { generateMonthRanges, generateQuarterRanges } from '@/lib/dateUtils';
-import { getProductionEntries } from '@/lib/api';
-import { aggregateProductionByJob } from '@/lib/productionUtils';
-import type { Granularity } from '@/app/components/GranularityToggle';
-import type { ProductionEntry } from '@/types';
-import { normalizeProcessType } from '@/lib/processTypeConfig';
+} from "@/lib/projectionUtils";
+import { generateMonthRanges, generateQuarterRanges } from "@/lib/dateUtils";
+import { getProductionEntries } from "@/lib/api";
+import { aggregateProductionByJob } from "@/lib/productionUtils";
+import type { Granularity } from "@/app/components/GranularityToggle";
+import type { ProductionEntry } from "@/types";
+import { normalizeProcessType } from "@/lib/processTypeConfig";
 
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
  */
 function getJobRevenue(job: ParsedJob): number {
   // Check if job has parsed requirements with price_per_m
-  if (job.requirements && Array.isArray(job.requirements) && job.requirements.length > 0) {
+  if (
+    job.requirements &&
+    Array.isArray(job.requirements) &&
+    job.requirements.length > 0
+  ) {
     const revenue = job.requirements.reduce((total, req) => {
       const pricePerMStr = req.price_per_m;
-      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const isValidPrice =
+        pricePerMStr && pricePerMStr !== "undefined" && pricePerMStr !== "null";
       const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
-      return total + ((job.quantity / 1000) * pricePerM);
+      return total + (job.quantity / 1000) * pricePerM;
     }, 0);
-    
+
     // Add add-on charges if available
-    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    const addOnCharges = parseFloat(job.add_on_charges || "0");
     return revenue + addOnCharges;
   }
-  
+
   // Fallback to total_billing
-  return parseFloat(job.total_billing || '0');
+  return parseFloat(job.total_billing || "0");
 }
 
 export interface ProcessTypeCounts {
@@ -73,13 +78,18 @@ export interface ProjectionFilters {
   serviceTypes: string[];
   searchQuery: string;
   granularity?: Granularity;
-  scheduleFilter?: 'all' | 'confirmed' | 'soft';
-  filterMode?: 'and' | 'or';
+  scheduleFilter?: "all" | "confirmed" | "soft";
+  filterMode?: "and" | "or";
 }
 
 // Helper function to count process types from job projections
-function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCounts {
-  console.log('[DEBUG] calculateProcessTypeCounts - Total projections:', projections.length);
+function calculateProcessTypeCounts(
+  projections: JobProjection[],
+): ProcessTypeCounts {
+  console.log(
+    "[DEBUG] calculateProcessTypeCounts - Total projections:",
+    projections.length,
+  );
 
   const counts: ProcessTypeCounts = {
     insert: { jobs: 0, pieces: 0 },
@@ -96,12 +106,20 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
 
   projections.forEach((projection) => {
     const job = projection.job;
-    console.log(`[DEBUG] Job ${job.job_number} - Requirements:`, job.requirements);
+    console.log(
+      `[DEBUG] Job ${job.job_number} - Requirements:`,
+      job.requirements,
+    );
 
     // Get unique process types for this job
     const processTypesInJob = new Set<string>();
     job.requirements?.forEach((req) => {
-      console.log(`[DEBUG] Job ${job.job_number} - Requirement:`, req, '| process_type:', req.process_type);
+      console.log(
+        `[DEBUG] Job ${job.job_number} - Requirement:`,
+        req,
+        "| process_type:",
+        req.process_type,
+      );
       if (req.process_type) {
         // Normalize the process type to ensure consistent matching
         const normalized = normalizeProcessType(req.process_type);
@@ -109,7 +127,10 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
       }
     });
 
-    console.log(`[DEBUG] Job ${job.job_number} - Process types found:`, Array.from(processTypesInJob));
+    console.log(
+      `[DEBUG] Job ${job.job_number} - Process types found:`,
+      Array.from(processTypesInJob),
+    );
 
     // Count each unique job once per process type and add its quantity
     processTypesInJob.forEach((processType) => {
@@ -120,31 +141,31 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
 
         // Increment the appropriate counter based on normalized process type
         switch (processType) {
-          case 'insert':
+          case "insert":
             counts.insert.jobs++;
             counts.insert.pieces += jobQuantity;
             break;
-          case 'sort':
+          case "sort":
             counts.sort.jobs++;
             counts.sort.pieces += jobQuantity;
             break;
-          case 'inkjet':
+          case "inkjet":
             counts.inkjet.jobs++;
             counts.inkjet.pieces += jobQuantity;
             break;
-          case 'labelApply':
+          case "labelApply":
             counts.labelApply.jobs++;
             counts.labelApply.pieces += jobQuantity;
             break;
-          case 'fold':
+          case "fold":
             counts.fold.jobs++;
             counts.fold.pieces += jobQuantity;
             break;
-          case 'laser':
+          case "laser":
             counts.laser.jobs++;
             counts.laser.pieces += jobQuantity;
             break;
-          case 'hpPress':
+          case "hpPress":
             counts.hpPress.jobs++;
             counts.hpPress.pieces += jobQuantity;
             break;
@@ -153,32 +174,40 @@ function calculateProcessTypeCounts(projections: JobProjection[]): ProcessTypeCo
     });
   });
 
-  console.log('[DEBUG] Final processTypeCounts:', counts);
+  console.log("[DEBUG] Final processTypeCounts:", counts);
   return counts;
 }
 
-export function useProjections(
-  startDate: Date,
-  filters: ProjectionFilters
-) {
+export function useProjections(startDate: Date, filters: ProjectionFilters) {
   // Fetch both jobs and production entries in parallel
-  const { jobs, isLoading, error, refetch: refetchJobs } = useJobs(filters.facility);
-  const granularity = filters.granularity || 'weekly';
+  const {
+    jobs,
+    isLoading,
+    error,
+    refetch: refetchJobs,
+  } = useJobs(filters.facility);
+  const granularity = filters.granularity || "weekly";
 
   // Fetch production entries to adjust projections (in parallel with jobs)
-  const [productionEntries, setProductionEntries] = useState<ProductionEntry[]>([]);
+  const [productionEntries, setProductionEntries] = useState<ProductionEntry[]>(
+    [],
+  );
   const [productionLoading, setProductionLoading] = useState(false);
 
   useEffect(() => {
     const fetchProduction = async () => {
       setProductionLoading(true);
       try {
-        const entries = await getProductionEntries(filters.facility || undefined);
+        const entries = await getProductionEntries(
+          filters.facility || undefined,
+        );
         setProductionEntries(entries);
       } catch (err) {
         // Silently handle error - production tracking is optional
         // Backend may not be set up yet with production_entries table
-        console.log('[useProjections] Production data not available (backend not configured yet)');
+        console.log(
+          "[useProjections] Production data not available (backend not configured yet)",
+        );
         setProductionEntries([]);
       } finally {
         setProductionLoading(false);
@@ -191,11 +220,11 @@ export function useProjections(
   // 1. Time ranges - only recalculates when granularity or startDate changes
   const timeRanges = useMemo<TimeRange[]>(() => {
     switch (granularity) {
-      case 'monthly':
+      case "monthly":
         return generateMonthRanges(startDate, 6);
-      case 'quarterly':
+      case "quarterly":
         return generateQuarterRanges(startDate, 6);
-      case 'weekly':
+      case "weekly":
       default:
         return generateWeekRanges(startDate);
     }
@@ -204,7 +233,10 @@ export function useProjections(
   // 2. Production aggregation - only recalculates when productionEntries changes
   const actualQuantitiesByJob = useMemo(() => {
     const aggregated = aggregateProductionByJob(productionEntries);
-    console.log('[useProjections] Actual quantities by job:', Object.fromEntries(aggregated));
+    console.log(
+      "[useProjections] Actual quantities by job:",
+      Object.fromEntries(aggregated),
+    );
     return aggregated;
   }, [productionEntries]);
 
@@ -226,7 +258,10 @@ export function useProjections(
         return projection;
       }
 
-      const remainingQuantity = Math.max(0, (projection.job.quantity || 0) - actualQuantity);
+      const remainingQuantity = Math.max(
+        0,
+        (projection.job.quantity || 0) - actualQuantity,
+      );
 
       if (remainingQuantity === 0) {
         const zeroedQuantities = new Map<string, number>();
@@ -256,7 +291,7 @@ export function useProjections(
       });
 
       console.log(
-        `[useProjections] Job ${projection.job.job_number}: original=${projection.job.quantity}, actual=${actualQuantity}, remaining=${remainingQuantity}, adjusted_total=${adjustedTotal}`
+        `[useProjections] Job ${projection.job.job_number}: original=${projection.job.quantity}, actual=${actualQuantity}, remaining=${remainingQuantity}, adjusted_total=${adjustedTotal}`,
       );
 
       return {
@@ -277,49 +312,76 @@ export function useProjections(
     const hasClientFilter = filters.clients.length > 0;
     const hasServiceTypeFilter = filters.serviceTypes.length > 0;
     const hasSearchFilter = filters.searchQuery.trim().length > 0;
-    const hasScheduleFilter = filters.scheduleFilter && filters.scheduleFilter !== 'all';
-    const filterMode = filters.filterMode || 'and';
+    const hasScheduleFilter =
+      filters.scheduleFilter && filters.scheduleFilter !== "all";
+    const filterMode = filters.filterMode || "and";
 
-    if (filterMode === 'or') {
-      return adjustedJobProjections.filter(p => {
-        if (!hasClientFilter && !hasServiceTypeFilter && !hasSearchFilter && !hasScheduleFilter) {
+    if (filterMode === "or") {
+      return adjustedJobProjections.filter((p) => {
+        if (
+          !hasClientFilter &&
+          !hasServiceTypeFilter &&
+          !hasSearchFilter &&
+          !hasScheduleFilter
+        ) {
           return true;
         }
 
-        const matchesClient = hasClientFilter && filters.clients.includes(p.job.client?.id);
-        const matchesServiceType = hasServiceTypeFilter && (
-          p.job.requirements && p.job.requirements.length > 0 &&
-          p.job.requirements.some(req =>
-            req.process_type && filters.serviceTypes.includes(req.process_type)
-          )
-        );
-        const matchesSearch = hasSearchFilter && (() => {
-          const query = filters.searchQuery.toLowerCase();
-          return (
-            p.job.job_number.toString().includes(query) ||
-            p.job.client?.name.toLowerCase().includes(query) ||
-            p.job.description?.toLowerCase().includes(query)
+        const matchesClient =
+          hasClientFilter && filters.clients.includes(p.job.client?.id);
+        const matchesServiceType =
+          hasServiceTypeFilter &&
+          p.job.requirements &&
+          p.job.requirements.length > 0 &&
+          p.job.requirements.some(
+            (req) =>
+              req.process_type &&
+              filters.serviceTypes.includes(req.process_type),
           );
-        })();
-        const matchesSchedule = hasScheduleFilter && (() => {
-          const isConfirmed = (p.job as any).confirmed === true || (p.job as any).confirmed === 1;
-          return filters.scheduleFilter === 'confirmed' ? isConfirmed : !isConfirmed;
-        })();
+        const matchesSearch =
+          hasSearchFilter &&
+          (() => {
+            const query = filters.searchQuery.toLowerCase();
+            return (
+              p.job.job_number.toString().includes(query) ||
+              p.job.client?.name.toLowerCase().includes(query) ||
+              p.job.description?.toLowerCase().includes(query)
+            );
+          })();
+        const matchesSchedule =
+          hasScheduleFilter &&
+          (() => {
+            const isConfirmed =
+              (p.job as any).confirmed === true ||
+              (p.job as any).confirmed === 1;
+            return filters.scheduleFilter === "confirmed"
+              ? isConfirmed
+              : !isConfirmed;
+          })();
 
-        return matchesClient || matchesServiceType || matchesSearch || matchesSchedule;
+        return (
+          matchesClient ||
+          matchesServiceType ||
+          matchesSearch ||
+          matchesSchedule
+        );
       });
     } else {
       let result = adjustedJobProjections;
 
       if (hasClientFilter) {
-        result = result.filter(p => filters.clients.includes(p.job.client?.id));
+        result = result.filter((p) =>
+          filters.clients.includes(p.job.client?.id),
+        );
       }
 
       if (hasServiceTypeFilter) {
-        result = result.filter(p => {
+        result = result.filter((p) => {
           if (p.job.requirements && p.job.requirements.length > 0) {
-            return p.job.requirements.some(req =>
-              req.process_type && filters.serviceTypes.includes(req.process_type)
+            return p.job.requirements.some(
+              (req) =>
+                req.process_type &&
+                filters.serviceTypes.includes(req.process_type),
             );
           }
           return false;
@@ -328,7 +390,7 @@ export function useProjections(
 
       if (hasSearchFilter) {
         const query = filters.searchQuery.toLowerCase();
-        result = result.filter(p => {
+        result = result.filter((p) => {
           const job = p.job;
           return (
             job.job_number.toString().includes(query) ||
@@ -339,11 +401,12 @@ export function useProjections(
       }
 
       if (hasScheduleFilter) {
-        result = result.filter(p => {
-          const isConfirmed = (p.job as any).confirmed === true || (p.job as any).confirmed === 1;
-          if (filters.scheduleFilter === 'confirmed') {
+        result = result.filter((p) => {
+          const isConfirmed =
+            (p.job as any).confirmed === true || (p.job as any).confirmed === 1;
+          if (filters.scheduleFilter === "confirmed") {
             return isConfirmed;
-          } else if (filters.scheduleFilter === 'soft') {
+          } else if (filters.scheduleFilter === "soft") {
             return !isConfirmed;
           }
           return true;
@@ -356,7 +419,10 @@ export function useProjections(
 
   // 5. Service summaries and grand totals - only recalculates when filteredProjections or timeRanges change
   const { serviceSummaries, grandTotals } = useMemo(() => {
-    const summaries = calculateGenericServiceTypeSummaries(filteredProjections, timeRanges);
+    const summaries = calculateGenericServiceTypeSummaries(
+      filteredProjections,
+      timeRanges,
+    );
     const totals = calculateGenericGrandTotals(summaries, timeRanges);
     return { serviceSummaries: summaries, grandTotals: totals };
   }, [filteredProjections, timeRanges]);
@@ -368,31 +434,41 @@ export function useProjections(
 
   // 7. Revenue and job counts - only recalculates when filteredProjections change
   const { totalRevenue, totalJobsInTimeframe } = useMemo(() => {
-    console.log(`[Total Revenue] Starting calculation for ${filteredProjections.length} filtered jobs`);
+    console.log(
+      `[Total Revenue] Starting calculation for ${filteredProjections.length} filtered jobs`,
+    );
     const revenue = filteredProjections.reduce((total, projection) => {
       const job = projection.job;
       const jobBilling = getJobRevenue(job);
       const totalJobQuantity = job.quantity || 0;
 
       if (totalJobQuantity === 0) {
-        console.log(`[Total Revenue] Job ${job.job_number}: skipping (quantity is 0)`);
+        console.log(
+          `[Total Revenue] Job ${job.job_number}: skipping (quantity is 0)`,
+        );
         return total;
       }
 
       const portionInTimeframe = projection.totalQuantity / totalJobQuantity;
       const proportionalRevenue = jobBilling * portionInTimeframe;
 
-      console.log(`[Total Revenue] Job ${job.job_number}: revenue=$${jobBilling.toFixed(2)}, portion=${(portionInTimeframe * 100).toFixed(1)}%, proportional_revenue=$${proportionalRevenue.toFixed(2)}`);
+      console.log(
+        `[Total Revenue] Job ${job.job_number}: revenue=$${jobBilling.toFixed(2)}, portion=${(portionInTimeframe * 100).toFixed(1)}%, proportional_revenue=$${proportionalRevenue.toFixed(2)}`,
+      );
       return total + proportionalRevenue;
     }, 0);
-    console.log(`[Total Revenue] Final total: $${revenue.toFixed(2)} from ${filteredProjections.length} jobs`);
+    console.log(
+      `[Total Revenue] Final total: $${revenue.toFixed(2)} from ${filteredProjections.length} jobs`,
+    );
 
     const jobsCount = new Set(
       filteredProjections
-        .filter(p => p.totalQuantity > 0)
-        .map(p => p.job.id)
+        .filter((p) => p.totalQuantity > 0)
+        .map((p) => p.job.id),
     ).size;
-    console.log(`[Total Jobs] ${jobsCount} jobs have activity in the selected timeframe (out of ${filteredProjections.length} total)`);
+    console.log(
+      `[Total Jobs] ${jobsCount} jobs have activity in the selected timeframe (out of ${filteredProjections.length} total)`,
+    );
 
     return { totalRevenue: revenue, totalJobsInTimeframe: jobsCount };
   }, [filteredProjections]);
@@ -454,10 +530,14 @@ export function useProjections(
       (async () => {
         setProductionLoading(true);
         try {
-          const entries = await getProductionEntries(filters.facility || undefined);
+          const entries = await getProductionEntries(
+            filters.facility || undefined,
+          );
           setProductionEntries(entries);
         } catch (err) {
-          console.log('[useProjections] Production data not available (backend not configured yet)');
+          console.log(
+            "[useProjections] Production data not available (backend not configured yet)",
+          );
           setProductionEntries([]);
         } finally {
           setProductionLoading(false);

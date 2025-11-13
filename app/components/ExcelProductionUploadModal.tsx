@@ -1,17 +1,17 @@
-import React, { useState, useCallback } from 'react';
-import { ParsedJob } from '@/hooks/useJobs';
-import { ProductionEntry } from '@/types';
-import { parseExcelFile, ExcelParseResult } from '@/lib/excelParser';
+import React, { useState, useCallback } from "react";
+import { ParsedJob } from "@/hooks/useJobs";
+import { ProductionEntry } from "@/types";
+import { parseExcelFile, ExcelParseResult } from "@/lib/excelParser";
 import {
   validateProductionRows,
   ValidatedProductionRow,
   getValidationSummary,
   ValidationSummary,
-} from '@/lib/productionValidator';
-import { batchCreateProductionEntries } from '@/lib/api';
-import ExcelUploadZone from './ExcelUploadZone';
-import ExcelPreviewTable from './ExcelPreviewTable';
-import Toast from './Toast';
+} from "@/lib/productionValidator";
+import { batchCreateProductionEntries } from "@/lib/api";
+import ExcelUploadZone from "./ExcelUploadZone";
+import ExcelPreviewTable from "./ExcelPreviewTable";
+import Toast from "./Toast";
 
 interface ExcelProductionUploadModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ interface ExcelProductionUploadModalProps {
   existingEntries?: ProductionEntry[];
 }
 
-type Step = 'upload' | 'preview' | 'confirm' | 'uploading' | 'complete';
+type Step = "upload" | "preview" | "confirm" | "uploading" | "complete";
 
 /**
  * Main modal component for uploading production data from Excel
@@ -35,20 +35,28 @@ export default function ExcelProductionUploadModal({
   facilitiesId,
   existingEntries,
 }: ExcelProductionUploadModalProps) {
-  const [step, setStep] = useState<Step>('upload');
+  const [step, setStep] = useState<Step>("upload");
   const [isProcessing, setIsProcessing] = useState(false);
   const [parseResult, setParseResult] = useState<ExcelParseResult | null>(null);
-  const [validatedRows, setValidatedRows] = useState<ValidatedProductionRow[]>([]);
+  const [validatedRows, setValidatedRows] = useState<ValidatedProductionRow[]>(
+    [],
+  );
   const [summary, setSummary] = useState<ValidationSummary | null>(null);
-  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [uploadProgress, setUploadProgress] = useState({
+    current: 0,
+    total: 0,
+  });
   const [uploadedCount, setUploadedCount] = useState(0);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Reset state when modal opens/closes
   React.useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
-        setStep('upload');
+        setStep("upload");
         setIsProcessing(false);
         setParseResult(null);
         setValidatedRows([]);
@@ -90,18 +98,18 @@ export default function ExcelProductionUploadModal({
         setSummary(validationSummary);
 
         // Move to preview step
-        setStep('preview');
+        setStep("preview");
       } catch (error) {
-        console.error('Error processing file:', error);
+        console.error("Error processing file:", error);
         setToast({
-          type: 'error',
-          message: `Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          type: "error",
+          message: `Failed to process file: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       } finally {
         setIsProcessing(false);
       }
     },
-    [jobs, facilitiesId, existingEntries]
+    [jobs, facilitiesId, existingEntries],
   );
 
   const handleRemoveRow = useCallback((rowIndex: number) => {
@@ -113,27 +121,27 @@ export default function ExcelProductionUploadModal({
   }, []);
 
   const handleConfirm = useCallback(() => {
-    setStep('confirm');
+    setStep("confirm");
   }, []);
 
   const handleBack = useCallback(() => {
-    if (step === 'preview') {
-      setStep('upload');
-    } else if (step === 'confirm') {
-      setStep('preview');
+    if (step === "preview") {
+      setStep("upload");
+    } else if (step === "confirm") {
+      setStep("preview");
     }
   }, [step]);
 
   const handleUpload = useCallback(async () => {
     if (!summary || summary.valid === 0) {
       setToast({
-        type: 'error',
-        message: 'No valid entries to upload',
+        type: "error",
+        message: "No valid entries to upload",
       });
       return;
     }
 
-    setStep('uploading');
+    setStep("uploading");
     setUploadProgress({ current: 0, total: summary.valid });
 
     try {
@@ -143,7 +151,7 @@ export default function ExcelProductionUploadModal({
         .map((row) => row.productionEntry!);
 
       if (entriesToCreate.length === 0) {
-        throw new Error('No valid entries to upload');
+        throw new Error("No valid entries to upload");
       }
 
       // Batch create in chunks to avoid overwhelming the API
@@ -154,28 +162,31 @@ export default function ExcelProductionUploadModal({
         const chunk = entriesToCreate.slice(i, i + CHUNK_SIZE);
         await batchCreateProductionEntries(chunk);
         totalCreated += chunk.length;
-        setUploadProgress({ current: totalCreated, total: entriesToCreate.length });
+        setUploadProgress({
+          current: totalCreated,
+          total: entriesToCreate.length,
+        });
       }
 
       setUploadedCount(totalCreated);
-      setStep('complete');
+      setStep("complete");
 
       // Call success callback after a short delay
       setTimeout(() => {
         onSuccess?.();
       }, 1500);
     } catch (error) {
-      console.error('Error uploading production entries:', error);
+      console.error("Error uploading production entries:", error);
       setToast({
-        type: 'error',
-        message: `Failed to upload entries: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: "error",
+        message: `Failed to upload entries: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
-      setStep('preview'); // Go back to preview on error
+      setStep("preview"); // Go back to preview on error
     }
   }, [summary, validatedRows, onSuccess]);
 
   const handleReset = useCallback(() => {
-    setStep('upload');
+    setStep("upload");
     setParseResult(null);
     setValidatedRows([]);
     setSummary(null);
@@ -187,7 +198,10 @@ export default function ExcelProductionUploadModal({
   return (
     <>
       {/* Modal Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        onClick={onClose}
+      />
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -200,20 +214,31 @@ export default function ExcelProductionUploadModal({
                   Import Production Data from Excel
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  {step === 'upload' && 'Upload an Excel file with production data'}
-                  {step === 'preview' && 'Review and validate the data'}
-                  {step === 'confirm' && 'Confirm before uploading'}
-                  {step === 'uploading' && 'Uploading production entries...'}
-                  {step === 'complete' && 'Upload complete!'}
+                  {step === "upload" &&
+                    "Upload an Excel file with production data"}
+                  {step === "preview" && "Review and validate the data"}
+                  {step === "confirm" && "Confirm before uploading"}
+                  {step === "uploading" && "Uploading production entries..."}
+                  {step === "complete" && "Upload complete!"}
                 </p>
               </div>
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600"
-                disabled={step === 'uploading'}
+                disabled={step === "uploading"}
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -221,14 +246,19 @@ export default function ExcelProductionUploadModal({
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {/* Upload Step */}
-              {step === 'upload' && (
+              {step === "upload" && (
                 <div>
-                  <ExcelUploadZone onFileSelect={handleFileSelect} isLoading={isProcessing} />
+                  <ExcelUploadZone
+                    onFileSelect={handleFileSelect}
+                    isLoading={isProcessing}
+                  />
 
                   {/* Parse Errors */}
                   {parseResult && parseResult.errors.length > 0 && (
                     <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <h3 className="text-sm font-medium text-red-800 mb-2">Parsing Errors:</h3>
+                      <h3 className="text-sm font-medium text-red-800 mb-2">
+                        Parsing Errors:
+                      </h3>
                       <ul className="space-y-1">
                         {parseResult.errors.map((error, index) => (
                           <li key={index} className="text-sm text-red-700">
@@ -242,7 +272,7 @@ export default function ExcelProductionUploadModal({
               )}
 
               {/* Preview Step */}
-              {step === 'preview' && summary && (
+              {step === "preview" && summary && (
                 <div>
                   <ExcelPreviewTable
                     validatedRows={validatedRows}
@@ -253,8 +283,9 @@ export default function ExcelProductionUploadModal({
                   {summary.invalid > 0 && (
                     <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
-                        <strong>Note:</strong> {summary.invalid} row(s) have errors and will not be uploaded.
-                        You can remove them or fix the issues in your Excel file and re-upload.
+                        <strong>Note:</strong> {summary.invalid} row(s) have
+                        errors and will not be uploaded. You can remove them or
+                        fix the issues in your Excel file and re-upload.
                       </p>
                     </div>
                   )}
@@ -262,17 +293,25 @@ export default function ExcelProductionUploadModal({
               )}
 
               {/* Confirm Step */}
-              {step === 'confirm' && summary && (
+              {step === "confirm" && summary && (
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-blue-900 mb-4">Ready to Upload</h3>
+                    <h3 className="text-lg font-medium text-blue-900 mb-4">
+                      Ready to Upload
+                    </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <div className="text-3xl font-bold text-blue-700">{summary.valid}</div>
-                        <div className="text-sm text-blue-600">Production entries will be created</div>
+                        <div className="text-3xl font-bold text-blue-700">
+                          {summary.valid}
+                        </div>
+                        <div className="text-sm text-blue-600">
+                          Production entries will be created
+                        </div>
                       </div>
                       <div>
-                        <div className="text-3xl font-bold text-blue-700">{summary.totalQuantity.toLocaleString()}</div>
+                        <div className="text-3xl font-bold text-blue-700">
+                          {summary.totalQuantity.toLocaleString()}
+                        </div>
                         <div className="text-sm text-blue-600">Total units</div>
                       </div>
                     </div>
@@ -281,23 +320,28 @@ export default function ExcelProductionUploadModal({
                   {summary.warnings > 0 && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <p className="text-sm text-yellow-800">
-                        <strong>Warning:</strong> {summary.warnings} row(s) have warnings but will still be uploaded.
+                        <strong>Warning:</strong> {summary.warnings} row(s) have
+                        warnings but will still be uploaded.
                       </p>
                     </div>
                   )}
 
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <p className="text-sm text-gray-700">
-                      This action cannot be undone. Production entries will be created in the system.
+                      This action cannot be undone. Production entries will be
+                      created in the system.
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Uploading Step */}
-              {step === 'uploading' && (
+              {step === "uploading" && (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" viewBox="0 0 24 24">
+                  <svg
+                    className="animate-spin h-12 w-12 text-blue-600 mb-4"
+                    viewBox="0 0 24 24"
+                  >
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -313,9 +357,12 @@ export default function ExcelProductionUploadModal({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Uploading Production Entries</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Uploading Production Entries
+                  </h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    {uploadProgress.current} of {uploadProgress.total} entries uploaded
+                    {uploadProgress.current} of {uploadProgress.total} entries
+                    uploaded
                   </p>
                   <div className="w-full max-w-md bg-gray-200 rounded-full h-2">
                     <div
@@ -329,10 +376,14 @@ export default function ExcelProductionUploadModal({
               )}
 
               {/* Complete Step */}
-              {step === 'complete' && (
+              {step === "complete" && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-8 h-8 text-green-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path
                         fillRule="evenodd"
                         d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -340,7 +391,9 @@ export default function ExcelProductionUploadModal({
                       />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Complete!</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Upload Complete!
+                  </h3>
                   <p className="text-sm text-gray-600 mb-6">
                     Successfully created {uploadedCount} production entries
                   </p>
@@ -363,7 +416,7 @@ export default function ExcelProductionUploadModal({
             </div>
 
             {/* Footer */}
-            {(step === 'preview' || step === 'confirm') && (
+            {(step === "preview" || step === "confirm") && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
                 <button
                   onClick={handleBack}
@@ -378,7 +431,7 @@ export default function ExcelProductionUploadModal({
                   >
                     Cancel
                   </button>
-                  {step === 'preview' && (
+                  {step === "preview" && (
                     <button
                       onClick={handleConfirm}
                       disabled={!summary || summary.valid === 0}
@@ -387,7 +440,7 @@ export default function ExcelProductionUploadModal({
                       Continue ({summary?.valid || 0} valid entries)
                     </button>
                   )}
-                  {step === 'confirm' && (
+                  {step === "confirm" && (
                     <button
                       onClick={handleUpload}
                       className="px-4 py-2 bg-green-600 rounded-lg text-sm font-medium text-white hover:bg-green-700"

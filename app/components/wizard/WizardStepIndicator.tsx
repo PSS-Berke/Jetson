@@ -3,9 +3,9 @@
  * Shows progress through the 5 steps with visual indicators
  */
 
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 interface WizardStepIndicatorProps {
   currentStep: number;
@@ -16,7 +16,10 @@ interface WizardStepIndicatorProps {
   }[];
 }
 
-export default function WizardStepIndicator({ currentStep, steps }: WizardStepIndicatorProps) {
+export default function WizardStepIndicator({
+  currentStep,
+  steps,
+}: WizardStepIndicatorProps) {
   return (
     <div className="w-full py-4">
       {/* Progress Bar */}
@@ -45,10 +48,10 @@ export default function WizardStepIndicator({ currentStep, steps }: WizardStepIn
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
                     isCompleted
-                      ? 'bg-blue-500 text-white'
+                      ? "bg-blue-500 text-white"
                       : isCurrent
-                      ? 'bg-blue-500 text-white ring-4 ring-blue-100'
-                      : 'bg-gray-200 text-gray-500'
+                        ? "bg-blue-500 text-white ring-4 ring-blue-100"
+                        : "bg-gray-200 text-gray-500"
                   }`}
                 >
                   {isCompleted ? (
@@ -76,10 +79,10 @@ export default function WizardStepIndicator({ currentStep, steps }: WizardStepIn
                   <div
                     className={`hidden sm:block text-sm font-medium ${
                       isCurrent
-                        ? 'text-blue-600'
+                        ? "text-blue-600"
                         : isCompleted
-                        ? 'text-gray-700'
-                        : 'text-gray-400'
+                          ? "text-gray-700"
+                          : "text-gray-400"
                     }`}
                   >
                     {step.label}
@@ -90,10 +93,10 @@ export default function WizardStepIndicator({ currentStep, steps }: WizardStepIn
                     <div
                       className={`sm:hidden text-xs font-medium ${
                         isCurrent
-                          ? 'text-blue-600'
+                          ? "text-blue-600"
                           : isCompleted
-                          ? 'text-gray-700'
-                          : 'text-gray-400'
+                            ? "text-gray-700"
+                            : "text-gray-400"
                       }`}
                     >
                       {step.shortLabel}

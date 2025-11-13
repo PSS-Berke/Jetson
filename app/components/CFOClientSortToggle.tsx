@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useRef, useLayoutEffect, useState } from 'react';
+import { useRef, useLayoutEffect, useState } from "react";
 
-export type ClientSortType = 'revenue' | 'volume' | 'profit';
+export type ClientSortType = "revenue" | "volume" | "profit";
 
 interface CFOClientSortToggleProps {
   currentSort: ClientSortType;
@@ -11,12 +11,12 @@ interface CFOClientSortToggleProps {
 
 export default function CFOClientSortToggle({
   currentSort,
-  onSortChange
+  onSortChange,
 }: CFOClientSortToggleProps) {
   const sortOptions: { value: ClientSortType; label: string }[] = [
-    { value: 'revenue', label: 'Revenue' },
-    { value: 'volume', label: 'Volume' },
-    { value: 'profit', label: 'Profit' }
+    { value: "revenue", label: "Revenue" },
+    { value: "volume", label: "Volume" },
+    { value: "profit", label: "Profit" },
   ];
 
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -25,7 +25,9 @@ export default function CFOClientSortToggle({
 
   useLayoutEffect(() => {
     const updateBubblePosition = () => {
-      const selectedIndex = sortOptions.findIndex(s => s.value === currentSort);
+      const selectedIndex = sortOptions.findIndex(
+        (s) => s.value === currentSort,
+      );
 
       // Reset bubble if no valid selection
       if (selectedIndex === -1) {
@@ -45,7 +47,7 @@ export default function CFOClientSortToggle({
 
         setBubbleStyle({
           width: buttonRect.width,
-          left: buttonRect.left - containerRect.left - containerPadding
+          left: buttonRect.left - containerRect.left - containerPadding,
         });
       }
     };
@@ -53,9 +55,9 @@ export default function CFOClientSortToggle({
     updateBubblePosition();
 
     // Update on window resize to handle responsive changes
-    window.addEventListener('resize', updateBubblePosition);
-    return () => window.removeEventListener('resize', updateBubblePosition);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.addEventListener("resize", updateBubblePosition);
+    return () => window.removeEventListener("resize", updateBubblePosition);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSort]);
 
   return (
@@ -69,7 +71,7 @@ export default function CFOClientSortToggle({
           className="absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 bg-[var(--primary-blue)] rounded-full transition-all duration-300 ease-in-out"
           style={{
             width: `${bubbleStyle.width}px`,
-            transform: `translateX(${bubbleStyle.left}px)`
+            transform: `translateX(${bubbleStyle.left}px)`,
           }}
         />
       )}
@@ -78,12 +80,14 @@ export default function CFOClientSortToggle({
       {sortOptions.map((option, index) => (
         <button
           key={option.value}
-          ref={el => { buttonRefs.current[index] = el; }}
+          ref={(el) => {
+            buttonRefs.current[index] = el;
+          }}
           onClick={() => onSortChange(option.value)}
           className={`relative z-10 px-3 sm:px-4 lg:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-colors ${
             currentSort === option.value
-              ? 'text-white'
-              : 'text-[var(--text-dark)] hover:text-[var(--primary-blue)]'
+              ? "text-white"
+              : "text-[var(--text-dark)] hover:text-[var(--primary-blue)]"
           }`}
         >
           {option.label}

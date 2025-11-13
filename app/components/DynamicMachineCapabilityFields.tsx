@@ -1,8 +1,12 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { getProcessTypeConfig, getProcessTypeOptions, type FieldConfig } from '@/lib/processTypeConfig';
-import { MachineCapabilityValue } from '@/types';
+import React from "react";
+import {
+  getProcessTypeConfig,
+  getProcessTypeOptions,
+  type FieldConfig,
+} from "@/lib/processTypeConfig";
+import { MachineCapabilityValue } from "@/types";
 
 interface DynamicMachineCapabilityFieldsProps {
   processTypeKey: string;
@@ -36,29 +40,37 @@ export default function DynamicMachineCapabilityFields({
 
     const baseInputClasses = `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
       errors[field.name]
-        ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-200'
-        : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
+        ? "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-200"
+        : "border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]"
     }`;
 
     // Skip price_per_m - that's job-specific, not machine capability
-    if (field.name === 'price_per_m') {
+    if (field.name === "price_per_m") {
       return null;
     }
 
     switch (field.type) {
-      case 'dropdown': {
+      case "dropdown": {
         // For machines, dropdown fields become multi-select (supported options)
-        const selectedOptions = (capabilities[`supported_${field.name}s`] as string[]) || [];
+        const selectedOptions =
+          (capabilities[`supported_${field.name}s`] as string[]) || [];
         const capabilityFieldName = `supported_${field.name}s`;
 
         return (
           <div key={field.name} className="flex-1 min-w-[200px]">
-            <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-2">
-              Supported {field.label}s {field.required && <span className="text-red-500">*</span>}
+            <label
+              htmlFor={fieldId}
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Supported {field.label}s{" "}
+              {field.required && <span className="text-red-500">*</span>}
             </label>
             <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-white shadow-sm">
               {field.options?.map((option) => (
-                <label key={option} className="flex items-center space-x-2.5 py-2 hover:bg-gray-50 px-2 rounded cursor-pointer transition-colors">
+                <label
+                  key={option}
+                  className="flex items-center space-x-2.5 py-2 hover:bg-gray-50 px-2 rounded cursor-pointer transition-colors"
+                >
                   <input
                     type="checkbox"
                     checked={selectedOptions.includes(option)}
@@ -75,7 +87,9 @@ export default function DynamicMachineCapabilityFields({
               ))}
             </div>
             {errors[capabilityFieldName] && (
-              <p className="mt-1.5 text-sm text-red-600">{errors[capabilityFieldName]}</p>
+              <p className="mt-1.5 text-sm text-red-600">
+                {errors[capabilityFieldName]}
+              </p>
             )}
             <p className="mt-1.5 text-xs text-gray-500">
               Select all options this machine supports
@@ -84,26 +98,39 @@ export default function DynamicMachineCapabilityFields({
         );
       }
 
-      case 'number': {
+      case "number": {
         // For number fields, we need min/max capabilities
-        const minValue = capabilities[`min_${field.name}`] as number | undefined;
-        const maxValue = capabilities[`max_${field.name}`] as number | undefined;
+        const minValue = capabilities[`min_${field.name}`] as
+          | number
+          | undefined;
+        const maxValue = capabilities[`max_${field.name}`] as
+          | number
+          | undefined;
 
         return (
           <div key={field.name} className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {field.label} Range {field.required && <span className="text-red-500">*</span>}
+              {field.label} Range{" "}
+              {field.required && <span className="text-red-500">*</span>}
             </label>
             <div className="flex gap-3">
               <div className="flex-1">
-                <label htmlFor={`${fieldId}-min`} className="block text-xs font-medium text-gray-600 mb-1.5">
+                <label
+                  htmlFor={`${fieldId}-min`}
+                  className="block text-xs font-medium text-gray-600 mb-1.5"
+                >
                   Min
                 </label>
                 <input
                   type="number"
                   id={`${fieldId}-min`}
-                  value={minValue ?? ''}
-                  onChange={(e) => onChange(`min_${field.name}`, parseFloat(e.target.value) || 0)}
+                  value={minValue ?? ""}
+                  onChange={(e) =>
+                    onChange(
+                      `min_${field.name}`,
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
                   min={field.validation?.min}
                   max={field.validation?.max}
                   step={field.validation?.step || 1}
@@ -112,14 +139,22 @@ export default function DynamicMachineCapabilityFields({
                 />
               </div>
               <div className="flex-1">
-                <label htmlFor={`${fieldId}-max`} className="block text-xs font-medium text-gray-600 mb-1.5">
+                <label
+                  htmlFor={`${fieldId}-max`}
+                  className="block text-xs font-medium text-gray-600 mb-1.5"
+                >
                   Max
                 </label>
                 <input
                   type="number"
                   id={`${fieldId}-max`}
-                  value={maxValue ?? ''}
-                  onChange={(e) => onChange(`max_${field.name}`, parseFloat(e.target.value) || 0)}
+                  value={maxValue ?? ""}
+                  onChange={(e) =>
+                    onChange(
+                      `max_${field.name}`,
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
                   min={field.validation?.min}
                   max={field.validation?.max}
                   step={field.validation?.step || 1}
@@ -137,25 +172,33 @@ export default function DynamicMachineCapabilityFields({
         );
       }
 
-      case 'text':
+      case "text":
       default: {
         // Text fields - machines might support specific values
         const value = capabilities[field.name] as string | undefined;
 
         return (
           <div key={field.name} className="flex-1 min-w-[200px]">
-            <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-2">
-              {field.label} {field.required && <span className="text-red-500">*</span>}
+            <label
+              htmlFor={fieldId}
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              {field.label}{" "}
+              {field.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="text"
               id={fieldId}
-              value={value || ''}
+              value={value || ""}
               onChange={(e) => onChange(field.name, e.target.value)}
               placeholder={field.placeholder}
               className={baseInputClasses}
             />
-            {errors[field.name] && <p className="mt-1.5 text-sm text-red-600">{errors[field.name]}</p>}
+            {errors[field.name] && (
+              <p className="mt-1.5 text-sm text-red-600">
+                {errors[field.name]}
+              </p>
+            )}
           </div>
         );
       }
@@ -166,7 +209,10 @@ export default function DynamicMachineCapabilityFields({
     <div className="space-y-5">
       {/* Process Type Selector */}
       <div className="w-full">
-        <label htmlFor="process-type" className="block text-sm font-medium text-gray-700 mb-2">
+        <label
+          htmlFor="process-type"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
           Process Type <span className="text-red-500">*</span>
         </label>
         <select
@@ -175,8 +221,8 @@ export default function DynamicMachineCapabilityFields({
           onChange={(e) => onProcessTypeChange(e.target.value)}
           className={`w-full px-4 py-2.5 text-base border rounded-lg focus:outline-none focus:ring-2 transition-colors bg-white ${
             errors.process_type_key
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-              : 'border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]'
+              ? "border-red-300 focus:border-red-500 focus:ring-red-200"
+              : "border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]"
           }`}
           required
         >
@@ -188,7 +234,9 @@ export default function DynamicMachineCapabilityFields({
           ))}
         </select>
         {errors.process_type_key && (
-          <p className="mt-1.5 text-sm text-red-600 break-words">{errors.process_type_key}</p>
+          <p className="mt-1.5 text-sm text-red-600 break-words">
+            {errors.process_type_key}
+          </p>
         )}
         <p className="mt-1.5 text-xs text-gray-500 break-words">
           This determines what capabilities this machine can support

@@ -1,10 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { getVarianceStatus } from '@/lib/productionUtils';
-import { addProductionEntry, deleteProductionEntry, getProductionEntries } from '@/lib/api';
-import type { ProductionComparison } from '@/types';
-import type { ProductionEntry } from '@/types';
+import { useState, useRef, useEffect } from "react";
+import { getVarianceStatus } from "@/lib/productionUtils";
+import {
+  addProductionEntry,
+  deleteProductionEntry,
+  getProductionEntries,
+} from "@/lib/api";
+import type { ProductionComparison } from "@/types";
+import type { ProductionEntry } from "@/types";
 
 interface ProductionComparisonTableProps {
   comparisons: ProductionComparison[];
@@ -15,8 +19,8 @@ interface ProductionComparisonTableProps {
   startDate?: number;
   endDate?: number;
   facilitiesId?: number;
-  granularity?: 'day' | 'week' | 'month';
-  dataDisplayMode?: 'pieces' | 'revenue';
+  granularity?: "day" | "week" | "month";
+  dataDisplayMode?: "pieces" | "revenue";
 }
 
 interface BatchEntryData {
@@ -27,8 +31,15 @@ interface BatchEntryData {
   notes: string;
 }
 
-type SortField = 'job_number' | 'job_name' | 'client' | 'date_entered' | 'projected' | 'actual' | 'variance';
-type SortDirection = 'asc' | 'desc';
+type SortField =
+  | "job_number"
+  | "job_name"
+  | "client"
+  | "date_entered"
+  | "projected"
+  | "actual"
+  | "variance";
+type SortDirection = "asc" | "desc";
 
 export default function ProductionComparisonTable({
   comparisons,
@@ -39,29 +50,40 @@ export default function ProductionComparisonTable({
   startDate,
   endDate,
   facilitiesId,
-  granularity = 'week',
-  dataDisplayMode = 'pieces',
+  granularity = "week",
+  dataDisplayMode = "pieces",
 }: ProductionComparisonTableProps) {
-  const [sortField, setSortField] = useState<SortField>('job_number');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>("job_number");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [editingCell, setEditingCell] = useState<{ jobId: number, entryId: number | null } | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editingCell, setEditingCell] = useState<{
+    jobId: number;
+    entryId: number | null;
+  } | null>(null);
+  const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Batch mode state
-  const [batchData, setBatchData] = useState<Map<number, BatchEntryData>>(new Map());
+  const [batchData, setBatchData] = useState<Map<number, BatchEntryData>>(
+    new Map(),
+  );
   const [submitting, setSubmitting] = useState(false);
 
   // Helper function to calculate revenue from pieces
-  const calculateRevenue = (pieces: number, job: ProductionComparison['job']): number => {
+  const calculateRevenue = (
+    pieces: number,
+    job: ProductionComparison["job"],
+  ): number => {
     // Simple calculation: sum all requirements' pricing * pieces
     if (!job.requirements || job.requirements.length === 0) return 0;
 
     const totalPricePerPiece = job.requirements.reduce((sum, req) => {
-      const pricing = typeof req.pricing === 'number' ? req.pricing : parseFloat(req.pricing || '0');
+      const pricing =
+        typeof req.pricing === "number"
+          ? req.pricing
+          : parseFloat(req.pricing || "0");
       return sum + (pricing || 0);
     }, 0);
 
@@ -69,8 +91,11 @@ export default function ProductionComparisonTable({
   };
 
   // Helper function to format display value based on mode
-  const formatDisplayValue = (pieces: number, job: ProductionComparison['job']): string => {
-    if (dataDisplayMode === 'revenue') {
+  const formatDisplayValue = (
+    pieces: number,
+    job: ProductionComparison["job"],
+  ): string => {
+    if (dataDisplayMode === "revenue") {
       const revenue = calculateRevenue(pieces, job);
       return `$${revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
@@ -79,16 +104,16 @@ export default function ProductionComparisonTable({
 
   // Helper function to get the display label
   const getDisplayLabel = (): string => {
-    return dataDisplayMode === 'revenue' ? 'Revenue' : 'Pieces';
+    return dataDisplayMode === "revenue" ? "Revenue" : "Pieces";
   };
 
   // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
@@ -98,31 +123,31 @@ export default function ProductionComparisonTable({
     let bValue: string | number;
 
     switch (sortField) {
-      case 'job_number':
+      case "job_number":
         aValue = a.job.job_number;
         bValue = b.job.job_number;
         break;
-      case 'job_name':
+      case "job_name":
         aValue = a.job.job_name.toLowerCase();
         bValue = b.job.job_name.toLowerCase();
         break;
-      case 'client':
-        aValue = a.job.client?.name.toLowerCase() || '';
-        bValue = b.job.client?.name.toLowerCase() || '';
+      case "client":
+        aValue = a.job.client?.name.toLowerCase() || "";
+        bValue = b.job.client?.name.toLowerCase() || "";
         break;
-      case 'date_entered':
+      case "date_entered":
         aValue = a.last_updated_at || 0;
         bValue = b.last_updated_at || 0;
         break;
-      case 'projected':
+      case "projected":
         aValue = a.projected_quantity;
         bValue = b.projected_quantity;
         break;
-      case 'actual':
+      case "actual":
         aValue = a.actual_quantity;
         bValue = b.actual_quantity;
         break;
-      case 'variance':
+      case "variance":
         aValue = a.variance_percentage;
         bValue = b.variance_percentage;
         break;
@@ -131,8 +156,8 @@ export default function ProductionComparisonTable({
         bValue = b.job.job_number;
     }
 
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
 
@@ -157,16 +182,22 @@ export default function ProductionComparisonTable({
   }, [editingCell]);
 
   // Start editing a cell
-  const handleStartEdit = (comparison: ProductionComparison, e: React.MouseEvent) => {
+  const handleStartEdit = (
+    comparison: ProductionComparison,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation(); // Prevent row click
-    setEditingCell({ jobId: comparison.job.id, entryId: comparison.entry_ids?.[0] || null });
+    setEditingCell({
+      jobId: comparison.job.id,
+      entryId: comparison.entry_ids?.[0] || null,
+    });
     setEditValue(comparison.actual_quantity.toString());
   };
 
   // Handle input change with formatting
   const handleEditInputChange = (value: string) => {
     // Remove non-digits
-    const digitsOnly = value.replace(/\D/g, '');
+    const digitsOnly = value.replace(/\D/g, "");
     setEditValue(digitsOnly);
   };
 
@@ -191,12 +222,15 @@ export default function ProductionComparisonTable({
       // Delete all existing entries for this job in this period
       if (comparison.entry_ids && comparison.entry_ids.length > 0) {
         await Promise.all(
-          comparison.entry_ids.map(entryId => deleteProductionEntry(entryId))
+          comparison.entry_ids.map((entryId) => deleteProductionEntry(entryId)),
         );
       }
 
       // Create a single new entry with the new value
-      const newEntry: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'> = {
+      const newEntry: Omit<
+        ProductionEntry,
+        "id" | "created_at" | "updated_at"
+      > = {
         job: comparison.job.id,
         date: Date.now(),
         actual_quantity: newValue,
@@ -209,8 +243,8 @@ export default function ProductionComparisonTable({
         onEdit(comparison);
       }
     } catch (error) {
-      console.error('Error saving actual quantity:', error);
-      alert('Failed to save. Please try again.');
+      console.error("Error saving actual quantity:", error);
+      alert("Failed to save. Please try again.");
     } finally {
       setSaving(false);
       setEditingCell(null);
@@ -220,14 +254,17 @@ export default function ProductionComparisonTable({
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingCell(null);
-    setEditValue('');
+    setEditValue("");
   };
 
   // Handle keyboard events
-  const handleKeyDown = (e: React.KeyboardEvent, comparison: ProductionComparison) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (
+    e: React.KeyboardEvent,
+    comparison: ProductionComparison,
+  ) => {
+    if (e.key === "Enter") {
       handleSaveEdit(comparison);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       handleCancelEdit();
     }
   };
@@ -237,30 +274,35 @@ export default function ProductionComparisonTable({
     if (isBatchMode && startDate && endDate) {
       const initBatchData = async () => {
         try {
-          const existingEntries = await getProductionEntries(facilitiesId, startDate, endDate);
+          const existingEntries = await getProductionEntries(
+            facilitiesId,
+            startDate,
+            endDate,
+          );
 
           // Create a map of job_id to current actual quantity
           const actualsMap = new Map<number, number>();
-          existingEntries.forEach(entry => {
+          existingEntries.forEach((entry) => {
             const currentActual = actualsMap.get(entry.job) || 0;
             actualsMap.set(entry.job, currentActual + entry.actual_quantity);
           });
 
           // Initialize batch data for all comparisons
           const newBatchData = new Map<number, BatchEntryData>();
-          comparisons.forEach(comp => {
+          comparisons.forEach((comp) => {
             newBatchData.set(comp.job.id, {
               jobId: comp.job.id,
-              currentActual: actualsMap.get(comp.job.id) || comp.actual_quantity,
-              addAmount: '',
-              setTotal: '',
-              notes: '',
+              currentActual:
+                actualsMap.get(comp.job.id) || comp.actual_quantity,
+              addAmount: "",
+              setTotal: "",
+              notes: "",
             });
           });
 
           setBatchData(newBatchData);
         } catch (error) {
-          console.error('Error initializing batch data:', error);
+          console.error("Error initializing batch data:", error);
         }
       };
 
@@ -273,24 +315,32 @@ export default function ProductionComparisonTable({
 
   // Handle batch add amount change
   const handleBatchAddAmountChange = (jobId: number, value: string) => {
-    const digitsOnly = value.replace(/\D/g, '');
+    const digitsOnly = value.replace(/\D/g, "");
     const currentData = batchData.get(jobId);
     if (currentData) {
       const newBatchData = new Map(batchData);
       // Clear setTotal when using addAmount
-      newBatchData.set(jobId, { ...currentData, addAmount: digitsOnly, setTotal: '' });
+      newBatchData.set(jobId, {
+        ...currentData,
+        addAmount: digitsOnly,
+        setTotal: "",
+      });
       setBatchData(newBatchData);
     }
   };
 
   // Handle batch set total change
   const handleBatchSetTotalChange = (jobId: number, value: string) => {
-    const digitsOnly = value.replace(/\D/g, '');
+    const digitsOnly = value.replace(/\D/g, "");
     const currentData = batchData.get(jobId);
     if (currentData) {
       const newBatchData = new Map(batchData);
       // Clear addAmount when using setTotal
-      newBatchData.set(jobId, { ...currentData, setTotal: digitsOnly, addAmount: '' });
+      newBatchData.set(jobId, {
+        ...currentData,
+        setTotal: digitsOnly,
+        addAmount: "",
+      });
       setBatchData(newBatchData);
     }
   };
@@ -322,26 +372,31 @@ export default function ProductionComparisonTable({
   const handleBatchSave = async () => {
     setSubmitting(true);
     try {
-      const jobsToUpdate: Array<{ jobId: number; finalQuantity: number; notes?: string; entryIds: number[] }> = [];
+      const jobsToUpdate: Array<{
+        jobId: number;
+        finalQuantity: number;
+        notes?: string;
+        entryIds: number[];
+      }> = [];
 
       // Collect all jobs that need updating
       batchData.forEach((data, jobId) => {
         let finalQuantity: number | null = null;
 
         // Check if using Add Amount mode
-        if (data.addAmount.trim() !== '') {
+        if (data.addAmount.trim() !== "") {
           const addAmount = parseInt(data.addAmount);
           finalQuantity = data.currentActual + addAmount;
         }
         // Check if using Set Total mode
-        else if (data.setTotal.trim() !== '') {
+        else if (data.setTotal.trim() !== "") {
           finalQuantity = parseInt(data.setTotal);
         }
 
         // Only add to update list if we have a valid quantity
         if (finalQuantity !== null) {
           // Find the comparison for this job to get entry IDs
-          const comparison = comparisons.find(c => c.job.id === jobId);
+          const comparison = comparisons.find((c) => c.job.id === jobId);
           const entryIds = comparison?.entry_ids || [];
 
           jobsToUpdate.push({
@@ -354,7 +409,7 @@ export default function ProductionComparisonTable({
       });
 
       if (jobsToUpdate.length === 0) {
-        alert('Please enter at least one production quantity');
+        alert("Please enter at least one production quantity");
         setSubmitting(false);
         return;
       }
@@ -364,14 +419,17 @@ export default function ProductionComparisonTable({
         // Delete all existing entries for this job in this period
         if (job.entryIds.length > 0) {
           await Promise.all(
-            job.entryIds.map(entryId => deleteProductionEntry(entryId))
+            job.entryIds.map((entryId) => deleteProductionEntry(entryId)),
           );
         }
 
         // Create a single new entry with the final total
-        const newEntry: Omit<ProductionEntry, 'id' | 'created_at' | 'updated_at'> = {
+        const newEntry: Omit<
+          ProductionEntry,
+          "id" | "created_at" | "updated_at"
+        > = {
           job: job.jobId,
-          date: granularity === 'week' ? (startDate || Date.now()) : Date.now(),
+          date: granularity === "week" ? startDate || Date.now() : Date.now(),
           actual_quantity: job.finalQuantity,
           notes: job.notes,
           facilities_id: facilitiesId,
@@ -384,8 +442,8 @@ export default function ProductionComparisonTable({
       if (onToggleBatchMode) onToggleBatchMode();
       if (onBatchSave) onBatchSave();
     } catch (error) {
-      console.error('Error saving batch entries:', error);
-      alert('Failed to save batch entries. Please try again.');
+      console.error("Error saving batch entries:", error);
+      alert("Failed to save batch entries. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -401,25 +459,27 @@ export default function ProductionComparisonTable({
   const getStatusClass = (variance_percentage: number): string => {
     const status = getVarianceStatus(variance_percentage);
     switch (status) {
-      case 'ahead':
-        return 'text-green-700 bg-green-50';
-      case 'on-track':
-        return 'text-yellow-700 bg-yellow-50';
-      case 'behind':
-        return 'text-red-700 bg-red-50';
+      case "ahead":
+        return "text-green-700 bg-green-50";
+      case "on-track":
+        return "text-yellow-700 bg-yellow-50";
+      case "behind":
+        return "text-red-700 bg-red-50";
     }
   };
 
   // Render sort icon
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <span className="text-gray-400">⇅</span>;
-    return <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+    return <span>{sortDirection === "asc" ? "↑" : "↓"}</span>;
   };
 
   if (comparisons.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow p-12 text-center">
-        <p className="text-gray-500">No production data available for this period</p>
+        <p className="text-gray-500">
+          No production data available for this period
+        </p>
       </div>
     );
   }
@@ -431,11 +491,17 @@ export default function ProductionComparisonTable({
         <div>
           {isBatchMode ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-blue-600">Batch Entry Mode</span>
-              <span className="text-xs text-gray-500">Add to current or set new total for each job</span>
+              <span className="text-sm font-semibold text-blue-600">
+                Batch Entry Mode
+              </span>
+              <span className="text-xs text-gray-500">
+                Add to current or set new total for each job
+              </span>
             </div>
           ) : (
-            <span className="text-sm font-semibold text-gray-700">Production Data</span>
+            <span className="text-sm font-semibold text-gray-700">
+              Production Data
+            </span>
           )}
         </div>
         <div className="flex gap-2">
@@ -453,7 +519,7 @@ export default function ProductionComparisonTable({
                 disabled={submitting}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
               >
-                {submitting ? 'Saving...' : 'Save All'}
+                {submitting ? "Saving..." : "Save All"}
               </button>
             </>
           ) : (
@@ -473,51 +539,54 @@ export default function ProductionComparisonTable({
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th
-                onClick={() => !isBatchMode && handleSort('job_number')}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => !isBatchMode && handleSort("job_number")}
+                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   Job # {!isBatchMode && <SortIcon field="job_number" />}
                 </div>
               </th>
               <th
-                onClick={() => !isBatchMode && handleSort('job_name')}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => !isBatchMode && handleSort("job_name")}
+                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   Job Name {!isBatchMode && <SortIcon field="job_name" />}
                 </div>
               </th>
               <th
-                onClick={() => !isBatchMode && handleSort('client')}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => !isBatchMode && handleSort("client")}
+                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   Client {!isBatchMode && <SortIcon field="client" />}
                 </div>
               </th>
               <th
-                onClick={() => !isBatchMode && handleSort('date_entered')}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => !isBatchMode && handleSort("date_entered")}
+                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
-                  Date Entered {!isBatchMode && <SortIcon field="date_entered" />}
+                  Date Entered{" "}
+                  {!isBatchMode && <SortIcon field="date_entered" />}
                 </div>
               </th>
               <th
-                onClick={() => !isBatchMode && handleSort('projected')}
-                className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => !isBatchMode && handleSort("projected")}
+                className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center justify-end gap-2">
-                  Projected {getDisplayLabel()} {!isBatchMode && <SortIcon field="projected" />}
+                  Projected {getDisplayLabel()}{" "}
+                  {!isBatchMode && <SortIcon field="projected" />}
                 </div>
               </th>
               <th
-                onClick={() => !isBatchMode && handleSort('actual')}
-                className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                onClick={() => !isBatchMode && handleSort("actual")}
+                className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center justify-end gap-2">
-                  {isBatchMode ? 'Current' : 'Actual'} {getDisplayLabel()} {!isBatchMode && <SortIcon field="actual" />}
+                  {isBatchMode ? "Current" : "Actual"} {getDisplayLabel()}{" "}
+                  {!isBatchMode && <SortIcon field="actual" />}
                 </div>
               </th>
               {isBatchMode ? (
@@ -538,7 +607,7 @@ export default function ProductionComparisonTable({
               ) : (
                 <>
                   <th
-                    onClick={() => handleSort('variance')}
+                    onClick={() => handleSort("variance")}
                     className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   >
                     <div className="flex items-center justify-end gap-2">
@@ -562,8 +631,10 @@ export default function ProductionComparisonTable({
               return (
                 <tr
                   key={comparison.job.id}
-                  className={`${isBatchMode ? '' : 'hover:bg-gray-50 cursor-pointer'}`}
-                  onClick={() => !isEditing && !isBatchMode && onEdit && onEdit(comparison)}
+                  className={`${isBatchMode ? "" : "hover:bg-gray-50 cursor-pointer"}`}
+                  onClick={() =>
+                    !isEditing && !isBatchMode && onEdit && onEdit(comparison)
+                  }
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {comparison.job.job_number}
@@ -572,28 +643,50 @@ export default function ProductionComparisonTable({
                     {comparison.job.job_name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {comparison.job.client?.name || 'Unknown'}
-                    {comparison.job.sub_client && <span className="text-gray-400"> / {comparison.job.sub_client.name}</span>}
+                    {comparison.job.client?.name || "Unknown"}
+                    {comparison.job.sub_client && (
+                      <span className="text-gray-400">
+                        {" "}
+                        / {comparison.job.sub_client.name}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {comparison.last_updated_at
-                      ? new Date(comparison.last_updated_at).toLocaleDateString()
-                      : '-'}
+                      ? new Date(
+                          comparison.last_updated_at,
+                        ).toLocaleDateString()
+                      : "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {formatDisplayValue(comparison.projected_quantity, comparison.job)}
+                    {formatDisplayValue(
+                      comparison.projected_quantity,
+                      comparison.job,
+                    )}
                   </td>
                   <td
                     className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
-                      comparison.actual_quantity > 0 ? 'text-blue-600' : 'text-gray-900'
+                      comparison.actual_quantity > 0
+                        ? "text-blue-600"
+                        : "text-gray-900"
                     }`}
-                    onClick={(e) => !isEditing && !isBatchMode && handleStartEdit(comparison, e)}
+                    onClick={(e) =>
+                      !isEditing &&
+                      !isBatchMode &&
+                      handleStartEdit(comparison, e)
+                    }
                   >
                     {isEditing && !isBatchMode ? (
                       <input
                         ref={inputRef}
                         type="text"
-                        value={editValue ? (dataDisplayMode === 'revenue' ? `$${calculateRevenue(parseInt(editValue), comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : parseInt(editValue).toLocaleString()) : ''}
+                        value={
+                          editValue
+                            ? dataDisplayMode === "revenue"
+                              ? `$${calculateRevenue(parseInt(editValue), comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : parseInt(editValue).toLocaleString()
+                            : ""
+                        }
                         onChange={(e) => handleEditInputChange(e.target.value)}
                         onBlur={() => handleSaveEdit(comparison)}
                         onKeyDown={(e) => handleKeyDown(e, comparison)}
@@ -601,8 +694,17 @@ export default function ProductionComparisonTable({
                         disabled={saving}
                       />
                     ) : (
-                      <span className={!isBatchMode ? "cursor-text hover:bg-blue-50 px-2 py-1 rounded" : ""}>
-                        {formatDisplayValue(comparison.actual_quantity, comparison.job)}
+                      <span
+                        className={
+                          !isBatchMode
+                            ? "cursor-text hover:bg-blue-50 px-2 py-1 rounded"
+                            : ""
+                        }
+                      >
+                        {formatDisplayValue(
+                          comparison.actual_quantity,
+                          comparison.job,
+                        )}
                       </span>
                     )}
                   </td>
@@ -611,8 +713,17 @@ export default function ProductionComparisonTable({
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="text"
-                          value={batchEntry?.addAmount ? parseInt(batchEntry.addAmount).toLocaleString() : ''}
-                          onChange={(e) => handleBatchAddAmountChange(comparison.job.id, e.target.value)}
+                          value={
+                            batchEntry?.addAmount
+                              ? parseInt(batchEntry.addAmount).toLocaleString()
+                              : ""
+                          }
+                          onChange={(e) =>
+                            handleBatchAddAmountChange(
+                              comparison.job.id,
+                              e.target.value,
+                            )
+                          }
                           placeholder="Add..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -620,22 +731,38 @@ export default function ProductionComparisonTable({
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="text"
-                          value={batchEntry?.setTotal ? parseInt(batchEntry.setTotal).toLocaleString() : ''}
-                          onChange={(e) => handleBatchSetTotalChange(comparison.job.id, e.target.value)}
+                          value={
+                            batchEntry?.setTotal
+                              ? parseInt(batchEntry.setTotal).toLocaleString()
+                              : ""
+                          }
+                          onChange={(e) =>
+                            handleBatchSetTotalChange(
+                              comparison.job.id,
+                              e.target.value,
+                            )
+                          }
                           placeholder="Set..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                        <span className={`font-semibold ${hasInput ? 'text-blue-600' : 'text-gray-400'}`}>
+                        <span
+                          className={`font-semibold ${hasInput ? "text-blue-600" : "text-gray-400"}`}
+                        >
                           {newTotal.toLocaleString()}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="text"
-                          value={batchEntry?.notes || ''}
-                          onChange={(e) => handleBatchNotesChange(comparison.job.id, e.target.value)}
+                          value={batchEntry?.notes || ""}
+                          onChange={(e) =>
+                            handleBatchNotesChange(
+                              comparison.job.id,
+                              e.target.value,
+                            )
+                          }
                           placeholder="Optional notes"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
@@ -644,21 +771,26 @@ export default function ProductionComparisonTable({
                   ) : (
                     <>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                        <span className={comparison.variance >= 0 ? 'text-green-600' : 'text-red-600'}>
-                          {comparison.variance >= 0 ? '+' : ''}
-                          {dataDisplayMode === 'revenue'
-                            ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : comparison.variance.toLocaleString()
+                        <span
+                          className={
+                            comparison.variance >= 0
+                              ? "text-green-600"
+                              : "text-red-600"
                           }
+                        >
+                          {comparison.variance >= 0 ? "+" : ""}
+                          {dataDisplayMode === "revenue"
+                            ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : comparison.variance.toLocaleString()}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
-                            comparison.variance_percentage
+                            comparison.variance_percentage,
                           )}`}
                         >
-                          {comparison.variance_percentage >= 0 ? '+' : ''}
+                          {comparison.variance_percentage >= 0 ? "+" : ""}
                           {comparison.variance_percentage.toFixed(1)}%
                         </span>
                       </td>
@@ -684,22 +816,25 @@ export default function ProductionComparisonTable({
                 <div className="font-semibold text-gray-900">
                   Job #{comparison.job.job_number}
                 </div>
-                <div className="text-sm text-gray-600">{comparison.job.job_name}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {comparison.job.client?.name || 'Unknown'}
+                <div className="text-sm text-gray-600">
+                  {comparison.job.job_name}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Entered: {comparison.last_updated_at
+                  {comparison.job.client?.name || "Unknown"}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Entered:{" "}
+                  {comparison.last_updated_at
                     ? new Date(comparison.last_updated_at).toLocaleDateString()
-                    : '-'}
+                    : "-"}
                 </div>
               </div>
               <span
                 className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
-                  comparison.variance_percentage
+                  comparison.variance_percentage,
                 )}`}
               >
-                {comparison.variance_percentage >= 0 ? '+' : ''}
+                {comparison.variance_percentage >= 0 ? "+" : ""}
                 {comparison.variance_percentage.toFixed(1)}%
               </span>
             </div>
@@ -708,29 +843,38 @@ export default function ProductionComparisonTable({
               <div>
                 <span className="text-gray-500">Projected:</span>
                 <span className="ml-2 font-medium">
-                  {formatDisplayValue(comparison.projected_quantity, comparison.job)}
+                  {formatDisplayValue(
+                    comparison.projected_quantity,
+                    comparison.job,
+                  )}
                 </span>
               </div>
               <div>
                 <span className="text-gray-500">Actual:</span>
-                <span className={`ml-2 font-semibold ${
-                  comparison.actual_quantity > 0 ? 'text-blue-600' : 'text-gray-900'
-                }`}>
-                  {formatDisplayValue(comparison.actual_quantity, comparison.job)}
+                <span
+                  className={`ml-2 font-semibold ${
+                    comparison.actual_quantity > 0
+                      ? "text-blue-600"
+                      : "text-gray-900"
+                  }`}
+                >
+                  {formatDisplayValue(
+                    comparison.actual_quantity,
+                    comparison.job,
+                  )}
                 </span>
               </div>
               <div className="col-span-2">
                 <span className="text-gray-500">Variance:</span>
                 <span
                   className={`ml-2 font-medium ${
-                    comparison.variance >= 0 ? 'text-green-600' : 'text-red-600'
+                    comparison.variance >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  {comparison.variance >= 0 ? '+' : ''}
-                  {dataDisplayMode === 'revenue'
+                  {comparison.variance >= 0 ? "+" : ""}
+                  {dataDisplayMode === "revenue"
                     ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : comparison.variance.toLocaleString()
-                  }
+                    : comparison.variance.toLocaleString()}
                 </span>
               </div>
             </div>
@@ -747,7 +891,9 @@ export default function ProductionComparisonTable({
               <span className="text-sm text-gray-700">Show:</span>
               <select
                 value={itemsPerPage}
-                onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                onChange={(e) =>
+                  handleItemsPerPageChange(Number(e.target.value))
+                }
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value={10}>10</option>
@@ -761,13 +907,16 @@ export default function ProductionComparisonTable({
             {/* Page info and navigation */}
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-700">
-                Showing {startIndex + 1} to {Math.min(endIndex, sortedComparisons.length)} of{' '}
+                Showing {startIndex + 1} to{" "}
+                {Math.min(endIndex, sortedComparisons.length)} of{" "}
                 {sortedComparisons.length} jobs
               </span>
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
                   disabled={currentPage === 1}
                   className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -777,7 +926,9 @@ export default function ProductionComparisonTable({
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
                   disabled={currentPage === totalPages}
                   className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

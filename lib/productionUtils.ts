@@ -1,26 +1,31 @@
-import type { ParsedJob } from '@/hooks/useJobs';
-import type { ProductionEntry, ProductionComparison } from '@/types';
+import type { ParsedJob } from "@/hooks/useJobs";
+import type { ProductionEntry, ProductionComparison } from "@/types";
 
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
  */
 function getJobRevenue(job: ParsedJob): number {
   // Check if job has parsed requirements with price_per_m
-  if (job.requirements && Array.isArray(job.requirements) && job.requirements.length > 0) {
+  if (
+    job.requirements &&
+    Array.isArray(job.requirements) &&
+    job.requirements.length > 0
+  ) {
     const revenue = job.requirements.reduce((total, req) => {
       const pricePerMStr = req.price_per_m;
-      const isValidPrice = pricePerMStr && pricePerMStr !== 'undefined' && pricePerMStr !== 'null';
+      const isValidPrice =
+        pricePerMStr && pricePerMStr !== "undefined" && pricePerMStr !== "null";
       const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
-      return total + ((job.quantity / 1000) * pricePerM);
+      return total + (job.quantity / 1000) * pricePerM;
     }, 0);
-    
+
     // Add add-on charges if available
-    const addOnCharges = parseFloat(job.add_on_charges || '0');
+    const addOnCharges = parseFloat(job.add_on_charges || "0");
     return revenue + addOnCharges;
   }
-  
+
   // Fallback to total_billing
-  return parseFloat(job.total_billing || '0');
+  return parseFloat(job.total_billing || "0");
 }
 
 /**
@@ -31,7 +36,7 @@ function getJobRevenue(job: ParsedJob): number {
  */
 export const calculateVariance = (
   projected: number,
-  actual: number
+  actual: number,
 ): { variance: number; variance_percentage: number } => {
   const variance = actual - projected;
   const variance_percentage = projected > 0 ? (variance / projected) * 100 : 0;
@@ -52,7 +57,7 @@ export const calculateVariance = (
 export const getJobsInTimeRange = (
   jobs: ParsedJob[],
   startDate: number,
-  endDate: number
+  endDate: number,
 ): ParsedJob[] => {
   return jobs.filter((job) => {
     // Job is in range if:
@@ -68,7 +73,7 @@ export const getJobsInTimeRange = (
  * @returns Map of week start timestamps to total quantities
  */
 export const aggregateProductionByWeek = (
-  entries: ProductionEntry[]
+  entries: ProductionEntry[],
 ): Map<number, number> => {
   const weeklyTotals = new Map<number, number>();
 
@@ -100,9 +105,15 @@ export const aggregateProductionByWeek = (
 export const aggregateProductionByJob = (
   entries: ProductionEntry[],
   startDate?: number,
-  endDate?: number
-): Map<number, { total: number; entryIds: number[]; lastUpdatedAt?: number }> => {
-  const jobTotals = new Map<number, { total: number; entryIds: number[]; lastUpdatedAt?: number }>();
+  endDate?: number,
+): Map<
+  number,
+  { total: number; entryIds: number[]; lastUpdatedAt?: number }
+> => {
+  const jobTotals = new Map<
+    number,
+    { total: number; entryIds: number[]; lastUpdatedAt?: number }
+  >();
 
   entries.forEach((entry) => {
     // Filter by date range if provided
@@ -113,7 +124,11 @@ export const aggregateProductionByJob = (
       return; // Skip entries after end date
     }
 
-    const current = jobTotals.get(entry.job) || { total: 0, entryIds: [], lastUpdatedAt: undefined };
+    const current = jobTotals.get(entry.job) || {
+      total: 0,
+      entryIds: [],
+      lastUpdatedAt: undefined,
+    };
 
     // Track the most recent created_at timestamp
     const newLastUpdated = current.lastUpdatedAt
@@ -142,10 +157,14 @@ export const mergeProjectionsWithActuals = (
   jobs: ParsedJob[],
   productionEntries: ProductionEntry[],
   startDate: number,
-  endDate: number
+  endDate: number,
 ): ProductionComparison[] => {
   // Aggregate actual production by job, filtering by date range
-  const actualByJob = aggregateProductionByJob(productionEntries, startDate, endDate);
+  const actualByJob = aggregateProductionByJob(
+    productionEntries,
+    startDate,
+    endDate,
+  );
 
   // Filter jobs to those in the time range
   const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
@@ -165,13 +184,17 @@ export const mergeProjectionsWithActuals = (
         : job.quantity;
 
     // Get actual quantity and entry IDs from production entries
-    const jobData = actualByJob.get(job.id) || { total: 0, entryIds: [], lastUpdatedAt: undefined };
+    const jobData = actualByJob.get(job.id) || {
+      total: 0,
+      entryIds: [],
+      lastUpdatedAt: undefined,
+    };
     const actual_quantity = jobData.total;
 
     // Calculate variance
     const { variance, variance_percentage } = calculateVariance(
       projected_quantity,
-      actual_quantity
+      actual_quantity,
     );
 
     return {
@@ -192,11 +215,11 @@ export const mergeProjectionsWithActuals = (
  * @returns Status string for styling
  */
 export const getVarianceStatus = (
-  variance_percentage: number
-): 'ahead' | 'on-track' | 'behind' => {
-  if (variance_percentage >= -5) return 'ahead'; // >= 95% of projected
-  if (variance_percentage >= -20) return 'on-track'; // 80-95% of projected
-  return 'behind'; // < 80% of projected
+  variance_percentage: number,
+): "ahead" | "on-track" | "behind" => {
+  if (variance_percentage >= -5) return "ahead"; // >= 95% of projected
+  if (variance_percentage >= -20) return "on-track"; // 80-95% of projected
+  return "behind"; // < 80% of projected
 };
 
 /**
@@ -205,7 +228,7 @@ export const getVarianceStatus = (
  * @returns Summary object with key metrics
  */
 export const calculateProductionSummary = (
-  comparisons: ProductionComparison[]
+  comparisons: ProductionComparison[],
 ): {
   total_jobs: number;
   total_projected: number;
@@ -219,8 +242,14 @@ export const calculateProductionSummary = (
   total_revenue: number;
 } => {
   const total_jobs = comparisons.length;
-  const total_projected = comparisons.reduce((sum, c) => sum + c.projected_quantity, 0);
-  const total_actual = comparisons.reduce((sum, c) => sum + c.actual_quantity, 0);
+  const total_projected = comparisons.reduce(
+    (sum, c) => sum + c.projected_quantity,
+    0,
+  );
+  const total_actual = comparisons.reduce(
+    (sum, c) => sum + c.actual_quantity,
+    0,
+  );
   const total_variance = total_actual - total_projected;
   const average_variance_percentage =
     total_projected > 0 ? (total_variance / total_projected) * 100 : 0;
@@ -231,12 +260,13 @@ export const calculateProductionSummary = (
 
   comparisons.forEach((c) => {
     const status = getVarianceStatus(c.variance_percentage);
-    if (status === 'ahead') jobs_ahead++;
-    else if (status === 'on-track') jobs_on_track++;
+    if (status === "ahead") jobs_ahead++;
+    else if (status === "on-track") jobs_on_track++;
     else jobs_behind++;
   });
 
-  const completion_rate = total_projected > 0 ? (total_actual / total_projected) * 100 : 0;
+  const completion_rate =
+    total_projected > 0 ? (total_actual / total_projected) * 100 : 0;
 
   // Calculate total revenue based on actual production
   const total_revenue = comparisons.reduce((sum, c) => {
@@ -246,7 +276,8 @@ export const calculateProductionSummary = (
     if (jobQuantity === 0) return sum;
 
     // Calculate revenue proportional to actual quantity produced
-    const revenueGenerated = (c.actual_quantity / jobQuantity) * jobTotalBilling;
+    const revenueGenerated =
+      (c.actual_quantity / jobQuantity) * jobTotalBilling;
     return sum + revenueGenerated;
   }, 0);
 

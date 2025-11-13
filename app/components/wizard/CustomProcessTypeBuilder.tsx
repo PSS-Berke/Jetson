@@ -3,14 +3,14 @@
  * Embedded dynamic form builder for creating custom process types in the wizard
  */
 
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Copy, Trash2, Edit2 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { ChevronUp, ChevronDown, Copy, Trash2, Edit2 } from "lucide-react";
 
 interface FormField {
   id: string;
-  type: 'text' | 'number' | 'select';
+  type: "text" | "number" | "select";
   label: string;
   placeholder?: string;
   required?: boolean;
@@ -28,47 +28,53 @@ export default function CustomProcessTypeBuilder({
   fields,
   onChange,
 }: CustomProcessTypeBuilderProps) {
-  const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
+  const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(
+    null,
+  );
 
   // Field editor state
-  const [fieldType, setFieldType] = useState<'text' | 'number' | 'select'>('text');
-  const [fieldLabel, setFieldLabel] = useState('');
-  const [fieldPlaceholder, setFieldPlaceholder] = useState('');
+  const [fieldType, setFieldType] = useState<"text" | "number" | "select">(
+    "text",
+  );
+  const [fieldLabel, setFieldLabel] = useState("");
+  const [fieldPlaceholder, setFieldPlaceholder] = useState("");
   const [fieldRequired, setFieldRequired] = useState(false);
-  const [fieldOptions, setFieldOptions] = useState('');
+  const [fieldOptions, setFieldOptions] = useState("");
 
   // Preview form values
-  const [previewValues, setPreviewValues] = useState<{ [key: string]: string }>({});
+  const [previewValues, setPreviewValues] = useState<{ [key: string]: string }>(
+    {},
+  );
 
   // Helper to convert label to snake_case ID
   const toSnakeCase = (str: string): string => {
     return str
       .toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
   };
 
   const resetFieldEditor = () => {
-    setFieldType('text');
-    setFieldLabel('');
-    setFieldPlaceholder('');
+    setFieldType("text");
+    setFieldLabel("");
+    setFieldPlaceholder("");
     setFieldRequired(false);
-    setFieldOptions('');
+    setFieldOptions("");
     setEditingFieldIndex(null);
   };
 
   const handleAddField = () => {
     if (!fieldLabel) {
-      alert('Please provide a label for the field.');
+      alert("Please provide a label for the field.");
       return;
     }
 
     const generatedId = toSnakeCase(fieldLabel);
 
     if (!generatedId) {
-      alert('Please provide a valid label that contains letters or numbers.');
+      alert("Please provide a valid label that contains letters or numbers.");
       return;
     }
 
@@ -79,9 +85,9 @@ export default function CustomProcessTypeBuilder({
       placeholder: fieldPlaceholder || undefined,
       required: fieldRequired,
       options:
-        fieldType === 'select'
+        fieldType === "select"
           ? fieldOptions
-              .split(',')
+              .split(",")
               .map((opt) => opt.trim())
               .filter((opt) => opt)
           : undefined,
@@ -102,9 +108,9 @@ export default function CustomProcessTypeBuilder({
     const field = fields[index];
     setFieldType(field.type);
     setFieldLabel(field.label);
-    setFieldPlaceholder(field.placeholder || '');
+    setFieldPlaceholder(field.placeholder || "");
     setFieldRequired(field.required || false);
-    setFieldOptions(field.options?.join(', ') || '');
+    setFieldOptions(field.options?.join(", ") || "");
     setEditingFieldIndex(index);
   };
 
@@ -123,13 +129,16 @@ export default function CustomProcessTypeBuilder({
     onChange([...fields, duplicatedField]);
   };
 
-  const handleMoveField = (index: number, direction: 'up' | 'down') => {
+  const handleMoveField = (index: number, direction: "up" | "down") => {
     const newFields = [...fields];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
 
     if (targetIndex < 0 || targetIndex >= fields.length) return;
 
-    [newFields[index], newFields[targetIndex]] = [newFields[targetIndex], newFields[index]];
+    [newFields[index], newFields[targetIndex]] = [
+      newFields[targetIndex],
+      newFields[index],
+    ];
     onChange(newFields);
   };
 
@@ -147,12 +156,14 @@ export default function CustomProcessTypeBuilder({
         {/* Field Editor */}
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <h3 className="font-semibold text-gray-900 mb-4">
-            {editingFieldIndex !== null ? 'Edit Field' : 'Add New Field'}
+            {editingFieldIndex !== null ? "Edit Field" : "Add New Field"}
           </h3>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Label *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Label *
+              </label>
               <input
                 type="text"
                 value={fieldLabel}
@@ -168,10 +179,14 @@ export default function CustomProcessTypeBuilder({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Field Type *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Field Type *
+              </label>
               <select
                 value={fieldType}
-                onChange={(e) => setFieldType(e.target.value as 'text' | 'number' | 'select')}
+                onChange={(e) =>
+                  setFieldType(e.target.value as "text" | "number" | "select")
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="text">Text</option>
@@ -193,7 +208,7 @@ export default function CustomProcessTypeBuilder({
               />
             </div>
 
-            {fieldType === 'select' && (
+            {fieldType === "select" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Options (comma-separated) *
@@ -229,7 +244,7 @@ export default function CustomProcessTypeBuilder({
               onClick={handleAddField}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              {editingFieldIndex !== null ? 'Update Field' : 'Add Field'}
+              {editingFieldIndex !== null ? "Update Field" : "Add Field"}
             </button>
 
             {editingFieldIndex !== null && (
@@ -247,7 +262,9 @@ export default function CustomProcessTypeBuilder({
         {/* Field List */}
         {fields.length > 0 && (
           <div>
-            <h3 className="font-semibold text-gray-900 mb-3">Form Fields ({fields.length})</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">
+              Form Fields ({fields.length})
+            </h3>
             <div className="space-y-2">
               {fields.map((field, index) => (
                 <div
@@ -255,7 +272,9 @@ export default function CustomProcessTypeBuilder({
                   className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between"
                 >
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">{field.label}</div>
+                    <div className="font-medium text-gray-900">
+                      {field.label}
+                    </div>
                     <div className="text-xs text-gray-500">
                       ID: {field.id} | Type: {field.type}
                     </div>
@@ -263,7 +282,7 @@ export default function CustomProcessTypeBuilder({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => handleMoveField(index, 'up')}
+                      onClick={() => handleMoveField(index, "up")}
                       disabled={index === 0}
                       className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
                       title="Move up"
@@ -272,7 +291,7 @@ export default function CustomProcessTypeBuilder({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleMoveField(index, 'down')}
+                      onClick={() => handleMoveField(index, "down")}
                       disabled={index === fields.length - 1}
                       className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
                       title="Move down"
@@ -313,8 +332,12 @@ export default function CustomProcessTypeBuilder({
 
       {/* Right Side - Live Preview */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Live Preview</h3>
-        <p className="text-sm text-gray-600 mb-4">See how your form will look</p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Live Preview
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          See how your form will look
+        </p>
 
         {fields.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -323,19 +346,25 @@ export default function CustomProcessTypeBuilder({
           </div>
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-lg font-bold text-blue-600 mb-4">{processTypeName}</h4>
+            <h4 className="text-lg font-bold text-blue-600 mb-4">
+              {processTypeName}
+            </h4>
             <div className="space-y-4">
               {fields.map((field) => (
                 <div key={field.id}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {field.label}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
+                    {field.required && (
+                      <span className="text-red-500 ml-1">*</span>
+                    )}
                   </label>
 
-                  {field.type === 'select' ? (
+                  {field.type === "select" ? (
                     <select
-                      value={previewValues[field.id] || ''}
-                      onChange={(e) => handlePreviewInputChange(field.id, e.target.value)}
+                      value={previewValues[field.id] || ""}
+                      onChange={(e) =>
+                        handlePreviewInputChange(field.id, e.target.value)
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select an option...</option>
@@ -348,8 +377,10 @@ export default function CustomProcessTypeBuilder({
                   ) : (
                     <input
                       type={field.type}
-                      value={previewValues[field.id] || ''}
-                      onChange={(e) => handlePreviewInputChange(field.id, e.target.value)}
+                      value={previewValues[field.id] || ""}
+                      onChange={(e) =>
+                        handlePreviewInputChange(field.id, e.target.value)
+                      }
                       placeholder={field.placeholder}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />

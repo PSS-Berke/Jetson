@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { ParsedJob } from './useJobs';
-import { Machine, MachineCapacityData, DailySummary } from '@/types/calendar';
-import { calculateMachineCapacities, calculateDailySummaries } from '@/lib/calendarUtils';
+import { useMemo } from "react";
+import { ParsedJob } from "./useJobs";
+import { Machine, MachineCapacityData, DailySummary } from "@/types/calendar";
+import {
+  calculateMachineCapacities,
+  calculateDailySummaries,
+} from "@/lib/calendarUtils";
 
 interface UseMachineCapacityProps {
   jobs: ParsedJob[];
@@ -29,7 +32,7 @@ export const useMachineCapacity = ({
   jobs,
   machines,
   startDate,
-  endDate
+  endDate,
 }: UseMachineCapacityProps): UseMachineCapacityReturn => {
   // Calculate machine capacities
   const machineCapacities = useMemo(() => {
@@ -46,7 +49,7 @@ export const useMachineCapacity = ({
     if (machineCapacities.size === 0) return 0;
 
     let totalUtilization = 0;
-    machineCapacities.forEach(capacity => {
+    machineCapacities.forEach((capacity) => {
       totalUtilization += capacity.averageUtilization;
     });
 
@@ -58,7 +61,7 @@ export const useMachineCapacity = ({
     let peak = 0;
     let machine: Machine | null = null;
 
-    machineCapacities.forEach(capacity => {
+    machineCapacities.forEach((capacity) => {
       if (capacity.peakUtilization > peak) {
         peak = capacity.peakUtilization;
         machine = capacity.machine;
@@ -71,7 +74,7 @@ export const useMachineCapacity = ({
   // Find low utilization machines (< 50%)
   const lowUtilizationMachines = useMemo(() => {
     const machines: Machine[] = [];
-    machineCapacities.forEach(capacity => {
+    machineCapacities.forEach((capacity) => {
       if (capacity.averageUtilization < 50) {
         machines.push(capacity.machine);
       }
@@ -82,7 +85,7 @@ export const useMachineCapacity = ({
   // Find high utilization machines (> 80%)
   const highUtilizationMachines = useMemo(() => {
     const machines: Machine[] = [];
-    machineCapacities.forEach(capacity => {
+    machineCapacities.forEach((capacity) => {
       if (capacity.averageUtilization > 80) {
         machines.push(capacity.machine);
       }
@@ -97,6 +100,6 @@ export const useMachineCapacity = ({
     peakUtilization,
     peakMachine,
     lowUtilizationMachines,
-    highUtilizationMachines
+    highUtilizationMachines,
   };
 };

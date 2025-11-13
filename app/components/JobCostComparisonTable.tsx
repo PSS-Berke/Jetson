@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from "react";
 import {
   JobCostComparison,
   formatCurrency,
@@ -8,7 +8,7 @@ import {
   formatNumber,
   getProfitTextColor,
   getProfitColorClass,
-} from '@/lib/jobCostUtils';
+} from "@/lib/jobCostUtils";
 
 interface JobCostComparisonTableProps {
   comparisons: JobCostComparison[];
@@ -20,8 +20,16 @@ interface JobCostComparisonTableProps {
   facilitiesId?: number;
 }
 
-type SortField = 'job_number' | 'job_name' | 'client' | 'billing_rate' | 'actual_cost' | 'profit_margin' | 'profit_percentage' | 'total_profit';
-type SortDirection = 'asc' | 'desc';
+type SortField =
+  | "job_number"
+  | "job_name"
+  | "client"
+  | "billing_rate"
+  | "actual_cost"
+  | "profit_margin"
+  | "profit_percentage"
+  | "total_profit";
+type SortDirection = "asc" | "desc";
 
 export default function JobCostComparisonTable({
   comparisons,
@@ -32,22 +40,24 @@ export default function JobCostComparisonTable({
   // endDate,
   // facilitiesId,
 }: JobCostComparisonTableProps) {
-  const [sortField, setSortField] = useState<SortField>('job_number');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>("job_number");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [editingCell, setEditingCell] = useState<{ jobId: number } | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editingCell, setEditingCell] = useState<{ jobId: number } | null>(
+    null,
+  );
+  const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
@@ -57,35 +67,35 @@ export default function JobCostComparisonTable({
     let bValue: string | number;
 
     switch (sortField) {
-      case 'job_number':
+      case "job_number":
         aValue = a.job.job_number;
         bValue = b.job.job_number;
         break;
-      case 'job_name':
+      case "job_name":
         aValue = a.job.job_name.toLowerCase();
         bValue = b.job.job_name.toLowerCase();
         break;
-      case 'client':
-        aValue = a.job.client?.name.toLowerCase() || '';
-        bValue = b.job.client?.name.toLowerCase() || '';
+      case "client":
+        aValue = a.job.client?.name.toLowerCase() || "";
+        bValue = b.job.client?.name.toLowerCase() || "";
         break;
-      case 'billing_rate':
+      case "billing_rate":
         aValue = a.billing_rate_per_m;
         bValue = b.billing_rate_per_m;
         break;
-      case 'actual_cost':
+      case "actual_cost":
         aValue = a.actual_cost_per_m || 0;
         bValue = b.actual_cost_per_m || 0;
         break;
-      case 'profit_margin':
+      case "profit_margin":
         aValue = a.profit_metrics?.profit_per_m || 0;
         bValue = b.profit_metrics?.profit_per_m || 0;
         break;
-      case 'profit_percentage':
+      case "profit_percentage":
         aValue = a.profit_metrics?.profit_percentage || 0;
         bValue = b.profit_metrics?.profit_percentage || 0;
         break;
-      case 'total_profit':
+      case "total_profit":
         aValue = a.profit_metrics?.total_profit || 0;
         bValue = b.profit_metrics?.total_profit || 0;
         break;
@@ -94,8 +104,8 @@ export default function JobCostComparisonTable({
         bValue = b.job.job_number;
     }
 
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
 
@@ -120,7 +130,10 @@ export default function JobCostComparisonTable({
   }, [editingCell]);
 
   // Start editing a cell
-  const handleStartEdit = (comparison: JobCostComparison, e: React.MouseEvent) => {
+  const handleStartEdit = (
+    comparison: JobCostComparison,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     setEditingCell({ jobId: comparison.job.id });
     setEditValue((comparison.actual_cost_per_m || 0).toString());
@@ -129,9 +142,9 @@ export default function JobCostComparisonTable({
   // Handle input change with decimal formatting
   const handleEditInputChange = (value: string) => {
     // Allow digits and decimal point
-    const validChars = value.replace(/[^\d.]/g, '');
+    const validChars = value.replace(/[^\d.]/g, "");
     // Only allow one decimal point
-    const parts = validChars.split('.');
+    const parts = validChars.split(".");
     if (parts.length > 2) return;
     setEditValue(validChars);
   };
@@ -156,7 +169,7 @@ export default function JobCostComparisonTable({
     try {
       // TODO: Implement API call to save/update cost entry
       // For now, just simulate the save
-      console.log('Saving cost entry:', {
+      console.log("Saving cost entry:", {
         job: comparison.job.id,
         actual_cost_per_m: newValue,
         date: Date.now(),
@@ -167,8 +180,8 @@ export default function JobCostComparisonTable({
         onEdit(comparison);
       }
     } catch (error) {
-      console.error('Error saving actual cost:', error);
-      alert('Failed to save. Please try again.');
+      console.error("Error saving actual cost:", error);
+      alert("Failed to save. Please try again.");
     } finally {
       setSaving(false);
       setEditingCell(null);
@@ -178,14 +191,17 @@ export default function JobCostComparisonTable({
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingCell(null);
-    setEditValue('');
+    setEditValue("");
   };
 
   // Handle keyboard events
-  const handleKeyDown = (e: React.KeyboardEvent, comparison: JobCostComparison) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (
+    e: React.KeyboardEvent,
+    comparison: JobCostComparison,
+  ) => {
+    if (e.key === "Enter") {
       handleSaveEdit(comparison);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       handleCancelEdit();
     }
   };
@@ -197,7 +213,7 @@ export default function JobCostComparisonTable({
     }
     return (
       <span className="text-blue-600 ml-1">
-        {sortDirection === 'asc' ? '↑' : '↓'}
+        {sortDirection === "asc" ? "↑" : "↓"}
       </span>
     );
   };
@@ -207,8 +223,12 @@ export default function JobCostComparisonTable({
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Job Profitability Analysis</h3>
-          <p className="text-sm text-gray-500">Compare billing rates with actual costs</p>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Job Profitability Analysis
+          </h3>
+          <p className="text-sm text-gray-500">
+            Compare billing rates with actual costs
+          </p>
         </div>
         <div className="flex gap-2">
           {onToggleBatchMode && (
@@ -216,11 +236,11 @@ export default function JobCostComparisonTable({
               onClick={onToggleBatchMode}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 isBatchMode
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
               }`}
             >
-              {isBatchMode ? 'Exit Batch Mode' : 'Batch Entry'}
+              {isBatchMode ? "Exit Batch Mode" : "Batch Entry"}
             </button>
           )}
         </div>
@@ -233,54 +253,54 @@ export default function JobCostComparisonTable({
             <tr>
               <th
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('job_number')}
+                onClick={() => handleSort("job_number")}
               >
-                Job # {renderSortIcon('job_number')}
+                Job # {renderSortIcon("job_number")}
               </th>
               <th
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('job_name')}
+                onClick={() => handleSort("job_name")}
               >
-                Job Name {renderSortIcon('job_name')}
+                Job Name {renderSortIcon("job_name")}
               </th>
               <th
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('client')}
+                onClick={() => handleSort("client")}
               >
-                Client {renderSortIcon('client')}
+                Client {renderSortIcon("client")}
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quantity
               </th>
               <th
                 className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('billing_rate')}
+                onClick={() => handleSort("billing_rate")}
               >
-                Billing Rate (per/M) {renderSortIcon('billing_rate')}
+                Billing Rate (per/M) {renderSortIcon("billing_rate")}
               </th>
               <th
                 className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('actual_cost')}
+                onClick={() => handleSort("actual_cost")}
               >
-                Actual Cost (per/M) {renderSortIcon('actual_cost')}
+                Actual Cost (per/M) {renderSortIcon("actual_cost")}
               </th>
               <th
                 className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('profit_margin')}
+                onClick={() => handleSort("profit_margin")}
               >
-                Profit (per/M) {renderSortIcon('profit_margin')}
+                Profit (per/M) {renderSortIcon("profit_margin")}
               </th>
               <th
                 className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('profit_percentage')}
+                onClick={() => handleSort("profit_percentage")}
               >
-                Profit % {renderSortIcon('profit_percentage')}
+                Profit % {renderSortIcon("profit_percentage")}
               </th>
               <th
                 className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('total_profit')}
+                onClick={() => handleSort("total_profit")}
               >
-                Total Profit {renderSortIcon('total_profit')}
+                Total Profit {renderSortIcon("total_profit")}
               </th>
             </tr>
           </thead>
@@ -308,8 +328,13 @@ export default function JobCostComparisonTable({
                       {comparison.job.job_name}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {comparison.job.client?.name || 'Unknown'}
-                      {comparison.job.sub_client && <span className="text-gray-400"> / {comparison.job.sub_client.name}</span>}
+                      {comparison.job.client?.name || "Unknown"}
+                      {comparison.job.sub_client && (
+                        <span className="text-gray-400">
+                          {" "}
+                          / {comparison.job.sub_client.name}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-gray-900">
                       {formatNumber(comparison.job.quantity)}
@@ -319,30 +344,42 @@ export default function JobCostComparisonTable({
                     </td>
                     <td
                       className="px-4 py-3 text-sm text-right cursor-pointer hover:bg-blue-50"
-                      onClick={(e) => !isEditing && handleStartEdit(comparison, e)}
+                      onClick={(e) =>
+                        !isEditing && handleStartEdit(comparison, e)
+                      }
                     >
                       {isEditing ? (
                         <input
                           ref={inputRef}
                           type="text"
                           value={editValue}
-                          onChange={(e) => handleEditInputChange(e.target.value)}
+                          onChange={(e) =>
+                            handleEditInputChange(e.target.value)
+                          }
                           onKeyDown={(e) => handleKeyDown(e, comparison)}
                           onBlur={() => handleSaveEdit(comparison)}
                           className="w-full px-2 py-1 border border-blue-500 rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                           disabled={saving}
                         />
                       ) : (
-                        <span className={comparison.actual_cost_per_m === null ? 'text-gray-400 italic' : 'text-gray-900 font-medium'}>
+                        <span
+                          className={
+                            comparison.actual_cost_per_m === null
+                              ? "text-gray-400 italic"
+                              : "text-gray-900 font-medium"
+                          }
+                        >
                           {comparison.actual_cost_per_m !== null
                             ? formatCurrency(comparison.actual_cost_per_m)
-                            : 'Click to enter'}
+                            : "Click to enter"}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-right">
                       {profitMetrics ? (
-                        <span className={`font-semibold ${getProfitTextColor(profitMetrics.profit_percentage)}`}>
+                        <span
+                          className={`font-semibold ${getProfitTextColor(profitMetrics.profit_percentage)}`}
+                        >
                           {formatCurrency(profitMetrics.profit_per_m)}
                         </span>
                       ) : (
@@ -351,7 +388,9 @@ export default function JobCostComparisonTable({
                     </td>
                     <td className="px-4 py-3 text-sm text-right">
                       {profitMetrics ? (
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold border ${getProfitColorClass(profitMetrics.profit_status)}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold border ${getProfitColorClass(profitMetrics.profit_status)}`}
+                        >
                           {formatPercentage(profitMetrics.profit_percentage)}
                         </span>
                       ) : (
@@ -360,7 +399,9 @@ export default function JobCostComparisonTable({
                     </td>
                     <td className="px-4 py-3 text-sm text-right">
                       {profitMetrics ? (
-                        <span className={`font-semibold ${getProfitTextColor(profitMetrics.profit_percentage)}`}>
+                        <span
+                          className={`font-semibold ${getProfitTextColor(profitMetrics.profit_percentage)}`}
+                        >
                           {formatCurrency(profitMetrics.total_profit)}
                         </span>
                       ) : (
@@ -391,7 +432,9 @@ export default function JobCostComparisonTable({
               <option value={100}>100</option>
             </select>
             <span className="text-sm text-gray-700 ml-4">
-              Showing {startIndex + 1}-{Math.min(endIndex, sortedComparisons.length)} of {sortedComparisons.length}
+              Showing {startIndex + 1}-
+              {Math.min(endIndex, sortedComparisons.length)} of{" "}
+              {sortedComparisons.length}
             </span>
           </div>
 
@@ -407,7 +450,9 @@ export default function JobCostComparisonTable({
               Page {currentPage} of {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
               disabled={currentPage === totalPages}
               className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >

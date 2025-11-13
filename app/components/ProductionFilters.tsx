@@ -1,11 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { ParsedJob } from '@/hooks/useJobs';
-import DateRangePicker, { type DateRange } from './DateRangePicker';
-import { Filter, SlidersHorizontal, LayoutGrid, Table2, Upload } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from "react";
+import { ParsedJob } from "@/hooks/useJobs";
+import DateRangePicker, { type DateRange } from "./DateRangePicker";
+import {
+  Filter,
+  SlidersHorizontal,
+  LayoutGrid,
+  Table2,
+  Upload,
+} from "lucide-react";
 
-type GranularityType = 'day' | 'week' | 'month';
+type GranularityType = "day" | "week" | "month";
 
 interface ProductionFiltersProps {
   jobs: ParsedJob[];
@@ -15,16 +21,16 @@ interface ProductionFiltersProps {
   onServiceTypesChange: (types: string[]) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  filterMode: 'and' | 'or';
-  onFilterModeChange: (mode: 'and' | 'or') => void;
-  scheduleFilter: 'all' | 'confirmed' | 'soft';
-  onScheduleFilterChange: (filter: 'all' | 'confirmed' | 'soft') => void;
-  filterViewMode: 'simple' | 'advanced';
-  onFilterViewModeChange: (mode: 'simple' | 'advanced') => void;
-  dataDisplayMode: 'pieces' | 'revenue';
-  onDataDisplayModeChange: (mode: 'pieces' | 'revenue') => void;
-  mobileViewMode?: 'cards' | 'table';
-  onMobileViewModeChange?: (mode: 'cards' | 'table') => void;
+  filterMode: "and" | "or";
+  onFilterModeChange: (mode: "and" | "or") => void;
+  scheduleFilter: "all" | "confirmed" | "soft";
+  onScheduleFilterChange: (filter: "all" | "confirmed" | "soft") => void;
+  filterViewMode: "simple" | "advanced";
+  onFilterViewModeChange: (mode: "simple" | "advanced") => void;
+  dataDisplayMode: "pieces" | "revenue";
+  onDataDisplayModeChange: (mode: "pieces" | "revenue") => void;
+  mobileViewMode?: "cards" | "table";
+  onMobileViewModeChange?: (mode: "cards" | "table") => void;
   granularity: GranularityType;
   dateRangeDisplay: string;
   onPreviousPeriod: () => void;
@@ -53,7 +59,7 @@ export default function ProductionFilters({
   onFilterViewModeChange,
   dataDisplayMode,
   onDataDisplayModeChange,
-  mobileViewMode = 'table',
+  mobileViewMode = "table",
   onMobileViewModeChange,
   granularity,
   onPreviousPeriod,
@@ -73,32 +79,38 @@ export default function ProductionFilters({
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+      if (
+        clientDropdownRef.current &&
+        !clientDropdownRef.current.contains(event.target as Node)
+      ) {
         setIsClientDropdownOpen(false);
       }
-      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(event.target as Node)) {
+      if (
+        serviceDropdownRef.current &&
+        !serviceDropdownRef.current.contains(event.target as Node)
+      ) {
         setIsServiceDropdownOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
   // Extract unique clients from jobs
   const clients = useMemo(() => {
     const clientMap = new Map<number, { id: number; name: string }>();
-    jobs.forEach(job => {
+    jobs.forEach((job) => {
       if (job.client) {
         clientMap.set(job.client.id, job.client);
       }
     });
     return Array.from(clientMap.values()).sort((a, b) => {
       // Handle null or undefined names
-      const nameA = a.name || '';
-      const nameB = b.name || '';
+      const nameA = a.name || "";
+      const nameB = b.name || "";
       return nameA.localeCompare(nameB);
     });
   }, [jobs]);
@@ -106,8 +118,8 @@ export default function ProductionFilters({
   // Map legacy process type names to new full names
   const normalizeProcessType = (processType: string): string => {
     const mapping: Record<string, string> = {
-      'IJ': 'Inkjet',
-      'L/A': 'Label/Apply',
+      IJ: "Inkjet",
+      "L/A": "Label/Apply",
     };
     return mapping[processType] || processType;
   };
@@ -115,9 +127,9 @@ export default function ProductionFilters({
   // Extract unique process types from requirements and normalize them
   const serviceTypes = useMemo(() => {
     const types = new Set<string>();
-    jobs.forEach(job => {
+    jobs.forEach((job) => {
       if (job.requirements && job.requirements.length > 0) {
-        job.requirements.forEach(req => {
+        job.requirements.forEach((req) => {
           if (req.process_type) {
             types.add(normalizeProcessType(req.process_type));
           }
@@ -129,7 +141,7 @@ export default function ProductionFilters({
 
   const handleClientToggle = (clientId: number) => {
     if (selectedClients.includes(clientId)) {
-      onClientsChange(selectedClients.filter(id => id !== clientId));
+      onClientsChange(selectedClients.filter((id) => id !== clientId));
     } else {
       onClientsChange([...selectedClients, clientId]);
     }
@@ -137,22 +149,24 @@ export default function ProductionFilters({
 
   const handleServiceTypeToggle = (serviceType: string) => {
     if (selectedServiceTypes.includes(serviceType)) {
-      onServiceTypesChange(selectedServiceTypes.filter(t => t !== serviceType));
+      onServiceTypesChange(
+        selectedServiceTypes.filter((t) => t !== serviceType),
+      );
     } else {
       onServiceTypesChange([...selectedServiceTypes, serviceType]);
     }
   };
 
   const getPeriodLabel = () => {
-    if (granularity === 'day') return 'Day Range';
-    if (granularity === 'month') return 'Month Range';
-    return 'Week Range';
+    if (granularity === "day") return "Day Range";
+    if (granularity === "month") return "Month Range";
+    return "Week Range";
   };
 
   const getTodayButtonLabel = () => {
-    if (granularity === 'day') return 'Today';
-    if (granularity === 'month') return 'This Month';
-    return 'This Week';
+    if (granularity === "day") return "Today";
+    if (granularity === "month") return "This Month";
+    return "This Week";
   };
 
   return (
@@ -163,22 +177,22 @@ export default function ProductionFilters({
           {/* Simple/Advanced View Toggle */}
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => onFilterViewModeChange('simple')}
+              onClick={() => onFilterViewModeChange("simple")}
               className={`p-2 rounded-md transition-all ${
-                filterViewMode === 'simple'
-                  ? 'bg-white text-[var(--dark-blue)] shadow-sm'
-                  : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                filterViewMode === "simple"
+                  ? "bg-white text-[var(--dark-blue)] shadow-sm"
+                  : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
               }`}
               title="Simple filtering view"
             >
               <Filter className="w-4 h-4" />
             </button>
             <button
-              onClick={() => onFilterViewModeChange('advanced')}
+              onClick={() => onFilterViewModeChange("advanced")}
               className={`p-2 rounded-md transition-all ${
-                filterViewMode === 'advanced'
-                  ? 'bg-white text-[var(--primary-blue)] shadow-sm'
-                  : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                filterViewMode === "advanced"
+                  ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                  : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
               }`}
               title="Advanced filtering view"
             >
@@ -187,25 +201,25 @@ export default function ProductionFilters({
           </div>
 
           {/* Match All/Any Toggle - Only visible in advanced mode */}
-          {filterViewMode === 'advanced' && (
+          {filterViewMode === "advanced" && (
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => onFilterModeChange('and')}
+                onClick={() => onFilterModeChange("and")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  filterMode === 'and'
-                    ? 'bg-white text-[var(--dark-blue)] shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  filterMode === "and"
+                    ? "bg-white text-[var(--dark-blue)] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
                 title="Jobs must match ALL active filters"
               >
                 Match All
               </button>
               <button
-                onClick={() => onFilterModeChange('or')}
+                onClick={() => onFilterModeChange("or")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  filterMode === 'or'
-                    ? 'bg-white text-[var(--primary-blue)] shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  filterMode === "or"
+                    ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
                 title="Jobs can match ANY active filter"
               >
@@ -226,7 +240,7 @@ export default function ProductionFilters({
           </div>
 
           {/* Date Range Selector - Only on first row in simple mode */}
-          {filterViewMode === 'simple' && (
+          {filterViewMode === "simple" && (
             <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
               <button
                 onClick={onToday}
@@ -237,10 +251,20 @@ export default function ProductionFilters({
               <button
                 onClick={onPreviousPeriod}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Previous ${granularity === 'day' ? 'day' : granularity === 'month' ? 'month' : 'week'}`}
+                aria-label={`Previous ${granularity === "day" ? "day" : granularity === "month" ? "month" : "week"}`}
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
               </button>
               <DateRangePicker
@@ -250,10 +274,20 @@ export default function ProductionFilters({
               <button
                 onClick={onNextPeriod}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Next ${granularity === 'day' ? 'day' : granularity === 'month' ? 'month' : 'week'}`}
+                aria-label={`Next ${granularity === "day" ? "day" : granularity === "month" ? "month" : "week"}`}
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             </div>
@@ -263,7 +297,7 @@ export default function ProductionFilters({
         {/* Second Row - Shows in simple mode OR advanced mode */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
           {/* Date Range Selector - On second row in advanced mode */}
-          {filterViewMode === 'advanced' && (
+          {filterViewMode === "advanced" && (
             <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
               <button
                 onClick={onToday}
@@ -274,10 +308,20 @@ export default function ProductionFilters({
               <button
                 onClick={onPreviousPeriod}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Previous ${granularity === 'day' ? 'day' : granularity === 'month' ? 'month' : 'week'}`}
+                aria-label={`Previous ${granularity === "day" ? "day" : granularity === "month" ? "month" : "week"}`}
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
               </button>
               <DateRangePicker
@@ -287,10 +331,20 @@ export default function ProductionFilters({
               <button
                 onClick={onNextPeriod}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Next ${granularity === 'day' ? 'day' : granularity === 'month' ? 'month' : 'week'}`}
+                aria-label={`Next ${granularity === "day" ? "day" : granularity === "month" ? "month" : "week"}`}
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             </div>
@@ -308,15 +362,27 @@ export default function ProductionFilters({
                   {selectedClients.length}
                 </span>
               )}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
 
             {isClientDropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 z-50 max-h-64 overflow-y-auto">
                 {clients.length === 0 ? (
-                  <div className="px-4 py-2 text-sm text-[var(--text-light)]">No clients found</div>
+                  <div className="px-4 py-2 text-sm text-[var(--text-light)]">
+                    No clients found
+                  </div>
                 ) : (
                   <>
                     <button
@@ -326,7 +392,7 @@ export default function ProductionFilters({
                       Clear All
                     </button>
                     <div className="border-t border-[var(--border)] my-1"></div>
-                    {clients.map(client => (
+                    {clients.map((client) => (
                       <label
                         key={client.id}
                         className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
@@ -337,7 +403,9 @@ export default function ProductionFilters({
                           onChange={() => handleClientToggle(client.id)}
                           className="mr-2"
                         />
-                        <span className="text-sm text-[var(--text-dark)]">{client.name}</span>
+                        <span className="text-sm text-[var(--text-dark)]">
+                          {client.name}
+                        </span>
                       </label>
                     ))}
                   </>
@@ -358,15 +426,27 @@ export default function ProductionFilters({
                   {selectedServiceTypes.length}
                 </span>
               )}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
 
             {isServiceDropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 z-50 max-h-64 overflow-y-auto">
                 {serviceTypes.length === 0 ? (
-                  <div className="px-4 py-2 text-sm text-[var(--text-light)]">No process types found</div>
+                  <div className="px-4 py-2 text-sm text-[var(--text-light)]">
+                    No process types found
+                  </div>
                 ) : (
                   <>
                     <button
@@ -376,7 +456,7 @@ export default function ProductionFilters({
                       Clear All
                     </button>
                     <div className="border-t border-[var(--border)] my-1"></div>
-                    {serviceTypes.map(serviceType => (
+                    {serviceTypes.map((serviceType) => (
                       <label
                         key={serviceType}
                         className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
@@ -387,7 +467,9 @@ export default function ProductionFilters({
                           onChange={() => handleServiceTypeToggle(serviceType)}
                           className="mr-2"
                         />
-                        <span className="text-sm text-[var(--text-dark)]">{serviceType}</span>
+                        <span className="text-sm text-[var(--text-dark)]">
+                          {serviceType}
+                        </span>
                       </label>
                     ))}
                   </>
@@ -398,36 +480,36 @@ export default function ProductionFilters({
         </div>
 
         {/* Third Row - Advanced Filters Only */}
-        {filterViewMode === 'advanced' && (
+        {filterViewMode === "advanced" && (
           <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
             {/* Schedule Filter Toggle */}
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => onScheduleFilterChange('all')}
+                onClick={() => onScheduleFilterChange("all")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  scheduleFilter === 'all'
-                    ? 'bg-white text-[var(--dark-blue)] shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  scheduleFilter === "all"
+                    ? "bg-white text-[var(--dark-blue)] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
               >
                 All
               </button>
               <button
-                onClick={() => onScheduleFilterChange('confirmed')}
+                onClick={() => onScheduleFilterChange("confirmed")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  scheduleFilter === 'confirmed'
-                    ? 'bg-white text-[#EF3340] shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  scheduleFilter === "confirmed"
+                    ? "bg-white text-[#EF3340] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
               >
                 Hard
               </button>
               <button
-                onClick={() => onScheduleFilterChange('soft')}
+                onClick={() => onScheduleFilterChange("soft")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  scheduleFilter === 'soft'
-                    ? 'bg-white text-[#2E3192] shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  scheduleFilter === "soft"
+                    ? "bg-white text-[#2E3192] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
               >
                 Soft
@@ -437,21 +519,21 @@ export default function ProductionFilters({
             {/* Pieces vs Revenue Toggle */}
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => onDataDisplayModeChange('pieces')}
+                onClick={() => onDataDisplayModeChange("pieces")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  dataDisplayMode === 'pieces'
-                    ? 'bg-white text-[var(--primary-blue)] shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  dataDisplayMode === "pieces"
+                    ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
               >
                 Pieces
               </button>
               <button
-                onClick={() => onDataDisplayModeChange('revenue')}
+                onClick={() => onDataDisplayModeChange("revenue")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  dataDisplayMode === 'revenue'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                  dataDisplayMode === "revenue"
+                    ? "bg-white text-green-600 shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                 }`}
               >
                 Revenue
@@ -462,22 +544,22 @@ export default function ProductionFilters({
             {onMobileViewModeChange && (
               <div className="flex md:hidden items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => onMobileViewModeChange('cards')}
+                  onClick={() => onMobileViewModeChange("cards")}
                   className={`p-2 rounded-md transition-all ${
-                    mobileViewMode === 'cards'
-                      ? 'bg-white text-[var(--dark-blue)] shadow-sm'
-                      : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                    mobileViewMode === "cards"
+                      ? "bg-white text-[var(--dark-blue)] shadow-sm"
+                      : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                   }`}
                   title="Card view (mobile)"
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => onMobileViewModeChange('table')}
+                  onClick={() => onMobileViewModeChange("table")}
                   className={`p-2 rounded-md transition-all ${
-                    mobileViewMode === 'table'
-                      ? 'bg-white text-[var(--primary-blue)] shadow-sm'
-                      : 'text-[var(--text-light)] hover:text-[var(--text-dark)]'
+                    mobileViewMode === "table"
+                      ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                      : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
                   }`}
                   title="Table view (mobile)"
                 >
@@ -489,7 +571,7 @@ export default function ProductionFilters({
         )}
 
         {/* Fourth Row - Bulk Upload & Export PDF (Advanced Mode Only) */}
-        {filterViewMode === 'advanced' && (onBulkUpload || onExportPDF) && (
+        {filterViewMode === "advanced" && (onBulkUpload || onExportPDF) && (
           <div className="flex gap-3 justify-start">
             {onBulkUpload && (
               <button

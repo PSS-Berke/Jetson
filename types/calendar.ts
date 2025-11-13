@@ -1,5 +1,5 @@
-import { ParsedJob } from '@/hooks/useJobs';
-import type { Machine } from '@/types';
+import { ParsedJob } from "@/hooks/useJobs";
+import type { Machine } from "@/types";
 
 // Re-export for convenience
 export type { Machine };
@@ -85,17 +85,17 @@ export interface MachineJobAllocation {
 /**
  * Shift type
  */
-export type ShiftType = '1st' | '2nd' | 'both';
+export type ShiftType = "1st" | "2nd" | "both";
 
 /**
  * Calendar view type
  */
-export type CalendarViewType = 'month' | 'week' | 'day';
+export type CalendarViewType = "month" | "week" | "day";
 
 /**
  * Machine capacity display mode
  */
-export type CapacityDisplayMode = 'sidebar' | 'overlay';
+export type CapacityDisplayMode = "sidebar" | "overlay";
 
 /**
  * Filter options for calendar

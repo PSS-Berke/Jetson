@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DataTablePaginationProps {
   currentPage: number;
@@ -17,7 +17,7 @@ export function DataTablePagination({
   pageSizeOptions,
   totalItems,
   onPageChange,
-  onPageSizeChange
+  onPageSizeChange,
 }: DataTablePaginationProps) {
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
@@ -78,9 +78,10 @@ export function DataTablePagination({
                 onClick={() => onPageChange(pageNum)}
                 className={`
                   px-3 py-1 rounded text-sm font-medium
-                  ${currentPage === pageNum
-                    ? 'bg-blue-600 text-white'
-                    : 'hover:bg-gray-100 text-gray-700'
+                  ${
+                    currentPage === pageNum
+                      ? "bg-blue-600 text-white"
+                      : "hover:bg-gray-100 text-gray-700"
                   }
                 `}
               >

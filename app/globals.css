@@ -32,7 +32,9 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
+    "Cantarell", sans-serif;
 }
 
 /* Calendar Styles */
@@ -151,7 +153,9 @@ body {
   color: white;
   white-space: nowrap;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   cursor: pointer;
 }
 
@@ -182,7 +186,9 @@ body {
   border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   font-size: 0.7rem;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .calendar-date-header .job-item.clickable:hover {
@@ -398,13 +404,18 @@ body {
 
 /* Smooth transitions */
 .calendar-container * {
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 /* Mobile touch improvements */
 @media (max-width: 768px) {
   /* Ensure all interactive elements have adequate touch targets (44x44px minimum) */
-  button, a, input[type="button"], input[type="submit"] {
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"] {
     min-height: 44px;
   }
 
@@ -414,7 +425,8 @@ body {
   }
 
   /* Prevent text selection on interactive elements for better mobile UX */
-  button, a {
+  button,
+  a {
     -webkit-user-select: none;
     user-select: none;
   }
@@ -554,7 +566,8 @@ body {
     width: 100%;
   }
 
-  th, td {
+  th,
+  td {
     font-size: 7pt !important;
     padding: 2px 3px !important;
     overflow: hidden;

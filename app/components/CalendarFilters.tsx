@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Machine } from '@/types/calendar';
-import { ParsedJob } from '@/hooks/useJobs';
+import { useState } from "react";
+import { Machine } from "@/types/calendar";
+import { ParsedJob } from "@/hooks/useJobs";
 
 interface CalendarFiltersProps {
   machines: Machine[];
@@ -29,35 +29,37 @@ export default function CalendarFilters({
   onServiceTypesChange,
   onSelectAllMachines,
   onSelectNoMachines,
-  onClearAll
+  onClearAll,
 }: CalendarFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Get unique clients from jobs
   const uniqueClients = Array.from(
-    new Map(jobs.map(job => [job.clients_id, job.client.name])).entries()
+    new Map(jobs.map((job) => [job.clients_id, job.client.name])).entries(),
   ).map(([id, name]) => ({ id, name }));
 
   // Get unique service types from jobs
-  const uniqueServiceTypes = Array.from(new Set(jobs.map(job => job.service_type)));
+  const uniqueServiceTypes = Array.from(
+    new Set(jobs.map((job) => job.service_type)),
+  );
 
   const toggleMachine = (machineId: number) => {
     const newSelection = selectedMachines.includes(machineId)
-      ? selectedMachines.filter(id => id !== machineId)
+      ? selectedMachines.filter((id) => id !== machineId)
       : [...selectedMachines, machineId];
     onMachinesChange(newSelection);
   };
 
   const toggleClient = (clientId: number) => {
     const newSelection = selectedClients.includes(clientId)
-      ? selectedClients.filter(id => id !== clientId)
+      ? selectedClients.filter((id) => id !== clientId)
       : [...selectedClients, clientId];
     onClientsChange(newSelection);
   };
 
   const toggleServiceType = (type: string) => {
     const newSelection = selectedServiceTypes.includes(type)
-      ? selectedServiceTypes.filter(t => t !== type)
+      ? selectedServiceTypes.filter((t) => t !== type)
       : [...selectedServiceTypes, type];
     onServiceTypesChange(newSelection);
   };
@@ -72,7 +74,9 @@ export default function CalendarFilters({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold text-[var(--dark-blue)]">Filters</h3>
+          <h3 className="text-lg font-semibold text-[var(--dark-blue)]">
+            Filters
+          </h3>
           {hasActiveFilters && (
             <span className="px-2 py-1 bg-[var(--primary-blue)] text-white text-xs font-semibold rounded-full">
               Active
@@ -92,7 +96,7 @@ export default function CalendarFilters({
             onClick={() => setIsExpanded(!isExpanded)}
             className="text-[var(--text-light)] hover:text-[var(--text-dark)]"
           >
-            {isExpanded ? '−' : '+'}
+            {isExpanded ? "−" : "+"}
           </button>
         </div>
       </div>
@@ -123,7 +127,7 @@ export default function CalendarFilters({
               </div>
             </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {machines.map(machine => (
+              {machines.map((machine) => (
                 <label
                   key={machine.id}
                   className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
@@ -148,7 +152,7 @@ export default function CalendarFilters({
               Clients
             </label>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {uniqueClients.map(client => (
+              {uniqueClients.map((client) => (
                 <label
                   key={client.id}
                   className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
@@ -173,7 +177,7 @@ export default function CalendarFilters({
               Service Types
             </label>
             <div className="space-y-2">
-              {uniqueServiceTypes.map(type => (
+              {uniqueServiceTypes.map((type) => (
                 <label
                   key={type}
                   className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"

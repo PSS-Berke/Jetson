@@ -1,4 +1,4 @@
-export { DataTable } from './DataTable';
+export { DataTable } from "./DataTable";
 export type {
   DataTableProps,
   ColumnConfig,
@@ -11,5 +11,5 @@ export type {
   MobileConfig,
   PaginationConfig,
   SortConfig,
-  SortDirection
-} from './DataTableTypes';
+  SortDirection,
+} from "./DataTableTypes";

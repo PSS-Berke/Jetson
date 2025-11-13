@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { getUtilizationColorVar, formatUtilization } from '@/lib/capacityUtils';
+import { getUtilizationColorVar, formatUtilization } from "@/lib/capacityUtils";
 
 interface CapacityIndicatorProps {
   utilizationPercent: number;
   showPercentage?: boolean;
   showLabel?: boolean;
   label?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
@@ -16,27 +16,29 @@ export default function CapacityIndicator({
   showPercentage = true,
   showLabel = false,
   label,
-  size = 'md',
-  className = ''
+  size = "md",
+  className = "",
 }: CapacityIndicatorProps) {
   const color = getUtilizationColorVar(utilizationPercent);
 
   const sizeClasses = {
-    sm: 'h-2',
-    md: 'h-3',
-    lg: 'h-4'
+    sm: "h-2",
+    md: "h-3",
+    lg: "h-4",
   };
 
   const textSizeClasses = {
-    sm: 'text-xs',
-    md: 'text-sm',
-    lg: 'text-base'
+    sm: "text-xs",
+    md: "text-sm",
+    lg: "text-base",
   };
 
   return (
     <div className={`w-full ${className}`}>
       {showLabel && label && (
-        <div className={`${textSizeClasses[size]} font-semibold text-[var(--text-dark)] mb-1`}>
+        <div
+          className={`${textSizeClasses[size]} font-semibold text-[var(--text-dark)] mb-1`}
+        >
           {label}
         </div>
       )}
@@ -48,7 +50,7 @@ export default function CapacityIndicator({
             className={`${sizeClasses[size]} rounded-full transition-all duration-300`}
             style={{
               width: `${Math.min(utilizationPercent, 100)}%`,
-              backgroundColor: color
+              backgroundColor: color,
             }}
           />
         </div>

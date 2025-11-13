@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import useSWR from 'swr';
-import { getMachines } from '@/lib/api';
-import type { Machine } from '@/types';
+import { useMemo } from "react";
+import useSWR from "swr";
+import { getMachines } from "@/lib/api";
+import type { Machine } from "@/types";
 
 interface UseMachinesReturn {
   machines: Machine[];
@@ -17,11 +17,14 @@ const machinesFetcher = async (status?: string, facilitiesId?: number) => {
   return await getMachines(status, facilitiesId);
 };
 
-export const useMachines = (initialStatus?: string, initialFacilityId?: number): UseMachinesReturn => {
+export const useMachines = (
+  initialStatus?: string,
+  initialFacilityId?: number,
+): UseMachinesReturn => {
   // Create unique SWR key
   const key = useMemo(
-    () => ['machines', initialStatus, initialFacilityId],
-    [initialStatus, initialFacilityId]
+    () => ["machines", initialStatus, initialFacilityId],
+    [initialStatus, initialFacilityId],
   );
 
   // Use SWR for data fetching with caching
@@ -35,9 +38,12 @@ export const useMachines = (initialStatus?: string, initialFacilityId?: number):
       shouldRetryOnError: false, // Disable retries to avoid flooding console
       errorRetryCount: 0,
       onError: (err) => {
-        console.error('[useMachines] Error fetching machines:', err?.message || err);
-      }
-    }
+        console.error(
+          "[useMachines] Error fetching machines:",
+          err?.message || err,
+        );
+      },
+    },
   );
 
   const machines = useMemo(() => data ?? [], [data]);
@@ -49,7 +55,8 @@ export const useMachines = (initialStatus?: string, initialFacilityId?: number):
     refetch: async (status?: string, facilitiesId?: number) => {
       // If parameters are provided, use them; otherwise use initial values
       const newStatus = status !== undefined ? status : initialStatus;
-      const newFacilityId = facilitiesId !== undefined ? facilitiesId : initialFacilityId;
+      const newFacilityId =
+        facilitiesId !== undefined ? facilitiesId : initialFacilityId;
 
       await mutate(machinesFetcher(newStatus, newFacilityId), {
         revalidate: true,

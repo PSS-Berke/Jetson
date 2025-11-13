@@ -3,10 +3,10 @@
  * Collects line number, machine name, and facility
  */
 
-'use client';
+"use client";
 
-import React from 'react';
-import FacilityToggle from '../FacilityToggle';
+import React from "react";
+import FacilityToggle from "../FacilityToggle";
 
 interface StepBasicInfoProps {
   quantity: number;
@@ -38,25 +38,25 @@ export default function StepBasicInfo({
   // Auto-calculate line range when quantity changes
   const handleQuantityChange = (value: string) => {
     const qty = parseInt(value) || 1;
-    onChange('quantity', qty);
-    
+    onChange("quantity", qty);
+
     // Auto-update line range if lineStart is set
     if (qty > 1 && lineStart) {
       const startNum = parseInt(lineStart);
       if (!isNaN(startNum)) {
-        onChange('lineEnd', String(startNum + qty - 1));
+        onChange("lineEnd", String(startNum + qty - 1));
       }
     }
   };
 
   // Auto-calculate lineEnd when lineStart changes
   const handleLineStartChange = (value: string) => {
-    onChange('lineStart', value);
-    
+    onChange("lineStart", value);
+
     if (quantity > 1 && value) {
       const startNum = parseInt(value);
       if (!isNaN(startNum)) {
-        onChange('lineEnd', String(startNum + quantity - 1));
+        onChange("lineEnd", String(startNum + quantity - 1));
       }
     }
   };
@@ -64,9 +64,10 @@ export default function StepBasicInfo({
   // Generate machine designations preview
   const generateDesignations = (): string[] => {
     if (!machineDesignation || quantity === 1) return [];
-    
-    return Array.from({ length: quantity }, (_, i) => 
-      `${machineDesignation}${i + 1}`
+
+    return Array.from(
+      { length: quantity },
+      (_, i) => `${machineDesignation}${i + 1}`,
     );
   };
 
@@ -74,7 +75,9 @@ export default function StepBasicInfo({
 
   return (
     <div className="max-w-2xl mx-auto py-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Basic Information</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        Basic Information
+      </h2>
       <p className="text-sm text-gray-600 mb-8">
         Enter the essential details for this machine
       </p>
@@ -82,7 +85,10 @@ export default function StepBasicInfo({
       <div className="space-y-6">
         {/* Quantity */}
         <div>
-          <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="quantity"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Quantity <span className="text-red-500">*</span>
           </label>
           <input
@@ -92,11 +98,11 @@ export default function StepBasicInfo({
             max="100"
             value={quantity}
             onChange={(e) => handleQuantityChange(e.target.value)}
-            onBlur={() => onBlur('quantity')}
+            onBlur={() => onBlur("quantity")}
             className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               touched.quantity && errors.quantity
-                ? 'border-red-500 focus:ring-red-500'
-                : 'border-gray-300'
+                ? "border-red-500 focus:ring-red-500"
+                : "border-gray-300"
             }`}
           />
           {touched.quantity && errors.quantity && (
@@ -119,25 +125,32 @@ export default function StepBasicInfo({
         {/* Line Number or Line Range */}
         {quantity === 1 ? (
           <div>
-            <label htmlFor="line" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="line"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Line Number <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               id="line"
               value={line}
-              onChange={(e) => onChange('line', e.target.value)}
-              onBlur={() => onBlur('line')}
+              onChange={(e) => onChange("line", e.target.value)}
+              onBlur={() => onBlur("line")}
               placeholder="e.g., 101"
               className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 touched.line && errors.line
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300'
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-gray-300"
               }`}
             />
             {touched.line && errors.line && (
               <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -154,7 +167,10 @@ export default function StepBasicInfo({
         ) : (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="lineStart" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="lineStart"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Starting Line Number <span className="text-red-500">*</span>
               </label>
               <input
@@ -162,17 +178,21 @@ export default function StepBasicInfo({
                 id="lineStart"
                 value={lineStart}
                 onChange={(e) => handleLineStartChange(e.target.value)}
-                onBlur={() => onBlur('lineStart')}
+                onBlur={() => onBlur("lineStart")}
                 placeholder="e.g., 101"
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   touched.lineStart && errors.lineStart
-                    ? 'border-red-500 focus:ring-red-500'
-                    : 'border-gray-300'
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-gray-300"
                 }`}
               />
               {touched.lineStart && errors.lineStart && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -184,25 +204,32 @@ export default function StepBasicInfo({
               )}
             </div>
             <div>
-              <label htmlFor="lineEnd" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="lineEnd"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Ending Line Number <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 id="lineEnd"
                 value={lineEnd}
-                onChange={(e) => onChange('lineEnd', e.target.value)}
-                onBlur={() => onBlur('lineEnd')}
+                onChange={(e) => onChange("lineEnd", e.target.value)}
+                onBlur={() => onBlur("lineEnd")}
                 placeholder="e.g., 103"
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   touched.lineEnd && errors.lineEnd
-                    ? 'border-red-500 focus:ring-red-500'
-                    : 'border-gray-300'
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-gray-300"
                 }`}
               />
               {touched.lineEnd && errors.lineEnd && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -214,27 +241,31 @@ export default function StepBasicInfo({
               )}
             </div>
             <p className="col-span-2 text-xs text-gray-500">
-              Line range for {quantity} machines (auto-calculated from starting line)
+              Line range for {quantity} machines (auto-calculated from starting
+              line)
             </p>
           </div>
         )}
 
         {/* Machine Name */}
         <div>
-          <label htmlFor="machineName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="machineName"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Machine Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             id="machineName"
             value={machineName}
-            onChange={(e) => onChange('machineName', e.target.value)}
-            onBlur={() => onBlur('machineName')}
+            onChange={(e) => onChange("machineName", e.target.value)}
+            onBlur={() => onBlur("machineName")}
             placeholder="e.g., Flow Master, Inserter, HP Press"
             className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               touched.machineName && errors.machineName
-                ? 'border-red-500 focus:ring-red-500'
-                : 'border-gray-300'
+                ? "border-red-500 focus:ring-red-500"
+                : "border-gray-300"
             }`}
           />
           {touched.machineName && errors.machineName && (
@@ -250,26 +281,32 @@ export default function StepBasicInfo({
             </p>
           )}
           <p className="mt-1 text-xs text-gray-500">
-            A descriptive name to identify {quantity === 1 ? 'this machine' : 'these machines'}
+            A descriptive name to identify{" "}
+            {quantity === 1 ? "this machine" : "these machines"}
           </p>
         </div>
 
         {/* Machine Designation */}
         <div>
-          <label htmlFor="machineDesignation" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="machineDesignation"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Machine Designation <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             id="machineDesignation"
             value={machineDesignation}
-            onChange={(e) => onChange('machineDesignation', e.target.value.toLowerCase())}
-            onBlur={() => onBlur('machineDesignation')}
+            onChange={(e) =>
+              onChange("machineDesignation", e.target.value.toLowerCase())
+            }
+            onBlur={() => onBlur("machineDesignation")}
             placeholder="e.g., fm, ins, hp"
             className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               touched.machineDesignation && errors.machineDesignation
-                ? 'border-red-500 focus:ring-red-500'
-                : 'border-gray-300'
+                ? "border-red-500 focus:ring-red-500"
+                : "border-gray-300"
             }`}
           />
           {touched.machineDesignation && errors.machineDesignation && (
@@ -287,7 +324,7 @@ export default function StepBasicInfo({
           <p className="mt-1 text-xs text-gray-500">
             Short code for machine identification (letters and numbers only)
           </p>
-          
+
           {/* Preview of designations */}
           {quantity > 1 && machineDesignation && designations.length > 0 && (
             <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
@@ -315,7 +352,7 @@ export default function StepBasicInfo({
           </label>
           <FacilityToggle
             currentFacility={facilities_id}
-            onFacilityChange={(facility) => onChange('facilities_id', facility)}
+            onFacilityChange={(facility) => onChange("facilities_id", facility)}
             showAll={false}
           />
           {touched.facilities_id && errors.facilities_id && (
@@ -349,13 +386,18 @@ export default function StepBasicInfo({
             />
           </svg>
           <div className="text-sm text-blue-800">
-            <strong>Note:</strong> {quantity === 1 ? 'The machine' : `All ${quantity} machines`} will be created with &quot;Offline&quot; status by default.
-            Speed and capacity will be determined by the performance rules you configure in Step 4.
+            <strong>Note:</strong>{" "}
+            {quantity === 1 ? "The machine" : `All ${quantity} machines`} will
+            be created with &quot;Offline&quot; status by default. Speed and
+            capacity will be determined by the performance rules you configure
+            in Step 4.
             {quantity > 1 && (
               <>
                 <br />
                 <br />
-                Each machine will be assigned a unique line number and designation based on the range and designation prefix you provide.
+                Each machine will be assigned a unique line number and
+                designation based on the range and designation prefix you
+                provide.
               </>
             )}
           </div>
