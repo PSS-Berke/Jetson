@@ -1,10 +1,10 @@
 "use client";
 
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { apiExchangeMSCodeForToken } from "@/lib/services/MicrosoftService";
-import { useEffect } from "react";
 
-export default function ConnectPage() {
+function ConnectContent() {
   const searchParams = useSearchParams();
   const code = searchParams.get("code");
   const state = searchParams.get("state");
@@ -19,9 +19,11 @@ export default function ConnectPage() {
       }
     }
   };
+
   useEffect(() => {
     handleExchangeMSCodeForToken();
   }, [code, state]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-2xl w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
@@ -31,5 +33,23 @@ export default function ConnectPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ConnectPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-2xl w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
+            <div className="text-center text-gray-600">
+              <p>Please wait while we connect you to the system.</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ConnectContent />
+    </Suspense>
   );
 }
