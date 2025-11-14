@@ -1259,6 +1259,25 @@ export const deleteMachineRule = async (ruleId: number): Promise<void> => {
 // ============================================================================
 
 /**
+ * Get all variable combinations (groups) - used for displaying groups in machine wizard
+ * @returns Array of variable combinations with rule_name used as group name
+ */
+export const getAllVariableCombinations = async (): Promise<any[]> => {
+  console.log("[getAllVariableCombinations] Fetching all variable combinations");
+  
+  const result = await apiFetch<any[]>("/variable_combinations", {
+    method: "GET",
+  });
+  
+  console.log(
+    "[getAllVariableCombinations] Received",
+    result.length,
+    "variable combinations",
+  );
+  return result;
+};
+
+/**
  * Get variable combinations (rules) by machine_variables_id
  * @param machineVariablesId - The machine variables ID
  * @returns Array of variable combinations

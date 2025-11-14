@@ -84,61 +84,8 @@ export default function CreateMachineWizard({
   };
 
   const handleNext = async () => {
-    // If on step 3 and user has added custom input form fields, save them via PATCH
-    if (
-      state.currentStep === 3 &&
-      state.machineVariablesId &&
-      state.formBuilderFields &&
-      state.formBuilderFields.length > 0
-    ) {
-      try {
-        console.log(
-          "[CreateMachineWizard] Step 3 Next: Saving machine variables before proceeding",
-        );
-        console.log(
-          "[CreateMachineWizard] Machine Variables ID:",
-          state.machineVariablesId,
-        );
-        console.log(
-          "[CreateMachineWizard] Form Builder Fields:",
-          state.formBuilderFields,
-        );
-
-        // Convert form builder fields to variables object
-        const variables: Record<string, any> = {};
-        state.formBuilderFields.forEach((field) => {
-          variables[field.fieldName] = {
-            label: field.fieldLabel,
-            type: field.fieldType,
-            value: field.fieldValue,
-            options: field.options,
-            required: field.required,
-          };
-        });
-
-        console.log(
-          "[CreateMachineWizard] Variables object to save:",
-          JSON.stringify(variables, null, 2),
-        );
-        console.log(
-          "[CreateMachineWizard] Calling PATCH /machine_variables/" +
-            state.machineVariablesId,
-        );
-
-        
-      } catch (error: any) {
-        console.error(
-          "[CreateMachineWizard] ✗ Error updating machine variables:",
-          error,
-        );
-        // Show error but don't block navigation - user can still proceed
-        setToastMessage(
-          "Warning: Failed to save form fields. You can continue, but fields may need to be re-entered.",
-        );
-        setShowErrorToast(true);
-      }
-    }
-
+    // Note: No API calls are made when clicking Next in any step
+    // APIs are only called when fields are modified (auto-save) or on final submission
     nextStep();
   };
 

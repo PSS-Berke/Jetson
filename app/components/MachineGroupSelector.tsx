@@ -5,8 +5,9 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type { MachineGroup } from "@/types";
+import { getAllVariableCombinations } from "@/lib/api";
 
 interface MachineGroupSelectorProps {
   selectedOption: "none" | "existing" | "new";
@@ -35,10 +36,42 @@ export default function MachineGroupSelector({
   onSetNewGroupDescription,
   errors,
 }: MachineGroupSelectorProps) {
-  const [groups] = useState<MachineGroup[]>([]);
-  const [loading] = useState(false);
-  const [loadError] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Array<{ id: number; rule_name: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const selectedGroup = groups.find((g) => g.id === existingGroupId);
+
+  const fetchGroups = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      console.log("[MachineGroupSelector] Fetching variable combinations for groups");
+      const variableCombinations = await getAllVariableCombinations();
+      
+      // Transform variable combinations to groups format
+      // Use rule_name as the group name and id as the group id
+      const transformedGroups = variableCombinations.map((vc) => ({
+        id: vc.id,
+        rule_name: vc.rule_name || `Group ${vc.id}`,
+      }));
+      
+      console.log("[MachineGroupSelector] Fetched", transformedGroups.length, "groups");
+      setGroups(transformedGroups);
+    } catch (error: any) {
+      console.error("[MachineGroupSelector] Error fetching groups:", error);
+      setLoadError(error.message || "Failed to load groups. Please try again.");
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch groups when "existing" option is selected
+  useEffect(() => {
+    if (selectedOption === "existing") {
+      fetchGroups();
+    }
+  }, [selectedOption, fetchGroups]);
 
   return (
     <div className="space-y-4">
@@ -122,7 +155,10 @@ export default function MachineGroupSelector({
                   <button
                     key={group.id}
                     type="button"
-                    onClick={() => onSelectExistingGroup(group.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectExistingGroup(group.id);
+                    }}
                     className={`w-full text-left p-3 rounded-md border transition-all ${
                       existingGroupId === group.id
                         ? "border-blue-500 bg-blue-50"
@@ -130,15 +166,7 @@ export default function MachineGroupSelector({
                     }`}
                   >
                     <div className="font-medium text-gray-900">
-                      {group.name}
-                    </div>
-                    {group.description && (
-                      <div className="text-sm text-gray-500 mt-1">
-                        {group.description}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-400 mt-1">
-                      {group.machine_ids.length} machine(s)
+                      {group.rule_name}
                     </div>
                   </button>
                 ))}
@@ -265,8 +293,7 @@ export default function MachineGroupSelector({
               />
             </svg>
             <span className="text-green-800">
-              <strong>{selectedGroup.name}</strong> selected (
-              {selectedGroup.machine_ids.length} machine(s))
+              <strong>{selectedGroup.rule_name}</strong> selected
             </span>
           </div>
         </div>

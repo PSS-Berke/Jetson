@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from "react";
 import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
-import { getAllMachineVariables } from "@/lib/api";
+import { getAllMachineVariables, getMachineVariablesById } from "@/lib/api";
 import { Pen, Trash2 } from "lucide-react";
 
 interface ProcessTypeSelectorProps {
@@ -48,6 +48,15 @@ export default function ProcessTypeSelector({
   const [expandedProcessType, setExpandedProcessType] = useState<string | null>(
     null,
   );
+  const [processTypeToIdMap, setProcessTypeToIdMap] = useState<
+    Record<string, number>
+  >({});
+  const [expandedVariables, setExpandedVariables] = useState<
+    Record<string, any[]>
+  >({});
+  const [loadingVariables, setLoadingVariables] = useState<
+    Record<string, boolean>
+  >({});
 
   // Fetch machine variables and group by type
   useEffect(() => {
@@ -61,8 +70,15 @@ export default function ProcessTypeSelector({
         const apiTypes: Array<{ key: string; label: string; color: string }> =
           [];
 
+        const idMap: Record<string, number> = {};
+
         allVariables.forEach((group: MachineVariableGroup) => {
           if (group.type) {
+            // Store the ID mapping
+            if (group.id) {
+              idMap[group.type] = group.id;
+            }
+
             // Count variables
             if (Array.isArray(group.variables)) {
               counts[group.type] = group.variables.length;
@@ -92,6 +108,7 @@ export default function ProcessTypeSelector({
 
         setVariableCounts(counts);
         setApiProcessTypes(apiTypes);
+        setProcessTypeToIdMap(idMap);
       } catch (error) {
         console.error(
           "[ProcessTypeSelector] Error fetching variable counts:",
@@ -104,6 +121,81 @@ export default function ProcessTypeSelector({
 
     fetchVariableCounts();
   }, []);
+
+  // Fetch variables when a process type is expanded
+  useEffect(() => {
+    if (!expandedProcessType || !processTypeToIdMap[expandedProcessType]) {
+      return;
+    }
+
+    // Check if we already have the variables for this process type
+    if (expandedVariables[expandedProcessType]) {
+      return;
+    }
+
+    const fetchVariables = async () => {
+      const machineVariablesId = processTypeToIdMap[expandedProcessType];
+      if (!machineVariablesId) {
+        return;
+      }
+
+      setLoadingVariables((prev) => ({ ...prev, [expandedProcessType]: true }));
+
+      try {
+        const machineVariablesData = await getMachineVariablesById(
+          machineVariablesId,
+        );
+
+        // Extract variables from the response
+        let variables: any[] = [];
+        if (
+          machineVariablesData.variables &&
+          typeof machineVariablesData.variables === "object"
+        ) {
+          if (Array.isArray(machineVariablesData.variables)) {
+            variables = machineVariablesData.variables;
+          } else {
+            // Convert object to array format
+            variables = Object.entries(machineVariablesData.variables).map(
+              ([key, value]) => {
+                const val = value as any;
+                return {
+                  fieldName: key,
+                  fieldLabel: val.label || key,
+                  fieldType: val.type || "text",
+                  fieldValue: typeof val === "object" ? val.value : val,
+                  options: val.options,
+                  required: val.required || false,
+                };
+              },
+            );
+          }
+        }
+
+        setExpandedVariables((prev) => ({
+          ...prev,
+          [expandedProcessType]: variables,
+        }));
+      } catch (error) {
+        console.error(
+          "[ProcessTypeSelector] Error fetching variables:",
+          error,
+        );
+        setExpandedVariables((prev) => ({
+          ...prev,
+          [expandedProcessType]: [],
+        }));
+      } finally {
+        setLoadingVariables((prev) => ({
+          ...prev,
+          [expandedProcessType]: false,
+        }));
+      }
+    };
+
+    fetchVariables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedProcessType, processTypeToIdMap]);
 
   const handleCreateCustom = () => {
     setShowCustomForm(true);
@@ -200,124 +292,76 @@ export default function ProcessTypeSelector({
 
                     {isExpanded && (
                       <div className="px-3 pb-3 border-t border-gray-200 pt-3">
-                        <div className="space-y-2">
-                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                Supported Colors
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Supported Colors | Type: boolean
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                className="p-1 text-blue-500 hover:text-blue-700"
-                                title="Edit"
-                                onClick={() =>
-                                  onEditField?.("Supported Colors")
-                                }
-                              >
-                                <Pen className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="p-1 text-red-500 hover:text-red-700"
-                                title="Remove"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                        {loadingVariables[apiType.key] ? (
+                          <div className="text-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                            <p className="mt-2 text-xs text-gray-500">
+                              Loading variables...
+                            </p>
                           </div>
-                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                Supported Paper Sizes
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Supported Paper Sizes | Type: select
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                className="p-1 text-blue-500 hover:text-blue-700"
-                                title="Edit"
-                                onClick={() =>
-                                  onEditField?.("Supported Paper Sizes")
-                                }
-                              >
-                                <Pen className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="p-1 text-red-500 hover:text-red-700"
-                                title="Remove"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                        ) : expandedVariables[apiType.key] &&
+                          expandedVariables[apiType.key].length > 0 ? (
+                          <div className="space-y-2">
+                            {expandedVariables[apiType.key].map(
+                              (variable: any, index: number) => {
+                                const fieldLabel =
+                                  variable.fieldLabel ||
+                                  variable.variable_label ||
+                                  variable.label ||
+                                  variable.fieldName ||
+                                  variable.variable_name ||
+                                  `Field ${index + 1}`;
+                                const fieldType =
+                                  variable.fieldType ||
+                                  variable.variable_type ||
+                                  variable.type ||
+                                  "text";
+                                const fieldName =
+                                  variable.fieldName ||
+                                  variable.variable_name ||
+                                  "";
+
+                                return (
+                                  <div
+                                    key={index}
+                                    className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between"
+                                  >
+                                    <div className="flex-1">
+                                      <div className="font-medium text-gray-900">
+                                        {fieldLabel}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {fieldName || fieldLabel} | Type:{" "}
+                                        {fieldType}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        className="p-1 text-blue-500 hover:text-blue-700"
+                                        title="Edit"
+                                        onClick={() => onEditField?.(fieldLabel)}
+                                      >
+                                        <Pen className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="p-1 text-red-500 hover:text-red-700"
+                                        title="Remove"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              },
+                            )}
                           </div>
-                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                Supported Print Types
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Supported Print Types | Type: select
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                className="p-1 text-blue-500 hover:text-blue-700"
-                                title="Edit"
-                                onClick={() =>
-                                  onEditField?.("Supported Print Types")
-                                }
-                              >
-                                <Pen className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="p-1 text-red-500 hover:text-red-700"
-                                title="Remove"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                        ) : (
+                          <div className="text-center py-4 text-sm text-gray-500">
+                            No variables configured for this process type
                           </div>
-                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                Supported Paper Stocks
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Supported Paper Stocks | Type: select
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                className="p-1 text-blue-500 hover:text-blue-700"
-                                title="Edit"
-                                onClick={() =>
-                                  onEditField?.("Supported Paper Stocks")
-                                }
-                              >
-                                <Pen className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="p-1 text-red-500 hover:text-red-700"
-                                title="Remove"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>

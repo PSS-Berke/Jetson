@@ -15,7 +15,11 @@ import type {
   MachineVariableFromAPI,
   FormBuilderField,
 } from "@/hooks/useWizardState";
-import { getAllMachineVariables, getMachineVariablesById } from "@/lib/api";
+import {
+  getAllMachineVariables,
+  getMachineVariablesById,
+  updateMachineVariables,
+} from "@/lib/api";
 
 interface StepCapabilitiesProps {
   processTypeKey: string;
@@ -79,6 +83,17 @@ export default function StepCapabilities({
     required: false,
   });
   const editFormRef = useRef<HTMLDivElement>(null);
+  // Store available fields from saved process type (for selection)
+  const [availableFields, setAvailableFields] = useState<FormBuilderField[]>(
+    [],
+  );
+  // Track if we should save (skip initial load and process type loading)
+  const shouldSaveRef = useRef(false);
+  const isLoadingProcessTypeRef = useRef(false);
+  // Track if component is mounted to prevent saves when navigating away
+  const isMountedRef = useRef(true);
+  // Track if we're selecting available fields to prevent auto-save
+  const isSelectingAvailableFieldRef = useRef(false);
 
   // Auto-generate field name from field label (convert to snake_case)
   const generateFieldName = (label: string): string => {
@@ -88,39 +103,106 @@ export default function StepCapabilities({
       .replace(/^_+|_+$/g, "");
   };
 
-  // Load machine variables from API when process type is selected
-  useEffect(() => {
-    const loadVariablesForProcessType = async () => {
-      if (!processTypeKey || isCustomProcessType) {
-        // Clear variables if switching to custom or no process type
-        if (isCustomProcessType || !processTypeKey) {
-          onSetMachineVariables([]);
-          onSetMachineVariablesId(null);
-          onSetFormBuilderFields([]);
-        }
-        return;
+  // Function to load machine variables from API (only called when process type is clicked)
+  const loadVariablesForProcessType = async (processKey: string) => {
+    // Set loading flag to prevent auto-save during process type loading
+    isLoadingProcessTypeRef.current = true;
+    // Reset save flag BEFORE clearing fields to prevent auto-save
+    shouldSaveRef.current = false;
+    
+    if (!processKey || isCustomProcessType) {
+      // Clear variables if switching to custom or no process type
+      if (isCustomProcessType || !processKey) {
+        onSetMachineVariables([]);
+        onSetMachineVariablesId(null);
+        onSetFormBuilderFields([]);
+        setAvailableFields([]);
+        // Clear loading flag after state updates complete
+        setTimeout(() => {
+          isLoadingProcessTypeRef.current = false;
+          shouldSaveRef.current = true;
+        }, 100);
+      } else {
+        isLoadingProcessTypeRef.current = false;
+        shouldSaveRef.current = true;
       }
+      return;
+    }
 
-      try {
-        // First, get all machine variables to find the one matching the process type
-        const allVariables = await getAllMachineVariables();
-        const processTypeGroup = allVariables.find(
-          (group: MachineVariableFromAPI) => group.type === processTypeKey,
+    try {
+      // Fetch machine variables by ID directly (skip the first GET /machine_variables call)
+      // We need to find the ID first, but we'll use a more efficient approach
+      // Check if we can use the data from getAllMachineVariables if it has variables
+      const allVariables = await getAllMachineVariables();
+      const processTypeGroup = allVariables.find(
+        (group: MachineVariableFromAPI) => group.type === processKey,
+      );
+
+      if (processTypeGroup && processTypeGroup.id) {
+        // Store the ID
+        console.log(
+          "[StepCapabilities] Process type group:",
+          processTypeGroup,
         );
+        console.log(
+          "[StepCapabilities] Setting machine variables ID:",
+          processTypeGroup.id,
+        );
+        onSetMachineVariablesId(processTypeGroup.id);
 
-        if (processTypeGroup && processTypeGroup.id) {
-          // Store the ID
-          console.log(
-            "[StepCapabilities] Process type group:",
-            processTypeGroup,
-          );
-          console.log(
-            "[StepCapabilities] Setting machine variables ID:",
-            processTypeGroup.id,
-          );
-          onSetMachineVariablesId(processTypeGroup.id);
+        // Check if we can use data from getAllMachineVariables directly
+        // If it has variables, use them; otherwise fetch by ID
+        let fields: FormBuilderField[] = [];
+        let useDirectData = false;
 
-          // Now fetch the full details using GET /machine_variables/{id}
+        if (
+          processTypeGroup.variables &&
+          typeof processTypeGroup.variables === "object" &&
+          (Array.isArray(processTypeGroup.variables) ||
+            Object.keys(processTypeGroup.variables).length > 0)
+        ) {
+          // Use data from getAllMachineVariables directly
+          useDirectData = true;
+          if (Array.isArray(processTypeGroup.variables)) {
+            fields = processTypeGroup.variables.map(
+              (v: any, index: number) => ({
+                id: `available_${index}`,
+                fieldName: v.variable_name || "",
+                fieldLabel: v.variable_label || v.variable_name || "",
+                fieldType:
+                  (v.variable_type as
+                    | "text"
+                    | "number"
+                    | "select"
+                    | "boolean") || "text",
+                fieldValue: v.variable_value || "",
+                options: v.options,
+                required: v.required || false,
+              }),
+            );
+          } else {
+            fields = Object.entries(processTypeGroup.variables).map(
+              ([key, value], index) => {
+                const val = value as any;
+                return {
+                  id: `available_${Date.now()}_${index}`,
+                  fieldName: key,
+                  fieldLabel: val.label || key,
+                  fieldType:
+                    (val.type as "text" | "number" | "select" | "boolean") ||
+                    "text",
+                  fieldValue:
+                    typeof val === "object" ? val.value || "" : String(val),
+                  options: val.options,
+                  required: val.required || false,
+                };
+              },
+            );
+          }
+        }
+
+        // Only fetch by ID if we don't have the data from getAllMachineVariables
+        if (!useDirectData) {
           try {
             console.log(
               "[StepCapabilities] Fetching machine variables by ID:",
@@ -134,70 +216,15 @@ export default function StepCapabilities({
               machineVariablesData,
             );
 
-            // Load existing form builder fields from variables if they exist
+            // Convert to available fields
             if (
               machineVariablesData.variables &&
               typeof machineVariablesData.variables === "object"
             ) {
               if (Array.isArray(machineVariablesData.variables)) {
-                // Convert array to form builder fields
-                const fields: FormBuilderField[] =
-                  machineVariablesData.variables.map(
-                    (v: any, index: number) => ({
-                      id: `field_${index}`,
-                      fieldName: v.variable_name || "",
-                      fieldLabel: v.variable_label || v.variable_name || "",
-                      fieldType:
-                        (v.variable_type as
-                          | "text"
-                          | "number"
-                          | "select"
-                          | "boolean") || "text",
-                      fieldValue: v.variable_value || "",
-                      options: v.options,
-                      required: v.required || false,
-                    }),
-                  );
-                onSetFormBuilderFields(fields);
-              } else {
-                // Convert object to form builder fields (this is the format from PATCH)
-                const fields: FormBuilderField[] = Object.entries(
-                  machineVariablesData.variables,
-                ).map(([key, value], index) => {
-                  const val = value as any;
-                  return {
-                    id: `field_${Date.now()}_${index}`,
-                    fieldName: key,
-                    fieldLabel: val.label || key,
-                    fieldType:
-                      (val.type as "text" | "number" | "select" | "boolean") ||
-                      "text",
-                    fieldValue:
-                      typeof val === "object" ? val.value || "" : String(val),
-                    options: val.options,
-                    required: val.required || false,
-                  };
-                });
-                onSetFormBuilderFields(fields);
-              }
-            } else {
-              // No existing fields, start with empty
-              onSetFormBuilderFields([]);
-            }
-          } catch (fetchError) {
-            console.error(
-              "[StepCapabilities] Error fetching machine variables by ID:",
-              fetchError,
-            );
-            // Fallback: try to use data from getAllMachineVariables
-            if (
-              processTypeGroup.variables &&
-              typeof processTypeGroup.variables === "object"
-            ) {
-              if (Array.isArray(processTypeGroup.variables)) {
-                const fields: FormBuilderField[] =
-                  processTypeGroup.variables.map((v: any, index: number) => ({
-                    id: `field_${index}`,
+                fields = machineVariablesData.variables.map(
+                  (v: any, index: number) => ({
+                    id: `available_${index}`,
                     fieldName: v.variable_name || "",
                     fieldLabel: v.variable_label || v.variable_name || "",
                     fieldType:
@@ -209,56 +236,90 @@ export default function StepCapabilities({
                     fieldValue: v.variable_value || "",
                     options: v.options,
                     required: v.required || false,
-                  }));
-                onSetFormBuilderFields(fields);
+                  }),
+                );
               } else {
-                const fields: FormBuilderField[] = Object.entries(
-                  processTypeGroup.variables,
-                ).map(([key, value], index) => {
-                  const val = value as any;
-                  return {
-                    id: `field_${index}`,
-                    fieldName: key,
-                    fieldLabel: val.label || key,
-                    fieldType:
-                      (val.type as "text" | "number" | "select" | "boolean") ||
-                      "text",
-                    fieldValue:
-                      typeof val === "object" ? val.value || "" : String(val),
-                    options: val.options,
-                    required: val.required || false,
-                  };
-                });
-                onSetFormBuilderFields(fields);
+                fields = Object.entries(machineVariablesData.variables).map(
+                  ([key, value], index) => {
+                    const val = value as any;
+                    return {
+                      id: `available_${Date.now()}_${index}`,
+                      fieldName: key,
+                      fieldLabel: val.label || key,
+                      fieldType:
+                        (val.type as "text" | "number" | "select" | "boolean") ||
+                        "text",
+                      fieldValue:
+                        typeof val === "object" ? val.value || "" : String(val),
+                      options: val.options,
+                      required: val.required || false,
+                    };
+                  },
+                );
               }
-            } else {
-              onSetFormBuilderFields([]);
             }
+          } catch (fetchError) {
+            console.error(
+              "[StepCapabilities] Error fetching machine variables by ID:",
+              fetchError,
+            );
+            // Fields will remain empty if fetch fails
           }
-        } else {
-          // No variables for this process type
-          console.warn(
-            "[StepCapabilities] No ID found in process type group:",
-            processTypeGroup,
-          );
-          onSetMachineVariables([]);
-          onSetMachineVariablesId(null);
-          onSetFormBuilderFields([]);
         }
-      } catch (error) {
-        console.error(
-          "[StepCapabilities] Error loading variables for process type:",
-          error,
+
+        // Store as available fields for user selection (don't auto-add)
+        setAvailableFields(fields);
+        // Clear existing form builder fields when process type changes
+        // User will need to select which fields they want
+        onSetFormBuilderFields([]);
+        
+        // Clear loading flag AFTER state updates complete to prevent PATCH call
+        // Use setTimeout to ensure React has processed the state updates
+        // Also reset shouldSaveRef to prevent any auto-save during this transition
+        setTimeout(() => {
+          isLoadingProcessTypeRef.current = false;
+          // Re-enable saving after loading is complete
+          shouldSaveRef.current = true;
+        }, 100);
+      } else {
+        // No variables for this process type
+        console.warn(
+          "[StepCapabilities] No ID found in process type group:",
+          processTypeGroup,
         );
         onSetMachineVariables([]);
         onSetMachineVariablesId(null);
         onSetFormBuilderFields([]);
+        setAvailableFields([]);
+        // Clear loading flag after state updates complete
+        setTimeout(() => {
+          isLoadingProcessTypeRef.current = false;
+          shouldSaveRef.current = true;
+        }, 100);
       }
-    };
+    } catch (error) {
+      console.error(
+        "[StepCapabilities] Error loading variables for process type:",
+        error,
+      );
+      onSetMachineVariables([]);
+      onSetMachineVariablesId(null);
+      onSetFormBuilderFields([]);
+      setAvailableFields([]);
+      // Clear loading flag after state updates complete
+      setTimeout(() => {
+        isLoadingProcessTypeRef.current = false;
+        shouldSaveRef.current = true;
+      }, 100);
+    }
+  };
 
-    loadVariablesForProcessType();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processTypeKey, isCustomProcessType]);
+  // Handler for when process type is selected (called when user clicks on a process type)
+  const handleSelectProcessType = (key: string) => {
+    onSelectProcessType(key);
+    // Load variables only when process type is clicked
+    loadVariablesForProcessType(key);
+  };
 
   const handleAddField = () => {
     if (!fieldFormData.fieldLabel) {
@@ -296,8 +357,10 @@ export default function StepCapabilities({
       updatedFields[editingFieldIndex] = newField;
       onSetFormBuilderFields(updatedFields);
       setEditingFieldIndex(null);
+      // Auto-save will be triggered by useEffect when formBuilderFields updates
     } else {
       onAddFormBuilderField(newField);
+      // Auto-save will be triggered by useEffect when formBuilderFields updates
     }
 
     // Reset form
@@ -342,6 +405,7 @@ export default function StepCapabilities({
 
   const handleRemoveField = (id: string) => {
     onRemoveFormBuilderField(id);
+    // Auto-save will be triggered by useEffect when formBuilderFields updates
   };
 
   const handleFieldValueChange = (
@@ -349,6 +413,142 @@ export default function StepCapabilities({
     value: string | number | boolean,
   ) => {
     onUpdateFormBuilderField(id, { fieldValue: value });
+    // Auto-save will be triggered by useEffect when formBuilderFields updates
+  };
+
+  // Helper function to save fields to API
+  const saveFieldsToAPI = async (fieldsToSave: FormBuilderField[]) => {
+    if (!machineVariablesId) {
+      return;
+    }
+
+    // Don't save if component is unmounting or has been unmounted
+    if (!isMountedRef.current) {
+      console.log(
+        "[StepCapabilities] Skipping save - component is unmounting",
+      );
+      return;
+    }
+
+    try {
+      // Convert form builder fields to variables object
+      // Even if empty, we save an empty object to clear all fields
+      const variables: Record<string, any> = {};
+      fieldsToSave.forEach((field) => {
+        variables[field.fieldName] = {
+          label: field.fieldLabel,
+          type: field.fieldType,
+          value: field.fieldValue,
+          options: field.options,
+          required: field.required,
+        };
+      });
+
+      // Double-check component is still mounted before making API call
+      if (!isMountedRef.current) {
+        console.log(
+          "[StepCapabilities] Skipping save - component unmounted before API call",
+        );
+        return;
+      }
+
+      console.log(
+        "[StepCapabilities] Saving machine variables:",
+        machineVariablesId,
+        variables,
+      );
+      await updateMachineVariables(machineVariablesId, variables);
+      
+      // Check again after async operation completes
+      if (!isMountedRef.current) {
+        console.log(
+          "[StepCapabilities] Component unmounted during save - ignoring result",
+        );
+        return;
+      }
+      
+      console.log("[StepCapabilities] Machine variables saved successfully");
+    } catch (error) {
+      // Only log error if component is still mounted
+      if (isMountedRef.current) {
+        console.error(
+          "[StepCapabilities] Error saving machine variables:",
+          error,
+        );
+      }
+      // Don't show error to user - silent failure
+    }
+  };
+
+  // Auto-save when formBuilderFields change (but not on initial load or process type loading)
+  useEffect(() => {
+    if (!shouldSaveRef.current) {
+      // Skip first render - this is the initial load
+      shouldSaveRef.current = true;
+      return;
+    }
+
+    // Don't save if we're currently loading a process type
+    if (isLoadingProcessTypeRef.current) {
+      return;
+    }
+
+    // Don't save if we're selecting available fields
+    if (isSelectingAvailableFieldRef.current) {
+      return;
+    }
+
+    // Don't save if component is unmounting or has been unmounted
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    // Save if we have a machineVariablesId (even if fields array is empty)
+    if (machineVariablesId) {
+      saveFieldsToAPI(formBuilderFields);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formBuilderFields, machineVariablesId]);
+
+  // Cleanup: Mark component as unmounted when navigating away
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Handle selecting a field from available saved processes
+  const handleSelectAvailableField = (availableField: FormBuilderField) => {
+    // Set flag to prevent auto-save when selecting available fields
+    isSelectingAvailableFieldRef.current = true;
+    
+    // Check if field is already selected
+    const isAlreadySelected = formBuilderFields.some(
+      (field) => field.fieldName === availableField.fieldName,
+    );
+
+    if (isAlreadySelected) {
+      // Remove if already selected
+      const fieldToRemove = formBuilderFields.find(
+        (field) => field.fieldName === availableField.fieldName,
+      );
+      if (fieldToRemove) {
+        onRemoveFormBuilderField(fieldToRemove.id);
+      }
+    } else {
+      // Add the field with a new unique ID
+      const newField: FormBuilderField = {
+        ...availableField,
+        id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      };
+      onAddFormBuilderField(newField);
+    }
+    
+    // Clear the flag after state updates complete to prevent auto-save
+    setTimeout(() => {
+      isSelectingAvailableFieldRef.current = false;
+    }, 100);
   };
 
   return (
@@ -369,7 +569,7 @@ export default function StepCapabilities({
         selectedProcessType={processTypeKey}
         isCustom={isCustomProcessType}
         customName={customProcessTypeName}
-        onSelectExisting={onSelectProcessType}
+        onSelectExisting={handleSelectProcessType}
         onSelectCustom={onSelectCustomProcessType}
         onCancelCustom={onCancelCustomProcessType}
         onEditField={handleEditFieldByLabel}
@@ -407,6 +607,75 @@ export default function StepCapabilities({
               {errors.customProcessTypeFields}
             </p>
           )}
+        </div>
+      )}
+
+      {/* Available Fields from Saved Process - Select Individual Fields */}
+      {processTypeKey && !isCustomProcessType && availableFields.length > 0 && (
+        <div className="border-t border-gray-200 pt-8">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Select from Saved Processes
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Choose which fields from the saved process type you want to use
+              for this machine. Select individual fields by clicking on them.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {availableFields.map((availableField) => {
+              const isSelected = formBuilderFields.some(
+                (field) => field.fieldName === availableField.fieldName,
+              );
+              return (
+                <button
+                  key={availableField.id}
+                  type="button"
+                  onClick={() => handleSelectAvailableField(availableField)}
+                  className={`p-4 rounded-lg border-2 transition-all text-left ${
+                    isSelected
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            isSelected ? "bg-blue-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span className="font-medium text-gray-900">
+                          {availableField.fieldLabel}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {availableField.fieldType}
+                        {availableField.required && (
+                          <span className="text-red-500 ml-1">*</span>
+                        )}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <svg
+                        className="w-5 h-5 text-blue-500 flex-shrink-0"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
