@@ -22,6 +22,7 @@ interface ProcessTypeSelectorProps {
 }
 
 interface MachineVariableGroup {
+  id?: number;
   type: string;
   variables: any[];
 }
