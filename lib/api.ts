@@ -1351,3 +1351,20 @@ export const deleteVariableCombination = async (
   });
   console.log("[deleteVariableCombination] Variable combination deleted successfully");
 };
+
+// ============================================================================
+// Job Edit Logs API Functions
+// ============================================================================
+
+/**
+ * Get all job edit logs
+ * @returns Array of job edit logs
+ */
+export const getJobEditLogs = async (): Promise<any[]> => {
+  console.log("[getJobEditLogs] Fetching job edit logs");
+  const result = await apiFetch<any[]>("/job_edit_logs", {
+    method: "GET",
+  }, "jobs");
+  console.log("[getJobEditLogs] Received", result.length, "edit logs");
+  return result;
+};
