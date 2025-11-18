@@ -5,7 +5,7 @@ import SmartClientSelect from "./SmartClientSelect";
 import FacilityToggle from "./FacilityToggle";
 import ScheduleToggle from "./ScheduleToggle";
 import DynamicRequirementFields from "./DynamicRequirementFields";
-import { getToken } from "@/lib/api";
+import { getToken, getJobTemplates, createJobTemplate } from "@/lib/api";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
 import Toast from "./Toast";
 
@@ -48,12 +48,25 @@ interface JobFormData {
   total_billing: string;
 }
 
+type JobCreationMode = "new" | "template" | null;
+
+interface JobTemplate {
+  id: number;
+  clients_id: number;
+  template: Record<string, any>;
+  created_at?: number;
+  updated_at?: number;
+  job_name?: string;
+  job_number?: string;
+}
+
 export default function AddJobModal({
   isOpen,
   onClose,
   onSuccess,
 }: AddJobModalProps) {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [creationMode, setCreationMode] = useState<JobCreationMode>(null);
+  const [currentStep, setCurrentStep] = useState(0); // Start at step 0 for mode selection
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
@@ -66,6 +79,15 @@ export default function AddJobModal({
     newValue: number;
   } | null>(null);
   const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
+  
+  // Template selection state
+  const [selectedTemplateClientId, setSelectedTemplateClientId] = useState<number | null>(null);
+  const [selectedTemplateClientName, setSelectedTemplateClientName] = useState<string>("");
+  const [templates, setTemplates] = useState<JobTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<JobTemplate | null>(null);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
     clients_id: null,
@@ -212,6 +234,152 @@ export default function AddJobModal({
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setCreationMode(null);
+      setCurrentStep(0);
+      setSelectedTemplateClientId(null);
+      setSelectedTemplateClientName("");
+      setTemplates([]);
+      setSelectedTemplate(null);
+      setIsCreatingTemplate(false);
+      setFormData({
+        job_number: "",
+        clients_id: null,
+        client_name: "",
+        sub_clients_id: null,
+        sub_client_name: "",
+        job_name: "",
+        description: "",
+        quantity: "",
+        csr: "",
+        prgm: "",
+        facilities_id: null,
+        start_date: "",
+        due_date: "",
+        service_type: "insert",
+        pockets: "2",
+        machines_id: [],
+        requirements: [
+          {
+            process_type: "",
+            price_per_m: "",
+          },
+        ],
+        weekly_split: [],
+        locked_weeks: [],
+        price_per_m: "",
+        add_on_charges: "",
+        ext_price: "",
+        total_billing: "",
+      });
+    }
+  }, [isOpen]);
+
+  // Fetch templates when client is selected for template mode
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (creationMode === "template" && selectedTemplateClientId) {
+        setLoadingTemplates(true);
+        try {
+          const fetchedTemplates = await getJobTemplates(selectedTemplateClientId);
+          setTemplates(fetchedTemplates);
+        } catch (error) {
+          console.error("Error fetching templates:", error);
+          setTemplates([]);
+        } finally {
+          setLoadingTemplates(false);
+        }
+      } else {
+        setTemplates([]);
+      }
+    };
+
+    fetchTemplates();
+  }, [creationMode, selectedTemplateClientId]);
+
+  // Load template data into form
+  const loadTemplateIntoForm = (template: JobTemplate) => {
+    const templateData = template.template;
+    
+    // Parse requirements if they're a string
+    let requirements: Requirement[] = [
+      {
+        process_type: "",
+        price_per_m: "",
+      },
+    ];
+    
+    if (templateData.requirements) {
+      if (typeof templateData.requirements === "string") {
+        try {
+          requirements = JSON.parse(templateData.requirements);
+        } catch (e) {
+          console.error("Error parsing requirements:", e);
+        }
+      } else if (Array.isArray(templateData.requirements)) {
+        requirements = templateData.requirements;
+      }
+    }
+
+    // Convert dates from timestamps to date strings if needed
+    const formatDate = (dateValue: any): string => {
+      if (!dateValue) return "";
+      if (typeof dateValue === "number") {
+        return new Date(dateValue).toISOString().split("T")[0];
+      }
+      if (typeof dateValue === "string") {
+        // Check if it's a timestamp string
+        const timestamp = parseInt(dateValue);
+        if (!isNaN(timestamp)) {
+          return new Date(timestamp).toISOString().split("T")[0];
+        }
+        return dateValue;
+      }
+      return "";
+    };
+
+    setFormData({
+      job_number: templateData.job_number?.toString() || "",
+      clients_id: templateData.clients_id || selectedTemplateClientId || null,
+      client_name: templateData.client_name || "",
+      sub_clients_id: templateData.sub_clients_id || null,
+      sub_client_name: templateData.sub_client_name || "",
+      job_name: templateData.job_name || "",
+      description: templateData.description || "",
+      quantity: templateData.quantity?.toString() || "",
+      csr: templateData.csr || "",
+      prgm: templateData.prgm || "",
+      facilities_id: templateData.facilities_id || null,
+      start_date: formatDate(templateData.start_date),
+      due_date: formatDate(templateData.due_date),
+      service_type: templateData.service_type || "insert",
+      pockets: templateData.pockets?.toString() || "2",
+      machines_id: Array.isArray(templateData.machines_id) 
+        ? templateData.machines_id 
+        : templateData.machines_id 
+          ? [templateData.machines_id] 
+          : [],
+      requirements: requirements.length > 0 ? requirements : [
+        {
+          process_type: "",
+          price_per_m: "",
+        },
+      ],
+      weekly_split: Array.isArray(templateData.weekly_split) 
+        ? templateData.weekly_split 
+        : [],
+      locked_weeks: Array.isArray(templateData.locked_weeks) 
+        ? templateData.locked_weeks 
+        : [],
+      price_per_m: templateData.price_per_m?.toString() || "",
+      add_on_charges: templateData.add_on_charges?.toString() || "",
+      ext_price: templateData.ext_price?.toString() || "",
+      total_billing: templateData.total_billing?.toString() || "",
+    });
+  };
 
   if (!isOpen) return null;
 
@@ -465,9 +633,46 @@ export default function AddJobModal({
     return getWeeklySplitSum() - quantity;
   };
 
+  const handleModeSelection = (mode: "new" | "template") => {
+    setCreationMode(mode);
+    if (mode === "new") {
+      // For new job, go to step 1 (Job Details)
+      setCurrentStep(1);
+    } else {
+      // For template, go to step 1 (Client Selection for templates)
+      setCurrentStep(1);
+    }
+  };
+
   const handleNext = () => {
-    // Validate step 1 - job number, client ID, and facility are required
-    if (currentStep === 1) {
+    // Step 0: Mode selection (handled by handleModeSelection)
+    
+    // Step 1: For template mode, validate client selection (if not creating template)
+    if (currentStep === 1 && creationMode === "template" && !isCreatingTemplate) {
+      if (!selectedTemplateClientId) {
+        alert("Please select a client");
+        return;
+      }
+      // Move to template selection step
+      setCurrentStep(2);
+      return;
+    }
+
+    // Step 2: For template mode, validate template selection (only if not creating template)
+    if (currentStep === 2 && creationMode === "template" && !isCreatingTemplate) {
+      if (!selectedTemplate) {
+        alert("Please select a template");
+        return;
+      }
+      // Load template and go to review
+      loadTemplateIntoForm(selectedTemplate);
+      setCurrentStep(3);
+      setIsConfirmed(false);
+      return;
+    }
+
+    // Step 1 (for new job or template creation): Validate job number, client ID, and facility
+    if (currentStep === 1 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate))) {
       console.log(
         "[AddJobModal] Validation - facilities_id:",
         formData.facilities_id,
@@ -488,10 +693,12 @@ export default function AddJobModal({
         alert("Weekly split total must equal the total quantity");
         return;
       }
+      setCurrentStep(2);
+      return;
     }
 
-    // Validate step 2 - all requirements must have required fields based on their process type
-    if (currentStep === 2) {
+    // Step 2 (for new job or template creation): Validate requirements
+    if (currentStep === 2 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate))) {
       const allRequirementsValid = formData.requirements.every(
         (r, reqIndex) => {
           if (!r.process_type) {
@@ -539,20 +746,132 @@ export default function AddJobModal({
         );
         return;
       }
-    }
-
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
-      // Reset schedule type to soft schedule when entering review step
-      if (currentStep === 2) {
-        setIsConfirmed(false);
-      }
+      setCurrentStep(3);
+      setIsConfirmed(false);
+      return;
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+    if (currentStep > 0) {
+      if (isCreatingTemplate) {
+        if (currentStep === 1) {
+          // Go back to template selection
+          setIsCreatingTemplate(false);
+          setCurrentStep(2);
+        } else {
+          setCurrentStep(currentStep - 1);
+        }
+      } else if (currentStep === 1 && creationMode === "template") {
+        // Go back to mode selection
+        setCurrentStep(0);
+        setCreationMode(null);
+        setSelectedTemplateClientId(null);
+        setTemplates([]);
+        setSelectedTemplate(null);
+      } else if (currentStep === 2 && creationMode === "template") {
+        // Go back to client selection
+        setCurrentStep(1);
+        setSelectedTemplate(null);
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
+    }
+  };
+
+  // Get the maximum step number based on mode
+  const getMaxStep = (): number => {
+    if (creationMode === "template") {
+      if (isCreatingTemplate) {
+        return 3; // Job Details -> Requirements -> Review
+      }
+      return 3; // Mode selection -> Client -> Template -> Review
+    }
+    return 3; // Mode selection -> Job Details -> Requirements -> Review
+  };
+
+  // Get step label
+  const getStepLabel = (step: number): string => {
+    if (step === 0) return "Select Method";
+    if (creationMode === "template") {
+      if (isCreatingTemplate) {
+        if (step === 1) return "Job Details";
+        if (step === 2) return "Requirements";
+        if (step === 3) return "Review";
+      } else {
+        if (step === 1) return "Select Client";
+        if (step === 2) return "Select Template";
+        if (step === 3) return "Review";
+      }
+    } else {
+      if (step === 1) return "Job Details";
+      if (step === 2) return "Requirements";
+      if (step === 3) return "Review";
+    }
+    return "";
+  };
+
+  // Save template
+  const handleSaveTemplate = async () => {
+    if (!selectedTemplateClientId) {
+      alert("Please select a client first");
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      // Prepare template data from form
+      const templateData = {
+        job_number: formData.job_number,
+        clients_id: formData.clients_id || selectedTemplateClientId,
+        client_name: formData.client_name,
+        sub_clients_id: formData.sub_clients_id,
+        sub_client_name: formData.sub_client_name,
+        job_name: formData.job_name,
+        description: formData.description,
+        quantity: formData.quantity,
+        csr: formData.csr,
+        prgm: formData.prgm,
+        facilities_id: formData.facilities_id,
+        start_date: formData.start_date ? new Date(formData.start_date).getTime() : undefined,
+        due_date: formData.due_date ? new Date(formData.due_date).getTime() : undefined,
+        service_type: formData.service_type,
+        pockets: formData.pockets,
+        machines_id: formData.machines_id,
+        requirements: formData.requirements,
+        weekly_split: formData.weekly_split,
+        locked_weeks: formData.locked_weeks,
+        price_per_m: formData.price_per_m,
+        add_on_charges: formData.add_on_charges,
+        ext_price: formData.ext_price,
+        total_billing: formData.total_billing,
+      };
+
+      await createJobTemplate({
+        clients_id: selectedTemplateClientId,
+        template: templateData,
+      });
+
+      // Refresh templates
+      const fetchedTemplates = await getJobTemplates(selectedTemplateClientId);
+      setTemplates(fetchedTemplates);
+      
+      // Select the newly created template (it should be the last one)
+      if (fetchedTemplates.length > 0) {
+        const newTemplate = fetchedTemplates[fetchedTemplates.length - 1];
+        setSelectedTemplate(newTemplate);
+      }
+
+      // Exit template creation mode and go back to template selection
+      setIsCreatingTemplate(false);
+      setCurrentStep(2);
+      
+      alert("Template saved successfully!");
+    } catch (error: any) {
+      console.error("Error saving template:", error);
+      alert(`Failed to save template: ${error.message || "Please try again"}`);
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
@@ -837,7 +1156,7 @@ export default function AddJobModal({
   };
 
   const handleClose = () => {
-    setCurrentStep(1);
+    setCurrentStep(0);
     onClose();
   };
 
@@ -859,59 +1178,234 @@ export default function AddJobModal({
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
-          {[1, 2, 3].map((step) => (
-            <div
-              key={step}
-              className="flex items-center"
-              style={{ flex: step === 3 ? "0 1 auto" : "1 1 0%" }}
-            >
-              <div className="flex items-center">
+        {creationMode && (
+          <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
+            {(() => {
+              const steps = creationMode === "template" && !isCreatingTemplate
+                ? [0, 1, 2, 3] // Mode -> Client -> Template -> Review
+                : creationMode === "template" && isCreatingTemplate
+                  ? [1, 2, 3] // Job Details -> Requirements -> Review (no mode step shown)
+                  : [0, 1, 2, 3]; // Mode -> Job Details -> Requirements -> Review
+              
+              return steps.map((step, index) => (
                 <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                    step === currentStep
-                      ? "bg-[#EF3340] text-white"
-                      : step < currentStep
-                        ? "bg-[#2E3192] text-white"
-                        : "bg-gray-200 text-gray-500"
-                  }`}
+                  key={step}
+                  className="flex items-center"
+                  style={{ flex: index === steps.length - 1 ? "0 1 auto" : "1 1 0%" }}
                 >
-                  {step < currentStep ? "✓" : step}
-                </div>
-                <div className="ml-3">
-                  <div
-                    className={`text-xs font-medium whitespace-nowrap ${
-                      step === currentStep
-                        ? "text-[#EF3340]"
-                        : step < currentStep
-                          ? "text-[#2E3192]"
-                          : "text-gray-500"
-                    }`}
-                  >
-                    {step === 1 && "Job Details"}
-                    {step === 2 && "Requirements"}
-                    {step === 3 && "Review"}
+                  <div className="flex items-center">
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
+                        step === currentStep
+                          ? "bg-[#EF3340] text-white"
+                          : step < currentStep
+                            ? "bg-[#2E3192] text-white"
+                            : "bg-gray-200 text-gray-500"
+                      }`}
+                    >
+                      {step < currentStep ? "✓" : step === 0 ? "•" : step}
+                    </div>
+                    <div className="ml-3">
+                      <div
+                        className={`text-xs font-medium whitespace-nowrap ${
+                          step === currentStep
+                            ? "text-[#EF3340]"
+                            : step < currentStep
+                              ? "text-[#2E3192]"
+                              : "text-gray-500"
+                        }`}
+                      >
+                        {getStepLabel(step)}
+                      </div>
+                    </div>
                   </div>
+                  {index < steps.length - 1 && (
+                    <div
+                      className={`h-0.5 flex-1 mx-4 ${
+                        step < currentStep ? "bg-[#2E3192]" : "bg-gray-200"
+                      }`}
+                    />
+                  )}
                 </div>
-              </div>
-              {step < 3 && (
-                <div
-                  className={`h-0.5 flex-1 mx-4 ${
-                    step < currentStep ? "bg-[#2E3192]" : "bg-gray-200"
-                  }`}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+              ));
+            })()}
+          </div>
+        )}
 
         {/* Form Content */}
         <form
           onSubmit={handleSubmit}
           className="flex-1 overflow-y-auto p-4 sm:p-6"
         >
-          {/* Step 1: Job Details */}
-          {currentStep === 1 && (
+          {/* Step 0: Mode Selection */}
+          {currentStep === 0 && (
+            <div className="space-y-6">
+              <div className="text-center mb-8">
+                <h3 className="text-xl font-semibold text-[var(--dark-blue)] mb-2">
+                  How would you like to create this job?
+                </h3>
+                <p className="text-sm text-[var(--text-light)]">
+                  Choose to create a new job from scratch or use an existing template
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* New Job Option */}
+                <button
+                  type="button"
+                  onClick={() => handleModeSelection("new")}
+                  className="p-6 border-2 border-[var(--border)] rounded-lg hover:border-[var(--primary-blue)] hover:bg-blue-50 transition-all text-left group"
+                >
+                  <div className="flex items-center mb-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-semibold text-[var(--text-dark)]">New Job</h4>
+                  </div>
+                  <p className="text-sm text-[var(--text-light)]">
+                    Create a new job from scratch with all the details
+                  </p>
+                </button>
+
+                {/* Template Option */}
+                <button
+                  type="button"
+                  onClick={() => handleModeSelection("template")}
+                  className="p-6 border-2 border-[var(--border)] rounded-lg hover:border-[var(--primary-blue)] hover:bg-blue-50 transition-all text-left group"
+                >
+                  <div className="flex items-center mb-3">
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mr-4 group-hover:bg-green-200 transition-colors">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-semibold text-[var(--text-dark)]">Use Template</h4>
+                  </div>
+                  <p className="text-sm text-[var(--text-light)]">
+                    Select a past job template to quickly create a similar job
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 1: Client Selection (Template Mode) */}
+          {currentStep === 1 && creationMode === "template" && !isCreatingTemplate && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-2">
+                  Select Client
+                </h3>
+                <p className="text-sm text-[var(--text-light)]">
+                  Choose the client to view their job templates
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                  Client <span className="text-red-500">*</span>
+                </label>
+                <SmartClientSelect
+                  value={selectedTemplateClientId}
+                  onChange={(clientId, clientName) => {
+                    setSelectedTemplateClientId(clientId);
+                    setSelectedTemplateClientName(clientName);
+                    setTemplates([]);
+                    setSelectedTemplate(null);
+                  }}
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Template Selection (Template Mode) */}
+          {currentStep === 2 && creationMode === "template" && !isCreatingTemplate && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-2">
+                  Select Template
+                </h3>
+                <p className="text-sm text-[var(--text-light)]">
+                  Choose a template to use as the base for your new job
+                </p>
+              </div>
+              
+              {loadingTemplates ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-blue)]"></div>
+                  <p className="mt-2 text-sm text-[var(--text-light)]">Loading templates...</p>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-[var(--border)] rounded-lg">
+                  <p className="text-[var(--text-light)] mb-4">No templates found for this client</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingTemplate(true);
+                      // Pre-fill the client in the form
+                      if (selectedTemplateClientId) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          clients_id: selectedTemplateClientId,
+                          client_name: selectedTemplateClientName,
+                        }));
+                      }
+                      setCurrentStep(1); // Go to job details step
+                    }}
+                    className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Create Template
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {templates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSelectedTemplate(template)}
+                      className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
+                        selectedTemplate?.id === template.id
+                          ? "border-[var(--primary-blue)] bg-blue-50"
+                          : "border-[var(--border)] hover:border-blue-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-[var(--text-dark)]">
+                            {template.template.job_name || `Template #${template.id}`}
+                          </h4>
+                          {template.template.job_number && (
+                            <p className="text-sm text-[var(--text-light)] mt-1">
+                              Job #: {template.template.job_number}
+                            </p>
+                          )}
+                          {template.template.description && (
+                            <p className="text-sm text-[var(--text-light)] mt-1 line-clamp-2">
+                              {template.template.description}
+                            </p>
+                          )}
+                        </div>
+                        {selectedTemplate?.id === template.id && (
+                          <div className="ml-4">
+                            <svg className="w-6 h-6 text-[var(--primary-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 1: Job Details (New Job Mode or Template Creation Mode) */}
+          {currentStep === 1 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -922,6 +1416,7 @@ export default function AddJobModal({
                     value={formData.clients_id}
                     onChange={handleClientChange}
                     required
+                    initialClientName={formData.client_name || undefined}
                   />
                 </div>
                 <div>
@@ -1198,8 +1693,8 @@ export default function AddJobModal({
             </div>
           )}
 
-          {/* Step 2: Requirements */}
-          {currentStep === 2 && (
+          {/* Step 2: Requirements (New Job Mode or Template Creation Mode) */}
+          {currentStep === 2 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">
                 Job Requirements
@@ -1250,10 +1745,35 @@ export default function AddJobModal({
           {/* Step 3: Review */}
           {currentStep === 3 && (
             <div className="space-y-6">
+              {isCreatingTemplate && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
+                  <p className="text-sm text-yellow-800 font-medium">
+                    Creating a template for {selectedTemplateClientId ? "this client" : "the selected client"}. 
+                    Fill out the form below and click "Save Template" when done.
+                  </p>
+                </div>
+              )}
               <div className="bg-[var(--bg-alert-info)] border-l-4 border-[var(--primary-blue)] p-4 rounded">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-2">
-                  Job Summary
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-[var(--text-dark)]">
+                    {isCreatingTemplate ? "Template Summary" : "Job Summary"}
+                  </h3>
+                  {!isCreatingTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Switch to new job mode to enable editing
+                        if (creationMode === "template" && !isCreatingTemplate) {
+                          setCreationMode("new");
+                        }
+                        setCurrentStep(1);
+                      }}
+                      className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
+                    >
+                      Edit Details
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-[var(--text-light)]">Job #:</span>
@@ -1321,9 +1841,26 @@ export default function AddJobModal({
               </div>
 
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-3">
-                  Job Requirements & Pricing
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-[var(--text-dark)]">
+                    Job Requirements & Pricing
+                  </h3>
+                  {!isCreatingTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Switch to new job mode to enable editing
+                        if (creationMode === "template" && !isCreatingTemplate) {
+                          setCreationMode("new");
+                        }
+                        setCurrentStep(2);
+                      }}
+                      className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
+                    >
+                      Edit Requirements
+                    </button>
+                  )}
+                </div>
                 {formData.requirements.map((req, index) => {
                   const quantity = parseInt(formData.quantity || "0");
                   const pricePerM = parseFloat(req.price_per_m || "0");
@@ -1421,86 +1958,105 @@ export default function AddJobModal({
                 </div>
               </div>
 
-              <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-[var(--text-dark)] mb-3">
-                  Schedule Type
-                </h4>
-                <ScheduleToggle
-                  isConfirmed={isConfirmed}
-                  onScheduleChange={setIsConfirmed}
-                />
-                <p className="text-sm text-[var(--text-light)] mt-3">
-                  {isConfirmed
-                    ? "✓ This job will be confirmed and scheduled immediately."
-                    : "ℹ This job will be added as a soft schedule and can be confirmed later."}
-                </p>
-              </div>
+              {!isCreatingTemplate && (
+                <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
+                  <h4 className="font-semibold text-[var(--text-dark)] mb-3">
+                    Schedule Type
+                  </h4>
+                  <ScheduleToggle
+                    isConfirmed={isConfirmed}
+                    onScheduleChange={setIsConfirmed}
+                  />
+                  <p className="text-sm text-[var(--text-light)] mt-3">
+                    {isConfirmed
+                      ? "✓ This job will be confirmed and scheduled immediately."
+                      : "ℹ This job will be added as a soft schedule and can be confirmed later."}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Footer - Inside Form */}
-          <div className="flex items-center justify-between mt-6 pt-6 border-t border-[var(--border)]">
-            <div className="text-sm text-[var(--text-light)]">
-              Step {currentStep} of 3
+          {currentStep > 0 && (
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-[var(--border)]">
+              <div className="text-sm text-[var(--text-light)]">
+                Step {currentStep} of {getMaxStep()}
+              </div>
+              <div className="flex gap-3">
+                {currentStep > 0 && (
+                  <button
+                    type="button"
+                    onClick={handlePrevious}
+                    className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+                  >
+                    Previous
+                  </button>
+                )}
+                {currentStep < getMaxStep() ? (
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    disabled={
+                      (currentStep === 1 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) &&
+                        (!formData.job_number ||
+                          !formData.clients_id ||
+                          !formData.quantity)) ||
+                      (currentStep === 2 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) &&
+                        formData.requirements.some((r) => {
+                          if (!r.process_type) return true;
+                          // Check if at least one field besides process_type is filled
+                          const fieldCount = Object.keys(r).filter(
+                            (key) =>
+                              key !== "process_type" &&
+                              r[key] !== undefined &&
+                              r[key] !== null &&
+                              r[key] !== "",
+                          ).length;
+                          return fieldCount === 0;
+                        })) ||
+                      (currentStep === 1 && creationMode === "template" && !isCreatingTemplate && !selectedTemplateClientId) ||
+                      (currentStep === 2 && creationMode === "template" && !isCreatingTemplate && !selectedTemplate)
+                    }
+                    className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <>
+                    {isCreatingTemplate ? (
+                      <button
+                        type="button"
+                        onClick={handleSaveTemplate}
+                        disabled={savingTemplate || !formData.job_name || !formData.job_number}
+                        className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingTemplate ? "Saving Template..." : "Save Template"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCanSubmit(true);
+                          // Use setTimeout to allow state to update before form submission
+                          setTimeout(() => {
+                            const form = document.querySelector("form");
+                            if (form) {
+                              form.requestSubmit();
+                            }
+                          }, 0);
+                        }}
+                        disabled={submitting}
+                        className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submitting ? "Creating Job..." : "Submit Job"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            <div className="flex gap-3">
-              {currentStep > 1 && (
-                <button
-                  type="button"
-                  onClick={handlePrevious}
-                  className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
-                >
-                  Previous
-                </button>
-              )}
-              {currentStep < 3 ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={
-                    (currentStep === 1 &&
-                      (!formData.job_number ||
-                        !formData.clients_id ||
-                        !formData.quantity)) ||
-                    (currentStep === 2 &&
-                      formData.requirements.some((r) => {
-                        if (!r.process_type) return true;
-                        // Check if at least one field besides process_type is filled
-                        const fieldCount = Object.keys(r).filter(
-                          (key) =>
-                            key !== "process_type" &&
-                            r[key] !== undefined &&
-                            r[key] !== null &&
-                            r[key] !== "",
-                        ).length;
-                        return fieldCount === 0;
-                      }))
-                  }
-                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCanSubmit(true);
-                    // Use setTimeout to allow state to update before form submission
-                    setTimeout(() => {
-                      const form = document.querySelector("form");
-                      if (form) {
-                        form.requestSubmit();
-                      }
-                    }, 0);
-                  }}
-                  disabled={submitting}
-                  className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? "Creating Job..." : "Submit Job"}
-                </button>
-              )}
-            </div>
-          </div>
+          )}
         </form>
       </div>
 

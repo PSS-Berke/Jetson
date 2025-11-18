@@ -1368,3 +1368,130 @@ export const getJobEditLogs = async (): Promise<any[]> => {
   console.log("[getJobEditLogs] Received", result.length, "edit logs");
   return result;
 };
+
+// ============================================================================
+// Job Templates API Functions
+// ============================================================================
+
+/**
+ * Get job templates for a specific client
+ * @param clientsId - The client ID to filter templates by
+ * @returns Array of job templates
+ */
+export const getJobTemplates = async (clientsId?: number): Promise<any[]> => {
+  console.log("[getJobTemplates] Fetching job templates", clientsId ? `for client ${clientsId}` : "for all clients");
+  const token = getToken();
+  const url = new URL("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates");
+  
+  if (clientsId) {
+    url.searchParams.append("clients_id", clientsId.toString());
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("[getJobTemplates] Error:", errorData);
+    throw new Error(`Failed to fetch job templates: ${JSON.stringify(errorData)}`);
+  }
+
+  const result = await response.json();
+  console.log("[getJobTemplates] Received", Array.isArray(result) ? result.length : 1, "template(s)");
+  return Array.isArray(result) ? result : [result];
+};
+
+/**
+ * Create a new job template
+ * @param templateData - The template data with clients_id and template object
+ * @returns Created job template
+ */
+export const createJobTemplate = async (templateData: {
+  clients_id: number;
+  template: Record<string, any>;
+}): Promise<any> => {
+  console.log("[createJobTemplate] Creating job template:", templateData);
+  const token = getToken();
+  
+  const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(templateData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("[createJobTemplate] Error:", errorData);
+    throw new Error(`Failed to create job template: ${JSON.stringify(errorData)}`);
+  }
+
+  const result = await response.json();
+  console.log("[createJobTemplate] Template created:", result);
+  return result;
+};
+
+/**
+ * Update an existing job template
+ * @param templateData - The template data with job_templates_id and template object
+ * @returns Updated job template
+ */
+export const updateJobTemplate = async (templateData: {
+  job_templates_id: number;
+  template: Record<string, any>;
+}): Promise<any> => {
+  console.log("[updateJobTemplate] Updating job template:", templateData);
+  const token = getToken();
+  
+  const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(templateData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("[updateJobTemplate] Error:", errorData);
+    throw new Error(`Failed to update job template: ${JSON.stringify(errorData)}`);
+  }
+
+  const result = await response.json();
+  console.log("[updateJobTemplate] Template updated:", result);
+  return result;
+};
+
+/**
+ * Delete a job template
+ * @param jobTemplatesId - The job template ID to delete
+ */
+export const deleteJobTemplate = async (jobTemplatesId: number): Promise<void> => {
+  console.log("[deleteJobTemplate] Deleting job template:", jobTemplatesId);
+  const token = getToken();
+  
+  const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ job_templates_id: jobTemplatesId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("[deleteJobTemplate] Error:", errorData);
+    throw new Error(`Failed to delete job template: ${JSON.stringify(errorData)}`);
+  }
+
+  console.log("[deleteJobTemplate] Template deleted successfully");
+};

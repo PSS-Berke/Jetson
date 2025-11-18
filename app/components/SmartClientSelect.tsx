@@ -128,11 +128,22 @@ export default function SmartClientSelect({
             console.log("Fetched client:", client); // Debug log
             setSelectedClient(client);
           } else {
-            console.error(
-              "Error fetching client:",
-              response.status,
-              await response.text(),
-            );
+            // Handle 404 gracefully - client endpoint might not exist or client might not be found
+            // This is not a critical error, just log a warning
+            if (response.status === 404) {
+              console.warn(
+                "Client not found or endpoint does not exist. Client ID:",
+                value,
+              );
+              // If we can't fetch the client, we'll just use the ID without the name
+              // The component will still work, just without the client name displayed
+            } else {
+              console.error(
+                "Error fetching client:",
+                response.status,
+                await response.text(),
+              );
+            }
           }
         } catch (error) {
           console.error("Error fetching client:", error);
