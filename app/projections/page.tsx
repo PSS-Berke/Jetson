@@ -90,6 +90,7 @@ export default function ProjectionsPage() {
     "consolidated" | "expanded"
   >("consolidated");
   const [showOnlyInDateRange, setShowOnlyInDateRange] = useState(true);
+  const [showNotes, setShowNotes] = useState(false);
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -391,6 +392,8 @@ export default function ProjectionsPage() {
               viewMode === "financials" ? handleFinancialsPrint : handlePrint
             }
             onBulkUpload={() => setIsBulkUploadOpen(true)}
+            showNotes={showNotes}
+            onShowNotesChange={setShowNotes}
           />
         </div>
 
@@ -643,6 +646,8 @@ export default function ProjectionsPage() {
                     dataDisplayMode={dataDisplayMode}
                     viewMode={tableViewMode}
                     processViewMode={processViewMode}
+                    showNotes={showNotes}
+                    onShowNotesChange={setShowNotes}
                   />
 
                   {/* Pagination */}

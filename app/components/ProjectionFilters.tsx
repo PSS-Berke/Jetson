@@ -12,6 +12,8 @@ import {
   LayoutGrid,
   Table2,
   Upload,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import ViewModeToggle from "./ViewModeToggle";
 import ProcessViewToggle from "./ProcessViewToggle";
@@ -45,6 +47,8 @@ interface ProjectionFiltersProps {
   onDateRangeToggleChange: (value: boolean) => void;
   onExportPDF?: () => void;
   onBulkUpload?: () => void;
+  showNotes?: boolean;
+  onShowNotesChange?: (show: boolean) => void;
 }
 
 export default function ProjectionFilters({
@@ -76,6 +80,8 @@ export default function ProjectionFilters({
   onDateRangeToggleChange,
   onExportPDF,
   onBulkUpload,
+  showNotes = false,
+  onShowNotesChange,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -708,9 +714,31 @@ export default function ProjectionFilters({
           </div>
         )}
 
-        {/* Fourth Row - Bulk Upload & Export PDF (Advanced Mode Only) */}
-        {filterViewMode === "advanced" && (onBulkUpload || onExportPDF) && (
+        {/* Fourth Row - View Notes, Bulk Upload & Export PDF (Advanced Mode Only) */}
+        {filterViewMode === "advanced" && (onShowNotesChange || onBulkUpload || onExportPDF) && (
           <div className="flex gap-3 justify-start">
+            {onShowNotesChange && (
+              <button
+                onClick={() => onShowNotesChange(!showNotes)}
+                className={`px-6 py-2 rounded-lg font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-colors ${
+                  showNotes
+                    ? "bg-[var(--primary-blue)] text-white hover:bg-[var(--dark-blue)]"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                {showNotes ? (
+                  <>
+                    <EyeOff className="w-4 h-4" />
+                    Hide Notes
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    View Notes
+                  </>
+                )}
+              </button>
+            )}
             {onBulkUpload && (
               <button
                 onClick={onBulkUpload}
