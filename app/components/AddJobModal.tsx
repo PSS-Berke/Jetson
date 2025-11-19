@@ -1749,7 +1749,7 @@ export default function AddJobModal({
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
                   <p className="text-sm text-yellow-800 font-medium">
                     Creating a template for {selectedTemplateClientId ? "this client" : "the selected client"}. 
-                    Fill out the form below and click "Save Template" when done.
+                    Fill out the form below and click &quot;Save Template&quot; when done.
                   </p>
                 </div>
               )}
