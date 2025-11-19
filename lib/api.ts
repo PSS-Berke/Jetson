@@ -192,6 +192,34 @@ export const getMe = async (): Promise<User> => {
   return data;
 };
 
+// Update current user
+export const updateUser = async (
+  userData: Partial<User>,
+): Promise<User> => {
+  const data = await apiFetch<User>(
+    "/auth/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify(userData),
+    },
+    "auth",
+  );
+
+  return data;
+};
+
+// Update notes color
+export const updateNotesColor = async (color: string): Promise<void> => {
+  await apiFetch<void>(
+    "/notes_color",
+    {
+      method: "PUT",
+      body: JSON.stringify({ color }),
+    },
+    "jobs",
+  );
+};
+
 // Logout (client-side only)
 export const logout = (): void => {
   removeToken();

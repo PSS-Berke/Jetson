@@ -1,14 +1,79 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useUser } from "@/hooks/useUser";
 import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "../components/PageHeader";
 import { useRouter } from "next/navigation";
+import { updateNotesColor } from "@/lib/api";
 
 export default function AccountPage() {
-  const { user, isLoading } = useUser();
+  const { user, isLoading, refetch } = useUser();
   const { logout } = useAuth();
   const router = useRouter();
+  const [notesColor, setNotesColor] = useState<string>("#000000");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Sync notes color with user data
+  useEffect(() => {
+    if (user?.notes_color) {
+      setNotesColor(user.notes_color);
+    } else {
+      setNotesColor("#000000");
+    }
+  }, [user?.notes_color]);
+
+  // Handle save button click
+  const handleSave = async () => {
+    // Validate hex color format
+    const hexPattern = /^#[0-9A-Fa-f]{6}$/;
+    const trimmedColor = notesColor.trim();
+    
+    if (!hexPattern.test(trimmedColor)) {
+      setSaveError("Please enter a valid hex color (e.g., #FF5733)");
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      await updateNotesColor(trimmedColor);
+      await refetch(); // Refresh user data
+      setSaveSuccess(true);
+      // Clear success message after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("Failed to update notes color:", error);
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Failed to save notes color. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle hex input change
+  const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNotesColor(value);
+    // Clear errors when user starts typing
+    if (saveError) setSaveError(null);
+    if (saveSuccess) setSaveSuccess(false);
+  };
+
+  // Handle color picker change
+  const handleColorPickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNotesColor(e.target.value);
+    // Clear errors when user changes color
+    if (saveError) setSaveError(null);
+    if (saveSuccess) setSaveSuccess(false);
+  };
 
   // Redirect to login if not authenticated
   if (!isLoading && !user) {
@@ -83,14 +148,64 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              {/* User ID Field */}
+              {/* Name Field */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-light)] mb-2">
-                  User ID
+                  Name
                 </label>
-                <div className="px-4 py-3 bg-gray-50 border border-[var(--border)] rounded-lg text-[var(--text-dark)] font-mono text-sm">
-                  {user?.id || "Not available"}
+                <div className="px-4 py-3 bg-gray-50 border border-[var(--border)] rounded-lg text-[var(--text-dark)]">
+                  {user?.name || "Not available"}
                 </div>
+              </div>
+
+              {/* Notes Color Field */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-light)] mb-2">
+                  Notes Color
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={notesColor}
+                    onChange={handleColorPickerChange}
+                    className="w-16 h-12 border border-[var(--border)] rounded-lg cursor-pointer"
+                    disabled={isSaving}
+                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={notesColor}
+                      onChange={handleHexInputChange}
+                      className="w-full px-4 py-3 bg-white border border-[var(--border)] rounded-lg text-[var(--text-dark)] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] focus:border-transparent"
+                      placeholder="#000000"
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      maxLength={7}
+                      disabled={isSaving}
+                    />
+                  </div>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="px-6 py-3 bg-[var(--primary-blue)] text-white rounded-lg font-medium hover:bg-[var(--dark-blue)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>Save</span>
+                    )}
+                  </button>
+                </div>
+                {saveError && (
+                  <p className="mt-2 text-sm text-red-600">{saveError}</p>
+                )}
+                {saveSuccess && (
+                  <p className="mt-2 text-sm text-green-600">
+                    Notes color saved successfully!
+                  </p>
+                )}
               </div>
 
               {/* Account Type Field */}
