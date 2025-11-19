@@ -63,6 +63,7 @@ const ProjectionTableRow = memo(
     onSaveEdit,
     onTextChange,
     isSavingNote,
+    onOpenNotesModal,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -80,6 +81,7 @@ const ProjectionTableRow = memo(
     onSaveEdit?: (noteId: number) => void;
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
+    onOpenNotesModal?: (jobId: number) => void;
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
@@ -153,7 +155,10 @@ const ProjectionTableRow = memo(
         <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
           {job.quantity.toLocaleString()}
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {job.start_date
             ? new Date(job.start_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -162,7 +167,10 @@ const ProjectionTableRow = memo(
               })
             : "N/A"}
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {job.due_date
             ? new Date(job.due_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -187,9 +195,13 @@ const ProjectionTableRow = memo(
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
                 index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
               }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenNotesModal?.(job.id);
+              }}
             >
               {displayValue}
             </td>
@@ -365,6 +377,7 @@ const ProcessProjectionTableRow = memo(
     onSaveEdit,
     onTextChange,
     isSavingNote,
+    onOpenNotesModal,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -383,6 +396,7 @@ const ProcessProjectionTableRow = memo(
     onSaveEdit?: (noteId: number) => void;
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
+    onOpenNotesModal?: (jobId: number) => void;
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
@@ -457,7 +471,10 @@ const ProcessProjectionTableRow = memo(
         </td>
 
         {/* Dates - only on first row */}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {isFirstInGroup && job.start_date
             ? new Date(job.start_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -466,7 +483,10 @@ const ProcessProjectionTableRow = memo(
               })
             : ""}
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {isFirstInGroup && job.due_date
             ? new Date(job.due_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -495,9 +515,13 @@ const ProcessProjectionTableRow = memo(
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
                 index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
               }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenNotesModal?.(job.id);
+              }}
             >
               {displayValue}
             </td>
@@ -1074,6 +1098,7 @@ export default function ProjectionsTable({
 
   // Notes modal state
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [isSingleJobNoteModal, setIsSingleJobNoteModal] = useState(false);
 
   // View notes toggle state
   const [showNotes, setShowNotes] = useState(false);
@@ -1151,11 +1176,23 @@ export default function ProjectionsTable({
 
   const handleBulkAddNotes = () => {
     setShowBulkMenu(false);
+    setIsSingleJobNoteModal(false);
+    setShowNotesModal(true);
+  };
+
+  const handleOpenNotesModal = (jobId: number) => {
+    setSelectedJobIds(new Set([jobId]));
+    setIsSingleJobNoteModal(true);
     setShowNotesModal(true);
   };
 
   const handleNotesModalClose = () => {
     setShowNotesModal(false);
+    // Clear selection only when closing a single-job notes modal (opened via projected numbers click)
+    if (isSingleJobNoteModal) {
+      setSelectedJobIds(new Set());
+      setIsSingleJobNoteModal(false);
+    }
   };
 
   const handleNotesSuccess = () => {
@@ -1839,6 +1876,7 @@ export default function ProjectionsTable({
                       onSaveEdit={handleSaveEdit}
                       onTextChange={setEditingText}
                       isSavingNote={isSavingNote}
+                      onOpenNotesModal={handleOpenNotesModal}
                     />
                   );
                 },
@@ -1869,6 +1907,7 @@ export default function ProjectionsTable({
                     onSaveEdit={handleSaveEdit}
                     onTextChange={setEditingText}
                     isSavingNote={isSavingNote}
+                    onOpenNotesModal={handleOpenNotesModal}
                   />
                 );
               })
