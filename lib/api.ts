@@ -1357,12 +1357,23 @@ export const deleteVariableCombination = async (
 // ============================================================================
 
 /**
- * Get all job edit logs
+ * Get job edit logs, optionally filtered by job ID
+ * @param jobsId - Optional job ID to filter logs by
  * @returns Array of job edit logs
  */
-export const getJobEditLogs = async (): Promise<any[]> => {
-  console.log("[getJobEditLogs] Fetching job edit logs");
-  const result = await apiFetch<any[]>("/job_edit_logs", {
+export const getJobEditLogs = async (jobsId?: number): Promise<any[]> => {
+  const params = new URLSearchParams();
+  if (jobsId !== undefined && jobsId !== null) {
+    params.append("jobs_id", jobsId.toString());
+  }
+  
+  const queryString = params.toString();
+  const endpoint = queryString
+    ? `/job_edit_logs?${queryString}`
+    : "/job_edit_logs";
+  
+  console.log("[getJobEditLogs] Fetching job edit logs", jobsId ? `for job ${jobsId}` : "for all jobs");
+  const result = await apiFetch<any[]>(endpoint, {
     method: "GET",
   }, "jobs");
   console.log("[getJobEditLogs] Received", result.length, "edit logs");

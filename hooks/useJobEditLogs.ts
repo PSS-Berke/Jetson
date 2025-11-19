@@ -11,7 +11,7 @@ export interface JobEditLog {
   email: string;
 }
 
-export function useJobEditLogs() {
+export function useJobEditLogs(jobsId?: number) {
   const [logs, setLogs] = useState<JobEditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export function useJobEditLogs() {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await getJobEditLogs();
+      const data = await getJobEditLogs(jobsId);
       setLogs(data);
     } catch (err) {
       const errorMessage =
@@ -34,7 +34,7 @@ export function useJobEditLogs() {
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [jobsId]);
 
   return {
     logs,
