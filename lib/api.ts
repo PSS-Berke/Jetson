@@ -220,6 +220,60 @@ export const updateNotesColor = async (color: string): Promise<void> => {
   );
 };
 
+// Job Notes API
+export interface JobNote {
+  id?: number;
+  created_at?: string;
+  jobs_id: number[];
+  notes: string;
+  color?: string;
+  email?: string;
+  name?: string;
+}
+
+// Get all job notes
+export const getJobNotes = async (): Promise<JobNote[]> => {
+  const data = await apiFetch<JobNote[]>(
+    "/job_notes",
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+  return data;
+};
+
+// Create job note
+export const createJobNote = async (
+  jobNote: { jobs_id: number[]; notes: string },
+): Promise<JobNote> => {
+  const data = await apiFetch<JobNote>(
+    "/job_notes",
+    {
+      method: "POST",
+      body: JSON.stringify(jobNote),
+    },
+    "jobs",
+  );
+  return data;
+};
+
+// Update job note
+export const updateJobNote = async (
+  jobNoteId: number,
+  jobNote: { jobs_id: number[]; notes: string },
+): Promise<JobNote> => {
+  const data = await apiFetch<JobNote>(
+    `/job_notes/${jobNoteId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(jobNote),
+    },
+    "jobs",
+  );
+  return data;
+};
+
 // Logout (client-side only)
 export const logout = (): void => {
   removeToken();

@@ -158,6 +158,7 @@ export interface User {
   id: number;
   email: string;
   admin: boolean;
+  notes_color?: string;
   [key: string]: string | number | boolean | undefined;
 }
 
