@@ -90,6 +90,7 @@ export default function ProjectionsPage() {
   const [processViewMode, setProcessViewMode] = useState<
     "consolidated" | "expanded"
   >("consolidated");
+  const [showOnlyInDateRange, setShowOnlyInDateRange] = useState(true);
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -106,6 +107,7 @@ export default function ProjectionsPage() {
     granularity,
     scheduleFilter,
     filterMode,
+    showOnlyInDateRange,
   };
 
   const {
@@ -394,6 +396,8 @@ export default function ProjectionsPage() {
             onViewModeChange={setTableViewMode}
             processViewMode={processViewMode}
             onProcessViewModeChange={setProcessViewMode}
+            showOnlyInDateRange={showOnlyInDateRange}
+            onDateRangeToggleChange={setShowOnlyInDateRange}
             onExportPDF={
               viewMode === "financials" ? handleFinancialsPrint : handlePrint
             }
