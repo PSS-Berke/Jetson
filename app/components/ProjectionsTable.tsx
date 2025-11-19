@@ -10,9 +10,10 @@ import {
   expandJobProjectionsToProcesses,
 } from "@/lib/projectionUtils";
 import JobDetailsModal from "./JobDetailsModal";
+import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
-import { Trash, Lock, Unlock, ChevronDown } from "lucide-react";
-import { bulkDeleteJobs, bulkUpdateJobs } from "@/lib/api";
+import { Trash, Lock, Unlock, ChevronDown, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
+import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote } from "@/lib/api";
 
 type SortField =
   | "job_number"
@@ -52,6 +53,16 @@ const ProjectionTableRow = memo(
     dataDisplayMode,
     isSelected,
     onToggleSelect,
+    showNotes,
+    jobNotes,
+    noteColor,
+    editingNoteId,
+    editingText,
+    onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+    onTextChange,
+    isSavingNote,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -59,13 +70,43 @@ const ProjectionTableRow = memo(
     dataDisplayMode: "pieces" | "revenue";
     isSelected: boolean;
     onToggleSelect: () => void;
+    showNotes?: boolean;
+    jobNotes?: JobNote[];
+    noteColor?: string;
+    editingNoteId?: number | null;
+    editingText?: string;
+    onStartEdit?: (noteId: number, text: string) => void;
+    onCancelEdit?: () => void;
+    onSaveEdit?: (noteId: number) => void;
+    onTextChange?: (text: string) => void;
+    isSavingNote?: boolean;
   }) => {
     const job = projection.job;
+    const hasNotes = jobNotes && jobNotes.length > 0;
+    
+    // Helper function to convert hex to rgba with opacity
+    const hexToRgba = (hex: string, opacity: number) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    };
+
+    // Determine row background color
+    let rowBgColor = "";
+    if (isSelected) {
+      rowBgColor = "bg-blue-100";
+    }
 
     return (
       <tr
         key={job.id}
-        className={`cursor-pointer ${isSelected ? "bg-blue-100" : ""}`}
+        className={`cursor-pointer ${rowBgColor}`}
+        style={
+          hasNotes && noteColor && showNotes && !isSelected
+            ? { backgroundColor: hexToRgba(noteColor, 0.08) }
+            : undefined
+        }
         onClick={() => onJobClick(job)}
       >
         <td className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
@@ -164,6 +205,139 @@ const ProjectionTableRow = memo(
               })
             : formatQuantity(projection.totalQuantity)}
         </td>
+        {showNotes && (
+          <td 
+            className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {hasNotes ? (
+              <div className="space-y-1">
+                {jobNotes!.filter((note) => note && note.notes).map((note, idx) => {
+                  const isEditing = editingNoteId === note.id;
+                  const noteColorValue = note.color || noteColor || "#000000";
+                  
+                  return (
+                    <div
+                      key={note.id || idx}
+                      className="px-2 py-1 rounded border-l-2 relative group"
+                      style={{
+                        borderLeftColor: noteColorValue,
+                        backgroundColor: (() => {
+                          const color = noteColorValue;
+                          const r = parseInt(color.slice(1, 3), 16);
+                          const g = parseInt(color.slice(3, 5), 16);
+                          const b = parseInt(color.slice(5, 7), 16);
+                          return `rgba(${r}, ${g}, ${b}, 0.1)`;
+                        })(),
+                      }}
+                    >
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingText || ""}
+                            onChange={(e) => onTextChange?.(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") {
+                                e.stopPropagation();
+                                onCancelEdit?.();
+                              } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (note.id && editingText?.trim()) {
+                                  onSaveEdit?.(note.id);
+                                }
+                              }
+                            }}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[var(--primary-blue)] resize-none"
+                            rows={3}
+                            disabled={isSavingNote}
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCancelEdit?.();
+                              }}
+                              disabled={isSavingNote}
+                              className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                              title="Cancel (Esc)"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (note.id) onSaveEdit?.(note.id);
+                              }}
+                              disabled={isSavingNote || !note.id || !editingText?.trim()}
+                              className="p-1 text-[var(--primary-blue)] hover:text-[var(--dark-blue)] disabled:opacity-50"
+                              title="Save (Ctrl+Enter)"
+                            >
+                              {isSavingNote ? (
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--primary-blue)]"></div>
+                              ) : (
+                                <Save className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className={`text-xs whitespace-pre-wrap break-words flex-1 ${note.id ? 'cursor-pointer hover:underline' : ''}`}
+                              style={{ color: noteColorValue }}
+                              onClick={(e) => {
+                                if (note.id && note.notes) {
+                                  e.stopPropagation();
+                                  onStartEdit?.(note.id, note.notes);
+                                }
+                              }}
+                              title={note.id ? "Click to edit" : "Read-only note"}
+                            >
+                              {note.notes}
+                            </p>
+                            {note.id && note.notes ? (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onStartEdit?.(note.id!, note.notes);
+                                }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                className="opacity-70 hover:opacity-100 p-1.5 text-[var(--primary-blue)] hover:bg-blue-50 rounded transition-all flex-shrink-0 cursor-pointer"
+                                title="Click to edit note"
+                                type="button"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 italic">(read-only)</span>
+                            )}
+                          </div>
+                          {(note.name || note.email) && (
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {note.name || note.email}
+                              {note.created_at &&
+                                ` • ${new Date(note.created_at).toLocaleDateString()}`}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </td>
+        )}
       </tr>
     );
   },
@@ -181,6 +355,16 @@ const ProcessProjectionTableRow = memo(
     dataDisplayMode,
     isSelected,
     onToggleSelect,
+    showNotes,
+    jobNotes,
+    noteColor,
+    editingNoteId,
+    editingText,
+    onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+    onTextChange,
+    isSavingNote,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -189,8 +373,27 @@ const ProcessProjectionTableRow = memo(
     dataDisplayMode: "pieces" | "revenue";
     isSelected: boolean;
     onToggleSelect: () => void;
+    showNotes?: boolean;
+    jobNotes?: JobNote[];
+    noteColor?: string;
+    editingNoteId?: number | null;
+    editingText?: string;
+    onStartEdit?: (noteId: number, text: string) => void;
+    onCancelEdit?: () => void;
+    onSaveEdit?: (noteId: number) => void;
+    onTextChange?: (text: string) => void;
+    isSavingNote?: boolean;
   }) => {
     const job = processProjection.job;
+    const hasNotes = jobNotes && jobNotes.length > 0;
+
+    // Helper function to convert hex to rgba with opacity
+    const hexToRgba = (hex: string, opacity: number) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    };
 
     return (
       <tr
@@ -198,6 +401,11 @@ const ProcessProjectionTableRow = memo(
         className={`cursor-pointer border-l-4 ${
           isSelected ? "bg-blue-100 border-l-blue-500" : "border-l-gray-300"
         } ${isFirstInGroup ? "border-t-2 border-t-gray-400" : ""}`}
+        style={
+          hasNotes && noteColor && showNotes && !isSelected && isFirstInGroup
+            ? { backgroundColor: hexToRgba(noteColor, 0.08) }
+            : undefined
+        }
         onClick={() => onJobClick(job)}
       >
         {/* Checkbox - only show on first row of group */}
@@ -307,6 +515,139 @@ const ProcessProjectionTableRow = memo(
               })
             : formatQuantity(processProjection.totalQuantity)}
         </td>
+        {showNotes && (
+          <td 
+            className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isFirstInGroup && hasNotes ? (
+              <div className="space-y-1">
+                {jobNotes!.map((note, idx) => {
+                  const isEditing = editingNoteId === note.id;
+                  const noteColorValue = note.color || noteColor || "#000000";
+                  
+                  return (
+                    <div
+                      key={note.id || idx}
+                      className="px-2 py-1 rounded border-l-2 relative group"
+                      style={{
+                        borderLeftColor: noteColorValue,
+                        backgroundColor: (() => {
+                          const color = noteColorValue;
+                          const r = parseInt(color.slice(1, 3), 16);
+                          const g = parseInt(color.slice(3, 5), 16);
+                          const b = parseInt(color.slice(5, 7), 16);
+                          return `rgba(${r}, ${g}, ${b}, 0.1)`;
+                        })(),
+                      }}
+                    >
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingText || ""}
+                            onChange={(e) => onTextChange?.(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") {
+                                e.stopPropagation();
+                                onCancelEdit?.();
+                              } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (note.id && editingText?.trim()) {
+                                  onSaveEdit?.(note.id);
+                                }
+                              }
+                            }}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[var(--primary-blue)] resize-none"
+                            rows={3}
+                            disabled={isSavingNote}
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCancelEdit?.();
+                              }}
+                              disabled={isSavingNote}
+                              className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                              title="Cancel (Esc)"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (note.id) onSaveEdit?.(note.id);
+                              }}
+                              disabled={isSavingNote || !note.id || !editingText?.trim()}
+                              className="p-1 text-[var(--primary-blue)] hover:text-[var(--dark-blue)] disabled:opacity-50"
+                              title="Save (Ctrl+Enter)"
+                            >
+                              {isSavingNote ? (
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--primary-blue)]"></div>
+                              ) : (
+                                <Save className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className={`text-xs whitespace-pre-wrap break-words flex-1 ${note.id ? 'cursor-pointer hover:underline' : ''}`}
+                              style={{ color: noteColorValue }}
+                              onClick={(e) => {
+                                if (note.id && note.notes) {
+                                  e.stopPropagation();
+                                  onStartEdit?.(note.id, note.notes);
+                                }
+                              }}
+                              title={note.id ? "Click to edit" : "Read-only note"}
+                            >
+                              {note.notes}
+                            </p>
+                            {note.id && note.notes ? (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onStartEdit?.(note.id!, note.notes);
+                                }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                className="opacity-70 hover:opacity-100 p-1.5 text-[var(--primary-blue)] hover:bg-blue-50 rounded transition-all flex-shrink-0 cursor-pointer"
+                                title="Click to edit note"
+                                type="button"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 italic">(read-only)</span>
+                            )}
+                          </div>
+                          {(note.name || note.email) && (
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {note.name || note.email}
+                              {note.created_at &&
+                                ` • ${new Date(note.created_at).toLocaleDateString()}`}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </td>
+        )}
       </tr>
     );
   },
@@ -731,6 +1072,19 @@ export default function ProjectionsTable({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Notes modal state
+  const [showNotesModal, setShowNotesModal] = useState(false);
+
+  // View notes toggle state
+  const [showNotes, setShowNotes] = useState(false);
+  const [jobNotesMap, setJobNotesMap] = useState<Map<number, JobNote[]>>(new Map());
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+
+  // Inline note editing state
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
   // Transform data for process view
   const displayProjections = useMemo(() => {
     if (viewMode === "processes" && processViewMode === "expanded") {
@@ -793,6 +1147,121 @@ export default function ProjectionsTable({
   const handleBulkDelete = () => {
     setShowBulkMenu(false);
     setShowDeleteConfirm(true);
+  };
+
+  const handleBulkAddNotes = () => {
+    setShowBulkMenu(false);
+    setShowNotesModal(true);
+  };
+
+  const handleNotesModalClose = () => {
+    setShowNotesModal(false);
+  };
+
+  const handleNotesSuccess = () => {
+    // Optionally refresh data or show success message
+    onRefresh();
+    // Reload notes if view notes is enabled
+    if (showNotes) {
+      loadJobNotes();
+    }
+  };
+
+  // Load job notes when toggle is enabled
+  const loadJobNotes = async () => {
+    setIsLoadingNotes(true);
+    try {
+      const allNotes = await getJobNotes();
+      // Create a map of job ID to notes array
+      const notesMap = new Map<number, JobNote[]>();
+      
+      // Filter out invalid notes (must have notes text and jobs_id array)
+      const validNotes = allNotes.filter((note) => 
+        note && 
+        note.notes && 
+        typeof note.notes === 'string' &&
+        note.notes.trim().length > 0 &&
+        Array.isArray(note.jobs_id) && 
+        note.jobs_id.length > 0
+      );
+      
+      validNotes.forEach((note) => {
+        note.jobs_id.forEach((jobId) => {
+          if (!notesMap.has(jobId)) {
+            notesMap.set(jobId, []);
+          }
+          notesMap.get(jobId)!.push(note);
+        });
+      });
+      
+      setJobNotesMap(notesMap);
+    } catch (error) {
+      console.error("Failed to load job notes:", error);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  // Toggle view notes
+  const handleToggleViewNotes = () => {
+    const newShowNotes = !showNotes;
+    setShowNotes(newShowNotes);
+    if (newShowNotes) {
+      loadJobNotes();
+    } else {
+      // Cancel any ongoing edits when hiding notes
+      setEditingNoteId(null);
+      setEditingText("");
+    }
+  };
+
+  // Inline note editing handlers
+  const handleStartEdit = (noteId: number, text: string) => {
+    setEditingNoteId(noteId);
+    setEditingText(text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditingText("");
+  };
+
+  const handleSaveEdit = async (noteId: number) => {
+    if (!editingText.trim()) {
+      alert("Note cannot be empty.");
+      return;
+    }
+
+    setIsSavingNote(true);
+    try {
+      // Find the note to get its jobs_id
+      let noteToUpdate: JobNote | undefined;
+      for (const notes of jobNotesMap.values()) {
+        noteToUpdate = notes.find((n) => n.id === noteId);
+        if (noteToUpdate) break;
+      }
+
+      if (!noteToUpdate) {
+        alert("Note not found. Please refresh and try again.");
+        setIsSavingNote(false);
+        return;
+      }
+
+      await updateJobNote(noteId, {
+        jobs_id: noteToUpdate.jobs_id,
+        notes: editingText.trim(),
+      });
+
+      setEditingNoteId(null);
+      setEditingText("");
+      await loadJobNotes();
+      onRefresh();
+    } catch (error) {
+      console.error("Failed to update note:", error);
+      alert(`Failed to update note: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsSavingNote(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -1058,6 +1527,30 @@ export default function ProjectionsTable({
 
   return (
     <>
+      {/* View Notes Toggle */}
+      <div className="mb-4 flex items-center justify-end">
+        <button
+          onClick={handleToggleViewNotes}
+          className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
+            showNotes
+              ? "bg-[var(--primary-blue)] text-white hover:bg-[var(--dark-blue)]"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+          }`}
+        >
+          {showNotes ? (
+            <>
+              <EyeOff className="w-4 h-4" />
+              Hide Notes
+            </>
+          ) : (
+            <>
+              <Eye className="w-4 h-4" />
+              View Notes
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Bulk Actions Toolbar */}
       {selectedJobIds.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -1149,6 +1642,17 @@ export default function ProjectionsTable({
                     </div>
                   )}
                 </div>
+
+                {/* Add Notes Option */}
+                <button
+                  onClick={handleBulkAddNotes}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4 text-[var(--primary-blue)]" />
+                  <span className="text-sm font-medium text-[var(--text-dark)]">
+                    Add Notes
+                  </span>
+                </button>
 
                 {/* Delete Option */}
                 <button
@@ -1281,6 +1785,11 @@ export default function ProjectionsTable({
                   Total <SortIcon field="total" />
                 </div>
               </th>
+              {showNotes && (
+                <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider min-w-[200px]">
+                  Notes
+                </th>
+              )}
             </tr>
           </thead>
 
@@ -1288,7 +1797,7 @@ export default function ProjectionsTable({
             {sortedJobProjections.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10 + timeRanges.length}
+                  colSpan={10 + timeRanges.length + (showNotes ? 1 : 0)}
                   className="px-4 py-8 text-center text-[var(--text-light)]"
                 >
                   No jobs found for the selected criteria
@@ -1303,6 +1812,10 @@ export default function ProjectionsTable({
                     index === 0 ||
                     processProjection.jobId !==
                       (array[index - 1] as ProcessProjection).jobId;
+                  
+                  const jobNotes = showNotes ? jobNotesMap.get(processProjection.jobId) || [] : [];
+                  const hasNotes = jobNotes.length > 0;
+                  const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
 
                   return (
                     <ProcessProjectionTableRow
@@ -1316,23 +1829,49 @@ export default function ProjectionsTable({
                       onToggleSelect={() =>
                         handleToggleSelect(processProjection.jobId)
                       }
+                      showNotes={showNotes}
+                      jobNotes={isFirstInGroup ? jobNotes : undefined}
+                      noteColor={noteColor}
+                      editingNoteId={editingNoteId}
+                      editingText={editingText}
+                      onStartEdit={handleStartEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onTextChange={setEditingText}
+                      isSavingNote={isSavingNote}
                     />
                   );
                 },
               )
             ) : (
               // Jobs view or Consolidated view (standard jobs table)
-              (sortedJobProjections as JobProjection[]).map((projection) => (
-                <ProjectionTableRow
-                  key={projection.job.id}
-                  projection={projection}
-                  timeRanges={timeRanges}
-                  onJobClick={handleJobClick}
-                  dataDisplayMode={dataDisplayMode}
-                  isSelected={selectedJobIds.has(projection.job.id)}
-                  onToggleSelect={() => handleToggleSelect(projection.job.id)}
-                />
-              ))
+              (sortedJobProjections as JobProjection[]).map((projection) => {
+                const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
+                const hasNotes = jobNotes.length > 0;
+                const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+                
+                return (
+                  <ProjectionTableRow
+                    key={projection.job.id}
+                    projection={projection}
+                    timeRanges={timeRanges}
+                    onJobClick={handleJobClick}
+                    dataDisplayMode={dataDisplayMode}
+                    isSelected={selectedJobIds.has(projection.job.id)}
+                    onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                    showNotes={showNotes}
+                    jobNotes={jobNotes}
+                    noteColor={noteColor}
+                    editingNoteId={editingNoteId}
+                    editingText={editingText}
+                    onStartEdit={handleStartEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onSaveEdit={handleSaveEdit}
+                    onTextChange={setEditingText}
+                    isSavingNote={isSavingNote}
+                  />
+                );
+              })
             )}
           </tbody>
         </table>
@@ -1503,6 +2042,13 @@ export default function ProjectionsTable({
         job={selectedJob}
         onClose={handleCloseModal}
         onRefresh={onRefresh}
+      />
+
+      <JobNotesModal
+        isOpen={showNotesModal}
+        onClose={handleNotesModalClose}
+        selectedJobIds={Array.from(selectedJobIds)}
+        onSuccess={handleNotesSuccess}
       />
 
       {/* Delete Confirmation Modal */}

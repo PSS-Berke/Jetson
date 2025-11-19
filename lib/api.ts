@@ -192,6 +192,88 @@ export const getMe = async (): Promise<User> => {
   return data;
 };
 
+// Update current user
+export const updateUser = async (
+  userData: Partial<User>,
+): Promise<User> => {
+  const data = await apiFetch<User>(
+    "/auth/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify(userData),
+    },
+    "auth",
+  );
+
+  return data;
+};
+
+// Update notes color
+export const updateNotesColor = async (color: string): Promise<void> => {
+  await apiFetch<void>(
+    "/notes_color",
+    {
+      method: "PUT",
+      body: JSON.stringify({ color }),
+    },
+    "jobs",
+  );
+};
+
+// Job Notes API
+export interface JobNote {
+  id?: number;
+  created_at?: string;
+  jobs_id: number[];
+  notes: string;
+  color?: string;
+  email?: string;
+  name?: string;
+}
+
+// Get all job notes
+export const getJobNotes = async (): Promise<JobNote[]> => {
+  const data = await apiFetch<JobNote[]>(
+    "/job_notes",
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+  return data;
+};
+
+// Create job note
+export const createJobNote = async (
+  jobNote: { jobs_id: number[]; notes: string },
+): Promise<JobNote> => {
+  const data = await apiFetch<JobNote>(
+    "/job_notes",
+    {
+      method: "POST",
+      body: JSON.stringify(jobNote),
+    },
+    "jobs",
+  );
+  return data;
+};
+
+// Update job note
+export const updateJobNote = async (
+  jobNoteId: number,
+  jobNote: { jobs_id: number[]; notes: string },
+): Promise<JobNote> => {
+  const data = await apiFetch<JobNote>(
+    `/job_notes/${jobNoteId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(jobNote),
+    },
+    "jobs",
+  );
+  return data;
+};
+
 // Logout (client-side only)
 export const logout = (): void => {
   removeToken();
@@ -1357,12 +1439,23 @@ export const deleteVariableCombination = async (
 // ============================================================================
 
 /**
- * Get all job edit logs
+ * Get job edit logs, optionally filtered by job ID
+ * @param jobsId - Optional job ID to filter logs by
  * @returns Array of job edit logs
  */
-export const getJobEditLogs = async (): Promise<any[]> => {
-  console.log("[getJobEditLogs] Fetching job edit logs");
-  const result = await apiFetch<any[]>("/job_edit_logs", {
+export const getJobEditLogs = async (jobsId?: number): Promise<any[]> => {
+  const params = new URLSearchParams();
+  if (jobsId !== undefined && jobsId !== null) {
+    params.append("jobs_id", jobsId.toString());
+  }
+  
+  const queryString = params.toString();
+  const endpoint = queryString
+    ? `/job_edit_logs?${queryString}`
+    : "/job_edit_logs";
+  
+  console.log("[getJobEditLogs] Fetching job edit logs", jobsId ? `for job ${jobsId}` : "for all jobs");
+  const result = await apiFetch<any[]>(endpoint, {
     method: "GET",
   }, "jobs");
   console.log("[getJobEditLogs] Received", result.length, "edit logs");

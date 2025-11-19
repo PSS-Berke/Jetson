@@ -2,7 +2,6 @@ import ApiService from "./ApiService";
 import type {
   CompanyRequestPayload,
   ExchangeMSCodeForTokenRequestPayload,
-  MicrosoftCompany,
 } from "@/types/microsoft";
 
 export const apiExchangeMSCodeForToken = (

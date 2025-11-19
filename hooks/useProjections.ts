@@ -477,23 +477,14 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       const portionInTimeframe = projection.totalQuantity / totalJobQuantity;
       const proportionalRevenue = jobBilling * portionInTimeframe;
 
-      console.log(
-        `[Total Revenue] Job ${job.job_number}: revenue=$${jobBilling.toFixed(2)}, portion=${(portionInTimeframe * 100).toFixed(1)}%, proportional_revenue=$${proportionalRevenue.toFixed(2)}`,
-      );
       return total + proportionalRevenue;
     }, 0);
-    console.log(
-      `[Total Revenue] Final total: $${revenue.toFixed(2)} from ${filteredProjections.length} jobs`,
-    );
 
     const jobsCount = new Set(
       filteredProjections
         .filter((p) => p.totalQuantity > 0)
         .map((p) => p.job.id),
     ).size;
-    console.log(
-      `[Total Jobs] ${jobsCount} jobs have activity in the selected timeframe (out of ${filteredProjections.length} total)`,
-    );
 
     return { totalRevenue: revenue, totalJobsInTimeframe: jobsCount };
   }, [filteredProjections]);

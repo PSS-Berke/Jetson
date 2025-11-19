@@ -6,6 +6,7 @@ import { deleteJob } from "@/lib/api";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
 import EditJobModal from "./EditJobModal";
 import Toast from "./Toast";
+import JobRevisionHistoryModal from "./JobRevisionHistoryModal";
 
 interface JobDetailsModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export default function JobDetailsModal({
   onRefresh,
 }: JobDetailsModalProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isRevisionHistoryOpen, setIsRevisionHistoryOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
@@ -558,6 +560,12 @@ export default function JobDetailsModal({
             </button>
             <div className="flex gap-3">
               <button
+                onClick={() => setIsRevisionHistoryOpen(true)}
+                className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
+              >
+                Revision History
+              </button>
+              <button
                 onClick={handleEdit}
                 className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
               >
@@ -616,6 +624,15 @@ export default function JobDetailsModal({
         job={job}
         onClose={handleEditClose}
         onSuccess={handleEditSuccess}
+      />
+
+      {/* Revision History Modal */}
+      <JobRevisionHistoryModal
+        isOpen={isRevisionHistoryOpen}
+        onClose={() => setIsRevisionHistoryOpen(false)}
+        jobId={job.id}
+        jobNumber={job.job_number}
+        jobName={job.job_name}
       />
 
       {/* Delete Success Toast */}
