@@ -1,14 +1,287 @@
-/**
- * Step 5: Review & Submit
- * Displays all collected information with edit capability
- */
-
 "use client";
 
 import React from "react";
-import type { WizardState } from "@/hooks/useWizardState";
+import type { Machine, MachineCapabilityValue } from "@/types";
+import type {
+  CustomFormField,
+  FormBuilderField,
+  RuleFormData,
+  WizardState,
+} from "@/hooks/useWizardState";
 import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
 import { Edit2 } from "lucide-react";
+
+interface EditMachineReviewStepProps {
+  machine: Machine;
+  line: string;
+  machineName: string;
+  machineDesignation: string;
+  facilitiesId: number | null;
+  processTypeKey: string;
+  isCustomProcessType: boolean;
+  customProcessTypeName: string;
+  customProcessTypeFields: CustomFormField[];
+  capabilities: Record<string, MachineCapabilityValue>;
+  formBuilderFields: FormBuilderField[];
+  machineGroupOption: "none" | "existing" | "new";
+  existingGroupId: number | null;
+  newGroupName: string;
+  newGroupDescription: string;
+  rules: RuleFormData[];
+}
+
+const formatValue = (value: any): string => {
+  if (value === null || value === undefined || value === "") {
+    return "Not set";
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(", ") : "Not set";
+  }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  return String(value);
+};
+
+const formatRuleConditions = (conditions: RuleFormData["conditions"]): string => {
+  if (conditions.length === 0) {
+    return "No conditions";
+  }
+  return conditions
+    .map((condition, index) => {
+      const prefix = index > 0 ? ` ${condition.logic || "AND"} ` : "";
+      return `${prefix}${condition.parameter} ${condition.operator} ${condition.value}`;
+    })
+    .join("");
+};
+
+export function EditMachineReviewStep({
+  machine,
+  line,
+  machineName,
+  machineDesignation,
+  facilitiesId,
+  processTypeKey,
+  isCustomProcessType,
+  customProcessTypeName,
+  customProcessTypeFields,
+  capabilities,
+  formBuilderFields,
+  machineGroupOption,
+  existingGroupId,
+  newGroupName,
+  newGroupDescription,
+  rules,
+}: EditMachineReviewStepProps) {
+  const capabilityEntries =
+    formBuilderFields.length > 0
+      ? formBuilderFields.map((field) => ({
+          id: field.id,
+          label: field.fieldLabel || field.fieldName,
+          value: formatValue(field.fieldValue),
+          helper: field.fieldType,
+        }))
+      : Object.entries(capabilities).map(([key, value]) => ({
+          id: key,
+          label: key,
+          value: formatValue(value),
+        }));
+
+  const processSummary = isCustomProcessType
+    ? customProcessTypeName || "Custom process type (name not set)"
+    : processTypeKey || "No process type selected";
+
+  let groupSummaryTitle = "No group selected";
+  let groupSummaryBody =
+    "This machine will operate independently without shared configurations.";
+
+  if (machineGroupOption === "existing") {
+    groupSummaryTitle = "Existing group";
+    groupSummaryBody = existingGroupId
+      ? `Machine will remain in group #${existingGroupId}.`
+      : "Group not selected yet.";
+  } else if (machineGroupOption === "new") {
+    groupSummaryTitle = "New group";
+    groupSummaryBody = newGroupName
+      ? `Creating new group "${newGroupName}".`
+      : "New group name not provided yet.";
+    if (newGroupDescription) {
+      groupSummaryBody += ` Description: ${newGroupDescription}`;
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+        <svg className="w-5 h-5 text-blue-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path
+            fillRule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a1 1 0 00-.894.553l-3 6A1 1 0 007 13h6a1 1 0 00.894-1.447l-3-6A1 1 0 0010 5zm0 8a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <div>
+          <p className="text-sm text-blue-800 font-medium">
+            Review all details before saving your changes.
+          </p>
+          <p className="text-xs text-blue-700">
+            Use the Back button if something needs to be updated. Submitting will immediately update this machine.
+          </p>
+        </div>
+      </div>
+
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Basic Details</h3>
+          <p className="text-sm text-gray-600">
+            Confirm that the identifying information and facility assignments are correct.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-xs uppercase text-gray-500">Line</p>
+            <p className="text-base font-semibold text-gray-900">{formatValue(line)}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-xs uppercase text-gray-500">Machine Name</p>
+            <p className="text-base font-semibold text-gray-900">
+              {formatValue(machineName || machine.name)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-xs uppercase text-gray-500">Designation</p>
+            <p className="text-base font-semibold text-gray-900">
+              {formatValue(machineDesignation || machine.designation)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-xs uppercase text-gray-500">Facility</p>
+            <p className="text-base font-semibold text-gray-900">
+              {facilitiesId ?? machine.facilities_id ?? "Not set"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-xs uppercase text-gray-500">Machine Type</p>
+            <p className="text-base font-semibold text-gray-900">{formatValue(machine.type)}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-xs uppercase text-gray-500">Status</p>
+            <p className="text-base font-semibold text-gray-900">
+              {formatValue(machine.status)}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Process & Capabilities</h3>
+          <p className="text-sm text-gray-600">
+            Verify the selected process type and the values that will be saved for this machine.
+          </p>
+        </div>
+        <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+          <div>
+            <p className="text-xs uppercase text-gray-500">Process Type</p>
+            <p className="text-base font-semibold text-gray-900">{processSummary}</p>
+          </div>
+
+          {isCustomProcessType && customProcessTypeFields.length > 0 && (
+            <div>
+              <p className="text-xs uppercase text-gray-500 mb-2">Custom Fields</p>
+              <div className="space-y-2">
+                {customProcessTypeFields.map((field, index) => (
+                  <div
+                    key={`${field.fieldName}-${index}`}
+                    className="p-3 rounded-md bg-purple-50 border border-purple-100 text-sm text-purple-900"
+                  >
+                    <span className="font-medium">{field.fieldLabel || field.fieldName}</span>
+                    <span className="text-xs text-purple-700 ml-2">
+                      {field.fieldType || "text"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs uppercase text-gray-500 mb-2">Capabilities / Variables</p>
+            {capabilityEntries.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No capability values are set. You can add them in the previous step.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {capabilityEntries.map((entry) => (
+                  <div key={entry.id} className="border border-gray-200 rounded-md p-3">
+                    <p className="text-xs uppercase text-gray-500">{entry.label}</p>
+                    <p className="text-sm font-semibold text-gray-900">{entry.value}</p>
+                    {"helper" in entry && entry.helper && (
+                      <p className="text-xs text-gray-500">Type: {entry.helper}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Groups & Rules</h3>
+          <p className="text-sm text-gray-600">
+            Ensure the machine is assigned to the correct group and that the expected rules are present.
+          </p>
+        </div>
+        <div className="rounded-lg border border-gray-200 p-4 space-y-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+            <p className="text-xs uppercase text-gray-500">Group Assignment</p>
+            <p className="text-sm font-semibold text-gray-900">{groupSummaryTitle}</p>
+            <p className="text-xs text-gray-600 mt-1">{groupSummaryBody}</p>
+          </div>
+
+          <div>
+            <p className="text-xs uppercase text-gray-500 mb-2">Rules ({rules.length})</p>
+            {rules.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No rules are configured. You can add rules in the previous step or leave this blank.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {rules.map((rule, index) => (
+                  <div key={`${rule.name}-${index}`} className="border border-gray-200 rounded-md p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-900">{rule.name}</p>
+                      <span className="text-xs text-gray-500">Priority {rule.priority ?? index + 1}</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      When: {formatRuleConditions(rule.conditions)}
+                    </p>
+                    <div className="mt-2 text-xs text-gray-500 flex flex-wrap gap-3">
+                      <span>Speed: {rule.outputs.speed_modifier ?? 100}%</span>
+                      <span>People: {rule.outputs.people_required ?? 1}</span>
+                      {rule.outputs.fixed_rate && <span>Fixed Rate: {rule.outputs.fixed_rate}</span>}
+                      {rule.outputs.notes && <span>Notes: {rule.outputs.notes}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <p className="text-sm font-semibold text-green-900">Ready to Update</p>
+        <p className="text-xs text-green-800 mt-1">
+          Everything looks good! Use the submit button below to save these changes. You can always go back to edit before submitting.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 interface StepReviewProps {
   state: WizardState;

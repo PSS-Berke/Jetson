@@ -622,12 +622,25 @@ export const updateMachine = async (
   console.log("[updateMachine] Capabilities object:", machineData.capabilities);
 
   // Transform frontend data to API format
-  const apiData: any = { ...machineData };
-  if (machineData.line !== undefined) {
-    apiData.name = machineData.line.toString();
+  // API expects: machines_id, line, type, status, facilities_id, name, capabilities, process_type_key, designation
+  const apiData: any = {
+    machines_id: machineId,
+    line: machineData.line !== undefined ? (typeof machineData.line === 'number' ? machineData.line.toString() : machineData.line) : "",
+    type: machineData.type || "",
+    status: machineData.status || "",
+    facilities_id: machineData.facilities_id || 0,
+    name: machineData.name || "",
+    capabilities: machineData.capabilities || {},
+    process_type_key: machineData.process_type_key || "",
+    designation: machineData.designation || "",
+  };
+  
+  // Include speed_hr and shiftCapacity if provided
+  if (machineData.speed_hr !== undefined) {
+    apiData.speed_hr = machineData.speed_hr;
   }
-  if (machineData.capabilities !== undefined) {
-    apiData.details = machineData.capabilities;
+  if (machineData.shiftCapacity !== undefined) {
+    apiData.shiftCapacity = machineData.shiftCapacity;
   }
 
   console.log(

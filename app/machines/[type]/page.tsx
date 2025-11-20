@@ -21,6 +21,7 @@ import {
   updateMachine,
   deleteMachine,
   getMachineRules,
+  api,
 } from "@/lib/api";
 import { formatConditions } from "@/lib/rulesEngine";
 import DynamicMachineCapabilityFields from "../../components/DynamicMachineCapabilityFields";
@@ -141,6 +142,8 @@ export default function MachineTypePage() {
     useState<Partial<Machine> | null>(null);
   const [activeRules, setActiveRules] = useState<MachineRule[]>([]);
   const [rulesLoading, setRulesLoading] = useState(false);
+  const [rawMachinesResponse, setRawMachinesResponse] = useState<any[] | null>(null);
+  const [rawResponseLoading, setRawResponseLoading] = useState(false);
   const { user, isLoading: userLoading } = useUser();
   const {
     machines,
@@ -155,31 +158,40 @@ export default function MachineTypePage() {
 
   // Filter machines by type - must be before useEffect that uses it
   const filteredMachines = config ? machines.filter(config.filterFn) : [];
+  
+  // Filter raw machines response by type
+  const filteredRawMachinesResponse = rawMachinesResponse && config
+    ? rawMachinesResponse.filter((machine: any) => config.filterFn(machine as Machine))
+    : rawMachinesResponse;
 
-  // Fetch active rules for this machine type
-  useEffect(() => {
-    const loadRules = async () => {
-      if (!filteredMachines.length) return;
 
-      // Get process_type_key from the first machine of this type
-      const processTypeKey = filteredMachines[0]?.process_type_key;
-      if (!processTypeKey) return;
-
-      setRulesLoading(true);
-      try {
-        const rules = await getMachineRules(processTypeKey, undefined, true);
-        setActiveRules(rules);
-      } catch (error) {
-        console.error("[MachineTypePage] Error loading rules:", error);
-        // Set empty array if endpoint is not available yet
-        setActiveRules([]);
-      } finally {
-        setRulesLoading(false);
+  // Function to fetch raw machines response
+  const fetchRawMachinesResponse = async () => {
+    setRawResponseLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterStatus && filterStatus !== "") {
+        params.append("status", filterStatus);
       }
-    };
+      if (filterFacility && filterFacility > 0) {
+        params.append("facilities_id", filterFacility.toString());
+      }
+      const queryString = params.toString();
+      const endpoint = queryString ? `/machines?${queryString}` : "/machines";
+      const rawData = await api.get<any[]>(endpoint);
+      setRawMachinesResponse(rawData);
+    } catch (error) {
+      console.error("[MachineTypePage] Error fetching raw machines:", error);
+      setRawMachinesResponse(null);
+    } finally {
+      setRawResponseLoading(false);
+    }
+  };
 
-    loadRules();
-  }, [machines, machineType]);
+  // Fetch raw machines response
+  useEffect(() => {
+    fetchRawMachinesResponse();
+  }, [filterStatus, filterFacility]);
 
   const getNewMachineInitialState = (): Partial<Machine> => ({
     line: undefined,
@@ -205,9 +217,10 @@ export default function MachineTypePage() {
     setSelectedMachine(machine);
   };
 
-  const handleMachineModalClose = () => {
+  const handleMachineModalClose = async () => {
     setSelectedMachine(null);
     refetch(filterStatus, filterFacility || undefined);
+    await fetchRawMachinesResponse();
   };
 
   const handleAddMachineSuccess = () => {
@@ -498,6 +511,7 @@ export default function MachineTypePage() {
     try {
       await updateMachine(editingMachineId, editedMachine as Machine);
       refetch(filterStatus, filterFacility || undefined);
+      await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);
       setErrors({});
@@ -524,6 +538,7 @@ export default function MachineTypePage() {
     try {
       await deleteMachine(machineId);
       refetch(filterStatus, filterFacility || undefined);
+      await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);
       setErrors({});
@@ -623,6 +638,243 @@ export default function MachineTypePage() {
           </button>
         </div>
 
+        {/* Raw Response Display */}
+        <div className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <svg
+                className="w-6 h-6 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Machines
+            </h3>
+            {filteredRawMachinesResponse && (
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                {filteredRawMachinesResponse.length} machine{filteredRawMachinesResponse.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          {rawResponseLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">Loading response...</span>
+            </div>
+          ) : filteredRawMachinesResponse && filteredRawMachinesResponse.length > 0 ? (
+            <div className="space-y-4">
+              {filteredRawMachinesResponse.map((machine: any, index: number) => {
+                // Convert raw machine to Machine type for handlers
+                const machineForHandlers: Machine = {
+                  id: machine.id,
+                  created_at: machine.created_at,
+                  line: typeof machine.line === 'string' ? parseInt(machine.line) : machine.line,
+                  type: machine.type || '',
+                  status: (machine.status || 'available') as MachineStatus,
+                  facilities_id: machine.facilities_id,
+                  jobs_id: machine.jobs_id,
+                  name: machine.name || '',
+                  capabilities: machine.capabilities || {},
+                  process_type_key: machine.process_type_key || '',
+                  designation: machine.designation || '',
+                };
+
+                return (
+                  <div
+                    key={index}
+                    className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow relative"
+                  >
+                    {/* Edit and Delete Buttons */}
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMachine(machineForHandlers);
+                        }}
+                        className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors shadow-sm"
+                        title="Edit"
+                      >
+                        <FaPen size="0.875em" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(machine.id);
+                        }}
+                        className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors shadow-sm"
+                        title="Delete"
+                      >
+                        <FaTrash size="0.875em" />
+                      </button>
+                    </div>
+
+                    {(machine.name || machine.designation) && (
+                      <div className="mb-4 pb-4 border-b border-gray-200 pr-20">
+                        {machine.name && (
+                          <div className="text-2xl font-bold text-gray-900">
+                            {machine.name}
+                          </div>
+                        )}
+                        {machine.designation && (
+                          <div className="text-sm text-gray-600 mt-1">
+                            {machine.designation}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Created At
+                        </div>
+                        <div className="text-sm text-gray-900">
+                          {machine.created_at
+                            ? new Date(machine.created_at).toLocaleString()
+                            : 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Line
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {machine.line ?? 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Type
+                        </div>
+                        <div className="text-sm font-medium text-blue-700">
+                          {machine.type ?? 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Status
+                        </div>
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${
+                            machine.status === 'running'
+                              ? 'bg-blue-100 text-blue-800'
+                              : machine.status === 'available' || machine.status === 'avalible'
+                                ? 'bg-green-100 text-green-800'
+                                : machine.status === 'maintenance'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {machine.status ?? 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Facility ID
+                        </div>
+                        <div className="text-sm text-gray-900">
+                          {machine.facilities_id ?? 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Job ID
+                        </div>
+                        <div className="text-sm text-gray-900">
+                          {machine.jobs_id ?? 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Process Type Key
+                        </div>
+                        <div className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
+                          {machine.process_type_key || <span className="text-gray-400 italic">Empty</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {machine.capabilities && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                          Capabilities
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                          {machine.capabilities && typeof machine.capabilities === 'object' && Object.keys(machine.capabilities).length > 0 ? (
+                            <div className="space-y-2">
+                              {Object.entries(machine.capabilities).map(([key, value]) => (
+                                <div key={key} className="flex items-start gap-2">
+                                  <div className="text-xs font-semibold text-gray-600 min-w-[120px] capitalize">
+                                    {key.replace(/_/g, ' ')}:
+                                  </div>
+                                  <div className="text-sm text-gray-900 flex-1">
+                                    {Array.isArray(value) ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {value.map((item: any, idx: number) => (
+                                          <span
+                                            key={idx}
+                                            className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium"
+                                          >
+                                            {String(item)}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : value === null || value === undefined ? (
+                                      <span className="text-gray-400 italic">null</span>
+                                    ) : typeof value === 'object' ? (
+                                      <span className="text-gray-600">{JSON.stringify(value)}</span>
+                                    ) : (
+                                      <span className="font-medium">{String(value)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : machine.capabilities === null ? (
+                            <span className="text-sm text-gray-400 italic">null</span>
+                          ) : (
+                            <span className="text-sm text-gray-900">{String(machine.capabilities)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <svg
+                className="w-12 h-12 mx-auto mb-3 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                />
+              </svg>
+              <p>No data available</p>
+            </div>
+          )}
+        </div>
+
         {/* Active Rules Section */}
         {activeRules.length > 0 && (
           <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
@@ -672,618 +924,6 @@ export default function MachineTypePage() {
           </div>
         )}
 
-        {/* Machines Table */}
-        {machinesError ? (
-          <div className="text-center py-12">
-            <div className="text-red-600">
-              Error loading machines: {machinesError}
-            </div>
-          </div>
-        ) : machinesLoading ? (
-          <div className="text-center py-12">
-            <div className="text-[var(--text-light)]">Loading machines...</div>
-          </div>
-        ) : filteredMachines.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-[var(--text-light)] text-lg">
-              No machines found
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Facility
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Line
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider w-[10%]">
-                      Process
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Cap 1
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Cap 2
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Speed/hr
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Shift Capacity
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-light)] uppercase tracking-wider">
-                      Current Job
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {showNewMachineRow && newMachineFormData && (
-                    <tr className="bg-blue-50/50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {/* Facility Input */}
-                        <select
-                          name="facilities_id"
-                          value={newMachineFormData.facilities_id ?? ""}
-                          onChange={handleNewMachineInputChange}
-                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.facilities_id ? "border-red-400" : "border-gray-300"}`}
-                        >
-                          <option value="">Select Facility</option>
-                          <option value="1">Bolingbrook</option>
-                          <option value="2">Lemont</option>
-                        </select>
-                        {errors.facilities_id && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.facilities_id}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {/* Line Input */}
-                        <input
-                          type="number"
-                          name="line"
-                          value={newMachineFormData.line ?? ""}
-                          onChange={handleNewMachineInputChange}
-                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.line ? "border-red-400" : "border-gray-300"}`}
-                          placeholder="Line #"
-                        />
-                        {errors.line && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.line}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {/* Type Input */}
-                        <input
-                          type="text"
-                          name="type"
-                          value={newMachineFormData.type ?? ""}
-                          onChange={handleNewMachineInputChange}
-                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.type ? "border-red-400" : "border-gray-300"}`}
-                          placeholder="Type"
-                        />
-                        {errors.type && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.type}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[var(--text-dark)] w-[10%]">
-                        {/* Process Type - DynamicMachineCapabilityFields will handle this */}
-                        <DynamicMachineCapabilityFields
-                          processTypeKey={
-                            newMachineFormData.process_type_key ?? ""
-                          }
-                          capabilities={newMachineFormData.capabilities ?? {}}
-                          onChange={handleNewMachineCapabilityChange}
-                          onProcessTypeChange={
-                            handleNewMachineProcessTypeChange
-                          }
-                          errors={errors}
-                          minimalMode={true} // Add a prop to render a more compact version if needed
-                        />
-                        {errors.process_type_key && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.process_type_key}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {/* Status Select */}
-                        <select
-                          name="status"
-                          value={newMachineFormData.status ?? "available"}
-                          onChange={handleNewMachineInputChange}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
-                        >
-                          <option value="available">Available</option>
-                          <option value="running">Running</option>
-                          <option value="maintenance">Maintenance</option>
-                        </select>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                        {/* Capability 1 - Will be rendered by DynamicMachineCapabilityFields */}
-                        N/A
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                        {/* Capability 2 - Will be rendered by DynamicMachineCapabilityFields */}
-                        N/A
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {/* Speed/hr Input */}
-                        <input
-                          type="number"
-                          name="speed_hr"
-                          value={newMachineFormData.speed_hr ?? ""}
-                          onChange={handleNewMachineInputChange}
-                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.speed_hr ? "border-red-400" : "border-gray-300"}`}
-                          placeholder="Speed/hr"
-                          min="0"
-                          step="1"
-                        />
-                        {errors.speed_hr && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.speed_hr}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                        {/* Shift Capacity Input */}
-                        <input
-                          type="number"
-                          name="shiftCapacity"
-                          value={newMachineFormData.shiftCapacity ?? ""}
-                          onChange={handleNewMachineInputChange}
-                          className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.shiftCapacity ? "border-red-400" : "border-gray-300"}`}
-                          placeholder="Shift Capacity"
-                          min="0"
-                          step="1"
-                        />
-                        {errors.shiftCapacity && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.shiftCapacity}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                        {/* Actions: Save/Cancel */}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleSaveNewMachine}
-                            className="px-3 py-1 bg-green-400 text-white rounded-md hover:bg-green-500 transition-colors"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={handleCancelNewMachine}
-                            className="px-3 py-1 bg-gray-400 text-gray-800 rounded-md hover:bg-gray-500 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  {filteredMachines.map((machine) => {
-                    const capabilityKeys = getCapabilityColumns(machine);
-                    const processConfig = machine.process_type_key
-                      ? getProcessTypeConfig(machine.process_type_key)
-                      : null;
-
-                    const isEditing = editingMachineId === machine.id;
-
-                    return (
-                      <tr key={machine.id} className="relative group">
-                        {isEditing && editedMachineFormData ? (
-                          <>
-                            <td className="pl-16 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-row gap-1 p-0">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSaveEditedMachine();
-                                  }}
-                                  className="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
-                                  title="Save"
-                                >
-                                  <FaSave size="0.75em" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCancelEdit();
-                                  }}
-                                  className="p-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
-                                  title="Cancel Edit"
-                                >
-                                  <FaTimes size="0.75em" />
-                                </button>
-                              </div>
-                              {/* Facility Input */}
-                              <select
-                                name="facilities_id"
-                                value={
-                                  editedMachineFormData.facilities_id ?? ""
-                                }
-                                onChange={(e) =>
-                                  handleEditedMachineInputChange(e, machine.id)
-                                }
-                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.facilities_id ? "border-red-400" : "border-gray-300"}`}
-                              >
-                                <option value="">Select Facility</option>
-                                <option value="1">Bolingbrook</option>
-                                <option value="2">Lemont</option>
-                              </select>
-                              {errors.facilities_id && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.facilities_id}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {/* Line Input */}
-                              <input
-                                type="number"
-                                name="line"
-                                value={editedMachineFormData.line ?? ""}
-                                onChange={(e) =>
-                                  handleEditedMachineInputChange(e, machine.id)
-                                }
-                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.line ? "border-red-400" : "border-gray-300"}`}
-                                placeholder="Line #"
-                              />
-                              {errors.line && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.line}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {/* Type Input */}
-                              <input
-                                type="text"
-                                name="type"
-                                value={editedMachineFormData.type ?? ""}
-                                onChange={(e) =>
-                                  handleEditedMachineInputChange(e, machine.id)
-                                }
-                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.type ? "border-red-400" : "border-gray-300"}`}
-                                placeholder="Type"
-                              />
-                              {errors.type && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.type}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-[var(--text-dark)] w-[10%]">
-                              {/* Process Type - DynamicMachineCapabilityFields will handle this */}
-                              <DynamicMachineCapabilityFields
-                                processTypeKey={
-                                  editedMachineFormData.process_type_key ?? ""
-                                }
-                                capabilities={
-                                  editedMachineFormData.capabilities ?? {}
-                                }
-                                onChange={(field, value) =>
-                                  handleEditedMachineCapabilityChange(
-                                    field,
-                                    value,
-                                    machine.id,
-                                  )
-                                }
-                                onProcessTypeChange={(processTypeKey) =>
-                                  handleEditedMachineProcessTypeChange(
-                                    processTypeKey,
-                                    machine.id,
-                                  )
-                                }
-                                errors={errors}
-                                minimalMode={true}
-                              />
-                              {errors.process_type_key && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.process_type_key}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {/* Status Select */}
-                              <select
-                                name="status"
-                                value={
-                                  editedMachineFormData.status ?? "available"
-                                }
-                                onChange={(e) =>
-                                  handleEditedMachineInputChange(e, machine.id)
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
-                              >
-                                <option value="available">Available</option>
-                                <option value="running">Running</option>
-                                <option value="maintenance">Maintenance</option>
-                              </select>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              N/A
-                            </td>
-                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              N/A
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {/* Speed/hr Input */}
-                              <input
-                                type="number"
-                                name="speed_hr"
-                                value={editedMachineFormData.speed_hr ?? ""}
-                                onChange={(e) =>
-                                  handleEditedMachineInputChange(e, machine.id)
-                                }
-                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.speed_hr ? "border-red-400" : "border-gray-300"}`}
-                                placeholder="Speed/hr"
-                                min="0"
-                                step="1"
-                              />
-                              {errors.speed_hr && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.speed_hr}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {/* Shift Capacity Input */}
-                              <input
-                                type="number"
-                                name="shiftCapacity"
-                                value={
-                                  editedMachineFormData.shiftCapacity ?? ""
-                                }
-                                onChange={(e) =>
-                                  handleEditedMachineInputChange(e, machine.id)
-                                }
-                                className={`w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-1 ${errors.shiftCapacity ? "border-red-400" : "border-gray-300"}`}
-                                placeholder="Shift Capacity"
-                                min="0"
-                                step="1"
-                              />
-                              {errors.shiftCapacity && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.shiftCapacity}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              {/* Actions: Delete */}
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(machine.id);
-                                  }}
-                                  className="p-2 bg-red-500 text-white rounded-md hover:bg-red-500 transition-colors"
-                                  title="Delete"
-                                >
-                                  <FaTrash size="0.75em" />
-                                </button>
-                              </div>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="pl-16 pr-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-row gap-1 p-0">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation(); // Prevent row click from being triggered
-                                    handleEditClick(machine);
-                                  }}
-                                  className="p-2 bg-orange-100 text-white rounded-md hover:bg-orange-500 transition-colors"
-                                  title="Edit"
-                                >
-                                  <FaPen size="0.75em" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(machine.id);
-                                  }}
-                                  className="p-2 bg-red-100 text-white rounded-md hover:bg-red-600 transition-colors"
-                                  title="Delete"
-                                >
-                                  <FaTrash size="0.75em" />
-                                </button>
-                              </div>
-                              {machine.facilities_id === 1
-                                ? "Bolingbrook"
-                                : machine.facilities_id === 2
-                                  ? "Lemont"
-                                  : "N/A"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-dark)]">
-                              Line {machine.line}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {machine.type}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)] w-[10%]">
-                              {processConfig ? processConfig.label : "N/A"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}
-                              >
-                                {statusLabels[machine.status]}
-                              </span>
-                            </td>
-                            {capabilityKeys.map((key, idx) => {
-                              const field = processConfig?.fields.find(
-                                (f) => f.name === key,
-                              );
-                              const capKey =
-                                field?.type === "dropdown"
-                                  ? `supported_${key}s`
-                                  : field?.type === "number"
-                                    ? `max_${key}`
-                                    : key;
-                              return (
-                                <td
-                                  key={idx}
-                                  className="px-6 py-4 text-sm text-[var(--text-dark)]"
-                                >
-                                  {renderCapabilityValue(machine, capKey)}
-                                </td>
-                              );
-                            })}
-                            {capabilityKeys.length < 2 && (
-                              <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                                N/A
-                              </td>
-                            )}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {machine.speed_hr !== undefined && machine.speed_hr !== null
-                                ? `${machine.speed_hr}/hr`
-                                : "N/A"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {machine.shiftCapacity !== undefined && machine.shiftCapacity !== null
-                                ? machine.shiftCapacity.toLocaleString()
-                                : "N/A"}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-[var(--text-dark)]">
-                              {machine.currentJob ? (
-                                <span>
-                                  Job #{machine.currentJob.number} -{" "}
-                                  {machine.currentJob.name}
-                                </span>
-                              ) : machine.status === "available" ||
-                                machine.status === "avalible" ? (
-                                <span className="text-[var(--success)]">
-                                  Ready for next job
-                                </span>
-                              ) : (
-                                <span className="text-[var(--text-light)]">
-                                  No active job
-                                </span>
-                              )}
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
-              {filteredMachines.map((machine) => {
-                const processConfig = machine.process_type_key
-                  ? getProcessTypeConfig(machine.process_type_key)
-                  : null;
-
-                return (
-                  <div
-                    key={machine.id}
-                    className="bg-white rounded-lg shadow-sm border border-[var(--border)] p-4 cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleMachineClick(machine)}
-                  >
-                    {/* Machine Header */}
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="text-base font-semibold text-[var(--text-dark)]">
-                          Line {machine.line}
-                        </div>
-                        <div className="text-sm text-[var(--text-light)] mt-1">
-                          {machine.type}{" "}
-                          {processConfig ? `(${processConfig.label})` : ""}
-                        </div>
-                      </div>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[machine.status]}`}
-                      >
-                        {statusLabels[machine.status]}
-                      </span>
-                    </div>
-
-                    {/* Machine Details Grid */}
-                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                      <div>
-                        <div className="text-xs text-[var(--text-light)]">
-                          Facility
-                        </div>
-                        <div className="font-medium text-[var(--text-dark)]">
-                          {machine.facilities_id === 1
-                            ? "Bolingbrook"
-                            : machine.facilities_id === 2
-                              ? "Lemont"
-                              : "N/A"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-[var(--text-light)]">
-                          Speed/hr
-                        </div>
-                        <div className="font-medium text-[var(--text-dark)]">
-                          {machine.speed_hr !== undefined && machine.speed_hr !== null
-                            ? `${machine.speed_hr}/hr`
-                            : "N/A"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-[var(--text-light)]">
-                          Shift Capacity
-                        </div>
-                        <div className="font-medium text-[var(--text-dark)]">
-                          {machine.shiftCapacity !== undefined && machine.shiftCapacity !== null
-                            ? machine.shiftCapacity.toLocaleString()
-                            : "N/A"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Current Job */}
-                    <div className="border-t border-[var(--border)] pt-3">
-                      <div className="text-xs text-[var(--text-light)] mb-1">
-                        Current Job
-                      </div>
-                      <div className="text-sm text-[var(--text-dark)]">
-                        {machine.currentJob ? (
-                          <span>
-                            Job #{machine.currentJob.number} -{" "}
-                            {machine.currentJob.name}
-                          </span>
-                        ) : machine.status === "available" ||
-                          machine.status === "avalible" ? (
-                          <span className="text-[var(--success)]">
-                            Ready for next job
-                          </span>
-                        ) : (
-                          <span className="text-[var(--text-light)]">
-                            No active job
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
       </main>
 
       <AddJobModal

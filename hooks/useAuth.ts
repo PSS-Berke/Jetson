@@ -7,24 +7,7 @@ import {
   logout as apiLogout,
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
-
-interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-interface SignupData {
-  email: string;
-  password: string;
-  admin: boolean;
-}
-
-interface User {
-  id: number;
-  email: string;
-  admin: boolean;
-  [key: string]: any;
-}
+import { User, LoginCredentials, SignupData } from "@/types";
 
 interface UseAuthReturn {
   login: (credentials: LoginCredentials) => Promise<User>;

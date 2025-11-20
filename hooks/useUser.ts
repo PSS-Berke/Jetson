@@ -3,13 +3,7 @@
 import { useState, useEffect } from "react";
 import { getMe, getToken } from "@/lib/api";
 import { useRouter } from "next/navigation";
-
-interface User {
-  id: number;
-  email: string;
-  admin: boolean;
-  [key: string]: any;
-}
+import { User } from "@/types";
 
 interface UseUserReturn {
   user: User | null;

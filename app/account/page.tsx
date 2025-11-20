@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "../components/PageHeader";
 import { useRouter } from "next/navigation";
 import { updateNotesColor } from "@/lib/api";
+import { isAdmin } from "@/types";
 
 export default function AccountPage() {
   const { user, isLoading, refetch } = useUser();
@@ -215,9 +216,9 @@ export default function AccountPage() {
                 </label>
                 <div className="flex items-center gap-3">
                   <div className="px-4 py-3 bg-gray-50 border border-[var(--border)] rounded-lg text-[var(--text-dark)]">
-                    {user?.admin ? "Administrator" : "Standard User"}
+                    {isAdmin(user) ? "Administrator" : "Standard User"}
                   </div>
-                  {user?.admin && (
+                  {isAdmin(user) && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">
                       <svg
                         className="w-4 h-4"

@@ -159,10 +159,21 @@ export interface Client {
 export interface User {
   id: number;
   email: string;
-  admin: boolean;
+  name?: string;
+  role?: string; // "admin" or other roles
+  admin?: boolean; // Legacy field, prefer using role === "admin"
   notes_color?: string;
   [key: string]: string | number | boolean | undefined;
 }
+
+/**
+ * Check if a user is an administrator
+ * Handles both the new role-based system (role === "admin") and legacy admin boolean
+ */
+export const isAdmin = (user: User | null | undefined): boolean => {
+  if (!user) return false;
+  return user.role === "admin" || user.admin === true || user.admin === "true";
+};
 
 export interface LoginCredentials {
   email: string;

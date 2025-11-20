@@ -4,11 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-
-interface User {
-  email: string;
-  admin: boolean;
-}
+import { User, isAdmin } from "@/types";
 
 interface PageHeaderProps {
   currentPage?: "machines" | "production" | "projections";
@@ -119,14 +115,6 @@ export default function PageHeader({
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3 lg:gap-4">
-            {user?.admin && (
-              <button
-                onClick={() => router.push("/signup")}
-                className="px-3 lg:px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors"
-              >
-                Create User
-              </button>
-            )}
             {showAddJobButton && onAddJobClick && (
               <button
                 onClick={() => {
@@ -188,7 +176,7 @@ export default function PageHeader({
                     <div className="text-sm font-medium text-[var(--text-dark)] truncate">
                       {user?.email}
                     </div>
-                    {user?.admin && (
+                    {isAdmin(user) && (
                       <span className="inline-block mt-1 text-xs text-blue-600 font-semibold">
                         Admin
                       </span>
@@ -349,18 +337,6 @@ export default function PageHeader({
                   Add New Job
                 </button>
               )}
-              {user?.admin && (
-                <button
-                  onClick={() => {
-                    router.push("/signup");
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full px-4 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
-                >
-                  Create User
-                </button>
-              )}
-
               <div className="border-t border-[var(--border)] pt-2 mt-2">
                 <div className="px-4 py-2">
                   <div className="text-sm text-[var(--text-light)]">
@@ -369,7 +345,7 @@ export default function PageHeader({
                   <div className="text-sm font-medium text-[var(--text-dark)] truncate">
                     {user?.email}
                   </div>
-                  {user?.admin && (
+                  {isAdmin(user) && (
                     <span className="inline-block mt-1 text-xs text-blue-600 font-semibold">
                       Admin
                     </span>
