@@ -2,6 +2,7 @@ import Cookies from "js-cookie";
 import type {
   Machine,
   MachineStatus,
+  MachineCapabilityValue,
   Job,
   User,
   LoginCredentials,
@@ -471,7 +472,10 @@ export const createMachine = async (
   console.log("[createMachine] Capabilities object:", machineData.capabilities);
 
   // Extract paper_size and pockets from capabilities if they exist
-  const capabilities = machineData.capabilities || {};
+  const capabilities: Record<string, MachineCapabilityValue> = 
+    (machineData.capabilities && typeof machineData.capabilities === 'object' && !Array.isArray(machineData.capabilities))
+      ? machineData.capabilities as Record<string, MachineCapabilityValue>
+      : {};
   const paper_size = capabilities.paper_size 
     ? String(capabilities.paper_size) 
     : capabilities.supported_paper_sizes 
@@ -506,7 +510,7 @@ export const createMachine = async (
   if (!type && (machineData as any).name) {
     // Use name as type, or derive from process_type_key
     const processTypeKey = machineData.process_type_key || "";
-    if (processTypeKey) {
+    if (processTypeKey && typeof processTypeKey === 'string') {
       // Map process_type_key to a display name
       const typeMap: { [key: string]: string } = {
         insert: "Inserter",
