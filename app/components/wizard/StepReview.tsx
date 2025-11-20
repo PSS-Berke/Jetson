@@ -192,12 +192,12 @@ export function EditMachineReviewStep({
               <div className="space-y-2">
                 {customProcessTypeFields.map((field, index) => (
                   <div
-                    key={`${field.fieldName}-${index}`}
+                    key={`${field.id}-${index}`}
                     className="p-3 rounded-md bg-purple-50 border border-purple-100 text-sm text-purple-900"
                   >
-                    <span className="font-medium">{field.fieldLabel || field.fieldName}</span>
+                    <span className="font-medium">{field.label}</span>
                     <span className="text-xs text-purple-700 ml-2">
-                      {field.fieldType || "text"}
+                      {field.type || "text"}
                     </span>
                   </div>
                 ))}
