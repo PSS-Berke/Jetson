@@ -31,6 +31,7 @@ export interface Machine {
   id: number;
   created_at: number;
   line: number;
+  name?: string; // Machine name/identifier
   type: string; // Display name (e.g., "Inserter", "Folder")
   process_type_key?: string; // Maps to processTypeConfig keys (insert, fold, laser, etc.)
   facilities_id?: number;
@@ -51,6 +52,7 @@ export interface Machine {
   // Performance metrics
   speed_hr: number; // Speed per hour (can be 0 if determined by rules)
   shiftCapacity?: number; // Capacity per shift
+  people_per_process?: number; // Number of people required for this machine
 
   // Legacy fields - kept for backward compatibility
   max_size?: string; // Deprecated - use capabilities.supported_paper_sizes
