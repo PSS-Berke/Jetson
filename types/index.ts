@@ -172,7 +172,7 @@ export interface User {
  */
 export const isAdmin = (user: User | null | undefined): boolean => {
   if (!user) return false;
-  return user.role === "admin" || user.admin === true || user.admin === "true";
+  return user.role === "admin" || user.admin === true;
 };
 
 export interface LoginCredentials {
