@@ -576,48 +576,6 @@ export default function MachineTypePage() {
               showAll={true}
             />
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setIsAddMachineModalOpen(true)}
-              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4v16m8-8H4"
-                ></path>
-              </svg>
-              <span className="hidden lg:inline">Add Machine</span>
-              <span className="lg:hidden">Machine</span>
-            </button>
-            <button
-              onClick={() => setIsFormBuilderOpen(true)}
-              className="px-3 lg:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200 flex items-center gap-2 cursor-pointer relative z-10"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4v16m8-8H4"
-                ></path>
-              </svg>
-              <span className="hidden lg:inline">Build Form</span>
-              <span className="lg:hidden">Form</span>
-            </button>
-          </div>
         </div>
 
         {/* Status Filters */}
@@ -1194,12 +1152,12 @@ export default function MachineTypePage() {
                               </td>
                             )}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {machine.speed_hr
+                              {machine.speed_hr !== undefined && machine.speed_hr !== null
                                 ? `${machine.speed_hr}/hr`
                                 : "N/A"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-dark)]">
-                              {machine.shiftCapacity
+                              {machine.shiftCapacity !== undefined && machine.shiftCapacity !== null
                                 ? machine.shiftCapacity.toLocaleString()
                                 : "N/A"}
                             </td>
@@ -1279,7 +1237,9 @@ export default function MachineTypePage() {
                           Speed/hr
                         </div>
                         <div className="font-medium text-[var(--text-dark)]">
-                          {machine.speed_hr ? `${machine.speed_hr}/hr` : "N/A"}
+                          {machine.speed_hr !== undefined && machine.speed_hr !== null
+                            ? `${machine.speed_hr}/hr`
+                            : "N/A"}
                         </div>
                       </div>
                       <div>
@@ -1287,7 +1247,7 @@ export default function MachineTypePage() {
                           Shift Capacity
                         </div>
                         <div className="font-medium text-[var(--text-dark)]">
-                          {machine.shiftCapacity
+                          {machine.shiftCapacity !== undefined && machine.shiftCapacity !== null
                             ? machine.shiftCapacity.toLocaleString()
                             : "N/A"}
                         </div>

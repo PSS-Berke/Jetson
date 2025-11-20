@@ -103,6 +103,23 @@ export default function CreateMachineWizard({
     setIsSubmitting(true);
 
     try {
+      // Build combined capabilities object from step 3
+      // This includes both custom process type fields and form builder fields
+      const combinedCapabilities: Record<string, any> = {
+        ...state.capabilities, // Custom process type field values
+      };
+
+      // Add form builder field values to capabilities
+      if (state.formBuilderFields && state.formBuilderFields.length > 0) {
+        state.formBuilderFields.forEach((field) => {
+          if (field.fieldValue !== undefined && field.fieldValue !== null && field.fieldValue !== "") {
+            combinedCapabilities[field.fieldName] = field.fieldValue;
+          }
+        });
+      }
+
+      console.log("[CreateMachineWizard] Combined capabilities from step 3:", JSON.stringify(combinedCapabilities, null, 2));
+
       // Step 1: Create machine group if needed
       let machineGroupId: number | undefined;
 
@@ -120,13 +137,14 @@ export default function CreateMachineWizard({
         const machineData = {
           line: parseInt(state.line),
           name: state.machineName,
+          designation: state.machineDesignation,
           facilities_id: state.facilities_id!,
           process_type_key: state.isCustomProcessType
             ? state.customProcessTypeName
             : state.process_type_key,
           machine_category: state.machineCategory as MachineCategory,
           machine_group_id: machineGroupId,
-          capabilities: state.capabilities,
+          capabilities: combinedCapabilities,
           status: "Offline" as MachineStatus,
           // Placeholder values - will be determined by rules
           speed_hr: 0,
@@ -147,13 +165,14 @@ export default function CreateMachineWizard({
           const machineData = {
             line: lineNumber,
             name: `${state.machineName} ${designation}`,
+            designation: designation,
             facilities_id: state.facilities_id!,
             process_type_key: state.isCustomProcessType
               ? state.customProcessTypeName
               : state.process_type_key,
             machine_category: state.machineCategory as MachineCategory,
             machine_group_id: machineGroupId,
-            capabilities: state.capabilities,
+            capabilities: combinedCapabilities,
             status: "Offline" as MachineStatus,
             // Placeholder values - will be determined by rules
             speed_hr: 0,

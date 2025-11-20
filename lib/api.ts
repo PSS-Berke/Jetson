@@ -1,6 +1,7 @@
 import Cookies from "js-cookie";
 import type {
   Machine,
+  MachineStatus,
   Job,
   User,
   LoginCredentials,
@@ -366,18 +367,73 @@ export const getMachines = async (
   });
 
   // Transform API response to match Machine interface
-  return data.map((machine) => ({
-    ...machine,
-    line: machine.name ? parseInt(machine.name) : machine.line || 0,
-    capabilities: machine.details || machine.capabilities || {},
-    speed_hr: machine.speed_hr ? parseFloat(machine.speed_hr) : undefined,
-    shiftCapacity: machine.shiftCapacity
-      ? parseFloat(machine.shiftCapacity)
-      : undefined,
-    // Infer process_type_key from machine type if not provided
-    process_type_key:
-      machine.process_type_key || inferProcessTypeKey(machine.type),
-  }));
+  return data.map((machine) => {
+    // Normalize status (convert "Offline" to "offline", etc.)
+    const normalizeStatus = (status: string): MachineStatus => {
+      const normalized = status.toLowerCase().trim();
+      if (normalized === "offline") {
+        return "available"; // Map offline to available for now
+      }
+      if (
+        normalized === "running" ||
+        normalized === "available" ||
+        normalized === "avalible" ||
+        normalized === "maintenance"
+      ) {
+        return normalized as MachineStatus;
+      }
+      return "available"; // Default fallback
+    };
+
+    // Parse line - handle both string and number
+    const parseLine = (line: string | number | undefined): number => {
+      if (typeof line === "number") return line;
+      if (typeof line === "string") {
+        const parsed = parseInt(line, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    };
+
+    // Parse speed_hr - handle string numbers
+    const parseSpeedHr = (speed: string | number | undefined): number => {
+      if (typeof speed === "number") return speed;
+      if (typeof speed === "string") {
+        const parsed = parseFloat(speed);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    };
+
+    // Parse shift_capacity - handle both snake_case and camelCase
+    const parseShiftCapacity = (
+      capacity: string | number | undefined,
+    ): number | undefined => {
+      if (capacity === undefined || capacity === null || capacity === "") {
+        return undefined;
+      }
+      if (typeof capacity === "number") return capacity;
+      if (typeof capacity === "string") {
+        const parsed = parseFloat(capacity);
+        return isNaN(parsed) ? undefined : parsed;
+      }
+      return undefined;
+    };
+
+    return {
+      ...machine,
+      line: parseLine(machine.line),
+      capabilities: machine.capabilities || {},
+      speed_hr: parseSpeedHr(machine.speed_hr),
+      shiftCapacity:
+        parseShiftCapacity(machine.shift_capacity) ||
+        parseShiftCapacity(machine.shiftCapacity),
+      status: normalizeStatus(machine.status || "available"),
+      // Infer process_type_key from machine type if not provided
+      process_type_key:
+        machine.process_type_key || inferProcessTypeKey(machine.type),
+    };
+  });
 };
 
 // Helper function to infer process_type_key from machine type
@@ -410,6 +466,58 @@ export const createMachine = async (
   console.log("[createMachine] Creating machine:", machineData);
   console.log("[createMachine] Capabilities object:", machineData.capabilities);
 
+  // Extract paper_size and pockets from capabilities if they exist
+  const capabilities = machineData.capabilities || {};
+  const paper_size = capabilities.paper_size 
+    ? String(capabilities.paper_size) 
+    : capabilities.supported_paper_sizes 
+      ? (Array.isArray(capabilities.supported_paper_sizes) 
+          ? capabilities.supported_paper_sizes[0] 
+          : String(capabilities.supported_paper_sizes))
+      : "";
+  const pockets = capabilities.pockets 
+    ? Number(capabilities.pockets) 
+    : capabilities.max_pockets 
+      ? Number(capabilities.max_pockets) 
+      : 0;
+
+  // Get designation - prefer explicit designation, otherwise try to extract from name
+  let designation = "";
+  if ((machineData as any).designation) {
+    designation = String((machineData as any).designation);
+  } else if ((machineData as any).name) {
+    // Try to extract designation from name (e.g., "Machine Name fm1" -> "fm1")
+    const nameParts = String((machineData as any).name).split(" ");
+    if (nameParts.length > 1) {
+      const lastPart = nameParts[nameParts.length - 1];
+      // Check if last part looks like a designation (alphanumeric, typically short)
+      if (/^[a-zA-Z0-9]+$/.test(lastPart) && lastPart.length <= 10) {
+        designation = lastPart;
+      }
+    }
+  }
+
+  // Determine type field - use provided type, or derive from name/process_type_key
+  let type = machineData.type || "";
+  if (!type && (machineData as any).name) {
+    // Use name as type, or derive from process_type_key
+    const processTypeKey = machineData.process_type_key || "";
+    if (processTypeKey) {
+      // Map process_type_key to a display name
+      const typeMap: { [key: string]: string } = {
+        insert: "Inserter",
+        fold: "Folder",
+        laser: "HP Press",
+        inkjet: "Inkjetter",
+        affix: "Affixer",
+        sort: "Sorter",
+      };
+      type = typeMap[processTypeKey.toLowerCase()] || String((machineData as any).name);
+    } else {
+      type = String((machineData as any).name);
+    }
+  }
+
   // Transform frontend data to API format that Xano expects
   // Based on Xano's expected format:
   // - quantity should be 1 (For Loop will execute once to create one machine)
@@ -419,21 +527,21 @@ export const createMachine = async (
   const apiData: Record<string, any> = {
     quantity: 1, // For Loop executes this many times - we want to create 1 machine
     line: machineData.line?.toString() || "",
-    type: machineData.type || "",
+    type: type,
     speed_hr: machineData.speed_hr?.toString() || "0",
     status: machineData.status || "available",
     facilities_id: machineData.facilities_id || 0,
-    paper_size: "",
+    paper_size: paper_size,
     shift_capacity: machineData.shiftCapacity?.toString() || "",
     jobs_id: 0,
-    pockets: 0,
-    details: machineData.capabilities || {},
+    pockets: pockets,
+    name: (machineData as any).name || "",
+    capabilities: capabilities,
+    machine_category: (machineData as any).machine_category || "",
+    process_type_key: machineData.process_type_key || "",
+    people_per_process: (machineData as any).people_per_process || 0,
+    designation: designation,
   };
-
-  // Add process_type_key if provided
-  if (machineData.process_type_key) {
-    apiData.process_type_key = machineData.process_type_key;
-  }
 
   console.log(
     "[createMachine] Request body:",
