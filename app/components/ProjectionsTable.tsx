@@ -42,6 +42,8 @@ interface ProjectionsTableProps {
   dataDisplayMode?: "pieces" | "revenue";
   viewMode?: "jobs" | "processes";
   processViewMode?: "consolidated" | "expanded";
+  showNotes?: boolean;
+  onShowNotesChange?: (show: boolean) => void;
 }
 
 // Memoized desktop table row component
@@ -63,6 +65,7 @@ const ProjectionTableRow = memo(
     onSaveEdit,
     onTextChange,
     isSavingNote,
+    onOpenNotesModal,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -80,6 +83,7 @@ const ProjectionTableRow = memo(
     onSaveEdit?: (noteId: number) => void;
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
+    onOpenNotesModal?: (jobId: number) => void;
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
@@ -153,7 +157,10 @@ const ProjectionTableRow = memo(
         <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
           {job.quantity.toLocaleString()}
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {job.start_date
             ? new Date(job.start_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -162,7 +169,10 @@ const ProjectionTableRow = memo(
               })
             : "N/A"}
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {job.due_date
             ? new Date(job.due_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -187,9 +197,13 @@ const ProjectionTableRow = memo(
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
                 index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
               }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenNotesModal?.(job.id);
+              }}
             >
               {displayValue}
             </td>
@@ -365,6 +379,7 @@ const ProcessProjectionTableRow = memo(
     onSaveEdit,
     onTextChange,
     isSavingNote,
+    onOpenNotesModal,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -383,6 +398,7 @@ const ProcessProjectionTableRow = memo(
     onSaveEdit?: (noteId: number) => void;
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
+    onOpenNotesModal?: (jobId: number) => void;
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
@@ -457,7 +473,10 @@ const ProcessProjectionTableRow = memo(
         </td>
 
         {/* Dates - only on first row */}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {isFirstInGroup && job.start_date
             ? new Date(job.start_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -466,7 +485,10 @@ const ProcessProjectionTableRow = memo(
               })
             : ""}
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]">
+        <td
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+          onClick={(e) => e.stopPropagation()}
+        >
           {isFirstInGroup && job.due_date
             ? new Date(job.due_date).toLocaleDateString("en-US", {
                 month: "numeric",
@@ -495,9 +517,13 @@ const ProcessProjectionTableRow = memo(
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] ${
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
                 index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
               }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenNotesModal?.(job.id);
+              }}
             >
               {displayValue}
             </td>
@@ -1048,6 +1074,8 @@ export default function ProjectionsTable({
   dataDisplayMode = "pieces",
   viewMode = "jobs",
   processViewMode = "consolidated",
+  showNotes: showNotesProp = false,
+  onShowNotesChange,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -1074,9 +1102,10 @@ export default function ProjectionsTable({
 
   // Notes modal state
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [isSingleJobNoteModal, setIsSingleJobNoteModal] = useState(false);
 
-  // View notes toggle state
-  const [showNotes, setShowNotes] = useState(false);
+  // View notes toggle state (use prop or default to false)
+  const showNotes = showNotesProp;
   const [jobNotesMap, setJobNotesMap] = useState<Map<number, JobNote[]>>(new Map());
   const [isLoadingNotes, setIsLoadingNotes] = useState(false);
 
@@ -1094,6 +1123,52 @@ export default function ProjectionsTable({
   }, [viewMode, processViewMode, jobProjections]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
+
+  // Load job notes when toggle is enabled
+  const loadJobNotes = async () => {
+    setIsLoadingNotes(true);
+    try {
+      const allNotes = await getJobNotes();
+      // Create a map of job ID to notes array
+      const notesMap = new Map<number, JobNote[]>();
+
+      // Filter out invalid notes (must have notes text and jobs_id array)
+      const validNotes = allNotes.filter((note) =>
+        note &&
+        note.notes &&
+        typeof note.notes === 'string' &&
+        note.notes.trim().length > 0 &&
+        Array.isArray(note.jobs_id) &&
+        note.jobs_id.length > 0
+      );
+
+      validNotes.forEach((note) => {
+        note.jobs_id.forEach((jobId) => {
+          if (!notesMap.has(jobId)) {
+            notesMap.set(jobId, []);
+          }
+          notesMap.get(jobId)!.push(note);
+        });
+      });
+
+      setJobNotesMap(notesMap);
+    } catch (error) {
+      console.error("Failed to load job notes:", error);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  // Load notes when showNotes becomes true
+  useEffect(() => {
+    if (showNotes) {
+      loadJobNotes();
+    } else {
+      // Cancel any ongoing edits when hiding notes
+      setEditingNoteId(null);
+      setEditingText("");
+    }
+  }, [showNotes]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -1151,11 +1226,23 @@ export default function ProjectionsTable({
 
   const handleBulkAddNotes = () => {
     setShowBulkMenu(false);
+    setIsSingleJobNoteModal(false);
+    setShowNotesModal(true);
+  };
+
+  const handleOpenNotesModal = (jobId: number) => {
+    setSelectedJobIds(new Set([jobId]));
+    setIsSingleJobNoteModal(true);
     setShowNotesModal(true);
   };
 
   const handleNotesModalClose = () => {
     setShowNotesModal(false);
+    // Clear selection only when closing a single-job notes modal (opened via projected numbers click)
+    if (isSingleJobNoteModal) {
+      setSelectedJobIds(new Set());
+      setIsSingleJobNoteModal(false);
+    }
   };
 
   const handleNotesSuccess = () => {
@@ -1167,45 +1254,10 @@ export default function ProjectionsTable({
     }
   };
 
-  // Load job notes when toggle is enabled
-  const loadJobNotes = async () => {
-    setIsLoadingNotes(true);
-    try {
-      const allNotes = await getJobNotes();
-      // Create a map of job ID to notes array
-      const notesMap = new Map<number, JobNote[]>();
-      
-      // Filter out invalid notes (must have notes text and jobs_id array)
-      const validNotes = allNotes.filter((note) => 
-        note && 
-        note.notes && 
-        typeof note.notes === 'string' &&
-        note.notes.trim().length > 0 &&
-        Array.isArray(note.jobs_id) && 
-        note.jobs_id.length > 0
-      );
-      
-      validNotes.forEach((note) => {
-        note.jobs_id.forEach((jobId) => {
-          if (!notesMap.has(jobId)) {
-            notesMap.set(jobId, []);
-          }
-          notesMap.get(jobId)!.push(note);
-        });
-      });
-      
-      setJobNotesMap(notesMap);
-    } catch (error) {
-      console.error("Failed to load job notes:", error);
-    } finally {
-      setIsLoadingNotes(false);
-    }
-  };
-
   // Toggle view notes
   const handleToggleViewNotes = () => {
     const newShowNotes = !showNotes;
-    setShowNotes(newShowNotes);
+    onShowNotesChange?.(newShowNotes);
     if (newShowNotes) {
       loadJobNotes();
     } else {
@@ -1472,12 +1524,12 @@ export default function ProjectionsTable({
           bValue = bJob.job.job_number;
           break;
         case "client":
-          aValue = aJob.job.client?.name.toLowerCase() || "";
-          bValue = bJob.job.client?.name.toLowerCase() || "";
+          aValue = aJob.job.client?.name?.toLowerCase() || "";
+          bValue = bJob.job.client?.name?.toLowerCase() || "";
           break;
         case "sub_client":
-          aValue = aJob.job.sub_client?.name.toLowerCase() || "";
-          bValue = bJob.job.sub_client?.name.toLowerCase() || "";
+          aValue = aJob.job.sub_client?.name?.toLowerCase() || "";
+          bValue = bJob.job.sub_client?.name?.toLowerCase() || "";
           break;
         case "description":
           aValue = aJob.job.description?.toLowerCase() || "";
@@ -1527,30 +1579,6 @@ export default function ProjectionsTable({
 
   return (
     <>
-      {/* View Notes Toggle */}
-      <div className="mb-4 flex items-center justify-end">
-        <button
-          onClick={handleToggleViewNotes}
-          className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
-            showNotes
-              ? "bg-[var(--primary-blue)] text-white hover:bg-[var(--dark-blue)]"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          {showNotes ? (
-            <>
-              <EyeOff className="w-4 h-4" />
-              Hide Notes
-            </>
-          ) : (
-            <>
-              <Eye className="w-4 h-4" />
-              View Notes
-            </>
-          )}
-        </button>
-      </div>
-
       {/* Bulk Actions Toolbar */}
       {selectedJobIds.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -1839,6 +1867,7 @@ export default function ProjectionsTable({
                       onSaveEdit={handleSaveEdit}
                       onTextChange={setEditingText}
                       isSavingNote={isSavingNote}
+                      onOpenNotesModal={handleOpenNotesModal}
                     />
                   );
                 },
@@ -1869,6 +1898,7 @@ export default function ProjectionsTable({
                     onSaveEdit={handleSaveEdit}
                     onTextChange={setEditingText}
                     isSavingNote={isSavingNote}
+                    onOpenNotesModal={handleOpenNotesModal}
                   />
                 );
               })

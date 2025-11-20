@@ -80,6 +80,7 @@ export interface ProjectionFilters {
   granularity?: Granularity;
   scheduleFilter?: "all" | "confirmed" | "soft";
   filterMode?: "and" | "or";
+  showOnlyInDateRange?: boolean;
 }
 
 // Helper function to count process types from job projections
@@ -246,8 +247,32 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       return [];
     }
 
+    // Filter jobs by date range if toggle is enabled
+    const filteredJobsByDate = filters.showOnlyInDateRange
+      ? jobs.filter((job) => {
+          if (!job.start_date || !job.due_date || timeRanges.length === 0) {
+            return false;
+          }
+
+          const rangeStart = timeRanges[0].startDate.getTime();
+          const rangeEnd = timeRanges[timeRanges.length - 1].endDate.getTime();
+
+          // Job overlaps with date range if:
+          // - It starts before the range ends AND
+          // - It ends after the range starts
+          return job.start_date <= rangeEnd && job.due_date >= rangeStart;
+        })
+      : jobs;
+
+    console.log(
+      `[useProjections] Date range filter: ${filters.showOnlyInDateRange ? "ON" : "OFF"}, Jobs before: ${jobs.length}, Jobs after: ${filteredJobsByDate.length}`,
+    );
+
     // Calculate projections for all jobs using generic function
-    const jobProjections = calculateGenericJobProjections(jobs, timeRanges);
+    const jobProjections = calculateGenericJobProjections(
+      filteredJobsByDate,
+      timeRanges,
+    );
 
     // Adjust projections based on actual production
     return jobProjections.map((projection) => {
@@ -300,7 +325,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         totalQuantity: adjustedTotal,
       };
     });
-  }, [jobs, timeRanges, actualQuantitiesByJob]);
+  }, [jobs, timeRanges, actualQuantitiesByJob, filters.showOnlyInDateRange]);
 
   // 4. Filtered projections - only recalculates when filters or adjustedJobProjections change
   const filteredProjections = useMemo<JobProjection[]>(() => {

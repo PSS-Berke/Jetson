@@ -150,6 +150,12 @@ export default function MachineTypePage() {
   } = useMachines(filterStatus, filterFacility || undefined);
   const { logout } = useAuth();
 
+  // Get configuration for this machine type
+  const config = machineTypeConfig[machineType];
+
+  // Filter machines by type - must be before useEffect that uses it
+  const filteredMachines = config ? machines.filter(config.filterFn) : [];
+
   // Fetch active rules for this machine type
   useEffect(() => {
     const loadRules = async () => {
@@ -173,7 +179,7 @@ export default function MachineTypePage() {
     };
 
     loadRules();
-  }, [machines]);
+  }, [machines, machineType]);
 
   const getNewMachineInitialState = (): Partial<Machine> => ({
     line: undefined,
@@ -249,8 +255,6 @@ export default function MachineTypePage() {
     );
   }
 
-  // Get configuration for this machine type
-  const config = machineTypeConfig[machineType];
   if (!config) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -258,9 +262,6 @@ export default function MachineTypePage() {
       </div>
     );
   }
-
-  // Filter machines by type
-  const filteredMachines = machines.filter(config.filterFn);
 
   const statusColors = {
     running: "bg-blue-100 text-blue-800 border-blue-200",

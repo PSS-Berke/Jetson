@@ -100,13 +100,17 @@ const apiFetch = async <T = unknown>(
     const isJobCostEndpoint = endpoint.includes("/job_cost_entry");
     const isMachineRulesEndpoint = endpoint.includes("/machine_rules");
     const isMachineGroupsEndpoint = endpoint.includes("/machine_groups");
+    const isVariableCombinationsEndpoint = endpoint.includes("/variable_combinations");
+    const isMachineVariablesEndpoint = endpoint.includes("/machine_variables");
 
     // Log error details for debugging (unless it's an expected endpoint error)
     if (
       !isProductionEndpoint &&
       !isJobCostEndpoint &&
       !isMachineRulesEndpoint &&
-      !isMachineGroupsEndpoint
+      !isMachineGroupsEndpoint &&
+      !isVariableCombinationsEndpoint &&
+      !isMachineVariablesEndpoint
     ) {
       console.error("[API Error]", {
         endpoint,
@@ -527,6 +531,7 @@ export const createMachine = async (
   const apiData: Record<string, any> = {
     quantity: 1, // For Loop executes this many times - we want to create 1 machine
     line: machineData.line?.toString() || "",
+    name: machineData.name || "",
     type: type,
     speed_hr: machineData.speed_hr?.toString() || "0",
     status: machineData.status || "available",
@@ -535,14 +540,26 @@ export const createMachine = async (
     shift_capacity: machineData.shiftCapacity?.toString() || "",
     jobs_id: 0,
     pockets: pockets,
-    name: (machineData as any).name || "",
+    details: machineData.capabilities || {},
     capabilities: capabilities,
-    machine_category: (machineData as any).machine_category || "",
-    process_type_key: machineData.process_type_key || "",
-    people_per_process: (machineData as any).people_per_process || 0,
+    people_per_process: machineData.people_per_process || 1,
     designation: designation,
   };
 
+  // Add machine_category if provided
+  if (machineData.machine_category) {
+    apiData.machine_category = machineData.machine_category;
+  }
+
+  // Add machine_group_id if provided
+  if (machineData.machine_group_id !== undefined && machineData.machine_group_id !== null) {
+    apiData.machine_group_id = machineData.machine_group_id;
+  }
+
+  // Add process_type_key if provided
+  if (machineData.process_type_key) {
+    apiData.process_type_key = machineData.process_type_key;
+  }
   console.log(
     "[createMachine] Request body:",
     JSON.stringify(apiData, null, 2),
@@ -1454,17 +1471,24 @@ export const deleteMachineRule = async (ruleId: number): Promise<void> => {
  */
 export const getAllVariableCombinations = async (): Promise<any[]> => {
   console.log("[getAllVariableCombinations] Fetching all variable combinations groups");
-  
-  const result = await apiFetch<any[]>("/variable_combinations/groups", {
-    method: "GET",
-  });
-  
-  console.log(
-    "[getAllVariableCombinations] Received",
-    result.length,
-    "variable combinations groups",
-  );
-  return result;
+
+  try {
+    const result = await apiFetch<any[]>("/variable_combinations/groups", {
+      method: "GET",
+    });
+
+    console.log(
+      "[getAllVariableCombinations] Received",
+      result.length,
+      "variable combinations groups",
+    );
+    return result;
+  } catch (error) {
+    console.log(
+      "[getAllVariableCombinations] Endpoint not available or error occurred, returning empty array",
+    );
+    return [];
+  }
 };
 
 /**
@@ -1479,22 +1503,29 @@ export const getVariableCombinations = async (
     "[getVariableCombinations] Fetching variable combinations for machine_variables_id:",
     machineVariablesId,
   );
-  
-  const params = new URLSearchParams();
-  params.append("machine_variables_id", machineVariablesId.toString());
-  
-  const endpoint = `/variable_combinations?${params.toString()}`;
-  
-  const result = await apiFetch<any[]>(endpoint, {
-    method: "GET",
-  });
-  
-  console.log(
-    "[getVariableCombinations] Received",
-    result.length,
-    "variable combinations",
-  );
-  return result;
+
+  try {
+    const params = new URLSearchParams();
+    params.append("machine_variables_id", machineVariablesId.toString());
+
+    const endpoint = `/variable_combinations?${params.toString()}`;
+
+    const result = await apiFetch<any[]>(endpoint, {
+      method: "GET",
+    });
+
+    console.log(
+      "[getVariableCombinations] Received",
+      result.length,
+      "variable combinations",
+    );
+    return result;
+  } catch (error) {
+    console.log(
+      "[getVariableCombinations] Endpoint not available or error occurred, returning empty array",
+    );
+    return [];
+  }
 };
 
 /**
