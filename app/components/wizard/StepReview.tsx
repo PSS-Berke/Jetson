@@ -85,6 +85,7 @@ export function EditMachineReviewStep({
           id: key,
           label: key,
           value: formatValue(value),
+          helper: undefined as string | undefined,
         }));
 
   const processSummary = isCustomProcessType
@@ -217,7 +218,7 @@ export function EditMachineReviewStep({
                   <div key={entry.id} className="border border-gray-200 rounded-md p-3">
                     <p className="text-xs uppercase text-gray-500">{entry.label}</p>
                     <p className="text-sm font-semibold text-gray-900">{entry.value}</p>
-                    {"helper" in entry && entry.helper && (
+                    {entry.helper && (
                       <p className="text-xs text-gray-500">Type: {entry.helper}</p>
                     )}
                   </div>
