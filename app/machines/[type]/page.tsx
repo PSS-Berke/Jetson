@@ -684,6 +684,7 @@ export default function MachineTypePage() {
                   capabilities: machine.capabilities || {},
                   process_type_key: machine.process_type_key || '',
                   designation: machine.designation || '',
+                  speed_hr: machine.speed_hr ?? 0,
                 };
 
                 return (
