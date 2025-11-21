@@ -81,6 +81,7 @@ export default function StepCapabilities({
     fieldValue: "",
     options: "",
     required: false,
+    addToJobInput: false,
   });
   const editFormRef = useRef<HTMLDivElement>(null);
   // Store available fields from saved process type (for selection)
@@ -178,6 +179,7 @@ export default function StepCapabilities({
                 fieldValue: v.variable_value || "",
                 options: v.options,
                 required: v.required || false,
+                addToJobInput: v.addToJobInput || false,
               }),
             );
           } else {
@@ -195,6 +197,7 @@ export default function StepCapabilities({
                     typeof val === "object" ? val.value || "" : String(val),
                   options: val.options,
                   required: val.required || false,
+                  addToJobInput: val.addToJobInput || false,
                 };
               },
             );
@@ -236,6 +239,7 @@ export default function StepCapabilities({
                     fieldValue: v.variable_value || "",
                     options: v.options,
                     required: v.required || false,
+                    addToJobInput: v.addToJobInput || false,
                   }),
                 );
               } else {
@@ -253,6 +257,7 @@ export default function StepCapabilities({
                         typeof val === "object" ? val.value || "" : String(val),
                       options: val.options,
                       required: val.required || false,
+                      addToJobInput: val.addToJobInput || false,
                     };
                   },
                 );
@@ -350,6 +355,7 @@ export default function StepCapabilities({
               .filter((opt) => opt)
           : undefined,
       required: fieldFormData.required,
+      addToJobInput: fieldFormData.addToJobInput,
     };
 
     if (editingFieldIndex !== null) {
@@ -371,6 +377,7 @@ export default function StepCapabilities({
       fieldValue: "",
       options: "",
       required: false,
+      addToJobInput: false,
     });
   };
 
@@ -383,6 +390,7 @@ export default function StepCapabilities({
       fieldValue: String(field.fieldValue || ""),
       options: field.options?.join(", ") || "",
       required: field.required || false,
+      addToJobInput: (field as any).addToJobInput || false,
     });
     setEditingFieldIndex(index);
   };
@@ -441,6 +449,7 @@ export default function StepCapabilities({
           value: field.fieldValue,
           options: field.options,
           required: field.required,
+          addToJobInput: (field as any).addToJobInput,
         };
       });
 
@@ -833,6 +842,27 @@ export default function StepCapabilities({
                     </label>
                   </div>
 
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="addToJobInput"
+                      checked={fieldFormData.addToJobInput}
+                      onChange={(e) =>
+                        setFieldFormData({
+                          ...fieldFormData,
+                          addToJobInput: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="addToJobInput"
+                      className="ml-2 text-sm text-gray-700"
+                    >
+                      Add to job input
+                    </label>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleAddField}
@@ -853,6 +883,7 @@ export default function StepCapabilities({
                           fieldValue: "",
                           options: "",
                           required: false,
+                          addToJobInput: false,
                         });
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

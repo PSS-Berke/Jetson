@@ -124,6 +124,7 @@ export default function EditMachineModal({
             fieldValue: v.variable_value || "",
             options: v.options,
             required: v.required || false,
+            addToJobInput: v.addToJobInput || false,
           }));
         }
         setFormBuilderFields(fields);

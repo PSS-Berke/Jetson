@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
-  getProcessTypeConfig,
   getProcessTypeOptions,
   type FieldConfig,
 } from "@/lib/processTypeConfig";
@@ -24,13 +23,14 @@ export default function DynamicRequirementFields({
 }: DynamicRequirementFieldsProps) {
   const [dynamicFields, setDynamicFields] = useState<FieldConfig[]>([]);
   const [isLoadingFields, setIsLoadingFields] = useState(false);
-  const processConfig = getProcessTypeConfig(requirement.process_type);
+  const populatedProcessTypeRef = useRef<string | null>(null);
   const processTypeOptions = getProcessTypeOptions();
 
   // Fetch dynamic fields when process_type changes
   useEffect(() => {
     if (!requirement.process_type) {
       setDynamicFields([]);
+      populatedProcessTypeRef.current = null;
       return;
     }
 
@@ -44,25 +44,68 @@ export default function DynamicRequirementFields({
         const response = await getMachineVariables(requirement.process_type);
 
         // Extract fields from the API response
-        if (response && response.length > 0 && response[0].variables?.fields) {
-          const apiFields = response[0].variables.fields;
+        // Response structure: [{ id, type, variables: { varName: { type, label, value, required, addToJobInput } } }]
+        if (response && response.length > 0) {
+          const machineVariable = response[0];
+          
+          // Check if variables exist and is an object
+          if (machineVariable.variables && typeof machineVariable.variables === 'object') {
+            const variables = machineVariable.variables;
+            
+            // Filter variables where addToJobInput === true and map to FieldConfig
+            const mappedFields: FieldConfig[] = Object.entries(variables)
+              .filter(([varName, varConfig]: [string, any]) => {
+                // Only include variables where addToJobInput is true
+                return varConfig.addToJobInput === true;
+              })
+              .map(([varName, varConfig]: [string, any]) => {
+                // Map variable config to FieldConfig format
+                const fieldConfig: FieldConfig = {
+                  name: varName,
+                  type: varConfig.type === "select" ? "dropdown" : varConfig.type || "text",
+                  label: varConfig.label || varName,
+                  required: varConfig.required || false,
+                  placeholder: varConfig.placeholder,
+                  options: varConfig.options,
+                  validation: varConfig.validation,
+                };
+                
+                return fieldConfig;
+              });
+            
+            // Pre-populate field values from API response
+            // Only populate once per process type change
+            if (populatedProcessTypeRef.current !== requirement.process_type) {
+              Object.entries(variables).forEach(([varName, varConfig]: [string, any]) => {
+                if (varConfig.addToJobInput === true) {
+                  // Only set the value if it exists in API and is not already set in requirement
+                  const hasValue = varConfig.value !== undefined && 
+                    varConfig.value !== null && 
+                    varConfig.value !== "";
+                  const notAlreadySet = requirement[varName] === undefined || 
+                    requirement[varName] === null || 
+                    requirement[varName] === "";
+                  
+                  if (hasValue && notAlreadySet) {
+                    onChange(varName, varConfig.value);
+                  }
+                }
+              });
+              populatedProcessTypeRef.current = requirement.process_type;
+            }
 
-          // Map API fields to FieldConfig format
-          const mappedFields: FieldConfig[] = apiFields.map((field: any) => ({
-            name: field.id || field.name,
-            type: field.type === "select" ? "dropdown" : field.type,
-            label: field.label,
-            required: field.required || false,
-            placeholder: field.placeholder,
-            options: field.options,
-            validation: field.validation,
-          }));
-
-          console.log(
-            "[DynamicRequirementFields] Mapped fields:",
-            mappedFields,
-          );
-          setDynamicFields(mappedFields);
+            console.log(
+              "[DynamicRequirementFields] Mapped fields:",
+              mappedFields,
+            );
+            setDynamicFields(mappedFields);
+          } else {
+            // Fallback to static config if API returns no variables
+            console.log(
+              "[DynamicRequirementFields] No variables found, using static config",
+            );
+            setDynamicFields([]);
+          }
         } else {
           // Fallback to static config if API returns no fields
           console.log(
@@ -85,9 +128,8 @@ export default function DynamicRequirementFields({
     fetchFields();
   }, [requirement.process_type]);
 
-  // Use dynamic fields if available, otherwise fall back to static config
-  const fieldsToRender =
-    dynamicFields.length > 0 ? dynamicFields : processConfig?.fields || [];
+  // Only use dynamic fields from API - no fallback to static config
+  const fieldsToRender = dynamicFields;
 
   const renderField = (field: FieldConfig, index: number) => {
     const value = requirement[field.name] || "";

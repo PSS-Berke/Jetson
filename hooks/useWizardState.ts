@@ -63,6 +63,7 @@ export interface FormBuilderField {
   fieldValue: string | number | boolean;
   options?: string[];
   required?: boolean;
+  addToJobInput?: boolean;
 }
 
 export interface WizardState {
