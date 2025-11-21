@@ -2,7 +2,7 @@
 
 import { useState, memo, useMemo, useEffect, useRef } from "react";
 import { ParsedJob } from "@/hooks/useJobs";
-import { JobProjection, ServiceTypeSummary } from "@/hooks/useProjections";
+import { JobProjection, ServiceTypeSummary, ProcessTypeSummary, ProcessTypeFacilitySummary } from "@/hooks/useProjections";
 import {
   formatQuantity,
   TimeRange,
@@ -31,6 +31,7 @@ interface ProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
   jobProjections: JobProjection[];
   serviceSummaries: ServiceTypeSummary[];
+  processTypeSummaries: ProcessTypeSummary[] | ProcessTypeFacilitySummary[];
   grandTotals: {
     weeklyTotals: Map<string, number>;
     grandTotal: number;
@@ -44,6 +45,13 @@ interface ProjectionsTableProps {
   processViewMode?: "consolidated" | "expanded";
   showNotes?: boolean;
   onShowNotesChange?: (show: boolean) => void;
+}
+
+// Type guard to check if summary has facility information
+function isFacilitySummary(
+  summary: ProcessTypeSummary | ProcessTypeFacilitySummary
+): summary is ProcessTypeFacilitySummary {
+  return 'facilityId' in summary && 'facilityName' in summary;
 }
 
 // Memoized desktop table row component
@@ -1067,6 +1075,7 @@ MobileTableRow.displayName = "MobileTableRow";
 export default function ProjectionsTable({
   timeRanges,
   jobProjections,
+  processTypeSummaries,
   onRefresh,
   mobileViewMode = "cards",
   globalTimeScrollIndex = 0,
@@ -1702,6 +1711,79 @@ export default function ProjectionsTable({
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full bg-white rounded-lg shadow-sm border border-[var(--border)]">
           <thead>
+            {/* Process Type Summary Rows */}
+            {processTypeSummaries && processTypeSummaries.length > 0 && (
+              <>
+                {processTypeSummaries.map((summary) => {
+                  const displayValue = dataDisplayMode === "revenue"
+                    ? summary.grandRevenue
+                    : summary.grandTotal;
+                  const formattedTotal = dataDisplayMode === "revenue"
+                    ? `$${Math.round(displayValue).toLocaleString()}`
+                    : formatQuantity(Math.round(displayValue));
+
+                  // Create unique key based on whether it's a facility summary
+                  const summaryKey = isFacilitySummary(summary)
+                    ? `${summary.processType}-${summary.facilityId}`
+                    : summary.processType;
+
+                  // Create display label
+                  const displayLabel = isFacilitySummary(summary)
+                    ? `${summary.processType} (${summary.facilityName})`
+                    : summary.processType;
+
+                  return (
+                    <tr key={summaryKey} className="bg-blue-50 font-semibold text-sm border-b border-blue-200">
+                      {/* Empty checkbox column */}
+                      <th className="px-2 py-2 w-12"></th>
+                      {/* Job # column */}
+                      <th className="px-2 py-2"></th>
+                      {/* Client column */}
+                      <th className="px-2 py-2"></th>
+                      {/* Sub-client column */}
+                      <th className="px-2 py-2"></th>
+                      {/* Process column */}
+                      <th className="px-2 py-2"></th>
+                      {/* Description column */}
+                      <th className="px-2 py-2"></th>
+                      {/* Qty column */}
+                      <th className="px-2 py-2"></th>
+                      {/* Start & End columns - Process type name spanning both */}
+                      <th colSpan={2} className="px-2 py-2 text-center text-gray-800 font-semibold">
+                        {displayLabel}
+                      </th>
+                      {/* Time period totals */}
+                      {timeRanges.map((range, index) => {
+                        const periodValue = dataDisplayMode === "revenue"
+                          ? summary.weeklyRevenues.get(range.label) || 0
+                          : summary.weeklyTotals.get(range.label) || 0;
+                        const formattedValue = dataDisplayMode === "revenue"
+                          ? periodValue > 0 ? `$${Math.round(periodValue).toLocaleString()}` : ""
+                          : formatQuantity(Math.round(periodValue));
+
+                        return (
+                          <th
+                            key={range.label}
+                            className={`px-2 py-2 text-center text-xs font-semibold ${
+                              index % 2 === 0 ? "bg-blue-100" : "bg-blue-50"
+                            }`}
+                          >
+                            {formattedValue}
+                          </th>
+                        );
+                      })}
+                      {/* Grand total */}
+                      <th className="px-2 py-2 text-center text-gray-800 font-semibold">
+                        {formattedTotal}
+                      </th>
+                      {/* Empty notes column if visible */}
+                      {showNotes && <th className="px-2 py-2"></th>}
+                    </tr>
+                  );
+                })}
+              </>
+            )}
+
             {/* Column Headers */}
             <tr className="bg-gray-50 border-y border-gray-200">
               <th className="px-2 py-2 text-left w-12">

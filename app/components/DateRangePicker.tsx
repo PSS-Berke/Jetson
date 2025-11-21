@@ -33,7 +33,6 @@ export default function DateRangePicker({
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tempStartDate, setTempStartDate] = useState("");
-  const [tempEndDate, setTempEndDate] = useState("");
   const [mounted, setMounted] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -43,14 +42,13 @@ export default function DateRangePicker({
     setMounted(true);
   }, []);
 
-  // Format dates for display
-  const displayText = `${format(dateRange.start, displayFormat)} - ${format(dateRange.end, displayFormat)}`;
+  // Format dates for display - only show start date
+  const displayText = format(dateRange.start, displayFormat);
 
   // Initialize temp values when picker opens
   useEffect(() => {
     if (isOpen) {
       setTempStartDate(format(dateRange.start, "yyyy-MM-dd"));
-      setTempEndDate(format(dateRange.end, "yyyy-MM-dd"));
     }
   }, [isOpen, dateRange]);
 
@@ -82,21 +80,16 @@ export default function DateRangePicker({
     e.stopPropagation();
 
     const start = new Date(tempStartDate);
-    const end = new Date(tempEndDate);
 
-    // Validate dates
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      alert("Please enter valid dates");
+    // Validate date
+    if (isNaN(start.getTime())) {
+      alert("Please enter a valid date");
       return;
     }
 
-    if (start > end) {
-      alert("Start date must be before end date");
-      return;
-    }
-
-    console.log("Applying date range:", { start, end });
-    onDateRangeChange({ start, end });
+    console.log("Applying start date:", start);
+    // Pass the same date as both start and end for compatibility
+    onDateRangeChange({ start, end: start });
     setIsOpen(false);
   };
 
@@ -129,7 +122,7 @@ export default function DateRangePicker({
         >
           <div className="mb-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              Select Date Range
+              Select Start Date
             </h3>
 
             {/* Start Date */}
@@ -145,23 +138,6 @@ export default function DateRangePicker({
                 type="date"
                 value={tempStartDate}
                 onChange={(e) => setTempStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* End Date */}
-            <div className="mb-3">
-              <label
-                htmlFor="end-date"
-                className="block text-xs font-medium text-gray-600 mb-1"
-              >
-                End Date
-              </label>
-              <input
-                id="end-date"
-                type="date"
-                value={tempEndDate}
-                onChange={(e) => setTempEndDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

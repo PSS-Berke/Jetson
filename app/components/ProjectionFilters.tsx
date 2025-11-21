@@ -49,6 +49,8 @@ interface ProjectionFiltersProps {
   onBulkUpload?: () => void;
   showNotes?: boolean;
   onShowNotesChange?: (show: boolean) => void;
+  groupByFacility?: boolean;
+  onGroupByFacilityChange?: (groupByFacility: boolean) => void;
 }
 
 export default function ProjectionFilters({
@@ -82,6 +84,8 @@ export default function ProjectionFilters({
   onBulkUpload,
   showNotes = false,
   onShowNotesChange,
+  groupByFacility = false,
+  onGroupByFacilityChange,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -667,6 +671,32 @@ export default function ProjectionFilters({
                 Revenue
               </button>
             </div>
+
+            {/* Group by Facility Toggle */}
+            {onGroupByFacilityChange && (
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => onGroupByFacilityChange(false)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    !groupByFacility
+                      ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                      : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                  }`}
+                >
+                  Combined
+                </button>
+                <button
+                  onClick={() => onGroupByFacilityChange(true)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    groupByFacility
+                      ? "bg-white text-purple-600 shadow-sm"
+                      : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                  }`}
+                >
+                  By Facility
+                </button>
+              </div>
+            )}
 
             {/* Jobs vs Processes View Toggle */}
             {onViewModeChange && (

@@ -8,9 +8,13 @@ import {
   calculateGenericJobProjections,
   calculateGenericServiceTypeSummaries,
   calculateGenericGrandTotals,
+  calculateProcessTypeSummaries,
+  calculateProcessTypeSummariesByFacility,
   type WeekRange,
   type JobProjection,
   type ServiceTypeSummary,
+  type ProcessTypeSummary,
+  type ProcessTypeFacilitySummary,
   type TimeRange,
 } from "@/lib/projectionUtils";
 import { generateMonthRanges, generateQuarterRanges } from "@/lib/dateUtils";
@@ -62,6 +66,7 @@ export interface ProjectionsData {
   weekRanges: WeekRange[]; // Kept for backwards compatibility
   jobProjections: JobProjection[];
   serviceSummaries: ServiceTypeSummary[];
+  processTypeSummaries: ProcessTypeSummary[] | ProcessTypeFacilitySummary[];
   grandTotals: {
     weeklyTotals: Map<string, number>;
     grandTotal: number;
@@ -81,6 +86,7 @@ export interface ProjectionFilters {
   scheduleFilter?: "all" | "confirmed" | "soft";
   filterMode?: "and" | "or";
   showOnlyInDateRange?: boolean;
+  groupByFacility?: boolean;
 }
 
 // Helper function to count process types from job projections
@@ -452,6 +458,15 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     return { serviceSummaries: summaries, grandTotals: totals };
   }, [filteredProjections, timeRanges]);
 
+  // 5.5. Process type summaries - only recalculates when filteredProjections or timeRanges change
+  // Uses facility-grouped summaries if groupByFacility is true
+  const processTypeSummaries = useMemo(() => {
+    if (filters.groupByFacility) {
+      return calculateProcessTypeSummariesByFacility(filteredProjections, timeRanges);
+    }
+    return calculateProcessTypeSummaries(filteredProjections, timeRanges);
+  }, [filteredProjections, timeRanges, filters.groupByFacility]);
+
   // 6. Process type counts - only recalculates when filteredProjections change
   const processTypeCounts = useMemo(() => {
     return calculateProcessTypeCounts(filteredProjections);
@@ -497,6 +512,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         weekRanges: timeRanges as WeekRange[],
         jobProjections: [],
         serviceSummaries: [],
+        processTypeSummaries: [],
         grandTotals: {
           weeklyTotals: new Map(),
           grandTotal: 0,
@@ -521,6 +537,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       weekRanges: timeRanges as WeekRange[],
       jobProjections: adjustedJobProjections,
       serviceSummaries,
+      processTypeSummaries,
       grandTotals,
       filteredJobProjections: filteredProjections,
       processTypeCounts,
@@ -532,6 +549,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     timeRanges,
     adjustedJobProjections,
     serviceSummaries,
+    processTypeSummaries,
     grandTotals,
     filteredProjections,
     processTypeCounts,
@@ -570,4 +588,4 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   };
 }
 
-export type { WeekRange, JobProjection, ServiceTypeSummary, TimeRange };
+export type { WeekRange, JobProjection, ServiceTypeSummary, ProcessTypeSummary, ProcessTypeFacilitySummary, TimeRange };

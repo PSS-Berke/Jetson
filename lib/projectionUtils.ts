@@ -26,6 +26,26 @@ export interface ServiceTypeSummary {
   jobCount: number;
 }
 
+export interface ProcessTypeSummary {
+  processType: string;
+  weeklyTotals: Map<string, number>; // periodLabel -> total quantity
+  weeklyRevenues: Map<string, number>; // periodLabel -> total revenue
+  grandTotal: number;
+  grandRevenue: number;
+  jobCount: number;
+}
+
+export interface ProcessTypeFacilitySummary {
+  processType: string;
+  facilityId: number | null;
+  facilityName: string;
+  weeklyTotals: Map<string, number>; // periodLabel -> total quantity
+  weeklyRevenues: Map<string, number>; // periodLabel -> total revenue
+  grandTotal: number;
+  grandRevenue: number;
+  jobCount: number;
+}
+
 export interface ProcessProjection {
   job: ParsedJob;
   processType: string;
@@ -530,4 +550,214 @@ export function expandJobProjectionsToProcesses(
   });
 
   return processProjections;
+}
+
+/**
+ * Aggregate projections by process type to create summary rows
+ * Similar to service type summaries, but aggregates by the process types from job requirements
+ */
+export function calculateProcessTypeSummaries(
+  jobProjections: JobProjection[],
+  timeRanges: TimeRange[],
+): ProcessTypeSummary[] {
+  const summaryMap = new Map<string, ProcessTypeSummary>();
+
+  jobProjections.forEach((projection) => {
+    const job = projection.job;
+    const numProcesses = job.requirements?.length || 0;
+
+    // Skip jobs with no processes
+    if (numProcesses === 0) {
+      return;
+    }
+
+    // Process each requirement
+    job.requirements.forEach((requirement) => {
+      const processType = requirement.process_type || "Unknown";
+
+      // Initialize summary for this process type if not exists
+      if (!summaryMap.has(processType)) {
+        const weeklyTotals = new Map<string, number>();
+        const weeklyRevenues = new Map<string, number>();
+        timeRanges.forEach((range) => {
+          weeklyTotals.set(range.label, 0);
+          weeklyRevenues.set(range.label, 0);
+        });
+
+        summaryMap.set(processType, {
+          processType,
+          weeklyTotals,
+          weeklyRevenues,
+          grandTotal: 0,
+          grandRevenue: 0,
+          jobCount: 0,
+        });
+      }
+
+      const summary = summaryMap.get(processType)!;
+
+      // For each time period, add the job's quantity for this process
+      // Quantities are distributed equally among all processes in the job
+      projection.weeklyQuantities.forEach((quantity, label) => {
+        const processQty = Math.round(quantity / numProcesses);
+        const currentTotal = summary.weeklyTotals.get(label) || 0;
+        summary.weeklyTotals.set(label, currentTotal + processQty);
+      });
+
+      // For revenue, calculate based on this specific process's price_per_m
+      const processRevenue = getProcessRevenue(job, requirement);
+      projection.weeklyRevenues.forEach((jobRevenue, label) => {
+        const processRev = jobRevenue / numProcesses;
+        const currentRevTotal = summary.weeklyRevenues.get(label) || 0;
+        summary.weeklyRevenues.set(label, currentRevTotal + processRev);
+      });
+
+      // Update grand totals
+      const totalProcessQuantity = Math.round(projection.totalQuantity / numProcesses);
+      summary.grandTotal += totalProcessQuantity;
+      summary.grandRevenue += processRevenue;
+    });
+  });
+
+  // Update job counts - count unique jobs per process type
+  jobProjections.forEach((projection) => {
+    const job = projection.job;
+    if (!job.requirements || job.requirements.length === 0) {
+      return;
+    }
+
+    // Track which process types this job has
+    const processTypesInJob = new Set<string>();
+    job.requirements.forEach((req) => {
+      processTypesInJob.add(req.process_type || "Unknown");
+    });
+
+    // Increment job count for each process type in this job
+    processTypesInJob.forEach((processType) => {
+      const summary = summaryMap.get(processType);
+      if (summary) {
+        summary.jobCount++;
+      }
+    });
+  });
+
+  // Convert to array and sort by process type name
+  return Array.from(summaryMap.values()).sort((a, b) =>
+    a.processType.localeCompare(b.processType),
+  );
+}
+
+/**
+ * Aggregate projections by process type AND facility to create facility-specific summary rows
+ * Similar to calculateProcessTypeSummaries but groups by both process type and facility
+ */
+export function calculateProcessTypeSummariesByFacility(
+  jobProjections: JobProjection[],
+  timeRanges: TimeRange[],
+): ProcessTypeFacilitySummary[] {
+  const summaryMap = new Map<string, ProcessTypeFacilitySummary>();
+
+  // Facility ID to name mapping
+  const facilityNames: { [key: number]: string } = {
+    1: "Bolingbrook",
+    2: "Lemont",
+  };
+
+  jobProjections.forEach((projection) => {
+    const job = projection.job;
+    const numProcesses = job.requirements?.length || 0;
+
+    // Skip jobs with no processes
+    if (numProcesses === 0) {
+      return;
+    }
+
+    // Get facility info
+    const facilityId = job.facilities_id || null;
+    const facilityName = facilityId ? facilityNames[facilityId] || "Unknown" : "No Facility";
+
+    // Process each requirement
+    job.requirements.forEach((requirement) => {
+      const processType = requirement.process_type || "Unknown";
+
+      // Create composite key: processType-facilityId
+      const compositeKey = `${processType}-${facilityId}`;
+
+      // Initialize summary for this process type + facility combo if not exists
+      if (!summaryMap.has(compositeKey)) {
+        const weeklyTotals = new Map<string, number>();
+        const weeklyRevenues = new Map<string, number>();
+        timeRanges.forEach((range) => {
+          weeklyTotals.set(range.label, 0);
+          weeklyRevenues.set(range.label, 0);
+        });
+
+        summaryMap.set(compositeKey, {
+          processType,
+          facilityId,
+          facilityName,
+          weeklyTotals,
+          weeklyRevenues,
+          grandTotal: 0,
+          grandRevenue: 0,
+          jobCount: 0,
+        });
+      }
+
+      const summary = summaryMap.get(compositeKey)!;
+
+      // For each time period, add the job's quantity for this process
+      // Quantities are distributed equally among all processes in the job
+      projection.weeklyQuantities.forEach((quantity, label) => {
+        const processQty = Math.round(quantity / numProcesses);
+        const currentTotal = summary.weeklyTotals.get(label) || 0;
+        summary.weeklyTotals.set(label, currentTotal + processQty);
+      });
+
+      // For revenue, calculate based on this specific process's price_per_m
+      const processRevenue = getProcessRevenue(job, requirement);
+      projection.weeklyRevenues.forEach((jobRevenue, label) => {
+        const processRev = jobRevenue / numProcesses;
+        const currentRevTotal = summary.weeklyRevenues.get(label) || 0;
+        summary.weeklyRevenues.set(label, currentRevTotal + processRev);
+      });
+
+      // Update grand totals
+      const totalProcessQuantity = Math.round(projection.totalQuantity / numProcesses);
+      summary.grandTotal += totalProcessQuantity;
+      summary.grandRevenue += processRevenue;
+    });
+  });
+
+  // Update job counts - count unique jobs per process type + facility combination
+  jobProjections.forEach((projection) => {
+    const job = projection.job;
+    if (!job.requirements || job.requirements.length === 0) {
+      return;
+    }
+
+    const facilityId = job.facilities_id || null;
+
+    // Track which process types this job has
+    const processTypesInJob = new Set<string>();
+    job.requirements.forEach((req) => {
+      processTypesInJob.add(req.process_type || "Unknown");
+    });
+
+    // Increment job count for each process type + facility combo in this job
+    processTypesInJob.forEach((processType) => {
+      const compositeKey = `${processType}-${facilityId}`;
+      const summary = summaryMap.get(compositeKey);
+      if (summary) {
+        summary.jobCount++;
+      }
+    });
+  });
+
+  // Convert to array and sort by process type, then by facility name
+  return Array.from(summaryMap.values()).sort((a, b) => {
+    const processCompare = a.processType.localeCompare(b.processType);
+    if (processCompare !== 0) return processCompare;
+    return a.facilityName.localeCompare(b.facilityName);
+  });
 }
