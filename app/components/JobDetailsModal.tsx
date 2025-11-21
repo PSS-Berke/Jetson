@@ -480,74 +480,137 @@ export default function JobDetailsModal({
             <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">
               Requirements Details
             </h3>
-            {job.requirements && job.requirements.length > 0 ? (
-              <div className="space-y-4">
-                {job.requirements.map((req, index) => {
-                  // Get the process type configuration
-                  const processConfig = getProcessTypeConfig(req.process_type);
+            {(() => {
+              // Defensive parsing: handle cases where requirements might still be a string
+              let parsedRequirements: any[] = [];
+              
+              if (job.requirements) {
+                if (Array.isArray(job.requirements)) {
+                  parsedRequirements = job.requirements;
+                } else if (typeof job.requirements === "string") {
+                  try {
+                    // Try parsing as JSON string
+                    if (job.requirements.trim().startsWith("[")) {
+                      parsedRequirements = JSON.parse(job.requirements);
+                    } else if (job.requirements.trim().startsWith("{")) {
+                      // Handle single object wrapped in braces
+                      parsedRequirements = [JSON.parse(job.requirements)];
+                    }
+                  } catch (error) {
+                    console.error("[JobDetailsModal] Failed to parse requirements:", error, job.requirements);
+                    parsedRequirements = [];
+                  }
+                }
+              }
 
-                  // Get all fields for this process type, excluding process_type (shown in header)
-                  const fieldsToDisplay =
-                    processConfig?.fields.filter(
-                      (field) => field.name !== "process_type",
-                    ) || [];
+              console.log("[JobDetailsModal] Requirements debug:", {
+                jobId: job.id,
+                jobNumber: job.job_number,
+                rawRequirements: job.requirements,
+                parsedRequirements,
+                isArray: Array.isArray(job.requirements),
+                type: typeof job.requirements,
+              });
 
-                  return (
-                    <div key={index} className="bg-gray-50 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">
-                        Requirement {index + 1}:{" "}
-                        {processConfig?.label || req.process_type}
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        {fieldsToDisplay.map((fieldConfig) => {
-                          const fieldValue =
-                            req[fieldConfig.name as keyof typeof req];
+              if (parsedRequirements && parsedRequirements.length > 0) {
+                return (
+                  <div className="space-y-4">
+                    {parsedRequirements.map((req, index) => {
+                      // Get the process type configuration
+                      const processConfig = getProcessTypeConfig(req.process_type);
 
-                          // Skip if field has no value
-                          if (
-                            fieldValue === undefined ||
-                            fieldValue === null ||
-                            fieldValue === ""
-                          ) {
-                            return null;
-                          }
+                      // Get all fields for this process type, excluding process_type (shown in header)
+                      const fieldsToDisplay =
+                        processConfig?.fields.filter(
+                          (field) => field.name !== "process_type",
+                        ) || [];
 
-                          // Format the value based on field type
-                          let displayValue: string;
-                          if (fieldConfig.type === "currency") {
-                            displayValue = `$${parseFloat(String(fieldValue)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                          } else {
-                            displayValue = String(fieldValue);
-                          }
+                      // Get all keys from the requirement object to show any fields not in config
+                      const allReqKeys = Object.keys(req).filter(
+                        (key) => key !== "process_type" && req[key] !== undefined && req[key] !== null && req[key] !== ""
+                      );
+                      const configFieldNames = new Set(fieldsToDisplay.map((f) => f.name));
+                      const additionalFields = allReqKeys.filter((key) => !configFieldNames.has(key));
 
-                          return (
-                            <div key={fieldConfig.name}>
-                              <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
-                                {fieldConfig.label}
-                              </label>
-                              <p className="text-base text-[var(--text-dark)]">
-                                {displayValue}
-                              </p>
-                            </div>
-                          );
-                        })}
+                      return (
+                        <div key={index} className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">
+                            Requirement {index + 1}:{" "}
+                            {processConfig?.label || req.process_type || "Unknown"}
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            {fieldsToDisplay.map((fieldConfig) => {
+                              const fieldValue =
+                                req[fieldConfig.name as keyof typeof req];
 
-                        {/* Show "No additional details" if no fields to display */}
-                        {fieldsToDisplay.length === 0 && (
-                          <div className="col-span-2 text-sm text-[var(--text-light)] italic">
-                            No additional requirement details
+                              // Skip if field has no value
+                              if (
+                                fieldValue === undefined ||
+                                fieldValue === null ||
+                                fieldValue === ""
+                              ) {
+                                return null;
+                              }
+
+                              // Format the value based on field type
+                              let displayValue: string;
+                              if (fieldConfig.type === "currency") {
+                                displayValue = `$${parseFloat(String(fieldValue)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                              } else {
+                                displayValue = String(fieldValue);
+                              }
+
+                              return (
+                                <div key={fieldConfig.name}>
+                                  <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
+                                    {fieldConfig.label}
+                                  </label>
+                                  <p className="text-base text-[var(--text-dark)]">
+                                    {displayValue}
+                                  </p>
+                                </div>
+                              );
+                            })}
+
+                            {/* Show additional fields that aren't in the process type config */}
+                            {additionalFields.map((fieldName) => {
+                              const fieldValue = req[fieldName];
+                              if (fieldValue === undefined || fieldValue === null || fieldValue === "") {
+                                return null;
+                              }
+
+                              return (
+                                <div key={fieldName}>
+                                  <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
+                                    {fieldName.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                  </label>
+                                  <p className="text-base text-[var(--text-dark)]">
+                                    {String(fieldValue)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+
+                            {/* Show "No additional details" if no fields to display */}
+                            {fieldsToDisplay.length === 0 && additionalFields.length === 0 && (
+                              <div className="col-span-2 text-sm text-[var(--text-light)] italic">
+                                No additional requirement details
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-base text-[var(--text-light)]">
-                No specific requirements
-              </p>
-            )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              } else {
+                return (
+                  <p className="text-base text-[var(--text-light)]">
+                    No specific requirements
+                  </p>
+                );
+              }
+            })()}
           </div>
 
           {/* Footer */}
