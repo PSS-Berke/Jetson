@@ -59,16 +59,39 @@ export default function DynamicRequirementFields({
                 return varConfig.addToJobInput === true;
               })
               .map(([varName, varConfig]: [string, any]) => {
+                // Map variable type to FieldConfig type
+                let fieldType: FieldConfig["type"] = "text";
+                if (varConfig.type === "select" || varConfig.type === "dropdown") {
+                  fieldType = "dropdown";
+                } else if (varConfig.type === "number" || varConfig.type === "integer") {
+                  fieldType = "number";
+                } else if (varConfig.type === "boolean") {
+                  fieldType = "text"; // We'll handle boolean separately in renderField
+                } else if (varConfig.type === "currency") {
+                  fieldType = "currency";
+                } else {
+                  fieldType = (varConfig.type || "text") as FieldConfig["type"];
+                }
+                
                 // Map variable config to FieldConfig format
                 const fieldConfig: FieldConfig = {
                   name: varName,
-                  type: varConfig.type === "select" ? "dropdown" : varConfig.type || "text",
+                  type: fieldType,
                   label: varConfig.label || varName,
                   required: varConfig.required || false,
                   placeholder: varConfig.placeholder,
                   options: varConfig.options,
-                  validation: varConfig.validation,
-                };
+                  validation: {
+                    ...varConfig.validation,
+                    // For integer types, ensure step is 1 if not specified
+                    step: varConfig.type === "integer" 
+                      ? (varConfig.validation?.step || 1)
+                      : varConfig.validation?.step,
+                  },
+                  // Store the original type for boolean and integer handling
+                  ...(varConfig.type === "boolean" && { originalType: "boolean" }),
+                  ...(varConfig.type === "integer" && { originalType: "integer" }),
+                } as FieldConfig & { originalType?: string };
                 
                 return fieldConfig;
               });
@@ -78,13 +101,16 @@ export default function DynamicRequirementFields({
             if (populatedProcessTypeRef.current !== requirement.process_type) {
               Object.entries(variables).forEach(([varName, varConfig]: [string, any]) => {
                 if (varConfig.addToJobInput === true) {
-                  // Only set the value if it exists in API and is not already set in requirement
-                  const hasValue = varConfig.value !== undefined && 
-                    varConfig.value !== null && 
-                    varConfig.value !== "";
+                  // Handle boolean values - they can be false, which is a valid value
+                  const isBoolean = varConfig.type === "boolean";
+                  const hasValue = isBoolean
+                    ? varConfig.value !== undefined && varConfig.value !== null
+                    : varConfig.value !== undefined && 
+                      varConfig.value !== null && 
+                      varConfig.value !== "";
                   const notAlreadySet = requirement[varName] === undefined || 
                     requirement[varName] === null || 
-                    requirement[varName] === "";
+                    (isBoolean ? false : requirement[varName] === "");
                   
                   if (hasValue && notAlreadySet) {
                     onChange(varName, varConfig.value);
@@ -132,7 +158,14 @@ export default function DynamicRequirementFields({
   const fieldsToRender = dynamicFields;
 
   const renderField = (field: FieldConfig, index: number) => {
-    const value = requirement[field.name] || "";
+    // Check if this is a boolean field (stored in originalType)
+    const isBoolean = (field as any).originalType === "boolean";
+    
+    // Handle boolean values - default to false if not set
+    const value = isBoolean 
+      ? (requirement[field.name] !== undefined ? requirement[field.name] : false)
+      : (requirement[field.name] || "");
+    
     const error = errors[field.name];
     const fieldId = `${field.name}-${index}-${requirement.process_type}`;
     const fieldKey = `${requirement.process_type}-${field.name}-${index}`;
@@ -143,6 +176,31 @@ export default function DynamicRequirementFields({
         ? "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500"
         : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
     }`;
+
+    // Handle boolean fields
+    if (isBoolean) {
+      return (
+        <div key={fieldKey} className="flex-1 min-w-[200px]">
+          <label
+            htmlFor={fieldId}
+            className="flex items-center gap-3 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              id={fieldId}
+              checked={value === true || value === "true"}
+              onChange={(e) => onChange(field.name, e.target.checked)}
+              className="w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-[var(--primary-blue)] focus:ring-2"
+            />
+            <span className="text-sm font-semibold text-[var(--text-dark)]">
+              {field.label}{" "}
+              {field.required && <span className="text-red-500">*</span>}
+            </span>
+          </label>
+          {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+        </div>
+      );
+    }
 
     switch (field.type) {
       case "dropdown":
@@ -174,6 +232,7 @@ export default function DynamicRequirementFields({
         );
 
       case "number":
+        const isInteger = (field as any).originalType === "integer";
         return (
           <div key={fieldKey} className="flex-1 min-w-[200px]">
             <label
@@ -187,12 +246,17 @@ export default function DynamicRequirementFields({
               type="number"
               id={fieldId}
               value={value as number}
-              onChange={(e) =>
-                onChange(field.name, parseFloat(e.target.value) || 0)
-              }
+              onChange={(e) => {
+                const inputValue = e.target.value;
+                // Use parseInt for integers, parseFloat for numbers
+                const parsedValue = isInteger
+                  ? (inputValue === "" ? 0 : parseInt(inputValue, 10) || 0)
+                  : (inputValue === "" ? 0 : parseFloat(inputValue) || 0);
+                onChange(field.name, parsedValue);
+              }}
               min={field.validation?.min}
               max={field.validation?.max}
-              step={field.validation?.step || 1}
+              step={field.validation?.step || (isInteger ? 1 : undefined)}
               placeholder={field.placeholder}
               className={baseInputClasses}
               required={field.required}
