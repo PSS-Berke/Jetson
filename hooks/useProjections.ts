@@ -266,9 +266,14 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           const hasStartDate = job.start_date != null && job.start_date !== undefined;
           const hasDueDate = job.due_date != null && job.due_date !== undefined;
           
-          // If job doesn't have both dates, exclude it when filter is enabled
-          if (!hasStartDate || !hasDueDate || timeRanges.length === 0) {
-            return false;
+          // If job doesn't have both dates, always include it (jobs without dates should always display)
+          if (!hasStartDate || !hasDueDate) {
+            return true;
+          }
+
+          // If no time ranges, include all jobs with dates
+          if (timeRanges.length === 0) {
+            return true;
           }
 
           // Normalize dates to start of day for proper comparison
