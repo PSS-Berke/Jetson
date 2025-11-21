@@ -117,49 +117,6 @@ export const PROCESS_TYPE_CONFIGS: ProcessTypeConfig[] = [
     ],
   },
   {
-    key: "inkjet",
-    label: "Inkjet",
-    color: "#10B981", // Green
-    fields: [
-      {
-        name: "print_coverage",
-        label: "Print Coverage",
-        type: "dropdown",
-        required: true,
-        options: ["Black & White", "Full Color", "Spot Color"],
-      },
-      {
-        name: "paper_size",
-        label: "Paper Size",
-        type: "dropdown",
-        required: true,
-        options: COMMON_PAPER_SIZES,
-      },
-      {
-        name: "num_addresses",
-        label: "Number of Addresses",
-        type: "number",
-        required: false,
-        validation: {
-          min: 0,
-          step: 1,
-        },
-        placeholder: "0",
-      },
-      {
-        name: "price_per_m",
-        label: "Price (per/m)",
-        type: "currency",
-        required: true,
-        validation: {
-          min: 0,
-          step: 0.01,
-        },
-        placeholder: "0.00",
-      },
-    ],
-  },
-  {
     key: "labelApply",
     label: "Label/Apply",
     color: "#F59E0B", // Orange
@@ -390,12 +347,6 @@ export const PROCESS_TYPE_CONFIGS: ProcessTypeConfig[] = [
     color: "#10B981", // Green (maps to inkjet)
     fields: [],
   },
-  {
-    key: "sortAlt",
-    label: "Sort",
-    color: "#3B82F6", // Blue (maps to insert per your spec)
-    fields: [],
-  },
 ];
 
 /**
@@ -416,15 +367,27 @@ export function getAllProcessTypeKeys(): string[] {
 
 /**
  * Get all process types as options for dropdown
+ * These values map directly to the process_type parameter in the API
  */
 export function getProcessTypeOptions(): Array<{
   value: string;
   label: string;
 }> {
-  return PROCESS_TYPE_CONFIGS.map((config) => ({
-    value: config.key,
-    label: config.label,
-  }));
+  return [
+    { value: "Insert", label: "Insert" },
+    { value: "Sort", label: "Sort" },
+    { value: "Label/Apply", label: "Label/Apply" },
+    { value: "Fold", label: "Fold" },
+    { value: "Laser", label: "Laser" },
+    { value: "HP Press", label: "HP Press" },
+    { value: "Data", label: "Data" },
+    { value: "Affix glue+", label: "Affix glue+" },
+    { value: "Affix label+", label: "Affix label+" },
+    { value: "Insert+", label: "Insert+" },
+    { value: "9-12 in+", label: "9-12 in+" },
+    { value: "13+ in+", label: "13+ in+" },
+    { value: "Ink jet+", label: "Ink jet+" },
+  ];
 }
 
 /**
