@@ -14,12 +14,14 @@ interface DynamicRequirementFieldsProps {
   };
   onChange: (field: string, value: string | number) => void;
   errors?: Record<string, string>;
+  disableRequired?: boolean;
 }
 
 export default function DynamicRequirementFields({
   requirement,
   onChange,
   errors = {},
+  disableRequired = false,
 }: DynamicRequirementFieldsProps) {
   const [dynamicFields, setDynamicFields] = useState<FieldConfig[]>([]);
   const [isLoadingFields, setIsLoadingFields] = useState(false);
@@ -59,16 +61,39 @@ export default function DynamicRequirementFields({
                 return varConfig.addToJobInput === true;
               })
               .map(([varName, varConfig]: [string, any]) => {
+                // Map variable type to FieldConfig type
+                let fieldType: FieldConfig["type"] = "text";
+                if (varConfig.type === "select" || varConfig.type === "dropdown") {
+                  fieldType = "dropdown";
+                } else if (varConfig.type === "number" || varConfig.type === "integer") {
+                  fieldType = "number";
+                } else if (varConfig.type === "boolean") {
+                  fieldType = "text"; // We'll handle boolean separately in renderField
+                } else if (varConfig.type === "currency") {
+                  fieldType = "currency";
+                } else {
+                  fieldType = (varConfig.type || "text") as FieldConfig["type"];
+                }
+                
                 // Map variable config to FieldConfig format
                 const fieldConfig: FieldConfig = {
                   name: varName,
-                  type: varConfig.type === "select" ? "dropdown" : varConfig.type || "text",
+                  type: fieldType,
                   label: varConfig.label || varName,
                   required: varConfig.required || false,
                   placeholder: varConfig.placeholder,
                   options: varConfig.options,
-                  validation: varConfig.validation,
-                };
+                  validation: {
+                    ...varConfig.validation,
+                    // For integer types, ensure step is 1 if not specified
+                    step: varConfig.type === "integer" 
+                      ? (varConfig.validation?.step || 1)
+                      : varConfig.validation?.step,
+                  },
+                  // Store the original type for boolean and integer handling
+                  ...(varConfig.type === "boolean" && { originalType: "boolean" }),
+                  ...(varConfig.type === "integer" && { originalType: "integer" }),
+                } as FieldConfig & { originalType?: string };
                 
                 return fieldConfig;
               });
@@ -78,13 +103,16 @@ export default function DynamicRequirementFields({
             if (populatedProcessTypeRef.current !== requirement.process_type) {
               Object.entries(variables).forEach(([varName, varConfig]: [string, any]) => {
                 if (varConfig.addToJobInput === true) {
-                  // Only set the value if it exists in API and is not already set in requirement
-                  const hasValue = varConfig.value !== undefined && 
-                    varConfig.value !== null && 
-                    varConfig.value !== "";
+                  // Handle boolean values - they can be false, which is a valid value
+                  const isBoolean = varConfig.type === "boolean";
+                  const hasValue = isBoolean
+                    ? varConfig.value !== undefined && varConfig.value !== null
+                    : varConfig.value !== undefined && 
+                      varConfig.value !== null && 
+                      varConfig.value !== "";
                   const notAlreadySet = requirement[varName] === undefined || 
                     requirement[varName] === null || 
-                    requirement[varName] === "";
+                    (isBoolean ? false : requirement[varName] === "");
                   
                   if (hasValue && notAlreadySet) {
                     onChange(varName, varConfig.value);
@@ -132,7 +160,14 @@ export default function DynamicRequirementFields({
   const fieldsToRender = dynamicFields;
 
   const renderField = (field: FieldConfig, index: number) => {
-    const value = requirement[field.name] || "";
+    // Check if this is a boolean field (stored in originalType)
+    const isBoolean = (field as any).originalType === "boolean";
+    
+    // Handle boolean values - default to false if not set
+    const value = isBoolean 
+      ? (requirement[field.name] !== undefined ? requirement[field.name] : false)
+      : (requirement[field.name] || "");
+    
     const error = errors[field.name];
     const fieldId = `${field.name}-${index}-${requirement.process_type}`;
     const fieldKey = `${requirement.process_type}-${field.name}-${index}`;
@@ -144,6 +179,31 @@ export default function DynamicRequirementFields({
         : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
     }`;
 
+    // Handle boolean fields
+    if (isBoolean) {
+      return (
+        <div key={fieldKey} className="flex-1 min-w-[200px]">
+          <label
+            htmlFor={fieldId}
+            className="flex items-center gap-3 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              id={fieldId}
+              checked={value === "true" || value === 1 || (!!value && value !== "false")}
+              onChange={(e) => onChange(field.name, e.target.checked ? "true" : "false")}
+              className="w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-[var(--primary-blue)] focus:ring-2"
+            />
+            <span className="text-sm font-semibold text-[var(--text-dark)]">
+              {field.label}{" "}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
+            </span>
+          </label>
+          {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+        </div>
+      );
+    }
+
     switch (field.type) {
       case "dropdown":
         return (
@@ -153,14 +213,14 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <select
               id={fieldId}
               value={value as string}
               onChange={(e) => onChange(field.name, e.target.value)}
               className={baseInputClasses}
-              required={field.required}
+              required={!disableRequired && field.required}
             >
               <option value="">Select {field.label}...</option>
               {field.options?.map((option) => (
@@ -174,6 +234,7 @@ export default function DynamicRequirementFields({
         );
 
       case "number":
+        const isInteger = (field as any).originalType === "integer";
         return (
           <div key={fieldKey} className="flex-1 min-w-[200px]">
             <label
@@ -181,21 +242,26 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
               id={fieldId}
               value={value as number}
-              onChange={(e) =>
-                onChange(field.name, parseFloat(e.target.value) || 0)
-              }
+              onChange={(e) => {
+                const inputValue = e.target.value;
+                // Use parseInt for integers, parseFloat for numbers
+                const parsedValue = isInteger
+                  ? (inputValue === "" ? 0 : parseInt(inputValue, 10) || 0)
+                  : (inputValue === "" ? 0 : parseFloat(inputValue) || 0);
+                onChange(field.name, parsedValue);
+              }}
               min={field.validation?.min}
               max={field.validation?.max}
-              step={field.validation?.step || 1}
+              step={field.validation?.step || (isInteger ? 1 : undefined)}
               placeholder={field.placeholder}
               className={baseInputClasses}
-              required={field.required}
+              required={!disableRequired && field.required}
             />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
@@ -209,7 +275,7 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -224,7 +290,7 @@ export default function DynamicRequirementFields({
                 step={field.validation?.step || 0.01}
                 placeholder={field.placeholder || "0.00"}
                 className={`${baseInputClasses} pl-8`}
-                required={field.required}
+                required={!disableRequired && field.required}
               />
             </div>
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
@@ -240,7 +306,7 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="text"
@@ -249,7 +315,7 @@ export default function DynamicRequirementFields({
               onChange={(e) => onChange(field.name, e.target.value)}
               placeholder={field.placeholder}
               className={baseInputClasses}
-              required={field.required}
+              required={!disableRequired && field.required}
             />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
@@ -265,7 +331,7 @@ export default function DynamicRequirementFields({
           htmlFor="process-type"
           className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
         >
-          Process Type <span className="text-red-500">*</span>
+          Process Type {!disableRequired && <span className="text-red-500">*</span>}
         </label>
         <select
           id="process-type"
@@ -276,7 +342,7 @@ export default function DynamicRequirementFields({
               ? "border-red-300 focus:border-red-500 focus:ring-red-500"
               : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
           }`}
-          required
+          required={!disableRequired}
         >
           <option value="">Select Process Type...</option>
           {processTypeOptions.map((option) => (

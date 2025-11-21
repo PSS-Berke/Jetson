@@ -262,17 +262,28 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     // Filter jobs by date range if toggle is enabled
     const filteredJobsByDate = filters.showOnlyInDateRange
       ? jobs.filter((job) => {
-          if (!job.start_date || !job.due_date || timeRanges.length === 0) {
+          // Check if job has valid dates (not null/undefined, but 0 is valid)
+          const hasStartDate = job.start_date != null && job.start_date !== undefined;
+          const hasDueDate = job.due_date != null && job.due_date !== undefined;
+          
+          // If job doesn't have both dates, exclude it when filter is enabled
+          if (!hasStartDate || !hasDueDate || timeRanges.length === 0) {
             return false;
           }
+
+          // Normalize dates to start of day for proper comparison
+          const jobStart = new Date(job.start_date);
+          const jobEnd = new Date(job.due_date);
+          jobStart.setHours(0, 0, 0, 0);
+          jobEnd.setHours(0, 0, 0, 0);
 
           const rangeStart = timeRanges[0].startDate.getTime();
           const rangeEnd = timeRanges[timeRanges.length - 1].endDate.getTime();
 
           // Job overlaps with date range if:
-          // - It starts before the range ends AND
-          // - It ends after the range starts
-          return job.start_date <= rangeEnd && job.due_date >= rangeStart;
+          // - It starts before or on the range end AND
+          // - It ends on or after the range start
+          return jobStart.getTime() <= rangeEnd && jobEnd.getTime() >= rangeStart;
         })
       : jobs;
 

@@ -51,33 +51,66 @@ const parseJob = (job: Job): ParsedJob => {
           parsedRequirements = job.requirements;
         }
         // Try parsing as a simple JSON array string
-        else if (
-          typeof job.requirements === "string" &&
-          job.requirements.trim().startsWith("[")
-        ) {
-          parsedRequirements = JSON.parse(job.requirements);
-        }
-        // Handle the old nested format with escaped JSON strings
         else if (typeof job.requirements === "string") {
-          const reqString = job.requirements.slice(1, -1); // Remove { and }
-          const matches = reqString.match(/"\{[^}]+\}"/g);
+          const trimmed = job.requirements.trim();
+          
+          // Try parsing as JSON array first
+          if (trimmed.startsWith("[")) {
+            try {
+              parsedRequirements = JSON.parse(trimmed);
+            } catch (parseError) {
+              console.warn(
+                `[parseJob] Failed to parse requirements as JSON array for job ${job.job_number}:`,
+                parseError,
+                "Raw value:",
+                trimmed.substring(0, 100),
+              );
+            }
+          }
+          // Try parsing as single JSON object (wrap in array)
+          else if (trimmed.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              parsedRequirements = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (parseError) {
+              console.warn(
+                `[parseJob] Failed to parse requirements as JSON object for job ${job.job_number}:`,
+                parseError,
+                "Raw value:",
+                trimmed.substring(0, 100),
+              );
+            }
+          }
+          // Handle the old nested format with escaped JSON strings
+          else {
+            const reqString = trimmed.slice(1, -1); // Remove { and }
+            const matches = reqString.match(/"\{[^}]+\}"/g);
 
-          if (matches) {
-            parsedRequirements = matches
-              .map((match: string) => {
-                try {
-                  // Remove the outer quotes and parse the JSON
-                  const cleaned = match.slice(1, -1).replace(/\\/g, "");
-                  const parsed = JSON.parse(cleaned);
-                  return parsed;
-                } catch {
-                  return null;
-                }
-              })
-              .filter(Boolean);
+            if (matches) {
+              parsedRequirements = matches
+                .map((match: string) => {
+                  try {
+                    // Remove the outer quotes and parse the JSON
+                    const cleaned = match.slice(1, -1).replace(/\\/g, "");
+                    const parsed = JSON.parse(cleaned);
+                    return parsed;
+                  } catch {
+                    return null;
+                  }
+                })
+                .filter(Boolean);
+            }
           }
         }
       } catch (error) {
+        console.error(
+          `[parseJob] Error parsing requirements for job ${job.job_number}:`,
+          error,
+          "Raw requirements:",
+          typeof job.requirements === "string"
+            ? job.requirements.substring(0, 200)
+            : job.requirements,
+        );
         parsedRequirements = [];
       }
     }

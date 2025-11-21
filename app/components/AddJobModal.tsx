@@ -675,20 +675,8 @@ export default function AddJobModal({
       return;
     }
 
-    // Step 1 (for new job or template creation): Validate job number, client ID, and facility
+    // Step 1 (for new job or template creation): Validate weekly split if present
     if (currentStep === 1 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate))) {
-      console.log(
-        "[AddJobModal] Validation - facilities_id:",
-        formData.facilities_id,
-      );
-      if (
-        !formData.job_number ||
-        !formData.clients_id ||
-        !formData.facilities_id
-      ) {
-        alert("Please fill in job number, client name, and facility");
-        return;
-      }
       // Validate weekly split if present
       if (
         formData.weekly_split.length > 0 &&
@@ -1413,12 +1401,12 @@ export default function AddJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Client <span className="text-red-500">*</span>
+                    Client
                   </label>
                   <SmartClientSelect
                     value={formData.clients_id}
                     onChange={handleClientChange}
-                    required
+                    required={false}
                     initialClientName={formData.client_name || undefined}
                   />
                 </div>
@@ -1453,7 +1441,7 @@ export default function AddJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Job # <span className="text-red-500">*</span>
+                    Job #
                   </label>
                   <input
                     type="text"
@@ -1462,12 +1450,11 @@ export default function AddJobModal({
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 43"
-                    required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Facility <span className="text-red-500">*</span>
+                    Facility
                   </label>
                   <FacilityToggle
                     currentFacility={formData.facilities_id}
@@ -1541,7 +1528,7 @@ export default function AddJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Quantity <span className="text-red-500">*</span>
+                    Quantity
                   </label>
                   <input
                     type="text"
@@ -1554,7 +1541,6 @@ export default function AddJobModal({
                     onChange={handleQuantityChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 73"
-                    required
                   />
                 </div>
               </div>
@@ -1999,10 +1985,6 @@ export default function AddJobModal({
                     type="button"
                     onClick={handleNext}
                     disabled={
-                      (currentStep === 1 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) &&
-                        (!formData.job_number ||
-                          !formData.clients_id ||
-                          !formData.quantity)) ||
                       (currentStep === 2 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) &&
                         formData.requirements.some((r) => {
                           if (!r.process_type) return true;
