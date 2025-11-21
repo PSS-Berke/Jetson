@@ -1514,33 +1514,6 @@ export default function AddJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Data
-                  </label>
-                  <select
-                    name="data_type"
-                    value={formData.data_type}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                  >
-                    <option value="">Select...</option>
-                    <option value="A">Data - A</option>
-                    <option value="HP Press">HP - HP Press</option>
-                    <option value="New machine type">Laser - New machine type</option>
-                    <option value="fold">Fold+ - fold</option>
-                    <option value="affix">Affix glue+ - affix</option>
-                    <option value="affix">Affix label+ - affix</option>
-                    <option value="inserters">Insert + - inserters</option>
-                    <option value="inserters">9-12 in + - inserters</option>
-                    <option value="inserters">13+ in + - inserters</option>
-                    <option value="inkjet">Ink jet + - inkjet</option>
-                    <option value="inserters">Sort - inserters</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Start Date
                   </label>
                   <input

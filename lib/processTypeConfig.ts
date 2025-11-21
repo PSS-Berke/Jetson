@@ -348,6 +348,54 @@ export const PROCESS_TYPE_CONFIGS: ProcessTypeConfig[] = [
       },
     ],
   },
+  {
+    key: "data",
+    label: "Data",
+    color: "#14B8A6", // Teal
+    fields: [],
+  },
+  {
+    key: "affixGlue",
+    label: "Affix glue+",
+    color: "#F59E0B", // Orange (maps to labelApply)
+    fields: [],
+  },
+  {
+    key: "affixLabel",
+    label: "Affix label+",
+    color: "#F59E0B", // Orange (maps to labelApply)
+    fields: [],
+  },
+  {
+    key: "insertPlus",
+    label: "Insert+",
+    color: "#3B82F6", // Blue (maps to insert)
+    fields: [],
+  },
+  {
+    key: "insert9to12",
+    label: "9-12 in+",
+    color: "#3B82F6", // Blue (maps to insert)
+    fields: [],
+  },
+  {
+    key: "insert13Plus",
+    label: "13+ in+",
+    color: "#3B82F6", // Blue (maps to insert)
+    fields: [],
+  },
+  {
+    key: "inkjetPlus",
+    label: "Ink jet+",
+    color: "#10B981", // Green (maps to inkjet)
+    fields: [],
+  },
+  {
+    key: "sortAlt",
+    label: "Sort",
+    color: "#3B82F6", // Blue (maps to insert per your spec)
+    fields: [],
+  },
 ];
 
 /**
@@ -392,6 +440,29 @@ export function getProcessTypeColor(processTypeKey: string): string {
  */
 export function normalizeProcessType(processType: string): string {
   const normalized = processType.toLowerCase().trim();
+
+  // Handle new alias mappings
+  if (normalized === "affixglue" || normalized === "affix glue+") {
+    return "labelApply";
+  }
+  if (normalized === "affixlabel" || normalized === "affix label+") {
+    return "labelApply";
+  }
+  if (normalized === "insertplus" || normalized === "insert+") {
+    return "insert";
+  }
+  if (normalized === "insert9to12" || normalized === "9-12 in+" || normalized === "9-12 in+") {
+    return "insert";
+  }
+  if (normalized === "insert13plus" || normalized === "13+ in+" || normalized === "13+ in+") {
+    return "insert";
+  }
+  if (normalized === "inkjetplus" || normalized === "ink jet+") {
+    return "inkjet";
+  }
+  if (normalized === "sortalt" || (normalized === "sort" && processType !== "Sort")) {
+    return "insert";
+  }
 
   // Handle common variations
   if (
