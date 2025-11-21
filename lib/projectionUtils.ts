@@ -561,6 +561,8 @@ export function calculateProcessTypeSummaries(
   timeRanges: TimeRange[],
 ): ProcessTypeSummary[] {
   const summaryMap = new Map<string, ProcessTypeSummary>();
+  // Track canonical display names (first occurrence's casing)
+  const canonicalNames = new Map<string, string>();
 
   jobProjections.forEach((projection) => {
     const job = projection.job;
@@ -574,9 +576,16 @@ export function calculateProcessTypeSummaries(
     // Process each requirement
     job.requirements.forEach((requirement) => {
       const processType = requirement.process_type || "Unknown";
+      // Normalize to lowercase for grouping (case-insensitive)
+      const normalizedKey = processType.toLowerCase();
+
+      // Store canonical name (first occurrence's casing)
+      if (!canonicalNames.has(normalizedKey)) {
+        canonicalNames.set(normalizedKey, processType);
+      }
 
       // Initialize summary for this process type if not exists
-      if (!summaryMap.has(processType)) {
+      if (!summaryMap.has(normalizedKey)) {
         const weeklyTotals = new Map<string, number>();
         const weeklyRevenues = new Map<string, number>();
         timeRanges.forEach((range) => {
@@ -584,8 +593,8 @@ export function calculateProcessTypeSummaries(
           weeklyRevenues.set(range.label, 0);
         });
 
-        summaryMap.set(processType, {
-          processType,
+        summaryMap.set(normalizedKey, {
+          processType: canonicalNames.get(normalizedKey) || processType,
           weeklyTotals,
           weeklyRevenues,
           grandTotal: 0,
@@ -594,7 +603,7 @@ export function calculateProcessTypeSummaries(
         });
       }
 
-      const summary = summaryMap.get(processType)!;
+      const summary = summaryMap.get(normalizedKey)!;
 
       // For each time period, add the job's quantity for this process
       // Quantities are distributed equally among all processes in the job
@@ -626,15 +635,16 @@ export function calculateProcessTypeSummaries(
       return;
     }
 
-    // Track which process types this job has
+    // Track which process types this job has (normalized keys)
     const processTypesInJob = new Set<string>();
     job.requirements.forEach((req) => {
-      processTypesInJob.add(req.process_type || "Unknown");
+      const processType = req.process_type || "Unknown";
+      processTypesInJob.add(processType.toLowerCase());
     });
 
     // Increment job count for each process type in this job
-    processTypesInJob.forEach((processType) => {
-      const summary = summaryMap.get(processType);
+    processTypesInJob.forEach((normalizedKey) => {
+      const summary = summaryMap.get(normalizedKey);
       if (summary) {
         summary.jobCount++;
       }
@@ -656,6 +666,8 @@ export function calculateProcessTypeSummariesByFacility(
   timeRanges: TimeRange[],
 ): ProcessTypeFacilitySummary[] {
   const summaryMap = new Map<string, ProcessTypeFacilitySummary>();
+  // Track canonical display names (first occurrence's casing)
+  const canonicalNames = new Map<string, string>();
 
   // Facility ID to name mapping
   const facilityNames: { [key: number]: string } = {
@@ -679,9 +691,16 @@ export function calculateProcessTypeSummariesByFacility(
     // Process each requirement
     job.requirements.forEach((requirement) => {
       const processType = requirement.process_type || "Unknown";
+      // Normalize to lowercase for grouping (case-insensitive)
+      const normalizedKey = processType.toLowerCase();
 
-      // Create composite key: processType-facilityId
-      const compositeKey = `${processType}-${facilityId}`;
+      // Store canonical name (first occurrence's casing)
+      if (!canonicalNames.has(normalizedKey)) {
+        canonicalNames.set(normalizedKey, processType);
+      }
+
+      // Create composite key: normalizedProcessType-facilityId
+      const compositeKey = `${normalizedKey}-${facilityId}`;
 
       // Initialize summary for this process type + facility combo if not exists
       if (!summaryMap.has(compositeKey)) {
@@ -693,7 +712,7 @@ export function calculateProcessTypeSummariesByFacility(
         });
 
         summaryMap.set(compositeKey, {
-          processType,
+          processType: canonicalNames.get(normalizedKey) || processType,
           facilityId,
           facilityName,
           weeklyTotals,
@@ -738,15 +757,16 @@ export function calculateProcessTypeSummariesByFacility(
 
     const facilityId = job.facilities_id || null;
 
-    // Track which process types this job has
+    // Track which process types this job has (normalized keys)
     const processTypesInJob = new Set<string>();
     job.requirements.forEach((req) => {
-      processTypesInJob.add(req.process_type || "Unknown");
+      const processType = req.process_type || "Unknown";
+      processTypesInJob.add(processType.toLowerCase());
     });
 
     // Increment job count for each process type + facility combo in this job
-    processTypesInJob.forEach((processType) => {
-      const compositeKey = `${processType}-${facilityId}`;
+    processTypesInJob.forEach((normalizedKey) => {
+      const compositeKey = `${normalizedKey}-${facilityId}`;
       const summary = summaryMap.get(compositeKey);
       if (summary) {
         summary.jobCount++;
