@@ -189,7 +189,7 @@ export default function DynamicRequirementFields({
               type="checkbox"
               id={fieldId}
               checked={value === "true" || value === 1 || (!!value && value !== "false")}
-              onChange={(e) => onChange(field.name, e.target.checked)}
+              onChange={(e) => onChange(field.name, e.target.checked ? "true" : "false")}
               className="w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-[var(--primary-blue)] focus:ring-2"
             />
             <span className="text-sm font-semibold text-[var(--text-dark)]">
