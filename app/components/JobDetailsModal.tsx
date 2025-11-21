@@ -487,18 +487,23 @@ export default function JobDetailsModal({
               if (job.requirements) {
                 if (Array.isArray(job.requirements)) {
                   parsedRequirements = job.requirements;
-                } else if (typeof job.requirements === "string") {
-                  try {
-                    // Try parsing as JSON string
-                    if (job.requirements.trim().startsWith("[")) {
-                      parsedRequirements = JSON.parse(job.requirements);
-                    } else if (job.requirements.trim().startsWith("{")) {
-                      // Handle single object wrapped in braces
-                      parsedRequirements = [JSON.parse(job.requirements)];
+                } else {
+                  // Type assertion needed because ParsedJob types requirements as array,
+                  // but at runtime it might still be a string in some cases
+                  const requirementsStr = job.requirements as unknown as string;
+                  if (typeof requirementsStr === "string") {
+                    try {
+                      // Try parsing as JSON string
+                      if (requirementsStr.trim().startsWith("[")) {
+                        parsedRequirements = JSON.parse(requirementsStr);
+                      } else if (requirementsStr.trim().startsWith("{")) {
+                        // Handle single object wrapped in braces
+                        parsedRequirements = [JSON.parse(requirementsStr)];
+                      }
+                    } catch (error) {
+                      console.error("[JobDetailsModal] Failed to parse requirements:", error, requirementsStr);
+                      parsedRequirements = [];
                     }
-                  } catch (error) {
-                    console.error("[JobDetailsModal] Failed to parse requirements:", error, job.requirements);
-                    parsedRequirements = [];
                   }
                 }
               }
