@@ -14,12 +14,14 @@ interface DynamicRequirementFieldsProps {
   };
   onChange: (field: string, value: string | number) => void;
   errors?: Record<string, string>;
+  disableRequired?: boolean;
 }
 
 export default function DynamicRequirementFields({
   requirement,
   onChange,
   errors = {},
+  disableRequired = false,
 }: DynamicRequirementFieldsProps) {
   const [dynamicFields, setDynamicFields] = useState<FieldConfig[]>([]);
   const [isLoadingFields, setIsLoadingFields] = useState(false);
@@ -194,7 +196,7 @@ export default function DynamicRequirementFields({
             />
             <span className="text-sm font-semibold text-[var(--text-dark)]">
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </span>
           </label>
           {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
@@ -211,14 +213,14 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <select
               id={fieldId}
               value={value as string}
               onChange={(e) => onChange(field.name, e.target.value)}
               className={baseInputClasses}
-              required={field.required}
+              required={!disableRequired && field.required}
             >
               <option value="">Select {field.label}...</option>
               {field.options?.map((option) => (
@@ -240,7 +242,7 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
@@ -259,7 +261,7 @@ export default function DynamicRequirementFields({
               step={field.validation?.step || (isInteger ? 1 : undefined)}
               placeholder={field.placeholder}
               className={baseInputClasses}
-              required={field.required}
+              required={!disableRequired && field.required}
             />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
@@ -273,7 +275,7 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -288,7 +290,7 @@ export default function DynamicRequirementFields({
                 step={field.validation?.step || 0.01}
                 placeholder={field.placeholder || "0.00"}
                 className={`${baseInputClasses} pl-8`}
-                required={field.required}
+                required={!disableRequired && field.required}
               />
             </div>
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
@@ -304,7 +306,7 @@ export default function DynamicRequirementFields({
               className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
             >
               {field.label}{" "}
-              {field.required && <span className="text-red-500">*</span>}
+              {!disableRequired && field.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="text"
@@ -313,7 +315,7 @@ export default function DynamicRequirementFields({
               onChange={(e) => onChange(field.name, e.target.value)}
               placeholder={field.placeholder}
               className={baseInputClasses}
-              required={field.required}
+              required={!disableRequired && field.required}
             />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
@@ -329,7 +331,7 @@ export default function DynamicRequirementFields({
           htmlFor="process-type"
           className="block text-sm font-semibold text-[var(--text-dark)] mb-2"
         >
-          Process Type <span className="text-red-500">*</span>
+          Process Type {!disableRequired && <span className="text-red-500">*</span>}
         </label>
         <select
           id="process-type"
@@ -340,7 +342,7 @@ export default function DynamicRequirementFields({
               ? "border-red-300 focus:border-red-500 focus:ring-red-500"
               : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
           }`}
-          required
+          required={!disableRequired}
         >
           <option value="">Select Process Type...</option>
           {processTypeOptions.map((option) => (

@@ -590,43 +590,6 @@ export default function EditJobModal({
   };
 
   const handleNext = () => {
-    if (currentStep === 1) {
-      if (!formData.job_number || !formData.clients_id) {
-        alert("Please fill in job number and client name");
-        return;
-      }
-      // Validate weekly split if present
-      if (
-        formData.weekly_split.length > 0 &&
-        getWeeklySplitDifference() !== 0
-      ) {
-        alert("Weekly split total must equal the total quantity");
-        return;
-      }
-    }
-
-    // Validate step 2 - all requirements must have required fields based on their process type
-    if (currentStep === 2) {
-      const allRequirementsValid = formData.requirements.every((r) => {
-        if (!r.process_type) return false;
-
-        const config = getProcessTypeConfig(r.process_type);
-        if (!config) return false;
-
-        // Check all required fields for this process type
-        return config.fields.every((field) => {
-          if (!field.required) return true;
-          const value = r[field.name];
-          return value !== undefined && value !== null && value !== "";
-        });
-      });
-
-      if (!allRequirementsValid) {
-        alert("Please fill in all required fields for each requirement");
-        return;
-      }
-    }
-
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
       // Reset schedule type to soft schedule when entering review step
@@ -662,17 +625,6 @@ export default function EditJobModal({
         ? new Date(formData.due_date).getTime()
         : undefined;
 
-      // Validate that we have at least one machine selected
-      if (!formData.machines_id || formData.machines_id.length === 0) {
-        alert("Please select at least one machine");
-        return;
-      }
-
-      // Validate that we have requirements
-      if (!formData.requirements || formData.requirements.length === 0) {
-        alert("Please add at least one requirement");
-        return;
-      }
 
       // Calculate total billing from requirements
       const quantity = parseInt(formData.quantity);
@@ -914,13 +866,12 @@ export default function EditJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Client <span className="text-red-500">*</span>
+                    Client
                   </label>
                   <SmartClientSelect
                     value={formData.clients_id}
                     onChange={handleClientChange}
                     initialClientName={formData.client_name}
-                    required
                   />
                 </div>
                 <div>
@@ -957,7 +908,7 @@ export default function EditJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Job # <span className="text-red-500">*</span>
+                    Job #
                   </label>
                   <input
                     type="text"
@@ -966,12 +917,11 @@ export default function EditJobModal({
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 43"
-                    required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Facility <span className="text-red-500">*</span>
+                    Facility
                   </label>
                   <FacilityToggle
                     key={`facility-${job.id}-${formData.facilities_id}`}
@@ -1046,7 +996,7 @@ export default function EditJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Quantity <span className="text-red-500">*</span>
+                    Quantity
                   </label>
                   <input
                     type="text"
@@ -1059,7 +1009,6 @@ export default function EditJobModal({
                     onChange={handleQuantityChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 73"
-                    required
                   />
                 </div>
               </div>
@@ -1234,6 +1183,7 @@ export default function EditJobModal({
                     onChange={(field, value) =>
                       handleRequirementChange(index, field, value)
                     }
+                    disableRequired={true}
                   />
                 </div>
               ))}
@@ -1466,28 +1416,7 @@ export default function EditJobModal({
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={
-                    (currentStep === 1 &&
-                      (!formData.job_number ||
-                        !formData.clients_id ||
-                        !formData.quantity)) ||
-                    (currentStep === 2 &&
-                      formData.requirements.some((r) => {
-                        if (!r.process_type) return true;
-                        const config = getProcessTypeConfig(r.process_type);
-                        if (!config) return true;
-                        return config.fields.some((field) => {
-                          if (!field.required) return false;
-                          const value = r[field.name];
-                          return (
-                            value === undefined ||
-                            value === null ||
-                            value === ""
-                          );
-                        });
-                      }))
-                  }
-                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
                 >
                   Next
                 </button>
