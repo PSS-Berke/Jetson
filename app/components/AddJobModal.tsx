@@ -33,6 +33,7 @@ interface JobFormData {
   quantity: string;
   csr: string;
   prgm: string;
+  data_type: string;
   facilities_id: number | null;
   start_date: string;
   due_date: string;
@@ -79,7 +80,7 @@ export default function AddJobModal({
     newValue: number;
   } | null>(null);
   const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
-  
+
   // Template selection state
   const [selectedTemplateClientId, setSelectedTemplateClientId] = useState<number | null>(null);
   const [selectedTemplateClientName, setSelectedTemplateClientName] = useState<string>("");
@@ -99,6 +100,7 @@ export default function AddJobModal({
     quantity: "",
     csr: "",
     prgm: "",
+    data_type: "",
     facilities_id: null,
     start_date: "",
     due_date: "",
@@ -256,6 +258,7 @@ export default function AddJobModal({
         quantity: "",
         csr: "",
         prgm: "",
+        data_type: "",
         facilities_id: null,
         start_date: "",
         due_date: "",
@@ -303,7 +306,7 @@ export default function AddJobModal({
   // Load template data into form
   const loadTemplateIntoForm = (template: JobTemplate) => {
     const templateData = template.template;
-    
+
     // Parse requirements if they're a string
     let requirements: Requirement[] = [
       {
@@ -311,7 +314,7 @@ export default function AddJobModal({
         price_per_m: "",
       },
     ];
-    
+
     if (templateData.requirements) {
       if (typeof templateData.requirements === "string") {
         try {
@@ -352,15 +355,16 @@ export default function AddJobModal({
       quantity: templateData.quantity?.toString() || "",
       csr: templateData.csr || "",
       prgm: templateData.prgm || "",
+      data_type: templateData.data_type || "",
       facilities_id: templateData.facilities_id || null,
       start_date: formatDate(templateData.start_date),
       due_date: formatDate(templateData.due_date),
       service_type: templateData.service_type || "insert",
       pockets: templateData.pockets?.toString() || "2",
-      machines_id: Array.isArray(templateData.machines_id) 
-        ? templateData.machines_id 
-        : templateData.machines_id 
-          ? [templateData.machines_id] 
+      machines_id: Array.isArray(templateData.machines_id)
+        ? templateData.machines_id
+        : templateData.machines_id
+          ? [templateData.machines_id]
           : [],
       requirements: requirements.length > 0 ? requirements : [
         {
@@ -368,11 +372,11 @@ export default function AddJobModal({
           price_per_m: "",
         },
       ],
-      weekly_split: Array.isArray(templateData.weekly_split) 
-        ? templateData.weekly_split 
+      weekly_split: Array.isArray(templateData.weekly_split)
+        ? templateData.weekly_split
         : [],
-      locked_weeks: Array.isArray(templateData.locked_weeks) 
-        ? templateData.locked_weeks 
+      locked_weeks: Array.isArray(templateData.locked_weeks)
+        ? templateData.locked_weeks
         : [],
       price_per_m: templateData.price_per_m?.toString() || "",
       add_on_charges: templateData.add_on_charges?.toString() || "",
@@ -646,7 +650,7 @@ export default function AddJobModal({
 
   const handleNext = () => {
     // Step 0: Mode selection (handled by handleModeSelection)
-    
+
     // Step 1: For template mode, validate client selection (if not creating template)
     if (currentStep === 1 && creationMode === "template" && !isCreatingTemplate) {
       if (!selectedTemplateClientId) {
@@ -837,6 +841,7 @@ export default function AddJobModal({
         due_date: formData.due_date ? new Date(formData.due_date).getTime() : undefined,
         service_type: formData.service_type,
         pockets: formData.pockets,
+        data_type: formData.data_type,
         machines_id: formData.machines_id,
         requirements: formData.requirements,
         weekly_split: formData.weekly_split,
@@ -855,7 +860,7 @@ export default function AddJobModal({
       // Refresh templates
       const fetchedTemplates = await getJobTemplates(selectedTemplateClientId);
       setTemplates(fetchedTemplates);
-      
+
       // Select the newly created template (it should be the last one)
       if (fetchedTemplates.length > 0) {
         const newTemplate = fetchedTemplates[fetchedTemplates.length - 1];
@@ -865,7 +870,7 @@ export default function AddJobModal({
       // Exit template creation mode and go back to template selection
       setIsCreatingTemplate(false);
       setCurrentStep(2);
-      
+
       alert("Template saved successfully!");
     } catch (error: any) {
       console.error("Error saving template:", error);
@@ -1009,6 +1014,7 @@ export default function AddJobModal({
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
+        data_type: formData.data_type,
         price_per_m: (parseFloat(formData.price_per_m) || 0).toString(),
         add_on_charges: addOnCharges.toString(),
         ext_price: (parseFloat(formData.ext_price) || 0).toString(),
@@ -1114,6 +1120,7 @@ export default function AddJobModal({
         quantity: "",
         csr: "",
         prgm: "",
+        data_type: "",
         facilities_id: null,
         start_date: "",
         due_date: "",
@@ -1186,7 +1193,7 @@ export default function AddJobModal({
                 : creationMode === "template" && isCreatingTemplate
                   ? [1, 2, 3] // Job Details -> Requirements -> Review (no mode step shown)
                   : [0, 1, 2, 3]; // Mode -> Job Details -> Requirements -> Review
-              
+
               return steps.map((step, index) => (
                 <div
                   key={step}
@@ -1195,25 +1202,23 @@ export default function AddJobModal({
                 >
                   <div className="flex items-center">
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                        step === currentStep
+                      className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${step === currentStep
                           ? "bg-[#EF3340] text-white"
                           : step < currentStep
                             ? "bg-[#2E3192] text-white"
                             : "bg-gray-200 text-gray-500"
-                      }`}
+                        }`}
                     >
                       {step < currentStep ? "✓" : step === 0 ? "•" : step}
                     </div>
                     <div className="ml-3">
                       <div
-                        className={`text-xs font-medium whitespace-nowrap ${
-                          step === currentStep
+                        className={`text-xs font-medium whitespace-nowrap ${step === currentStep
                             ? "text-[#EF3340]"
                             : step < currentStep
                               ? "text-[#2E3192]"
                               : "text-gray-500"
-                        }`}
+                          }`}
                       >
                         {getStepLabel(step)}
                       </div>
@@ -1221,9 +1226,8 @@ export default function AddJobModal({
                   </div>
                   {index < steps.length - 1 && (
                     <div
-                      className={`h-0.5 flex-1 mx-4 ${
-                        step < currentStep ? "bg-[#2E3192]" : "bg-gray-200"
-                      }`}
+                      className={`h-0.5 flex-1 mx-4 ${step < currentStep ? "bg-[#2E3192]" : "bg-gray-200"
+                        }`}
                     />
                   )}
                 </div>
@@ -1248,7 +1252,7 @@ export default function AddJobModal({
                   Choose to create a new job from scratch or use an existing template
                 </p>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* New Job Option */}
                 <button
@@ -1302,7 +1306,7 @@ export default function AddJobModal({
                   Choose the client to view their job templates
                 </p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                   Client <span className="text-red-500">*</span>
@@ -1332,7 +1336,7 @@ export default function AddJobModal({
                   Choose a template to use as the base for your new job
                 </p>
               </div>
-              
+
               {loadingTemplates ? (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-blue)]"></div>
@@ -1367,11 +1371,10 @@ export default function AddJobModal({
                       key={template.id}
                       type="button"
                       onClick={() => setSelectedTemplate(template)}
-                      className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
-                        selectedTemplate?.id === template.id
+                      className={`w-full p-4 border-2 rounded-lg text-left transition-all ${selectedTemplate?.id === template.id
                           ? "border-[var(--primary-blue)] bg-blue-50"
                           : "border-[var(--border)] hover:border-blue-300 hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -1511,6 +1514,33 @@ export default function AddJobModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Data
+                  </label>
+                  <select
+                    name="data_type"
+                    value={formData.data_type}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                  >
+                    <option value="">Select...</option>
+                    <option value="A">Data - A</option>
+                    <option value="HP Press">HP - HP Press</option>
+                    <option value="New machine type">Laser - New machine type</option>
+                    <option value="fold">Fold+ - fold</option>
+                    <option value="affix">Affix glue+ - affix</option>
+                    <option value="affix">Affix label+ - affix</option>
+                    <option value="inserters">Insert + - inserters</option>
+                    <option value="inserters">9-12 in + - inserters</option>
+                    <option value="inserters">13+ in + - inserters</option>
+                    <option value="inkjet">Ink jet + - inkjet</option>
+                    <option value="inserters">Sort - inserters</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Start Date
                   </label>
                   <input
@@ -1565,11 +1595,10 @@ export default function AddJobModal({
                       weeks)
                     </h4>
                     <div
-                      className={`text-sm font-semibold ${
-                        getWeeklySplitDifference() === 0
+                      className={`text-sm font-semibold ${getWeeklySplitDifference() === 0
                           ? "text-green-600"
                           : "text-red-600"
-                      }`}
+                        }`}
                     >
                       Total: {getWeeklySplitSum().toLocaleString()} /{" "}
                       {parseInt(formData.quantity || "0").toLocaleString()}
@@ -1627,11 +1656,10 @@ export default function AddJobModal({
                               onChange={(e) =>
                                 handleWeeklySplitChange(index, e.target.value)
                               }
-                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
-                                isLocked
+                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${isLocked
                                   ? "bg-blue-50 border-blue-300 font-semibold pr-8"
                                   : "border-[var(--border)]"
-                              }`}
+                                }`}
                               title={
                                 isLocked
                                   ? "This week is locked and won't be auto-adjusted"
@@ -1748,7 +1776,7 @@ export default function AddJobModal({
               {isCreatingTemplate && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
                   <p className="text-sm text-yellow-800 font-medium">
-                    Creating a template for {selectedTemplateClientId ? "this client" : "the selected client"}. 
+                    Creating a template for {selectedTemplateClientId ? "this client" : "the selected client"}.
                     Fill out the form below and click &quot;Save Template&quot; when done.
                   </p>
                 </div>
