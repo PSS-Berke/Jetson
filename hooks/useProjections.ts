@@ -59,6 +59,7 @@ export interface ProcessTypeCounts {
   fold: { jobs: number; pieces: number };
   laser: { jobs: number; pieces: number };
   hpPress: { jobs: number; pieces: number };
+  data: { jobs: number; pieces: number };
 }
 
 export interface ProjectionsData {
@@ -106,6 +107,7 @@ function calculateProcessTypeCounts(
     fold: { jobs: 0, pieces: 0 },
     laser: { jobs: 0, pieces: 0 },
     hpPress: { jobs: 0, pieces: 0 },
+    data: { jobs: 0, pieces: 0 },
   };
 
   // Track which jobs have already been counted for each process type
@@ -175,6 +177,10 @@ function calculateProcessTypeCounts(
           case "hpPress":
             counts.hpPress.jobs++;
             counts.hpPress.pieces += jobQuantity;
+            break;
+          case "data":
+            counts.data.jobs++;
+            counts.data.pieces += jobQuantity;
             break;
         }
       }
@@ -526,6 +532,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           fold: { jobs: 0, pieces: 0 },
           laser: { jobs: 0, pieces: 0 },
           hpPress: { jobs: 0, pieces: 0 },
+          data: { jobs: 0, pieces: 0 },
         },
         totalRevenue: 0,
         totalJobsInTimeframe: 0,
