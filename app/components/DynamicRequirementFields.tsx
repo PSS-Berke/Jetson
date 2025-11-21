@@ -188,7 +188,7 @@ export default function DynamicRequirementFields({
             <input
               type="checkbox"
               id={fieldId}
-              checked={value === true || value === "true"}
+              checked={value === "true" || value === 1 || (!!value && value !== false && value !== "false")}
               onChange={(e) => onChange(field.name, e.target.checked)}
               className="w-5 h-5 text-[var(--primary-blue)] border-gray-300 rounded focus:ring-[var(--primary-blue)] focus:ring-2"
             />
