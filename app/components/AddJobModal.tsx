@@ -1203,10 +1203,10 @@ export default function AddJobModal({
                   <div className="flex items-center">
                     <div
                       className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${step === currentStep
-                          ? "bg-[#EF3340] text-white"
-                          : step < currentStep
-                            ? "bg-[#2E3192] text-white"
-                            : "bg-gray-200 text-gray-500"
+                        ? "bg-[#EF3340] text-white"
+                        : step < currentStep
+                          ? "bg-[#2E3192] text-white"
+                          : "bg-gray-200 text-gray-500"
                         }`}
                     >
                       {step < currentStep ? "✓" : step === 0 ? "•" : step}
@@ -1214,10 +1214,10 @@ export default function AddJobModal({
                     <div className="ml-3">
                       <div
                         className={`text-xs font-medium whitespace-nowrap ${step === currentStep
-                            ? "text-[#EF3340]"
-                            : step < currentStep
-                              ? "text-[#2E3192]"
-                              : "text-gray-500"
+                          ? "text-[#EF3340]"
+                          : step < currentStep
+                            ? "text-[#2E3192]"
+                            : "text-gray-500"
                           }`}
                       >
                         {getStepLabel(step)}
@@ -1372,8 +1372,8 @@ export default function AddJobModal({
                       type="button"
                       onClick={() => setSelectedTemplate(template)}
                       className={`w-full p-4 border-2 rounded-lg text-left transition-all ${selectedTemplate?.id === template.id
-                          ? "border-[var(--primary-blue)] bg-blue-50"
-                          : "border-[var(--border)] hover:border-blue-300 hover:bg-gray-50"
+                        ? "border-[var(--primary-blue)] bg-blue-50"
+                        : "border-[var(--border)] hover:border-blue-300 hover:bg-gray-50"
                         }`}
                     >
                       <div className="flex items-center justify-between">
@@ -1596,8 +1596,8 @@ export default function AddJobModal({
                     </h4>
                     <div
                       className={`text-sm font-semibold ${getWeeklySplitDifference() === 0
-                          ? "text-green-600"
-                          : "text-red-600"
+                        ? "text-green-600"
+                        : "text-red-600"
                         }`}
                     >
                       Total: {getWeeklySplitSum().toLocaleString()} /{" "}
@@ -1657,8 +1657,8 @@ export default function AddJobModal({
                                 handleWeeklySplitChange(index, e.target.value)
                               }
                               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${isLocked
-                                  ? "bg-blue-50 border-blue-300 font-semibold pr-8"
-                                  : "border-[var(--border)]"
+                                ? "bg-blue-50 border-blue-300 font-semibold pr-8"
+                                : "border-[var(--border)]"
                                 }`}
                               title={
                                 isLocked
