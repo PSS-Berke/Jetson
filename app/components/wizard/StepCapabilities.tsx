@@ -22,8 +22,6 @@ import {
 } from "@/lib/api";
 import {
   validateFieldName,
-  suggestNamespacedFieldName,
-  isReservedFieldName,
 } from "@/lib/capabilityValidation";
 
 interface StepCapabilitiesProps {
@@ -97,15 +95,15 @@ export default function StepCapabilities({
   const isInitialMountRef = useRef(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-generate field name from field label (convert to snake_case with custom_ prefix)
+  // Auto-generate field name from field label (convert to snake_case)
   const generateFieldName = (label: string): string => {
     const baseName = label
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
 
-    // Use validation library to ensure proper namespacing
-    return suggestNamespacedFieldName(baseName);
+    // Return the snake_case name without prefix
+    return baseName;
   };
 
   // Function to load machine variables from API (only called when process type is clicked)
