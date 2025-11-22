@@ -388,10 +388,18 @@ export default function StepCapabilities({
       updatedFields[editingFieldIndex] = newField;
       onSetFormBuilderFields(updatedFields);
       setEditingFieldIndex(null);
-      // Auto-save will be triggered by useEffect when formBuilderFields updates
+      // Save to API immediately when updating a field
+      if (machineVariablesId) {
+        saveFieldsToAPI(updatedFields);
+      }
     } else {
       onAddFormBuilderField(newField);
-      // Auto-save will be triggered by useEffect when formBuilderFields updates
+      // Save to API immediately when adding a new field (even if auto-save is disabled)
+      // Include all existing fields plus the new field
+      const fieldsWithNewField = [...formBuilderFields, newField];
+      if (machineVariablesId) {
+        saveFieldsToAPI(fieldsWithNewField);
+      }
     }
 
     // Reset form
@@ -438,7 +446,11 @@ export default function StepCapabilities({
 
   const handleRemoveField = (id: string) => {
     onRemoveFormBuilderField(id);
-    // Auto-save will be triggered by useEffect when formBuilderFields updates
+    // Save to API immediately when removing a field (even if auto-save is disabled)
+    const fieldsAfterRemoval = formBuilderFields.filter((field) => field.id !== id);
+    if (machineVariablesId) {
+      saveFieldsToAPI(fieldsAfterRemoval);
+    }
   };
 
   const handleFieldValueChange = (
@@ -534,6 +546,13 @@ export default function StepCapabilities({
       );
       if (fieldToRemove) {
         onRemoveFormBuilderField(fieldToRemove.id);
+        // Save to API immediately when removing a field (even if auto-save is disabled)
+        const fieldsAfterRemoval = formBuilderFields.filter(
+          (field) => field.id !== fieldToRemove.id,
+        );
+        if (machineVariablesId) {
+          saveFieldsToAPI(fieldsAfterRemoval);
+        }
       }
     } else {
       // Add the field with a new unique ID
@@ -542,6 +561,11 @@ export default function StepCapabilities({
         id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       };
       onAddFormBuilderField(newField);
+      // Save to API immediately when selecting a field from saved processes (even if auto-save is disabled)
+      const fieldsWithNewField = [...formBuilderFields, newField];
+      if (machineVariablesId) {
+        saveFieldsToAPI(fieldsWithNewField);
+      }
     }
   };
 

@@ -103,6 +103,7 @@ const apiFetch = async <T = unknown>(
     const isMachineGroupsEndpoint = endpoint.includes("/machine_groups");
     const isVariableCombinationsEndpoint = endpoint.includes("/variable_combinations");
     const isMachineVariablesEndpoint = endpoint.includes("/machine_variables");
+    const isCapabilityBucketsEndpoint = endpoint.includes("/capability_buckets");
 
     // Log error details for debugging (unless it's an expected endpoint error)
     if (
@@ -111,7 +112,8 @@ const apiFetch = async <T = unknown>(
       !isMachineRulesEndpoint &&
       !isMachineGroupsEndpoint &&
       !isVariableCombinationsEndpoint &&
-      !isMachineVariablesEndpoint
+      !isMachineVariablesEndpoint &&
+      !isCapabilityBucketsEndpoint
     ) {
       console.error("[API Error]", {
         endpoint,
@@ -1972,4 +1974,83 @@ export const deleteJobTemplate = async (jobTemplatesId: number): Promise<void> =
   }
 
   console.log("[deleteJobTemplate] Template deleted successfully");
+};
+
+// ============================================================================
+// Capability Buckets API Functions
+// ============================================================================
+
+/**
+ * Capability Bucket interface
+ */
+export interface CapabilityBucket {
+  id: number;
+  created_at: string;
+  name: string;
+  capabilities: Record<string, any>;
+}
+
+/**
+ * Get all capability buckets
+ * @returns Array of capability buckets
+ */
+export const getCapabilityBuckets = async (): Promise<CapabilityBucket[]> => {
+  console.log("[getCapabilityBuckets] Fetching capability buckets");
+  const result = await apiFetch<CapabilityBucket[]>("/capability_buckets", {
+    method: "GET",
+  });
+  console.log("[getCapabilityBuckets] Received", result.length, "capability buckets");
+  return result;
+};
+
+/**
+ * Create a new capability bucket
+ * @param bucketData - The capability bucket data with name and capabilities
+ * @returns Created capability bucket
+ */
+export const createCapabilityBucket = async (bucketData: {
+  name: string;
+  capabilities: Record<string, any>;
+}): Promise<CapabilityBucket> => {
+  console.log("[createCapabilityBucket] Creating capability bucket:", bucketData);
+  const result = await apiFetch<CapabilityBucket>("/capability_buckets", {
+    method: "POST",
+    body: JSON.stringify(bucketData),
+  });
+  console.log("[createCapabilityBucket] Capability bucket created:", result);
+  return result;
+};
+
+/**
+ * Update an existing capability bucket
+ * @param bucketId - The capability bucket ID
+ * @param bucketData - The updated capability bucket data
+ * @returns Updated capability bucket
+ */
+export const updateCapabilityBucket = async (
+  bucketId: number,
+  bucketData: {
+    name: string;
+    capabilities: Record<string, any>;
+  },
+): Promise<CapabilityBucket> => {
+  console.log("[updateCapabilityBucket] Updating capability bucket:", bucketId, bucketData);
+  const result = await apiFetch<CapabilityBucket>(`/capability_buckets/${bucketId}`, {
+    method: "PUT",
+    body: JSON.stringify(bucketData),
+  });
+  console.log("[updateCapabilityBucket] Capability bucket updated:", result);
+  return result;
+};
+
+/**
+ * Delete a capability bucket
+ * @param bucketId - The capability bucket ID
+ */
+export const deleteCapabilityBucket = async (bucketId: number): Promise<void> => {
+  console.log("[deleteCapabilityBucket] Deleting capability bucket:", bucketId);
+  await apiFetch<void>(`/capability_buckets/${bucketId}`, {
+    method: "DELETE",
+  });
+  console.log("[deleteCapabilityBucket] Capability bucket deleted successfully");
 };
