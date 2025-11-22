@@ -551,13 +551,7 @@ export default function StepCapabilities({
       );
       if (fieldToRemove) {
         onRemoveFormBuilderField(fieldToRemove.id);
-        // Save to API immediately when removing a field (even if auto-save is disabled)
-        const fieldsAfterRemoval = formBuilderFields.filter(
-          (field) => field.id !== fieldToRemove.id,
-        );
-        if (machineVariablesId) {
-          saveFieldsToAPI(fieldsAfterRemoval);
-        }
+        // Don't save to API when selecting from saved processes - let auto-save or form submission handle it
       }
     } else {
       // Add the field with a new unique ID
@@ -566,11 +560,7 @@ export default function StepCapabilities({
         id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       };
       onAddFormBuilderField(newField);
-      // Save to API immediately when selecting a field from saved processes (even if auto-save is disabled)
-      const fieldsWithNewField = [...formBuilderFields, newField];
-      if (machineVariablesId) {
-        saveFieldsToAPI(fieldsWithNewField);
-      }
+      // Don't save to API when selecting from saved processes - let auto-save or form submission handle it
     }
   };
 
