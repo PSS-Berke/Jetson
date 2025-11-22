@@ -50,6 +50,7 @@ interface StepCapabilitiesProps {
   onRemoveFormBuilderField: (id: string) => void;
   errors: Record<string, string>;
   disableAutoSave?: boolean; // When true, prevents PATCH machine variables on value changes
+  isEditMode?: boolean; // When true, indicates editing existing machine (don't clear pre-loaded fields)
 }
 
 export default function StepCapabilities({
@@ -75,6 +76,7 @@ export default function StepCapabilities({
   onRemoveFormBuilderField,
   errors,
   disableAutoSave = false,
+  isEditMode = false,
 }: StepCapabilitiesProps) {
   const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(
     null,
@@ -290,7 +292,10 @@ export default function StepCapabilities({
         setAvailableFields(fields);
         // Clear existing form builder fields when process type changes
         // User will need to select which fields they want
-        onSetFormBuilderFields([]);
+        // EXCEPT when in edit mode - preserve pre-loaded fields from saved machine data
+        if (!isEditMode) {
+          onSetFormBuilderFields([]);
+        }
       } else {
         // No variables for this process type
         console.warn(

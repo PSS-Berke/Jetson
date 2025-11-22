@@ -36,7 +36,7 @@ import Toast from "./Toast";
 interface CreateMachineWizardProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (processTypeKey: string) => void;
 }
 
 const WIZARD_STEPS = [
@@ -264,23 +264,28 @@ export default function CreateMachineWizard({
         
       }
 
-      // Step 4: Create rules
-      for (const rule of state.rules) {
-        await createMachineRule({
-          name: rule.name,
-          process_type_key:
-            state.process_type_key || state.customProcessTypeName,
-          machine_id: variableCombinationId
-            ? undefined
-            : createdMachines.length === 1
-              ? createdMachines[0].id
-              : undefined,
-          machine_group_id: variableCombinationId,
-          priority: rule.priority,
-          conditions: rule.conditions,
-          outputs: rule.outputs,
-          active: true,
-        });
+      // Step 4: Create rules (optional - may fail if endpoint not configured)
+      try {
+        for (const rule of state.rules) {
+          await createMachineRule({
+            name: rule.name,
+            process_type_key:
+              state.process_type_key || state.customProcessTypeName,
+            machine_id: variableCombinationId
+              ? undefined
+              : createdMachines.length === 1
+                ? createdMachines[0].id
+                : undefined,
+            machine_group_id: variableCombinationId,
+            priority: rule.priority,
+            conditions: rule.conditions,
+            outputs: rule.outputs,
+            active: true,
+          });
+        }
+      } catch (error) {
+        console.warn("[CreateMachineWizard] Machine rules creation failed (endpoint may not be configured):", error);
+        // Continue with machine creation even if rules fail
       }
 
       // Step 5: Save machine variables (form builder fields + values)
@@ -366,7 +371,12 @@ export default function CreateMachineWizard({
 
       // Wait a moment for toast to show, then close and callback
       setTimeout(() => {
-        onSuccess?.();
+        const processType = state.isCustomProcessType
+          ? state.customProcessTypeName
+          : state.process_type_key;
+        if (processType) {
+          onSuccess?.(processType);
+        }
         onClose();
       }, 1500);
     } catch (error: any) {

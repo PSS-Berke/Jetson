@@ -1617,11 +1617,18 @@ export const getMachineRules = async (
     : "/machine_rules";
 
   console.log("[getMachineRules] Fetching rules from:", endpoint);
-  const result = await apiFetch<MachineRule[]>(endpoint, {
-    method: "GET",
-  });
-  console.log("[getMachineRules] Received", result.length, "rules");
-  return result;
+
+  try {
+    const result = await apiFetch<MachineRule[]>(endpoint, {
+      method: "GET",
+    });
+    console.log("[getMachineRules] Received", result.length, "rules");
+    return result;
+  } catch (error) {
+    // If endpoint is not configured, return empty array
+    console.log("[getMachineRules] Endpoint not available, returning empty array");
+    return [];
+  }
 };
 
 /**

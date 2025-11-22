@@ -34,8 +34,6 @@ interface ProjectionFiltersProps {
   onFilterModeChange: (mode: "and" | "or") => void;
   filterViewMode: "simple" | "advanced";
   onFilterViewModeChange: (mode: "simple" | "advanced") => void;
-  dataDisplayMode: "pieces" | "revenue";
-  onDataDisplayModeChange: (mode: "pieces" | "revenue") => void;
   showExpandedProcesses?: boolean;
   onShowExpandedProcessesChange?: (show: boolean) => void;
   mobileViewMode?: "cards" | "table";
@@ -67,8 +65,6 @@ export default function ProjectionFilters({
   onFilterModeChange,
   filterViewMode,
   onFilterViewModeChange,
-  dataDisplayMode,
-  onDataDisplayModeChange,
   showExpandedProcesses = true,
   onShowExpandedProcessesChange,
   mobileViewMode = "cards",
@@ -640,30 +636,6 @@ export default function ProjectionFilters({
                 }`}
               >
                 Soft
-              </button>
-            </div>
-
-            {/* Pieces vs Revenue Toggle */}
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => onDataDisplayModeChange("pieces")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  dataDisplayMode === "pieces"
-                    ? "bg-white text-[var(--primary-blue)] shadow-sm"
-                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
-                }`}
-              >
-                Pieces
-              </button>
-              <button
-                onClick={() => onDataDisplayModeChange("revenue")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  dataDisplayMode === "revenue"
-                    ? "bg-white text-green-600 shadow-sm"
-                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
-                }`}
-              >
-                Revenue
               </button>
             </div>
 

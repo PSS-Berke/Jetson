@@ -71,6 +71,7 @@ export default function EditMachineModal({
   const [rules, setRules] = useState<RuleFormData[]>([]);
   const initializedRef = useRef<number | null>(null);
   const machineIdRef = useRef<number | null>(null);
+  const variablesLoadedRef = useRef<boolean>(false);
 
   // Extract stable machine ID
   const machineId = useMemo(() => machine?.id ?? null, [machine?.id]);
@@ -123,8 +124,11 @@ export default function EditMachineModal({
   };
 
   // Load machine variables
-  const loadMachineVariables = useCallback(async (processKey: string) => {
+  const loadMachineVariables = useCallback(async (processKey: string, capsToUse?: Record<string, MachineCapabilityValue>) => {
     try {
+      // Use provided capabilities or fall back to state
+      const currentCapabilities = capsToUse || capabilities;
+
       const allVariables = await getAllMachineVariables();
       const processTypeGroup = allVariables.find(
         (group: any) => group.type === processKey,
@@ -132,18 +136,26 @@ export default function EditMachineModal({
 
       if (processTypeGroup && processTypeGroup.id) {
         setMachineVariablesId(processTypeGroup.id);
-        
+
         // Convert to FormBuilderField format
         let fields: FormBuilderField[] = [];
         if (processTypeGroup.variables && Array.isArray(processTypeGroup.variables)) {
           fields = processTypeGroup.variables.map((v: any, index: number) => {
             const fieldType = (v.variable_type as "text" | "number" | "select" | "boolean") || "text";
+            const fieldName = v.variable_name || "";
+
+            // Check if this field has a saved value in the machine's capabilities
+            const savedValue = currentCapabilities[fieldName];
+            const fieldValue = (savedValue !== undefined && savedValue !== null)
+              ? savedValue  // Use the saved value from capabilities
+              : getFieldValue(v.variable_value, fieldType);  // Fall back to default from API
+
             return {
               id: `field_${index}`,
-              fieldName: v.variable_name || "",
+              fieldName: fieldName,
               fieldLabel: v.variable_label || v.variable_name || "",
               fieldType: fieldType,
-              fieldValue: getFieldValue(v.variable_value, fieldType),
+              fieldValue: fieldValue,
               options: v.options,
               required: v.required || false,
               addToJobInput: v.addToJobInput || false,
@@ -155,13 +167,14 @@ export default function EditMachineModal({
     } catch (error) {
       console.error("[EditMachineModal] Error loading machine variables:", error);
     }
-  }, []);
+  }, [capabilities]);
 
   // Reset when modal closes
   useEffect(() => {
     if (!isOpen) {
       initializedRef.current = null;
       machineIdRef.current = null;
+      variablesLoadedRef.current = false; // Reset variables loaded flag
     }
   }, [isOpen]);
 
@@ -205,6 +218,14 @@ export default function EditMachineModal({
     setProcess_type_key(machine.process_type_key || "");
     setCapabilities(capabilitiesValue);
 
+    // Load machine variables immediately if process type exists
+    // This ensures fields are ready before user navigates to Step 2
+    // Pass capabilitiesValue directly since state hasn't updated yet
+    if (machine.process_type_key) {
+      loadMachineVariables(machine.process_type_key, capabilitiesValue);
+      variablesLoadedRef.current = true; // Mark as loaded
+    }
+
     // Set machine group
     if (machine.machine_group_id) {
       setMachineGroupOption("existing");
@@ -216,7 +237,7 @@ export default function EditMachineModal({
 
     // Reset step to 1
     setCurrentStep(1);
-  }, [isOpen, machine, machineId]);
+  }, [isOpen, machine, machineId, loadMachineVariables]);
 
   // Load machine rules and variables when process type is available
   useEffect(() => {
@@ -226,8 +247,12 @@ export default function EditMachineModal({
 
     // Load machine rules for this machine
     loadMachineRules(machineId, processTypeKey);
-    // Load machine variables if process type is set
-    loadMachineVariables(processTypeKey);
+
+    // Only load machine variables if they weren't already loaded during initialization
+    // This prevents overwriting the fields that were populated with saved capabilities
+    if (!variablesLoadedRef.current) {
+      loadMachineVariables(processTypeKey);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, machineId, processTypeKey]);
 
@@ -623,6 +648,7 @@ export default function EditMachineModal({
                   setFormBuilderFields((prev) => prev.filter((f) => f.id !== id));
                 }}
                 errors={errors}
+                isEditMode={true}
               />
             )}
 

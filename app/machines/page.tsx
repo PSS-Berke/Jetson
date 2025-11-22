@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
 import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "../components/PageHeader";
@@ -55,10 +56,35 @@ export default function Machines() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
+  const router = useRouter();
 
-  const handleWizardSuccess = () => {
+  // Map process type keys to their routes
+  const processTypeToRoute: Record<string, string> = {
+    "insert": "/machines/inserters",
+    "insertPlus": "/machines/inserters",
+    "insert9to12": "/machines/inserters",
+    "insert13Plus": "/machines/inserters",
+    "fold": "/machines/folders",
+    "hpPress": "/machines/hp-press",
+    "inkjet": "/machines/inkjetters",
+    "inkjetPlus": "/machines/inkjetters",
+    "affixGlue": "/machines/affixers",
+    "affixLabel": "/machines/affixers",
+    "labelApply": "/machines/affixers",
+  };
+
+  const handleWizardSuccess = (processTypeKey: string) => {
     setIsWizardOpen(false);
-    // Optionally trigger a refresh of the machines list
+    // Navigate to the appropriate machine type page
+    const route = processTypeToRoute[processTypeKey];
+    if (route) {
+      router.push(route);
+    } else {
+      // If no specific route mapping exists, try to infer from the process type name
+      // For custom process types, we might not have a direct mapping
+      console.warn(`No route mapping found for process type: ${processTypeKey}`);
+      // Optionally: You could navigate to a generic machines list page or stay on current page
+    }
   };
 
   if (userLoading) {

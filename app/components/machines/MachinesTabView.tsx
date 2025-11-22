@@ -203,7 +203,7 @@ export default function MachinesTabView({
                   </div>
                   <div className="bg-gray-50 p-3 rounded border border-gray-200">
                     {machine.capabilities && typeof machine.capabilities === 'object' && !Array.isArray(machine.capabilities) && Object.keys(machine.capabilities).length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {Object.entries(machine.capabilities).map(([key, value]) => {
                           const isStandardField = isReservedFieldName(key);
                           const isCustomField = key.startsWith('custom_') || key.startsWith('fb_');
@@ -215,8 +215,8 @@ export default function MachinesTabView({
                             .replace(/\b\w/g, (char) => char.toUpperCase()); // Title case
 
                           return (
-                            <div key={key} className="flex items-start gap-2 group">
-                              <div className="text-xs font-semibold text-gray-600 min-w-[140px] flex items-center gap-1">
+                            <div key={key} className="flex flex-col gap-1 group p-2 bg-white rounded border border-gray-200">
+                              <div className="text-xs font-semibold text-gray-600 flex items-center gap-1 flex-wrap">
                                 <span className="capitalize">{fieldLabel}:</span>
                                 {isCustomField && (
                                   <span
@@ -227,7 +227,7 @@ export default function MachinesTabView({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-900 flex-1">
+                              <div className="text-sm text-gray-900">
                                 {Array.isArray(value) ? (
                                   <div className="flex flex-wrap gap-1">
                                     {value.map((item: any, idx: number) => (
@@ -240,7 +240,7 @@ export default function MachinesTabView({
                                       </span>
                                     ))}
                                   </div>
-                                ) : value === null || value === undefined ? (
+                                ) : value === null || value === undefined || value === '' ? (
                                   <span className="text-gray-400 italic">Not set</span>
                                 ) : typeof value === 'boolean' ? (
                                   <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${value ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
@@ -260,7 +260,7 @@ export default function MachinesTabView({
                                     </pre>
                                   </details>
                                 ) : (
-                                  <span className="font-medium">{String(value)}</span>
+                                  <span className="font-medium break-words">{String(value)}</span>
                                 )}
                               </div>
                             </div>

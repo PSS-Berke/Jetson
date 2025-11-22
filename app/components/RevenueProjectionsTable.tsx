@@ -4,7 +4,6 @@ import { useState, memo, useMemo, useEffect, useRef } from "react";
 import { ParsedJob } from "@/hooks/useJobs";
 import { JobProjection, ServiceTypeSummary, ProcessTypeSummary, ProcessTypeFacilitySummary } from "@/hooks/useProjections";
 import {
-  formatQuantity,
   TimeRange,
   ProcessProjection,
   expandJobProjectionsToProcesses,
@@ -12,7 +11,7 @@ import {
 import JobDetailsModal from "./JobDetailsModal";
 import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
-import { Trash, Lock, Unlock, ChevronDown, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
+import { Trash, Lock, Unlock, ChevronDown, FileText, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote } from "@/lib/api";
 
 type SortField =
@@ -27,14 +26,14 @@ type SortField =
   | "total";
 type SortDirection = "asc" | "desc";
 
-interface ProjectionsTableProps {
+interface RevenueProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
   jobProjections: JobProjection[];
   serviceSummaries: ServiceTypeSummary[];
   processTypeSummaries: ProcessTypeSummary[] | ProcessTypeFacilitySummary[];
   grandTotals: {
-    weeklyTotals: Map<string, number>;
-    grandTotal: number;
+    weeklyRevenues: Map<string, number>;
+    grandRevenue: number;
   };
   onRefresh: () => void;
   mobileViewMode?: "cards" | "table";
@@ -52,8 +51,18 @@ function isFacilitySummary(
   return 'facilityId' in summary && 'facilityName' in summary;
 }
 
+// Format currency for display
+function formatRevenue(amount: number): string {
+  return amount.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
 // Memoized desktop table row component
-const ProjectionTableRow = memo(
+const RevenueTableRow = memo(
   ({
     projection,
     timeRanges,
@@ -91,7 +100,7 @@ const ProjectionTableRow = memo(
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
-    
+
     // Helper function to convert hex to rgba with opacity
     const hexToRgba = (hex: string, opacity: number) => {
       const r = parseInt(hex.slice(1, 3), 16);
@@ -136,7 +145,6 @@ const ProjectionTableRow = memo(
         <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
           <div className="flex flex-wrap gap-1">
             {job.requirements && job.requirements.length > 0 ? (
-              // Get unique process types from requirements
               [
                 ...new Set(
                   job.requirements
@@ -185,29 +193,28 @@ const ProjectionTableRow = memo(
             : "N/A"}
         </td>
         {timeRanges.map((range, index) => {
-          const quantity = projection.weeklyQuantities.get(range.label) || 0;
-          const displayValue = formatQuantity(quantity);
+          const revenue = projection.weeklyRevenues.get(range.label) || 0;
 
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
-                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-green-700 cursor-pointer ${
+                index % 2 === 0 ? "bg-green-50" : "bg-white"
               }`}
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenNotesModal?.(job.id);
               }}
             >
-              {displayValue}
+              {formatRevenue(revenue)}
             </td>
           );
         })}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-          {formatQuantity(projection.totalQuantity)}
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-green-800">
+          {formatRevenue(projection.totalRevenue)}
         </td>
         {showNotes && (
-          <td 
+          <td
             className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -216,7 +223,7 @@ const ProjectionTableRow = memo(
                 {jobNotes!.filter((note) => note && note.notes).map((note, idx) => {
                   const isEditing = editingNoteId === note.id;
                   const noteColorValue = note.color || noteColor || "#000000";
-                  
+
                   return (
                     <div
                       key={note.id || idx}
@@ -344,10 +351,10 @@ const ProjectionTableRow = memo(
   },
 );
 
-ProjectionTableRow.displayName = "ProjectionTableRow";
+RevenueTableRow.displayName = "RevenueTableRow";
 
 // Memoized process table row component
-const ProcessProjectionTableRow = memo(
+const ProcessRevenueTableRow = memo(
   ({
     processProjection,
     timeRanges,
@@ -484,32 +491,31 @@ const ProcessProjectionTableRow = memo(
 
         {/* Time period columns - per process */}
         {timeRanges.map((range, index) => {
-          const quantity =
-            processProjection.weeklyQuantities.get(range.label) || 0;
-          const displayValue = formatQuantity(quantity);
+          const revenue =
+            processProjection.weeklyRevenues.get(range.label) || 0;
 
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
-                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-green-700 cursor-pointer ${
+                index % 2 === 0 ? "bg-green-50" : "bg-white"
               }`}
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenNotesModal?.(job.id);
               }}
             >
-              {displayValue}
+              {formatRevenue(revenue)}
             </td>
           );
         })}
 
         {/* Total - per process */}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-          {formatQuantity(processProjection.totalQuantity)}
+        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-green-800">
+          {formatRevenue(processProjection.totalRevenue)}
         </td>
         {showNotes && (
-          <td 
+          <td
             className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -518,7 +524,7 @@ const ProcessProjectionTableRow = memo(
                 {jobNotes!.map((note, idx) => {
                   const isEditing = editingNoteId === note.id;
                   const noteColorValue = note.color || noteColor || "#000000";
-                  
+
                   return (
                     <div
                       key={note.id || idx}
@@ -646,10 +652,10 @@ const ProcessProjectionTableRow = memo(
   },
 );
 
-ProcessProjectionTableRow.displayName = "ProcessProjectionTableRow";
+ProcessRevenueTableRow.displayName = "ProcessRevenueTableRow";
 
-// Memoized mobile card component
-const ProjectionMobileCard = memo(
+// Memoized mobile card component (revenue-focused)
+const RevenueMobileCard = memo(
   ({
     projection,
     timeRanges,
@@ -767,11 +773,11 @@ const ProjectionMobileCard = memo(
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-[var(--text-light)]">
-              Total Quantity
+            <div className="text-xs text-green-600 font-medium">
+              Total Revenue
             </div>
-            <div className="text-sm font-bold text-[var(--text-dark)]">
-              {formatQuantity(projection.totalQuantity)}
+            <div className="text-sm font-bold text-green-800">
+              {formatRevenue(projection.totalRevenue)}
             </div>
           </div>
         </div>
@@ -843,8 +849,8 @@ const ProjectionMobileCard = memo(
             onTouchEnd={handleTouchEnd}
           >
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-[var(--text-light)]">
-                Period Breakdown
+              <div className="text-xs text-green-600 font-medium">
+                Revenue Breakdown
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -901,18 +907,16 @@ const ProjectionMobileCard = memo(
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs">
               {visibleTimeRanges.map((range) => {
-                const quantity =
-                  projection.weeklyQuantities.get(range.label) || 0;
-                const hasValue = quantity > 0;
-                const displayValue = formatQuantity(quantity);
+                const revenue = projection.weeklyRevenues.get(range.label) || 0;
+                const hasValue = revenue > 0;
 
                 return hasValue ? (
                   <div key={range.label} className="text-center">
                     <div className="text-[var(--text-light)] text-[10px]">
                       {range.label}
                     </div>
-                    <div className="font-medium text-[var(--text-dark)]">
-                      {displayValue}
+                    <div className="font-medium text-green-700">
+                      {formatRevenue(revenue)}
                     </div>
                   </div>
                 ) : null;
@@ -925,10 +929,10 @@ const ProjectionMobileCard = memo(
   },
 );
 
-ProjectionMobileCard.displayName = "ProjectionMobileCard";
+RevenueMobileCard.displayName = "RevenueMobileCard";
 
-// Memoized mobile table row component
-const MobileTableRow = memo(
+// Memoized mobile table row component (revenue-focused)
+const MobileRevenueTableRow = memo(
   ({
     projection,
     visibleTimeRanges,
@@ -967,31 +971,30 @@ const MobileTableRow = memo(
           {job.client?.name || "Unknown"}
         </td>
         {visibleTimeRanges.map((range, index) => {
-          const quantity = projection.weeklyQuantities.get(range.label) || 0;
-          const displayValue = formatQuantity(quantity);
+          const revenue = projection.weeklyRevenues.get(range.label) || 0;
 
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 text-xs text-center font-medium text-[var(--text-dark)] ${
-                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+              className={`px-2 py-2 text-xs text-center font-medium text-green-700 ${
+                index % 2 === 0 ? "bg-green-50" : "bg-white"
               }`}
             >
-              {displayValue}
+              {formatRevenue(revenue)}
             </td>
           );
         })}
-        <td className="px-2 py-2 text-xs text-center font-bold text-[var(--text-dark)] sticky right-0 bg-white">
-          {formatQuantity(projection.totalQuantity)}
+        <td className="px-2 py-2 text-xs text-center font-bold text-green-800 sticky right-0 bg-white">
+          {formatRevenue(projection.totalRevenue)}
         </td>
       </tr>
     );
   },
 );
 
-MobileTableRow.displayName = "MobileTableRow";
+MobileRevenueTableRow.displayName = "MobileRevenueTableRow";
 
-export default function ProjectionsTable({
+export default function RevenueProjectionsTable({
   timeRanges,
   jobProjections,
   processTypeSummaries,
@@ -1002,7 +1005,7 @@ export default function ProjectionsTable({
   showExpandedProcesses = true,
   showNotes: showNotesProp = false,
   onShowNotesChange,
-}: ProjectionsTableProps) {
+}: RevenueProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>("job_number");
@@ -1030,7 +1033,7 @@ export default function ProjectionsTable({
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [isSingleJobNoteModal, setIsSingleJobNoteModal] = useState(false);
 
-  // View notes toggle state (use prop or default to false)
+  // View notes toggle state
   const showNotes = showNotesProp;
   const [jobNotesMap, setJobNotesMap] = useState<Map<number, JobNote[]>>(new Map());
   const [isLoadingNotes, setIsLoadingNotes] = useState(false);
@@ -1055,10 +1058,8 @@ export default function ProjectionsTable({
     setIsLoadingNotes(true);
     try {
       const allNotes = await getJobNotes();
-      // Create a map of job ID to notes array
       const notesMap = new Map<number, JobNote[]>();
 
-      // Filter out invalid notes (must have notes text and jobs_id array)
       const validNotes = allNotes.filter((note) =>
         note &&
         note.notes &&
@@ -1090,7 +1091,6 @@ export default function ProjectionsTable({
     if (showNotes) {
       loadJobNotes();
     } else {
-      // Cancel any ongoing edits when hiding notes
       setEditingNoteId(null);
       setEditingText("");
     }
@@ -1164,7 +1164,6 @@ export default function ProjectionsTable({
 
   const handleNotesModalClose = () => {
     setShowNotesModal(false);
-    // Clear selection only when closing a single-job notes modal (opened via projected numbers click)
     if (isSingleJobNoteModal) {
       setSelectedJobIds(new Set());
       setIsSingleJobNoteModal(false);
@@ -1172,24 +1171,9 @@ export default function ProjectionsTable({
   };
 
   const handleNotesSuccess = () => {
-    // Optionally refresh data or show success message
     onRefresh();
-    // Reload notes if view notes is enabled
     if (showNotes) {
       loadJobNotes();
-    }
-  };
-
-  // Toggle view notes
-  const handleToggleViewNotes = () => {
-    const newShowNotes = !showNotes;
-    onShowNotesChange?.(newShowNotes);
-    if (newShowNotes) {
-      loadJobNotes();
-    } else {
-      // Cancel any ongoing edits when hiding notes
-      setEditingNoteId(null);
-      setEditingText("");
     }
   };
 
@@ -1212,7 +1196,6 @@ export default function ProjectionsTable({
 
     setIsSavingNote(true);
     try {
-      // Find the note to get its jobs_id
       let noteToUpdate: JobNote | undefined;
       for (const notes of jobNotesMap.values()) {
         noteToUpdate = notes.find((n) => n.id === noteId);
@@ -1301,7 +1284,6 @@ export default function ProjectionsTable({
     }
 
     try {
-      // Get the selected jobs to update their locked_weeks arrays
       const selectedJobs = sortedJobProjections.filter((p) =>
         selectedJobIds.has(p.job.id),
       );
@@ -1309,7 +1291,6 @@ export default function ProjectionsTable({
       const updates = await Promise.allSettled(
         selectedJobs.map(async (projection) => {
           const job = projection.job;
-          // Create an array of locked states based on the job's weekly split
           const weeksCount = job.weekly_split?.length || 0;
           const locked_weeks = new Array(weeksCount).fill(shouldLock);
 
@@ -1391,22 +1372,19 @@ export default function ProjectionsTable({
     }
   };
 
-  // Sort projections (handles both jobs and processes)
+  // Sort projections
   const sortedJobProjections = useMemo(() => {
     if (showExpandedProcesses) {
       const processProjections = displayProjections as ProcessProjection[];
       return [...processProjections].sort((a, b) => {
         let compareValue = 0;
 
-        // Allow sorting by different fields in expanded process view
         switch (sortField) {
           case "process_type":
-            // Primary sort by process type
             compareValue = a.processType.localeCompare(b.processType);
             if (compareValue !== 0) {
               return sortDirection === "asc" ? compareValue : -compareValue;
             }
-            // Secondary sort by job number
             return a.jobNumber - b.jobNumber;
 
           case "job_number":
@@ -1414,16 +1392,14 @@ export default function ProjectionsTable({
             if (compareValue !== 0) {
               return sortDirection === "asc" ? compareValue : -compareValue;
             }
-            // Secondary sort by process type
             return a.processType.localeCompare(b.processType);
 
           case "quantity":
           case "total":
-            compareValue = a.totalQuantity - b.totalQuantity;
+            compareValue = a.totalRevenue - b.totalRevenue;
             break;
 
           default:
-            // Default: group by job, then by process type
             compareValue = a.jobNumber - b.jobNumber;
             if (compareValue !== 0) return compareValue;
             return a.processType.localeCompare(b.processType);
@@ -1436,7 +1412,7 @@ export default function ProjectionsTable({
       });
     }
 
-    // Jobs view - existing sorting logic
+    // Jobs view
     return [...displayProjections].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
@@ -1474,8 +1450,8 @@ export default function ProjectionsTable({
           bValue = bJob.job.due_date || 0;
           break;
         case "total":
-          aValue = aJob.totalQuantity;
-          bValue = bJob.totalQuantity;
+          aValue = aJob.totalRevenue;
+          bValue = bJob.totalRevenue;
           break;
         default:
           aValue = aJob.job.job_number;
@@ -1632,60 +1608,47 @@ export default function ProjectionsTable({
             {processTypeSummaries && processTypeSummaries.length > 0 && (
               <>
                 {processTypeSummaries.map((summary) => {
-                  const displayValue = summary.grandTotal;
-                  const formattedTotal = formatQuantity(Math.round(displayValue));
+                  const displayValue = summary.grandRevenue;
+                  const formattedTotal = `$${Math.round(displayValue).toLocaleString()}`;
 
-                  // Create unique key based on whether it's a facility summary
                   const summaryKey = isFacilitySummary(summary)
                     ? `${summary.processType}-${summary.facilityId}`
                     : summary.processType;
 
-                  // Create display label
                   const displayLabel = isFacilitySummary(summary)
                     ? `${summary.processType} (${summary.facilityName})`
                     : summary.processType;
 
                   return (
-                    <tr key={summaryKey} className="bg-blue-50 font-semibold text-sm border-b border-blue-200">
-                      {/* Empty checkbox column */}
+                    <tr key={summaryKey} className="bg-green-50 font-semibold text-sm border-b border-green-200">
                       <th className="px-2 py-2 w-12"></th>
-                      {/* Job # column */}
                       <th className="px-2 py-2"></th>
-                      {/* Client column */}
                       <th className="px-2 py-2"></th>
-                      {/* Sub-client column */}
                       <th className="px-2 py-2"></th>
-                      {/* Process column */}
                       <th className="px-2 py-2"></th>
-                      {/* Description column */}
                       <th className="px-2 py-2"></th>
-                      {/* Qty column */}
                       <th className="px-2 py-2"></th>
-                      {/* Start & End columns - Process type name spanning both */}
                       <th colSpan={2} className="px-2 py-2 text-center text-gray-800 font-semibold">
                         {displayLabel}
                       </th>
-                      {/* Time period totals */}
                       {timeRanges.map((range, index) => {
-                        const periodValue = summary.weeklyTotals.get(range.label) || 0;
-                        const formattedValue = formatQuantity(Math.round(periodValue));
+                        const periodValue = summary.weeklyRevenues.get(range.label) || 0;
+                        const formattedValue = periodValue > 0 ? `$${Math.round(periodValue).toLocaleString()}` : "";
 
                         return (
                           <th
                             key={range.label}
                             className={`px-2 py-2 text-center text-xs font-semibold ${
-                              index % 2 === 0 ? "bg-blue-100" : "bg-blue-50"
+                              index % 2 === 0 ? "bg-green-100" : "bg-green-50"
                             }`}
                           >
                             {formattedValue}
                           </th>
                         );
                       })}
-                      {/* Grand total */}
                       <th className="px-2 py-2 text-center text-gray-800 font-semibold">
                         {formattedTotal}
                       </th>
-                      {/* Empty notes column if visible */}
                       {showNotes && <th className="px-2 py-2"></th>}
                     </tr>
                   );
@@ -1787,8 +1750,8 @@ export default function ProjectionsTable({
               {timeRanges.map((range, index) => (
                 <th
                   key={range.label}
-                  className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-                    index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+                  className={`px-2 py-2 text-center text-[10px] font-medium text-green-700 uppercase tracking-wider ${
+                    index % 2 === 0 ? "bg-green-50" : "bg-white"
                   }`}
                 >
                   {range.label}
@@ -1796,10 +1759,10 @@ export default function ProjectionsTable({
               ))}
               <th
                 onClick={() => handleSort("total")}
-                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-2 py-2 text-center text-[10px] font-medium text-green-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-center gap-1">
-                  Total <SortIcon field="total" />
+                  Total Revenue <SortIcon field="total" />
                 </div>
               </th>
               {showNotes && (
@@ -1821,21 +1784,19 @@ export default function ProjectionsTable({
                 </td>
               </tr>
             ) : showExpandedProcesses ? (
-              // Expanded Process view - each process on its own line, sortable
               (sortedJobProjections as ProcessProjection[]).map(
                 (processProjection, index, array) => {
-                  // Determine if this is the first row for this job (for visual grouping)
                   const isFirstInGroup =
                     index === 0 ||
                     processProjection.jobId !==
                       (array[index - 1] as ProcessProjection).jobId;
-                  
+
                   const jobNotes = showNotes ? jobNotesMap.get(processProjection.jobId) || [] : [];
                   const hasNotes = jobNotes.length > 0;
                   const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
 
                   return (
-                    <ProcessProjectionTableRow
+                    <ProcessRevenueTableRow
                       key={`${processProjection.jobId}-${processProjection.processType}-${index}`}
                       processProjection={processProjection}
                       timeRanges={timeRanges}
@@ -1861,14 +1822,13 @@ export default function ProjectionsTable({
                 },
               )
             ) : (
-              // Jobs view or Consolidated view (standard jobs table)
               (sortedJobProjections as JobProjection[]).map((projection, index) => {
                 const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
                 const hasNotes = jobNotes.length > 0;
                 const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
 
                 return (
-                  <ProjectionTableRow
+                  <RevenueTableRow
                     key={`job-${projection.job.id}-${index}`}
                     projection={projection}
                     timeRanges={timeRanges}
@@ -1987,14 +1947,14 @@ export default function ProjectionsTable({
                   {mobileTableVisibleRanges.map((range, index) => (
                     <th
                       key={range.label}
-                      className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase ${
-                        index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+                      className={`px-2 py-2 text-center text-[10px] font-medium text-green-700 uppercase ${
+                        index % 2 === 0 ? "bg-green-50" : "bg-white"
                       }`}
                     >
                       {range.label}
                     </th>
                   ))}
-                  <th className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase sticky right-0 bg-gray-50">
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-green-700 uppercase sticky right-0 bg-gray-50">
                     Total
                   </th>
                 </tr>
@@ -2011,7 +1971,7 @@ export default function ProjectionsTable({
                   </tr>
                 ) : (
                   sortedJobProjections.map((projection, index) => (
-                    <MobileTableRow
+                    <MobileRevenueTableRow
                       key={`mobile-${projection.job.id}-${index}`}
                       projection={projection}
                       visibleTimeRanges={mobileTableVisibleRanges}
@@ -2035,7 +1995,7 @@ export default function ProjectionsTable({
               </div>
             ) : (
               sortedJobProjections.map((projection, index) => (
-                <ProjectionMobileCard
+                <RevenueMobileCard
                   key={`card-${projection.job.id}-${index}`}
                   projection={projection}
                   timeRanges={timeRanges}

@@ -86,11 +86,19 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         const filteredMachines = machines.filter(typeFilterFn);
 
         // Extract unique process type keys
+        // Filter out null, undefined, empty strings, and invalid values
         const processTypeKeys = Array.from(
           new Set(
             filteredMachines
               .map((m) => m.process_type_key)
-              .filter((key) => key && key.trim() !== "")
+              .filter((key) => {
+                // Ensure key is a valid string
+                return key &&
+                       typeof key === 'string' &&
+                       key.trim() !== "" &&
+                       key !== 'null' &&
+                       key !== 'undefined';
+              })
           )
         );
 
@@ -100,6 +108,8 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
           "[ProcessesTabView] Error fetching machine process types:",
           error
         );
+        // Set empty array on error to prevent cascading failures
+        setMachineProcessTypes([]);
       }
     };
 

@@ -15,6 +15,7 @@ import {
 import { useReactToPrint } from "react-to-print";
 import ProjectionFiltersComponent from "../components/ProjectionFilters";
 import ProjectionsTable from "../components/ProjectionsTable";
+import RevenueProjectionsTable from "../components/RevenueProjectionsTable";
 import FacilityToggle from "../components/FacilityToggle";
 import GranularityToggle, {
   type Granularity,
@@ -53,7 +54,7 @@ const BulkJobUploadModal = dynamic(
   },
 );
 
-type ViewMode = "table" | "calendar" | "financials";
+type ViewMode = "table" | "calendar" | "financials" | "revenue-table";
 
 export default function ProjectionsPage() {
   const [granularity, setGranularity] = useState<Granularity>("weekly");
@@ -76,17 +77,15 @@ export default function ProjectionsPage() {
   const [filterViewMode, setFilterViewMode] = useState<"simple" | "advanced">(
     "simple",
   );
-  const [dataDisplayMode, setDataDisplayMode] = useState<"pieces" | "revenue">(
-    "pieces",
-  );
   const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">(
     "cards",
   );
   const [globalTimeScrollIndex, setGlobalTimeScrollIndex] = useState(0);
-  const [showExpandedProcesses, setShowExpandedProcesses] = useState(true);
+  const [showExpandedProcesses, setShowExpandedProcesses] = useState(false);
   const [showOnlyInDateRange, setShowOnlyInDateRange] = useState(true);
   const [showNotes, setShowNotes] = useState(false);
   const [groupByFacility, setGroupByFacility] = useState(false);
+  const [financialsSubView, setFinancialsSubView] = useState<"dashboard" | "revenue-table">("dashboard");
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -376,8 +375,6 @@ export default function ProjectionsPage() {
             onFilterModeChange={setFilterMode}
             filterViewMode={filterViewMode}
             onFilterViewModeChange={setFilterViewMode}
-            dataDisplayMode={dataDisplayMode}
-            onDataDisplayModeChange={setDataDisplayMode}
             mobileViewMode={mobileViewMode}
             onMobileViewModeChange={setMobileViewMode}
             showExpandedProcesses={showExpandedProcesses}
@@ -439,7 +436,6 @@ export default function ProjectionsPage() {
                     mobileViewMode={mobileViewMode}
                     globalTimeScrollIndex={globalTimeScrollIndex}
                     onGlobalTimeScrollIndexChange={setGlobalTimeScrollIndex}
-                    dataDisplayMode={dataDisplayMode}
                     showExpandedProcesses={showExpandedProcesses}
                     showNotes={showNotes}
                     onShowNotesChange={setShowNotes}
@@ -477,26 +473,97 @@ export default function ProjectionsPage() {
 
               {/* Financials View */}
               {viewMode === "financials" && (
-                <CFODashboard
-                  jobs={filteredJobProjections.map((p) => p.job)}
-                  timeRanges={timeRanges}
-                  totalRevenue={totalRevenue}
-                  periodLabel={`Current ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
-                  previousPeriodLabel={`Previous ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
-                  startDate={startDate.getTime()}
-                  endDate={
-                    timeRanges.length > 0
-                      ? timeRanges[timeRanges.length - 1].endDate.getTime()
-                      : startDate.getTime()
-                  }
-                  facilitiesId={selectedFacility || undefined}
-                  granularity={granularity}
-                  selectedClients={selectedClientNames}
-                  selectedServiceTypes={selectedServiceTypes}
-                  searchQuery={searchQuery}
-                  filterMode={filterMode.toUpperCase() as "AND" | "OR"}
-                  printRef={financialsPrintRef}
-                />
+                <>
+                  {/* Sub-tabs for Financials View */}
+                  <div className="flex gap-2 mb-6 border-b border-[var(--border)]">
+                    <button
+                      onClick={() => setFinancialsSubView("dashboard")}
+                      className={`px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                        financialsSubView === "dashboard"
+                          ? "text-green-700 border-b-2 border-green-600"
+                          : "text-[var(--text-light)] hover:text-green-700"
+                      }`}
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => setFinancialsSubView("revenue-table")}
+                      className={`px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                        financialsSubView === "revenue-table"
+                          ? "text-green-700 border-b-2 border-green-600"
+                          : "text-[var(--text-light)] hover:text-green-700"
+                      }`}
+                    >
+                      Revenue Table
+                    </button>
+                  </div>
+
+                  {/* Dashboard Sub-view */}
+                  {financialsSubView === "dashboard" && (
+                    <CFODashboard
+                      jobs={filteredJobProjections.map((p) => p.job)}
+                      timeRanges={timeRanges}
+                      totalRevenue={totalRevenue}
+                      periodLabel={`Current ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
+                      previousPeriodLabel={`Previous ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
+                      startDate={startDate.getTime()}
+                      endDate={
+                        timeRanges.length > 0
+                          ? timeRanges[timeRanges.length - 1].endDate.getTime()
+                          : startDate.getTime()
+                      }
+                      facilitiesId={selectedFacility || undefined}
+                      granularity={granularity}
+                      selectedClients={selectedClientNames}
+                      selectedServiceTypes={selectedServiceTypes}
+                      searchQuery={searchQuery}
+                      filterMode={filterMode.toUpperCase() as "AND" | "OR"}
+                      printRef={financialsPrintRef}
+                    />
+                  )}
+
+                  {/* Revenue Table Sub-view */}
+                  {financialsSubView === "revenue-table" && (
+                    <>
+                      <RevenueProjectionsTable
+                        timeRanges={timeRanges}
+                        jobProjections={paginatedJobProjections}
+                        serviceSummaries={serviceSummaries}
+                        processTypeSummaries={processTypeSummaries}
+                        grandTotals={{
+                          weeklyRevenues: (() => {
+                            const revenueMap = new Map<string, number>();
+                            filteredJobProjections.forEach((projection) => {
+                              projection.weeklyRevenues.forEach((revenue, label) => {
+                                revenueMap.set(label, (revenueMap.get(label) || 0) + revenue);
+                              });
+                            });
+                            return revenueMap;
+                          })(),
+                          grandRevenue: totalRevenue,
+                        }}
+                        onRefresh={refetch}
+                        mobileViewMode={mobileViewMode}
+                        globalTimeScrollIndex={globalTimeScrollIndex}
+                        onGlobalTimeScrollIndexChange={setGlobalTimeScrollIndex}
+                        showExpandedProcesses={showExpandedProcesses}
+                        showNotes={showNotes}
+                        onShowNotesChange={setShowNotes}
+                      />
+
+                      {/* Pagination */}
+                      <div className="no-print mt-4">
+                        <Pagination
+                          currentPage={currentPage}
+                          totalItems={filteredJobProjections.length}
+                          itemsPerPage={itemsPerPage}
+                          onPageChange={setCurrentPage}
+                          onItemsPerPageChange={setItemsPerPage}
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
               )}
             </>
           )}
