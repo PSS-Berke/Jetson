@@ -49,6 +49,7 @@ interface StepCapabilitiesProps {
   ) => void;
   onRemoveFormBuilderField: (id: string) => void;
   errors: Record<string, string>;
+  disableAutoSave?: boolean; // When true, prevents PATCH machine variables on value changes
 }
 
 export default function StepCapabilities({
@@ -73,6 +74,7 @@ export default function StepCapabilities({
   onUpdateFormBuilderField,
   onRemoveFormBuilderField,
   errors,
+  disableAutoSave = false,
 }: StepCapabilitiesProps) {
   const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(
     null,
@@ -104,6 +106,23 @@ export default function StepCapabilities({
 
     // Return the snake_case name without prefix
     return baseName;
+  };
+
+  // Helper function to properly handle field values, preserving boolean false
+  const getFieldValue = (value: any, fieldType: string): string | number | boolean => {
+    // For boolean fields, preserve false as boolean, not empty string
+    if (fieldType === "boolean") {
+      if (value === false || value === "false" || value === 0) {
+        return false;
+      }
+      if (value === true || value === "true" || value === 1) {
+        return true;
+      }
+      // Default to false if value is undefined/null/empty
+      return false;
+    }
+    // For other types, use the value or default to empty string
+    return value !== undefined && value !== null ? value : "";
   };
 
   // Function to load machine variables from API (only called when process type is clicked)
@@ -155,35 +174,38 @@ export default function StepCapabilities({
           useDirectData = true;
           if (Array.isArray(processTypeGroup.variables)) {
             fields = processTypeGroup.variables.map(
-              (v: any, index: number) => ({
-                id: `available_${index}`,
-                fieldName: v.variable_name || "",
-                fieldLabel: v.variable_label || v.variable_name || "",
-                fieldType:
-                  (v.variable_type as
-                    | "text"
-                    | "number"
-                    | "select"
-                    | "boolean") || "text",
-                fieldValue: v.variable_value || "",
-                options: v.options,
-                required: v.required || false,
-                addToJobInput: v.addToJobInput || false,
-              }),
+              (v: any, index: number) => {
+                const fieldType = (v.variable_type as
+                  | "text"
+                  | "number"
+                  | "select"
+                  | "boolean") || "text";
+                return {
+                  id: `available_${index}`,
+                  fieldName: v.variable_name || "",
+                  fieldLabel: v.variable_label || v.variable_name || "",
+                  fieldType: fieldType,
+                  fieldValue: getFieldValue(v.variable_value, fieldType),
+                  options: v.options,
+                  required: v.required || false,
+                  addToJobInput: v.addToJobInput || false,
+                };
+              },
             );
           } else {
             fields = Object.entries(processTypeGroup.variables).map(
               ([key, value], index) => {
                 const val = value as any;
+                const fieldType = (val.type as "text" | "number" | "select" | "boolean") || "text";
+                const fieldValue = typeof val === "object" 
+                  ? getFieldValue(val.value, fieldType)
+                  : getFieldValue(val, fieldType);
                 return {
                   id: `available_${Date.now()}_${index}`,
                   fieldName: key,
                   fieldLabel: val.label || key,
-                  fieldType:
-                    (val.type as "text" | "number" | "select" | "boolean") ||
-                    "text",
-                  fieldValue:
-                    typeof val === "object" ? val.value || "" : String(val),
+                  fieldType: fieldType,
+                  fieldValue: fieldValue,
                   options: val.options,
                   required: val.required || false,
                   addToJobInput: val.addToJobInput || false,
@@ -215,35 +237,38 @@ export default function StepCapabilities({
             ) {
               if (Array.isArray(machineVariablesData.variables)) {
                 fields = machineVariablesData.variables.map(
-                  (v: any, index: number) => ({
-                    id: `available_${index}`,
-                    fieldName: v.variable_name || "",
-                    fieldLabel: v.variable_label || v.variable_name || "",
-                    fieldType:
-                      (v.variable_type as
-                        | "text"
-                        | "number"
-                        | "select"
-                        | "boolean") || "text",
-                    fieldValue: v.variable_value || "",
-                    options: v.options,
-                    required: v.required || false,
-                    addToJobInput: v.addToJobInput || false,
-                  }),
+                  (v: any, index: number) => {
+                    const fieldType = (v.variable_type as
+                      | "text"
+                      | "number"
+                      | "select"
+                      | "boolean") || "text";
+                    return {
+                      id: `available_${index}`,
+                      fieldName: v.variable_name || "",
+                      fieldLabel: v.variable_label || v.variable_name || "",
+                      fieldType: fieldType,
+                      fieldValue: getFieldValue(v.variable_value, fieldType),
+                      options: v.options,
+                      required: v.required || false,
+                      addToJobInput: v.addToJobInput || false,
+                    };
+                  },
                 );
               } else {
                 fields = Object.entries(machineVariablesData.variables).map(
                   ([key, value], index) => {
                     const val = value as any;
+                    const fieldType = (val.type as "text" | "number" | "select" | "boolean") || "text";
+                    const fieldValue = typeof val === "object" 
+                      ? getFieldValue(val.value, fieldType)
+                      : getFieldValue(val, fieldType);
                     return {
                       id: `available_${Date.now()}_${index}`,
                       fieldName: key,
                       fieldLabel: val.label || key,
-                      fieldType:
-                        (val.type as "text" | "number" | "select" | "boolean") ||
-                        "text",
-                      fieldValue:
-                        typeof val === "object" ? val.value || "" : String(val),
+                      fieldType: fieldType,
+                      fieldValue: fieldValue,
                       options: val.options,
                       required: val.required || false,
                       addToJobInput: val.addToJobInput || false,
@@ -463,6 +488,11 @@ export default function StepCapabilities({
 
   // Debounced auto-save when formBuilderFields change
   useEffect(() => {
+    // Skip if auto-save is disabled (e.g., in create mode)
+    if (disableAutoSave) {
+      return;
+    }
+
     // Skip initial mount
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
@@ -488,7 +518,7 @@ export default function StepCapabilities({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formBuilderFields, machineVariablesId]);
+  }, [formBuilderFields, machineVariablesId, disableAutoSave]);
 
   // Handle selecting a field from available saved processes
   const handleSelectAvailableField = (availableField: FormBuilderField) => {

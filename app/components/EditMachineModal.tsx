@@ -105,6 +105,23 @@ export default function EditMachineModal({
     }
   }, []);
 
+  // Helper function to properly handle field values, preserving boolean false
+  const getFieldValue = (value: any, fieldType: string): string | number | boolean => {
+    // For boolean fields, preserve false as boolean, not empty string
+    if (fieldType === "boolean") {
+      if (value === false || value === "false" || value === 0) {
+        return false;
+      }
+      if (value === true || value === "true" || value === 1) {
+        return true;
+      }
+      // Default to false if value is undefined/null/empty
+      return false;
+    }
+    // For other types, use the value or default to empty string
+    return value !== undefined && value !== null ? value : "";
+  };
+
   // Load machine variables
   const loadMachineVariables = useCallback(async (processKey: string) => {
     try {
@@ -119,16 +136,19 @@ export default function EditMachineModal({
         // Convert to FormBuilderField format
         let fields: FormBuilderField[] = [];
         if (processTypeGroup.variables && Array.isArray(processTypeGroup.variables)) {
-          fields = processTypeGroup.variables.map((v: any, index: number) => ({
-            id: `field_${index}`,
-            fieldName: v.variable_name || "",
-            fieldLabel: v.variable_label || v.variable_name || "",
-            fieldType: (v.variable_type as "text" | "number" | "select" | "boolean") || "text",
-            fieldValue: v.variable_value || "",
-            options: v.options,
-            required: v.required || false,
-            addToJobInput: v.addToJobInput || false,
-          }));
+          fields = processTypeGroup.variables.map((v: any, index: number) => {
+            const fieldType = (v.variable_type as "text" | "number" | "select" | "boolean") || "text";
+            return {
+              id: `field_${index}`,
+              fieldName: v.variable_name || "",
+              fieldLabel: v.variable_label || v.variable_name || "",
+              fieldType: fieldType,
+              fieldValue: getFieldValue(v.variable_value, fieldType),
+              options: v.options,
+              required: v.required || false,
+              addToJobInput: v.addToJobInput || false,
+            };
+          });
         }
         setFormBuilderFields(fields);
       }
@@ -416,11 +436,21 @@ export default function EditMachineModal({
       // Convert formBuilderFields to capabilities if they exist
       const finalCapabilities = formBuilderFields.length > 0
         ? formBuilderFields.reduce((acc, field) => {
-            if (typeof field.fieldValue === 'boolean') {
-              acc[field.fieldName] = field.fieldValue ? 'true' : 'false';
-            } else {
-              acc[field.fieldName] = field.fieldValue as MachineCapabilityValue;
+            // Normalize boolean values: ensure false is boolean, not empty string
+            let value = field.fieldValue;
+            if (field.fieldType === "boolean") {
+              // Convert empty string, "false", 0, or falsy values to boolean false
+              // Convert "true", 1, or truthy values to boolean true
+              if (value === "" || value === "false" || value === 0 || value === false) {
+                value = false;
+              } else if (value === "true" || value === 1 || value === true) {
+                value = true;
+              } else {
+                // Default to false for any other falsy value
+                value = false;
+              }
             }
+            acc[field.fieldName] = value as MachineCapabilityValue;
             return acc;
           }, {} as Record<string, MachineCapabilityValue>)
         : capabilities;

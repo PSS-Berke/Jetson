@@ -119,8 +119,31 @@ export default function CreateMachineWizard({
       // Add form builder field values to capabilities
       if (state.formBuilderFields && state.formBuilderFields.length > 0) {
         state.formBuilderFields.forEach((field) => {
-          if (field.fieldValue !== undefined && field.fieldValue !== null && field.fieldValue !== "") {
-            combinedCapabilities[field.fieldName] = field.fieldValue;
+          // Include the field if:
+          // 1. It's not undefined or null
+          // 2. It's not an empty string (for text fields)
+          // 3. For boolean fields, explicitly include false values
+          const shouldInclude = 
+            field.fieldValue !== undefined && 
+            field.fieldValue !== null && 
+            (field.fieldType === "boolean" || field.fieldValue !== "");
+          
+          if (shouldInclude) {
+            // Normalize boolean values: if it's a boolean field, ensure false is boolean, not empty string
+            let value = field.fieldValue;
+            if (field.fieldType === "boolean") {
+              // Convert empty string, "false", 0, or falsy values to boolean false
+              // Convert "true", 1, or truthy values to boolean true
+              if (value === "" || value === "false" || value === 0 || value === false) {
+                value = false;
+              } else if (value === "true" || value === 1 || value === true) {
+                value = true;
+              } else {
+                // Default to false for any other falsy value
+                value = false;
+              }
+            }
+            combinedCapabilities[field.fieldName] = value;
           }
         });
       }
@@ -508,6 +531,7 @@ export default function CreateMachineWizard({
                   dispatch({ type: "REMOVE_FORM_BUILDER_FIELD", payload: id })
                 }
                 errors={state.errors}
+                disableAutoSave={true}
               />
             )}
 
