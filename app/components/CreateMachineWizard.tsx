@@ -6,13 +6,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { useWizardState } from "@/hooks/useWizardState";
+import { useWizardState, generateLineList } from "@/hooks/useWizardState";
 import {
   createMachine,
+  createMachinesBulk,
   createMachineRule,
   createMachineGroup,
 } from "@/lib/api";
 import type {
+  Machine,
   MachineCategory,
   MachineStatus,
 } from "@/types";
@@ -180,12 +182,44 @@ export default function CreateMachineWizard({
       }
 
       // Step 2: Create machine(s)
-      const createdMachines = [];
+      let createdMachines: Machine[] = [];
 
       if (state.quantity === 1) {
-        // Single machine
+        // Single machine - use regular createMachine
         const machineData = {
           line: parseInt(state.line),
+          name: state.machineName,
+          designation: state.machineDesignation,
+          facilities_id: state.facilities_id!,
+          process_type_key: state.isCustomProcessType
+            ? state.customProcessTypeName
+            : state.process_type_key,
+          machine_category: state.machineCategory as MachineCategory,
+          machine_group_id: variableCombinationId,
+          capabilities: combinedCapabilities,
+          status: "Offline" as MachineStatus,
+          // Placeholder values - will be determined by rules
+          speed_hr: 0,
+          shiftCapacity: 0,
+          people_per_process: 1,
+        };
+
+        const newMachine = await createMachine(machineData);
+        createdMachines = [newMachine];
+      } else {
+        // Multiple machines - use bulk creation with line_list
+        const startLineStr = state.lineStart.trim();
+        
+        if (!startLineStr) {
+          throw new Error(`Starting line number is required`);
+        }
+
+        // Build line_list array with all line numbers (handles numeric and alphanumeric)
+        const lineList = generateLineList(startLineStr, state.quantity);
+
+        const bulkData = {
+          quantity: state.quantity,
+          line_list: lineList,
           name: state.machineName,
           designation: state.machineDesignation,
           facilities_id: state.facilities_id!,
@@ -196,43 +230,10 @@ export default function CreateMachineWizard({
           variable_combination_id: variableCombinationId,
           capabilities: combinedCapabilities,
           status: "Offline" as MachineStatus,
-          // Placeholder values - will be determined by rules
-          speed_hr: 0,
-          shiftCapacity: 0,
-          people_per_process: 1,
+          details: {},
         };
 
-        const newMachine = await createMachine(machineData);
-        createdMachines.push(newMachine);
-      } else {
-        // Multiple machines
-        const startLine = parseInt(state.lineStart);
-
-        for (let i = 0; i < state.quantity; i++) {
-          const lineNumber = startLine + i;
-          const designation = `${state.machineDesignation}${i + 1}`;
-
-          const machineData = {
-            line: lineNumber,
-            name: `${state.machineName} ${designation}`,
-            designation: designation,
-            facilities_id: state.facilities_id!,
-            process_type_key: state.isCustomProcessType
-              ? state.customProcessTypeName
-              : state.process_type_key,
-            machine_category: state.machineCategory as MachineCategory,
-            variable_combination_id: variableCombinationId,
-            capabilities: combinedCapabilities,
-            status: "Offline" as MachineStatus,
-            // Placeholder values - will be determined by rules
-            speed_hr: 0,
-            shiftCapacity: 0,
-            people_per_process: 1,
-          };
-
-          const newMachine = await createMachine(machineData);
-          createdMachines.push(newMachine);
-        }
+        createdMachines = await createMachinesBulk(bulkData);
       }
 
       // Step 3: Add machines to existing group if selected

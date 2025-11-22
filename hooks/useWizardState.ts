@@ -55,6 +55,63 @@ export interface MachineVariableFromAPI {
     | Record<string, any>;
 }
 
+/**
+ * Generate a list of line numbers from a starting line number
+ * Handles numeric (1, 2, 3), alphanumeric (a1, a2, a3), and alphabetic prefixes (a -> a1, a2, a3)
+ */
+export function generateLineList(startLine: string, quantity: number): string[] {
+  const lines: string[] = [];
+  
+  // Try to parse as numeric first
+  const numericMatch = startLine.match(/^(\d+)$/);
+  if (numericMatch) {
+    const startNum = parseInt(numericMatch[1], 10);
+    for (let i = 0; i < quantity; i++) {
+      lines.push(String(startNum + i));
+    }
+    return lines;
+  }
+  
+  // Try alphanumeric with prefix (e.g., "a1", "a2", "a3" or "fm1", "fm2", "fm3")
+  const prefixMatch = startLine.match(/^([a-zA-Z]+)(\d+)$/);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1];
+    const startNum = parseInt(prefixMatch[2], 10);
+    for (let i = 0; i < quantity; i++) {
+      lines.push(`${prefix}${startNum + i}`);
+    }
+    return lines;
+  }
+  
+  // Try alphanumeric with suffix (e.g., "1a", "2a", "3a")
+  const suffixMatch = startLine.match(/^(\d+)([a-zA-Z]+)$/);
+  if (suffixMatch) {
+    const startNum = parseInt(suffixMatch[1], 10);
+    const suffix = suffixMatch[2];
+    for (let i = 0; i < quantity; i++) {
+      lines.push(`${startNum + i}${suffix}`);
+    }
+    return lines;
+  }
+  
+  // Try pure alphabetic (e.g., "a", "fm", "abc") - append numbers starting from 1
+  const alphaMatch = startLine.match(/^([a-zA-Z]+)$/);
+  if (alphaMatch) {
+    const prefix = alphaMatch[1];
+    for (let i = 0; i < quantity; i++) {
+      lines.push(`${prefix}${i + 1}`);
+    }
+    return lines;
+  }
+  
+  // If no pattern matches, just return the starting line repeated
+  // This handles edge cases
+  for (let i = 0; i < quantity; i++) {
+    lines.push(startLine);
+  }
+  return lines;
+}
+
 export interface FormBuilderField {
   id: string;
   fieldName: string;
@@ -430,37 +487,30 @@ export function useWizardState() {
     if (state.quantity === 1) {
       if (!state.line.trim()) {
         errors.line = "Line number is required";
-      } else if (!/^\d+$/.test(state.line.trim())) {
-        errors.line = "Line number must be numeric";
       }
+      // Allow alphanumeric line numbers (e.g., "a1", "1", "line1")
     } else {
       // Multiple machines - validate line range
       if (!state.lineStart.trim()) {
         errors.lineStart = "Starting line number is required";
-      } else if (!/^\d+$/.test(state.lineStart.trim())) {
-        errors.lineStart = "Starting line number must be numeric";
       }
 
       if (!state.lineEnd.trim()) {
         errors.lineEnd = "Ending line number is required";
-      } else if (!/^\d+$/.test(state.lineEnd.trim())) {
-        errors.lineEnd = "Ending line number must be numeric";
       }
 
-      if (
-        state.lineStart.trim() &&
-        state.lineEnd.trim() &&
-        parseInt(state.lineStart) >= parseInt(state.lineEnd)
-      ) {
-        errors.lineEnd = "Ending line must be greater than starting line";
-      }
-
-      const lineRange =
-        state.lineEnd.trim() && state.lineStart.trim()
-          ? parseInt(state.lineEnd) - parseInt(state.lineStart) + 1
-          : 0;
-      if (lineRange !== state.quantity) {
-        errors.lineEnd = `Line range must match quantity (${state.quantity} machines)`;
+      // Validate that line range matches quantity
+      if (state.lineStart.trim() && state.lineEnd.trim()) {
+        const lineList = generateLineList(state.lineStart.trim(), state.quantity);
+        if (lineList.length !== state.quantity) {
+          errors.lineEnd = `Line range must match quantity (${state.quantity} machines)`;
+        } else {
+          const expectedEnd = lineList[lineList.length - 1];
+          const actualEnd = state.lineEnd.trim();
+          if (expectedEnd !== actualEnd) {
+            errors.lineEnd = `Expected ending line "${expectedEnd}" for ${state.quantity} machines starting from "${state.lineStart.trim()}"`;
+          }
+        }
       }
     }
 
@@ -615,22 +665,19 @@ export function useWizardState() {
           if (!/^[a-zA-Z0-9]+$/.test(state.machineDesignation)) return false;
 
           if (state.quantity === 1) {
-            return !!(state.line.trim() && /^\d+$/.test(state.line.trim()));
+            // Allow alphanumeric line numbers
+            return !!state.line.trim();
           } else {
             if (!state.lineStart.trim() || !state.lineEnd.trim()) return false;
-            if (
-              !/^\d+$/.test(state.lineStart.trim()) ||
-              !/^\d+$/.test(state.lineEnd.trim())
-            )
-              return false;
-            const lineRange =
-              parseInt(state.lineEnd) - parseInt(state.lineStart) + 1;
-            return (
-              lineRange === state.quantity &&
-              parseInt(state.lineStart) < parseInt(state.lineEnd)
-            );
+            
+            // Use generateLineList to validate line range matches quantity
+            const lineList = generateLineList(state.lineStart.trim(), state.quantity);
+            if (lineList.length !== state.quantity) return false;
+            
+            // Check that the ending line matches what we expect
+            const expectedEnd = lineList[lineList.length - 1];
+            return expectedEnd === state.lineEnd.trim();
           }
-          return true;
         case 3:
           if (!state.process_type_key && !state.isCustomProcessType)
             return false;

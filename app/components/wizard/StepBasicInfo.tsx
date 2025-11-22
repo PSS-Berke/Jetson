@@ -7,6 +7,7 @@
 
 import React from "react";
 import FacilityToggle from "../FacilityToggle";
+import { generateLineList } from "@/hooks/useWizardState";
 
 interface StepBasicInfoProps {
   quantity: number;
@@ -41,10 +42,10 @@ export default function StepBasicInfo({
     onChange("quantity", qty);
 
     // Auto-update line range if lineStart is set
-    if (qty > 1 && lineStart) {
-      const startNum = parseInt(lineStart);
-      if (!isNaN(startNum)) {
-        onChange("lineEnd", String(startNum + qty - 1));
+    if (qty > 1 && lineStart.trim()) {
+      const lineList = generateLineList(lineStart.trim(), qty);
+      if (lineList.length > 0) {
+        onChange("lineEnd", lineList[lineList.length - 1]);
       }
     }
   };
@@ -53,10 +54,10 @@ export default function StepBasicInfo({
   const handleLineStartChange = (value: string) => {
     onChange("lineStart", value);
 
-    if (quantity > 1 && value) {
-      const startNum = parseInt(value);
-      if (!isNaN(startNum)) {
-        onChange("lineEnd", String(startNum + quantity - 1));
+    if (quantity > 1 && value.trim()) {
+      const lineList = generateLineList(value.trim(), quantity);
+      if (lineList.length > 0) {
+        onChange("lineEnd", lineList[lineList.length - 1]);
       }
     }
   };
@@ -137,7 +138,7 @@ export default function StepBasicInfo({
               value={line}
               onChange={(e) => onChange("line", e.target.value)}
               onBlur={() => onBlur("line")}
-              placeholder="e.g., 101"
+              placeholder="e.g., 101 or a1"
               className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 touched.line && errors.line
                   ? "border-red-500 focus:ring-red-500"
@@ -179,7 +180,7 @@ export default function StepBasicInfo({
                 value={lineStart}
                 onChange={(e) => handleLineStartChange(e.target.value)}
                 onBlur={() => onBlur("lineStart")}
-                placeholder="e.g., 101"
+                placeholder="e.g., 1 or a1"
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   touched.lineStart && errors.lineStart
                     ? "border-red-500 focus:ring-red-500"
@@ -216,7 +217,7 @@ export default function StepBasicInfo({
                 value={lineEnd}
                 onChange={(e) => onChange("lineEnd", e.target.value)}
                 onBlur={() => onBlur("lineEnd")}
-                placeholder="e.g., 103"
+                placeholder="e.g., 3 or a3"
                 className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   touched.lineEnd && errors.lineEnd
                     ? "border-red-500 focus:ring-red-500"
@@ -244,6 +245,25 @@ export default function StepBasicInfo({
               Line range for {quantity} machines (auto-calculated from starting
               line)
             </p>
+            
+            {/* Preview of line_list array */}
+            {quantity > 1 && lineStart && lineStart.trim() && (
+              <div className="col-span-2 mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm font-medium text-blue-900 mb-2">
+                  Generated Line Numbers:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {generateLineList(lineStart.trim(), quantity).map((lineNum, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {lineNum}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

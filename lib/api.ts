@@ -668,6 +668,126 @@ export const createMachine = async (
   return createdMachine;
 };
 
+// Create multiple machines using line_list format
+export const createMachinesBulk = async (bulkData: {
+  quantity: number;
+  line_list: string[];
+  name: string;
+  designation: string;
+  facilities_id: number;
+  process_type_key: string;
+  machine_category?: string;
+  capabilities: Record<string, MachineCapabilityValue>;
+  status?: MachineStatus;
+  variable_combination_id?: number;
+  details?: Record<string, any>;
+}): Promise<Machine[]> => {
+  console.log("[createMachinesBulk] Creating machines in bulk:", bulkData);
+
+  // Extract paper_size and pockets from capabilities if they exist
+  const capabilities: Record<string, MachineCapabilityValue> = 
+    (bulkData.capabilities && typeof bulkData.capabilities === 'object' && !Array.isArray(bulkData.capabilities))
+      ? bulkData.capabilities as Record<string, MachineCapabilityValue>
+      : {};
+  const paper_size = capabilities.paper_size 
+    ? String(capabilities.paper_size) 
+    : capabilities.supported_paper_sizes 
+      ? (Array.isArray(capabilities.supported_paper_sizes) 
+          ? capabilities.supported_paper_sizes[0] 
+          : String(capabilities.supported_paper_sizes))
+      : "";
+  const pockets = capabilities.pockets 
+    ? Number(capabilities.pockets) 
+    : capabilities.max_pockets 
+      ? Number(capabilities.max_pockets) 
+      : 0;
+
+  // Determine type field - derive from process_type_key
+  let type = "";
+  const processTypeKey = bulkData.process_type_key || "";
+  if (processTypeKey && typeof processTypeKey === 'string') {
+    const typeMap: { [key: string]: string } = {
+      insert: "Inserter",
+      fold: "Folder",
+      laser: "HP Press",
+      hppress: "HP Press",
+      inkjet: "Inkjetter",
+      affix: "Affixer",
+      sort: "Sorter",
+    };
+    type = typeMap[processTypeKey.toLowerCase()] || bulkData.name;
+  } else {
+    type = bulkData.name;
+  }
+
+  // Transform to API format
+  const apiData: Record<string, any> = {
+    quantity: bulkData.quantity,
+    line_list: bulkData.line_list,
+    name: bulkData.name || "",
+    type: type,
+    status: bulkData.status || "available",
+    facilities_id: bulkData.facilities_id || 0,
+    designation: bulkData.designation || "",
+    capabilities: bulkData.capabilities || {},
+    process_type_key: bulkData.process_type_key || "",
+    machine_category: bulkData.machine_category || "",
+    details: bulkData.details || {},
+    paper_size: paper_size,
+    pockets: pockets,
+    speed_hr: "0",
+    shift_capacity: "",
+    people_per_process: 1,
+  };
+
+  // Add variable_combination_id if provided (for machine groups)
+  if (bulkData.variable_combination_id !== undefined && bulkData.variable_combination_id !== null) {
+    apiData.variable_combination_id = bulkData.variable_combination_id;
+  }
+
+  console.log("[createMachinesBulk] Request body:", JSON.stringify(apiData, null, 2));
+
+  const result = await apiFetch<any>("/machines", {
+    method: "POST",
+    body: JSON.stringify(apiData),
+  });
+  console.log("[createMachinesBulk] Response:", result);
+
+  // Parse response - Xano may return machines1 array or similar
+  let machinesResult: any[] = [];
+  if (result.machines1) {
+    machinesResult = Array.isArray(result.machines1) ? result.machines1 : [result.machines1];
+  } else if (Array.isArray(result)) {
+    machinesResult = result;
+  } else if (result) {
+    machinesResult = [result];
+  }
+
+  // Transform API response to frontend format
+  const createdMachines: Machine[] = machinesResult.map((machineResult: any) => {
+    const parsedCapabilities = parseCapabilities(machineResult.capabilities);
+    return {
+      ...machineResult,
+      line: machineResult.line
+        ? typeof machineResult.line === "number"
+          ? machineResult.line
+          : parseInt(machineResult.line)
+        : 0,
+      capabilities: parsedCapabilities,
+      speed_hr: machineResult.speed_hr
+        ? typeof machineResult.speed_hr === "number"
+          ? machineResult.speed_hr
+          : parseFloat(machineResult.speed_hr)
+        : 0,
+      process_type_key:
+        machineResult.process_type_key || inferProcessTypeKey(machineResult.type),
+    };
+  });
+
+  console.log("[createMachinesBulk] Created machines:", createdMachines);
+  return createdMachines;
+};
+
 // Update an existing machine
 export const updateMachine = async (
   machineId: number,
