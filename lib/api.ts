@@ -466,14 +466,11 @@ export const getMachines = async (
       return "available"; // Default fallback
     };
 
-    // Parse line - handle both string and number
-    const parseLine = (line: string | number | undefined): number => {
-      if (typeof line === "number") return line;
-      if (typeof line === "string") {
-        const parsed = parseInt(line, 10);
-        return isNaN(parsed) ? 0 : parsed;
-      }
-      return 0;
+    // Parse line - keep as string (can be alphanumeric like "a1", "fm1", etc.)
+    const parseLine = (line: string | number | undefined): string => {
+      if (typeof line === "string") return line;
+      if (typeof line === "number") return String(line);
+      return "";
     };
 
     // Parse speed_hr - handle string numbers
@@ -682,10 +679,10 @@ export const createMachine = async (
   const createdMachine: Machine = {
     ...machineResult,
     line: machineResult.line
-      ? typeof machineResult.line === "number"
+      ? typeof machineResult.line === "string"
         ? machineResult.line
-        : parseInt(machineResult.line)
-      : 0,
+        : String(machineResult.line)
+      : "",
     capabilities: parsedCapabilities,
     speed_hr: machineResult.speed_hr
       ? typeof machineResult.speed_hr === "number"
@@ -801,10 +798,10 @@ export const createMachinesBulk = async (bulkData: {
     return {
       ...machineResult,
       line: machineResult.line
-        ? typeof machineResult.line === "number"
+        ? typeof machineResult.line === "string"
           ? machineResult.line
-          : parseInt(machineResult.line)
-        : 0,
+          : String(machineResult.line)
+        : "",
       capabilities: parsedCapabilities,
       speed_hr: machineResult.speed_hr
         ? typeof machineResult.speed_hr === "number"
@@ -868,7 +865,7 @@ export const updateMachine = async (
   // Transform API response to frontend format
   return {
     ...result,
-    line: result.name ? parseInt(result.name) : result.line || 0,
+    line: result.name ? String(result.name) : (result.line ? String(result.line) : ""),
     capabilities: result.details || result.capabilities || {},
     speed_hr: result.speed_hr ? parseInt(result.speed_hr) : 0,
     process_type_key:

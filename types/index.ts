@@ -125,7 +125,7 @@ export interface MachineCapabilities {
 export interface Machine {
   id: number;
   created_at: number;
-  line: number;
+  line: string;
   name?: string; // Machine name/identifier
   type: string; // Display name (e.g., "Inserter", "Folder")
   process_type_key?: string; // Maps to processTypeConfig keys (insert, fold, laser, etc.)
@@ -234,7 +234,7 @@ export interface ParsedJob extends Omit<Job, "client" | "machines"> {
     id: number;
     name: string;
   } | null;
-  machines: { id: number; line: number }[];
+  machines: { id: number; line: string }[];
   parsedRequirements: JobRequirement[];
 }
 

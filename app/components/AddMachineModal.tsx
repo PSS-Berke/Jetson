@@ -207,7 +207,7 @@ export default function AddMachineModal({
 
       // Prepare the machine data
       const machineData = {
-        line: parseInt(formData.line),
+        line: formData.line,
         type: formData.type,
         process_type_key: formData.process_type_key,
         facilities_id: formData.facilities_id,

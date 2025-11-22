@@ -60,7 +60,7 @@ export default function MachinesTabView({
         const machineForHandlers: Machine = {
           id: machine.id,
           created_at: machine.created_at,
-          line: typeof machine.line === 'string' ? parseInt(machine.line) : machine.line,
+          line: typeof machine.line === 'string' ? machine.line : String(machine.line),
           type: machine.type || '',
           status: (machine.status || 'available') as MachineStatus,
           facilities_id: machine.facilities_id,
@@ -187,7 +187,7 @@ export default function MachinesTabView({
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    Process Type Key
+                    Process Type
                   </div>
                   <div className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
                     {machine.process_type_key || <span className="text-gray-400 italic">Empty</span>}

@@ -53,7 +53,7 @@ export interface JobDayDetail {
  */
 export interface JobMachineAllocation {
   machineId: number;
-  machineLine: number;
+  machineLine: string;
   hoursAllocated: number;
 }
 

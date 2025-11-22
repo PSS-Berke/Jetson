@@ -187,7 +187,7 @@ export default function CreateMachineWizard({
       if (state.quantity === 1) {
         // Single machine - use regular createMachine
         const machineData = {
-          line: parseInt(state.line),
+          line: state.line,
           name: state.machineName,
           designation: state.machineDesignation,
           facilities_id: state.facilities_id!,

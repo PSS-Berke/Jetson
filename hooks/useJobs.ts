@@ -22,7 +22,7 @@ export interface ParsedJob
   extends Omit<Job, "client" | "sub_client" | "machines" | "requirements"> {
   client: { id: number; name: string };
   sub_client?: { id: number; name: string } | null;
-  machines: { id: number; line: number }[];
+  machines: { id: number; line: string }[];
   requirements: ParsedRequirement[];
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
 }

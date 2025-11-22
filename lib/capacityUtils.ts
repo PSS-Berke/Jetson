@@ -17,7 +17,7 @@ export interface Job {
   start_date: number;
   due_date: number;
   time_estimate: number | null;
-  machines: { id: number; line: number }[];
+  machines: { id: number; line: string }[];
   total_billing: string;
   requirements?: { price_per_m?: string }[];
   add_on_charges?: string;

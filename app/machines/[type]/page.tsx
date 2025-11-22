@@ -164,16 +164,8 @@ export default function MachineTypePage() {
   } = useMachines(filterStatus, filterFacility || undefined, machineType);
   const { logout } = useAuth();
 
-  // Get configuration for this machine type
+  // Get configuration for this machine type (only for label, no filtering)
   const config = machineTypeConfig[machineType];
-
-  // Filter machines by type - must be before useEffect that uses it
-  const filteredMachines = config ? machines.filter(config.filterFn) : [];
-  
-  // Filter raw machines response by type
-  const filteredRawMachinesResponse = rawMachinesResponse && config
-    ? rawMachinesResponse.filter((machine: any) => config.filterFn(machine as Machine))
-    : rawMachinesResponse;
 
 
   // Function to fetch raw machines response
@@ -712,14 +704,14 @@ export default function MachineTypePage() {
                 </svg>
                 Machines
               </h3>
-              {filteredRawMachinesResponse && (
+              {rawMachinesResponse && (
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                  {filteredRawMachinesResponse.length} machine{filteredRawMachinesResponse.length !== 1 ? 's' : ''}
+                  {rawMachinesResponse.length} machine{rawMachinesResponse.length !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
             <MachinesTabView
-              machines={filteredRawMachinesResponse || []}
+              machines={rawMachinesResponse || []}
               loading={rawResponseLoading}
               onEditClick={(machine) => setSelectedMachine(machine)}
               onDeleteClick={handleDeleteClick}

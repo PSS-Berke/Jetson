@@ -427,7 +427,7 @@ export default function EditMachineModal({
 
       // Prepare the machine data
       const machineData = {
-        line: parseInt(line),
+        line: line,
         type: machineType, // Use updated machine type
         name: machineName || undefined,
         designation: machineDesignation || undefined,
