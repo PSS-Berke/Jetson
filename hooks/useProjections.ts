@@ -259,46 +259,9 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       return [];
     }
 
-    // Filter jobs by date range if toggle is enabled
-    const filteredJobsByDate = filters.showOnlyInDateRange
-      ? jobs.filter((job) => {
-          // Check if job has valid dates (not null/undefined, but 0 is valid)
-          const hasStartDate = job.start_date != null && job.start_date !== undefined;
-          const hasDueDate = job.due_date != null && job.due_date !== undefined;
-          
-          // If job doesn't have both dates, always include it (jobs without dates should always display)
-          if (!hasStartDate || !hasDueDate) {
-            return true;
-          }
-
-          // If no time ranges, include all jobs with dates
-          if (timeRanges.length === 0) {
-            return true;
-          }
-
-          // Normalize dates to start of day for proper comparison
-          const jobStart = new Date(job.start_date);
-          const jobEnd = new Date(job.due_date);
-          jobStart.setHours(0, 0, 0, 0);
-          jobEnd.setHours(0, 0, 0, 0);
-
-          const rangeStart = timeRanges[0].startDate.getTime();
-          const rangeEnd = timeRanges[timeRanges.length - 1].endDate.getTime();
-
-          // Job overlaps with date range if:
-          // - It starts before or on the range end AND
-          // - It ends on or after the range start
-          return jobStart.getTime() <= rangeEnd && jobEnd.getTime() >= rangeStart;
-        })
-      : jobs;
-
-    console.log(
-      `[useProjections] Date range filter: ${filters.showOnlyInDateRange ? "ON" : "OFF"}, Jobs before: ${jobs.length}, Jobs after: ${filteredJobsByDate.length}`,
-    );
-
     // Calculate projections for all jobs using generic function
     const jobProjections = calculateGenericJobProjections(
-      filteredJobsByDate,
+      jobs,
       timeRanges,
     );
 
@@ -353,12 +316,27 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         totalQuantity: adjustedTotal,
       };
     });
-  }, [jobs, timeRanges, actualQuantitiesByJob, filters.showOnlyInDateRange]);
+  }, [jobs, timeRanges, actualQuantitiesByJob]);
 
   // 4. Filtered projections - only recalculates when filters or adjustedJobProjections change
   const filteredProjections = useMemo<JobProjection[]>(() => {
     if (adjustedJobProjections.length === 0) {
       return [];
+    }
+
+    // Apply date range filter first if enabled
+    let projectionsToFilter = adjustedJobProjections;
+    if (filters.showOnlyInDateRange) {
+      projectionsToFilter = adjustedJobProjections.filter((projection) => {
+        // Check if any of the visible columns have production quantity > 0
+        const hasProductionInVisibleColumns = Array.from(projection.weeklyQuantities.values())
+          .some(qty => qty > 0);
+        return hasProductionInVisibleColumns;
+      });
+
+      console.log(
+        `[useProjections] Date range filter: ON, Projections before: ${adjustedJobProjections.length}, Projections after: ${projectionsToFilter.length}`,
+      );
     }
 
     // Determine which filters are active
@@ -370,7 +348,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     const filterMode = filters.filterMode || "and";
 
     if (filterMode === "or") {
-      return adjustedJobProjections.filter((p) => {
+      return projectionsToFilter.filter((p) => {
         if (
           !hasClientFilter &&
           !hasServiceTypeFilter &&
@@ -420,7 +398,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         );
       });
     } else {
-      let result = adjustedJobProjections;
+      let result = projectionsToFilter;
 
       if (hasClientFilter) {
         result = result.filter((p) =>

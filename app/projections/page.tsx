@@ -72,7 +72,7 @@ export default function ProjectionsPage() {
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filterViewMode, setFilterViewMode] = useState<"simple" | "advanced">(
     "simple",
   );
@@ -83,12 +83,7 @@ export default function ProjectionsPage() {
     "cards",
   );
   const [globalTimeScrollIndex, setGlobalTimeScrollIndex] = useState(0);
-  const [tableViewMode, setTableViewMode] = useState<"jobs" | "processes">(
-    "jobs",
-  );
-  const [processViewMode, setProcessViewMode] = useState<
-    "consolidated" | "expanded"
-  >("consolidated");
+  const [showExpandedProcesses, setShowExpandedProcesses] = useState(true);
   const [showOnlyInDateRange, setShowOnlyInDateRange] = useState(true);
   const [showNotes, setShowNotes] = useState(false);
   const [groupByFacility, setGroupByFacility] = useState(false);
@@ -140,12 +135,12 @@ export default function ProjectionsPage() {
   console.log("[DEBUG] ProjectionsPage - totalRevenue:", totalRevenue);
 
   // Calculate paginated job projections
-  const indexOfLastJob = currentPage * itemsPerPage;
-  const indexOfFirstJob = indexOfLastJob - itemsPerPage;
-  const paginatedJobProjections = filteredJobProjections.slice(
-    indexOfFirstJob,
-    indexOfLastJob,
-  );
+  const paginatedJobProjections = itemsPerPage === -1
+    ? filteredJobProjections  // Show all items
+    : filteredJobProjections.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      );
 
   // Handle granularity change and adjust start date accordingly
   const handleGranularityChange = (newGranularity: Granularity) => {
@@ -385,10 +380,8 @@ export default function ProjectionsPage() {
             onDataDisplayModeChange={setDataDisplayMode}
             mobileViewMode={mobileViewMode}
             onMobileViewModeChange={setMobileViewMode}
-            viewMode={tableViewMode}
-            onViewModeChange={setTableViewMode}
-            processViewMode={processViewMode}
-            onProcessViewModeChange={setProcessViewMode}
+            showExpandedProcesses={showExpandedProcesses}
+            onShowExpandedProcessesChange={setShowExpandedProcesses}
             showOnlyInDateRange={showOnlyInDateRange}
             onDateRangeToggleChange={setShowOnlyInDateRange}
             onExportPDF={
@@ -447,8 +440,7 @@ export default function ProjectionsPage() {
                     globalTimeScrollIndex={globalTimeScrollIndex}
                     onGlobalTimeScrollIndexChange={setGlobalTimeScrollIndex}
                     dataDisplayMode={dataDisplayMode}
-                    viewMode={tableViewMode}
-                    processViewMode={processViewMode}
+                    showExpandedProcesses={showExpandedProcesses}
                     showNotes={showNotes}
                     onShowNotesChange={setShowNotes}
                   />

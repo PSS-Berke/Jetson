@@ -10,11 +10,16 @@ import { useWizardState } from "@/hooks/useWizardState";
 import {
   createMachine,
   createMachineRule,
+  createMachineGroup,
 } from "@/lib/api";
 import type {
   MachineCategory,
   MachineStatus,
 } from "@/types";
+import {
+  validateCapabilities,
+  getAllValidationMessages,
+} from "@/lib/capabilityValidation";
 
 // Wizard components
 import WizardStepIndicator from "./wizard/WizardStepIndicator";
@@ -120,13 +125,58 @@ export default function CreateMachineWizard({
 
       console.log("[CreateMachineWizard] Combined capabilities from step 3:", JSON.stringify(combinedCapabilities, null, 2));
 
+      // Validate capabilities before submitting
+      const processTypeKey = state.isCustomProcessType
+        ? state.customProcessTypeName
+        : state.process_type_key;
+
+      const validationResult = validateCapabilities(
+        processTypeKey,
+        combinedCapabilities
+      );
+
+      // Show validation errors/warnings (non-blocking for warnings)
+      if (!validationResult.valid) {
+        const messages = getAllValidationMessages(validationResult);
+        const errorMessages = messages.filter((m) => m.startsWith("❌"));
+
+        if (errorMessages.length > 0) {
+          setToastMessage(
+            `Capability validation errors:\n${errorMessages.join("\n")}`
+          );
+          setShowErrorToast(true);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Log warnings but continue
+      if (validationResult.warnings.length > 0) {
+        const warningMessages = getAllValidationMessages(validationResult)
+          .filter((m) => m.startsWith("⚠️"));
+        console.warn(
+          "[CreateMachineWizard] Capability validation warnings:",
+          warningMessages.join("\n")
+        );
+      }
+
       // Step 1: Create machine group if needed
-      let machineGroupId: number | undefined;
+      let variableCombinationId: number | undefined;
 
       if (state.machineGroupOption === "new") {
-        
+        // Create a new group (variable combination marked as is_grouped=true)
+        const newGroup = await createMachineGroup({
+          rule_name: state.newGroupName,
+          description: state.newGroupDescription,
+          process_type: state.isCustomProcessType
+            ? state.customProcessTypeName
+            : state.process_type_key,
+          is_grouped: true, // Mark this as an explicitly created group
+        });
+        variableCombinationId = newGroup.id;
+        console.log("[CreateMachineWizard] Created new group:", newGroup);
       } else if (state.machineGroupOption === "existing") {
-        machineGroupId = state.existingGroupId || undefined;
+        variableCombinationId = state.existingGroupId || undefined;
       }
 
       // Step 2: Create machine(s)
@@ -143,7 +193,7 @@ export default function CreateMachineWizard({
             ? state.customProcessTypeName
             : state.process_type_key,
           machine_category: state.machineCategory as MachineCategory,
-          machine_group_id: machineGroupId,
+          variable_combination_id: variableCombinationId,
           capabilities: combinedCapabilities,
           status: "Offline" as MachineStatus,
           // Placeholder values - will be determined by rules
@@ -171,7 +221,7 @@ export default function CreateMachineWizard({
               ? state.customProcessTypeName
               : state.process_type_key,
             machine_category: state.machineCategory as MachineCategory,
-            machine_group_id: machineGroupId,
+            variable_combination_id: variableCombinationId,
             capabilities: combinedCapabilities,
             status: "Offline" as MachineStatus,
             // Placeholder values - will be determined by rules
@@ -196,12 +246,12 @@ export default function CreateMachineWizard({
           name: rule.name,
           process_type_key:
             state.process_type_key || state.customProcessTypeName,
-          machine_id: machineGroupId
+          machine_id: variableCombinationId
             ? undefined
             : createdMachines.length === 1
               ? createdMachines[0].id
               : undefined,
-          machine_group_id: machineGroupId,
+          machine_group_id: variableCombinationId,
           priority: rule.priority,
           conditions: rule.conditions,
           outputs: rule.outputs,

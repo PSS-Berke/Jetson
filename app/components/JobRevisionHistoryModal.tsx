@@ -89,31 +89,89 @@ export default function JobRevisionHistoryModal({
     return changes;
   };
 
+  const formatFieldName = (fieldName: string): string => {
+    // Handle special cases
+    const specialCases: { [key: string]: string } = {
+      po_number: "PO Number",
+      id: "ID",
+      jobs_id: "Job ID",
+      user_id: "User ID",
+      created_at: "Created At",
+      updated_at: "Updated At",
+    };
+
+    if (specialCases[fieldName]) {
+      return specialCases[fieldName];
+    }
+
+    // Convert snake_case to Title Case
+    return fieldName
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
   const formatValue = (value: any): string => {
     if (value === null || value === undefined) {
       return "—";
     }
-    
-    // Try to parse JSON strings
-    if (typeof value === "string" && (value.startsWith("[") || value.startsWith("{"))) {
-      try {
-        const parsed = JSON.parse(value);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        // If parsing fails, return as-is
-      }
-    }
-    
-    if (typeof value === "object") {
-      return JSON.stringify(value, null, 2);
-    }
-    if (typeof value === "boolean") {
-      return value ? "Yes" : "No";
-    }
+
+    // Handle empty strings
     if (typeof value === "string" && value === "") {
       return "(empty)";
     }
-    return String(value);
+
+    // Handle booleans
+    if (typeof value === "boolean") {
+      return value ? "Yes" : "No";
+    }
+
+    // Try to parse JSON strings first
+    let parsedValue = value;
+    if (typeof value === "string" && (value.startsWith("[") || value.startsWith("{"))) {
+      try {
+        parsedValue = JSON.parse(value);
+      } catch {
+        // If parsing fails, return as-is
+        return String(value);
+      }
+    }
+
+    // Handle arrays
+    if (Array.isArray(parsedValue)) {
+      if (parsedValue.length === 0) {
+        return "(empty array)";
+      }
+
+      // Check if array contains objects
+      if (typeof parsedValue[0] === "object" && parsedValue[0] !== null) {
+        // Format array of objects as key-value pairs
+        return parsedValue
+          .map((item, index) => {
+            const entries = Object.entries(item)
+              .filter(([key]) => key !== "id") // Skip id fields
+              .map(([key, val]) => `${formatFieldName(key)}: ${formatValue(val)}`)
+              .join(", ");
+            return parsedValue.length > 1 ? `[${index + 1}] ${entries}` : entries;
+          })
+          .join("\n");
+      }
+
+      // Simple array of primitives
+      return parsedValue.join(", ");
+    }
+
+    // Handle objects
+    if (typeof parsedValue === "object") {
+      const entries = Object.entries(parsedValue)
+        .filter(([key]) => key !== "id") // Skip id fields
+        .map(([key, val]) => `${formatFieldName(key)}: ${formatValue(val)}`)
+        .join("\n");
+      return entries || "(empty object)";
+    }
+
+    // Handle numbers and strings
+    return String(parsedValue);
   };
 
   return (
@@ -222,23 +280,19 @@ export default function JobRevisionHistoryModal({
                                   className="bg-gray-50 rounded p-3 border border-gray-200"
                                 >
                                   <div className="font-medium text-sm text-gray-700 mb-1">
-                                    {change.field}
+                                    {formatFieldName(change.field)}
                                   </div>
                                   <div className="grid grid-cols-2 gap-3 text-sm">
                                     <div>
                                       <div className="text-xs text-gray-500 mb-1">Old Value:</div>
-                                      <div className="bg-red-50 border border-red-200 rounded p-2 text-gray-800 break-words">
-                                        <pre className="whitespace-pre-wrap text-xs">
-                                          {formatValue(change.oldValue)}
-                                        </pre>
+                                      <div className="bg-red-50 border border-red-200 rounded p-2 text-gray-800 break-words whitespace-pre-wrap text-xs">
+                                        {formatValue(change.oldValue)}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-xs text-gray-500 mb-1">New Value:</div>
-                                      <div className="bg-green-50 border border-green-200 rounded p-2 text-gray-800 break-words">
-                                        <pre className="whitespace-pre-wrap text-xs">
-                                          {formatValue(change.newValue)}
-                                        </pre>
+                                      <div className="bg-green-50 border border-green-200 rounded p-2 text-gray-800 break-words whitespace-pre-wrap text-xs">
+                                        {formatValue(change.newValue)}
                                       </div>
                                     </div>
                                   </div>

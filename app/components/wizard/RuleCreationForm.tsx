@@ -312,6 +312,144 @@ export default function RuleCreationForm({
     setShowForm(false);
   };
 
+  const availableParams = getAvailableParameters();
+
+  const renderConditionValue = (condition: RuleCondition, index: number) => {
+    const parameter = availableParams.find(
+      (p) => p.value === condition.parameter
+    );
+
+    // Multi-select for 'in' and 'not_in' operators with dropdown fields
+    if (
+      parameter?.options &&
+      (condition.operator === "in" || condition.operator === "not_in")
+    ) {
+      const selectedValues: (string | number)[] = Array.isArray(condition.value)
+        ? condition.value
+        : [];
+      return (
+        <div className="flex-1 space-y-2">
+          <label className="block text-xs text-gray-600">Select values:</label>
+          <div className="flex flex-wrap gap-2">
+            {parameter.options.map((option) => {
+              const isSelected = selectedValues.includes(option);
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    const newValues = isSelected
+                      ? selectedValues.filter((v) => v !== option)
+                      : [...selectedValues, option];
+                    updateCondition(index, "value", newValues);
+                  }}
+                  className={`px-2 py-1 rounded text-xs ${
+                    isSelected
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Single-select dropdown for equals/not_equals with dropdown fields
+    if (
+      parameter?.options &&
+      ["equals", "not_equals"].includes(condition.operator)
+    ) {
+      return (
+        <select
+          value={condition.value as string}
+          onChange={(e) => updateCondition(index, "value", e.target.value)}
+          className="flex-1 px-2 py-2 border border-gray-300 rounded"
+        >
+          <option value="">Select value...</option>
+          {parameter.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    // Boolean checkbox
+    if (parameter?.type === "boolean") {
+      return (
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={
+              condition.value === "true" ||
+              condition.value === 1 ||
+              (!!condition.value && condition.value !== "false")
+            }
+            onChange={(e) =>
+              updateCondition(index, "value", e.target.checked ? "true" : "false")
+            }
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-600">Enabled</span>
+        </div>
+      );
+    }
+
+    // Between operator - dual inputs
+    if (condition.operator === "between") {
+      const values = Array.isArray(condition.value)
+        ? condition.value
+        : ["", ""];
+      return (
+        <div className="flex-1 flex gap-2 items-center">
+          <input
+            type={parameter?.type === "number" ? "number" : "text"}
+            value={values[0] || ""}
+            onChange={(e) => {
+              const newValues = [e.target.value, values[1] || ""];
+              updateCondition(index, "value", newValues);
+            }}
+            placeholder="Min"
+            className="flex-1 px-2 py-2 border border-gray-300 rounded"
+          />
+          <span className="text-xs text-gray-600">and</span>
+          <input
+            type={parameter?.type === "number" ? "number" : "text"}
+            value={values[1] || ""}
+            onChange={(e) => {
+              const newValues = [values[0] || "", e.target.value];
+              updateCondition(index, "value", newValues);
+            }}
+            placeholder="Max"
+            className="flex-1 px-2 py-2 border border-gray-300 rounded"
+          />
+        </div>
+      );
+    }
+
+    // Default: single text/number input
+    return (
+      <input
+        type={parameter?.type === "number" ? "number" : "text"}
+        value={String(condition.value || "")}
+        onChange={(e) => {
+          const value =
+            parameter?.type === "number"
+              ? parseFloat(e.target.value) || 0
+              : e.target.value;
+          updateCondition(index, "value", value);
+        }}
+        placeholder="Value"
+        className="flex-1 px-2 py-2 border border-gray-300 rounded"
+      />
+    );
+  };
+
   if (!showForm) {
     return (
       <button
@@ -324,8 +462,6 @@ export default function RuleCreationForm({
       </button>
     );
   }
-
-  const availableParams = getAvailableParameters();
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
@@ -448,15 +584,7 @@ export default function RuleCreationForm({
                   </select>
 
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={String(condition.value || "")}
-                      onChange={(e) =>
-                        updateCondition(index, "value", e.target.value)
-                      }
-                      placeholder="Value"
-                      className="flex-1 px-2 py-2 border border-gray-300 rounded"
-                    />
+                    {renderConditionValue(condition, index)}
                     <button
                       type="button"
                       onClick={() => removeCondition(index)}

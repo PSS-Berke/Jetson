@@ -20,6 +20,11 @@ import {
   getMachineVariablesById,
   updateMachineVariables,
 } from "@/lib/api";
+import {
+  validateFieldName,
+  suggestNamespacedFieldName,
+  isReservedFieldName,
+} from "@/lib/capabilityValidation";
 
 interface StepCapabilitiesProps {
   processTypeKey: string;
@@ -88,29 +93,23 @@ export default function StepCapabilities({
   const [availableFields, setAvailableFields] = useState<FormBuilderField[]>(
     [],
   );
-  // Track if we should save (skip initial load and process type loading)
-  const shouldSaveRef = useRef(false);
-  const isLoadingProcessTypeRef = useRef(false);
-  // Track if component is mounted to prevent saves when navigating away
-  const isMountedRef = useRef(true);
-  // Track if we're selecting available fields to prevent auto-save
-  const isSelectingAvailableFieldRef = useRef(false);
+  // Simplified auto-save tracking - only prevent save on initial mount
+  const isInitialMountRef = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-generate field name from field label (convert to snake_case)
+  // Auto-generate field name from field label (convert to snake_case with custom_ prefix)
   const generateFieldName = (label: string): string => {
-    return label
+    const baseName = label
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
+
+    // Use validation library to ensure proper namespacing
+    return suggestNamespacedFieldName(baseName);
   };
 
   // Function to load machine variables from API (only called when process type is clicked)
   const loadVariablesForProcessType = async (processKey: string) => {
-    // Set loading flag to prevent auto-save during process type loading
-    isLoadingProcessTypeRef.current = true;
-    // Reset save flag BEFORE clearing fields to prevent auto-save
-    shouldSaveRef.current = false;
-    
     if (!processKey || isCustomProcessType) {
       // Clear variables if switching to custom or no process type
       if (isCustomProcessType || !processKey) {
@@ -118,14 +117,6 @@ export default function StepCapabilities({
         onSetMachineVariablesId(null);
         onSetFormBuilderFields([]);
         setAvailableFields([]);
-        // Clear loading flag after state updates complete
-        setTimeout(() => {
-          isLoadingProcessTypeRef.current = false;
-          shouldSaveRef.current = true;
-        }, 100);
-      } else {
-        isLoadingProcessTypeRef.current = false;
-        shouldSaveRef.current = true;
       }
       return;
     }
@@ -277,15 +268,6 @@ export default function StepCapabilities({
         // Clear existing form builder fields when process type changes
         // User will need to select which fields they want
         onSetFormBuilderFields([]);
-        
-        // Clear loading flag AFTER state updates complete to prevent PATCH call
-        // Use setTimeout to ensure React has processed the state updates
-        // Also reset shouldSaveRef to prevent any auto-save during this transition
-        setTimeout(() => {
-          isLoadingProcessTypeRef.current = false;
-          // Re-enable saving after loading is complete
-          shouldSaveRef.current = true;
-        }, 100);
       } else {
         // No variables for this process type
         console.warn(
@@ -296,11 +278,6 @@ export default function StepCapabilities({
         onSetMachineVariablesId(null);
         onSetFormBuilderFields([]);
         setAvailableFields([]);
-        // Clear loading flag after state updates complete
-        setTimeout(() => {
-          isLoadingProcessTypeRef.current = false;
-          shouldSaveRef.current = true;
-        }, 100);
       }
     } catch (error) {
       console.error(
@@ -311,11 +288,6 @@ export default function StepCapabilities({
       onSetMachineVariablesId(null);
       onSetFormBuilderFields([]);
       setAvailableFields([]);
-      // Clear loading flag after state updates complete
-      setTimeout(() => {
-        isLoadingProcessTypeRef.current = false;
-        shouldSaveRef.current = true;
-      }, 100);
     }
   };
 
@@ -337,6 +309,36 @@ export default function StepCapabilities({
       editingFieldIndex !== null && fieldFormData.fieldName
         ? fieldFormData.fieldName
         : generateFieldName(fieldFormData.fieldLabel);
+
+    // Validate field name
+    const validation = validateFieldName(fieldName);
+    if (!validation.valid) {
+      const errorMessage = validation.errors.map((e) => e.message).join("\n");
+      alert(`Field name validation error:\n${errorMessage}`);
+      return;
+    }
+
+    // Show warnings if any
+    if (validation.warnings.length > 0) {
+      const warningMessage = validation.warnings
+        .map((w) => w.message)
+        .join("\n");
+      console.warn("[StepCapabilities] Field name warnings:", warningMessage);
+    }
+
+    // Check for duplicate field names (excluding the field being edited)
+    const duplicateField = formBuilderFields.find(
+      (field, index) =>
+        field.fieldName === fieldName &&
+        (editingFieldIndex === null || index !== editingFieldIndex)
+    );
+
+    if (duplicateField) {
+      alert(
+        `A field with the name "${fieldName}" already exists. Please choose a different label.`
+      );
+      return;
+    }
 
     const newField: FormBuilderField = {
       id:
@@ -424,17 +426,9 @@ export default function StepCapabilities({
     // Auto-save will be triggered by useEffect when formBuilderFields updates
   };
 
-  // Helper function to save fields to API
+  // Helper function to save fields to API with debouncing
   const saveFieldsToAPI = async (fieldsToSave: FormBuilderField[]) => {
     if (!machineVariablesId) {
-      return;
-    }
-
-    // Don't save if component is unmounting or has been unmounted
-    if (!isMountedRef.current) {
-      console.log(
-        "[StepCapabilities] Skipping save - component is unmounting",
-      );
       return;
     }
 
@@ -453,85 +447,53 @@ export default function StepCapabilities({
         };
       });
 
-      // Double-check component is still mounted before making API call
-      if (!isMountedRef.current) {
-        console.log(
-          "[StepCapabilities] Skipping save - component unmounted before API call",
-        );
-        return;
-      }
-
       console.log(
         "[StepCapabilities] Saving machine variables:",
         machineVariablesId,
         variables,
       );
       await updateMachineVariables(machineVariablesId, variables);
-      
-      // Check again after async operation completes
-      if (!isMountedRef.current) {
-        console.log(
-          "[StepCapabilities] Component unmounted during save - ignoring result",
-        );
-        return;
-      }
-      
       console.log("[StepCapabilities] Machine variables saved successfully");
     } catch (error) {
-      // Only log error if component is still mounted
-      if (isMountedRef.current) {
-        console.error(
-          "[StepCapabilities] Error saving machine variables:",
-          error,
-        );
-      }
+      console.error(
+        "[StepCapabilities] Error saving machine variables:",
+        error,
+      );
       // Don't show error to user - silent failure
     }
   };
 
-  // Auto-save when formBuilderFields change (but not on initial load or process type loading)
+  // Debounced auto-save when formBuilderFields change
   useEffect(() => {
-    if (!shouldSaveRef.current) {
-      // Skip first render - this is the initial load
-      shouldSaveRef.current = true;
+    // Skip initial mount
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
       return;
     }
 
-    // Don't save if we're currently loading a process type
-    if (isLoadingProcessTypeRef.current) {
-      return;
+    // Clear any existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
 
-    // Don't save if we're selecting available fields
-    if (isSelectingAvailableFieldRef.current) {
-      return;
-    }
-
-    // Don't save if component is unmounting or has been unmounted
-    if (!isMountedRef.current) {
-      return;
-    }
-
-    // Save if we have a machineVariablesId (even if fields array is empty)
+    // Set a new timeout for debounced save (500ms delay)
     if (machineVariablesId) {
-      saveFieldsToAPI(formBuilderFields);
+      saveTimeoutRef.current = setTimeout(() => {
+        saveFieldsToAPI(formBuilderFields);
+      }, 500);
     }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formBuilderFields, machineVariablesId]);
 
-  // Cleanup: Mark component as unmounted when navigating away
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
   // Handle selecting a field from available saved processes
   const handleSelectAvailableField = (availableField: FormBuilderField) => {
-    // Set flag to prevent auto-save when selecting available fields
-    isSelectingAvailableFieldRef.current = true;
-    
     // Check if field is already selected
     const isAlreadySelected = formBuilderFields.some(
       (field) => field.fieldName === availableField.fieldName,
@@ -553,11 +515,6 @@ export default function StepCapabilities({
       };
       onAddFormBuilderField(newField);
     }
-    
-    // Clear the flag after state updates complete to prevent auto-save
-    setTimeout(() => {
-      isSelectingAvailableFieldRef.current = false;
-    }, 100);
   };
 
   return (

@@ -54,6 +54,7 @@ export default function EditMachineModal({
   const [line, setLine] = useState<string>("");
   const [machineName, setMachineName] = useState<string>("");
   const [machineDesignation, setMachineDesignation] = useState<string>("");
+  const [machineType, setMachineType] = useState<string>("");
   const [facilities_id, setFacilities_id] = useState<number | null>(null);
   const [process_type_key, setProcess_type_key] = useState<string>("");
   const [isCustomProcessType, setIsCustomProcessType] = useState(false);
@@ -99,6 +100,8 @@ export default function EditMachineModal({
       setRules(transformedRules);
     } catch (error) {
       console.error("[EditMachineModal] Error loading machine rules:", error);
+      // Set empty rules array if endpoint is not available
+      setRules([]);
     }
   }, []);
 
@@ -177,6 +180,7 @@ export default function EditMachineModal({
     setLine(machine.line !== undefined && machine.line !== null ? machine.line.toString() : "");
     setMachineName((typeof machine.name === 'string' ? machine.name : '') || "");
     setMachineDesignation((typeof machine.designation === 'string' ? machine.designation : '') || "");
+    setMachineType((typeof machine.type === 'string' ? machine.type : '') || "");
     setFacilities_id(machine.facilities_id !== undefined && machine.facilities_id !== null ? machine.facilities_id : null);
     setProcess_type_key(machine.process_type_key || "");
     setCapabilities(capabilitiesValue);
@@ -304,7 +308,21 @@ export default function EditMachineModal({
   };
 
   const handleProcessTypeChange = (processTypeKey: string) => {
+    // Auto-populate the type field based on process type key
+    const typeMap: { [key: string]: string } = {
+      insert: "Inserter",
+      fold: "Folder",
+      laser: "HP Press",
+      hpPress: "HP Press",
+      inkjet: "Inkjetter",
+      affix: "Affixer",
+      sort: "Sorter",
+    };
+
+    const suggestedType = typeMap[processTypeKey] || machineType;
+
     setProcess_type_key(processTypeKey);
+    setMachineType(suggestedType);
     setCapabilities({});
     setFormBuilderFields([]);
   };
@@ -328,6 +346,29 @@ export default function EditMachineModal({
     } else if (step === 2) {
       if (!process_type_key) {
         stepErrors.process_type_key = "Process type is required";
+      }
+
+      // Validate that machine type matches process_type_key
+      if (machineType && process_type_key) {
+        const typeToProcessMap: { [key: string]: string[] } = {
+          insert: ["insert", "inserter"],
+          fold: ["fold", "folder"],
+          laser: ["laser", "hp", "press"],
+          hpPress: ["laser", "hp", "press"],
+          inkjet: ["inkjet"],
+          affix: ["affix"],
+          sort: ["sort"],
+        };
+
+        const expectedKeywords = typeToProcessMap[process_type_key] || [];
+        const typeLower = machineType.toLowerCase();
+        const matchesExpected = expectedKeywords.some((keyword) =>
+          typeLower.includes(keyword)
+        );
+
+        if (!matchesExpected) {
+          stepErrors.machineType = `Machine type "${machineType}" doesn't match the selected process type. Expected type containing: ${expectedKeywords.join(" or ")}`;
+        }
       }
     }
 
@@ -387,7 +428,7 @@ export default function EditMachineModal({
       // Prepare the machine data
       const machineData = {
         line: parseInt(line),
-        type: machine.type, // Keep original type
+        type: machineType, // Use updated machine type
         name: machineName || undefined,
         designation: machineDesignation || undefined,
         process_type_key: process_type_key,

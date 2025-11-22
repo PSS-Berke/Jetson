@@ -347,6 +347,50 @@ export const api = {
   },
 };
 
+/**
+ * Helper function to parse capabilities - handle both JSON strings and objects
+ * Standardized to always return a valid capabilities object
+ */
+const parseCapabilities = (capabilities: any): Record<string, any> => {
+  // Handle null/undefined
+  if (!capabilities) {
+    return {};
+  }
+
+  // If it's already an object (and not an array), return it
+  if (typeof capabilities === 'object' && !Array.isArray(capabilities)) {
+    return capabilities;
+  }
+
+  // If it's a string, try to parse it as JSON
+  if (typeof capabilities === 'string') {
+    // Handle empty string
+    if (capabilities.trim() === '') {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(capabilities);
+      // Only return if it's a valid object (not array, null, etc.)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {
+      console.warn('[parseCapabilities] Failed to parse capabilities as JSON:', {
+        capabilities,
+        error: e,
+      });
+    }
+  }
+
+  // Fallback for any other type
+  console.warn('[parseCapabilities] Unexpected capabilities type:', {
+    type: typeof capabilities,
+    value: capabilities,
+  });
+  return {};
+};
+
 // Get all machines
 export const getMachines = async (
   status?: string,
@@ -428,7 +472,7 @@ export const getMachines = async (
     return {
       ...machine,
       line: parseLine(machine.line),
-      capabilities: machine.capabilities || {},
+      capabilities: parseCapabilities(machine.capabilities),
       speed_hr: parseSpeedHr(machine.speed_hr),
       shiftCapacity:
         parseShiftCapacity(machine.shift_capacity) ||
@@ -442,6 +486,7 @@ export const getMachines = async (
 };
 
 // Helper function to infer process_type_key from machine type
+// NOTE: This should only be used as a fallback. New code should explicitly set process_type_key.
 const inferProcessTypeKey = (type: string): string => {
   const typeMap: { [key: string]: string } = {
     insert: "insert",
@@ -450,8 +495,8 @@ const inferProcessTypeKey = (type: string): string => {
     folder: "fold",
     folders: "fold",
     fold: "fold",
-    "hp press": "laser",
-    laser: "laser",
+    "hp press": "hpPress", // Changed from "laser" to "hpPress" for consistency
+    laser: "hpPress",
     inkjet: "inkjet",
     inkjetter: "inkjet",
     inkjetters: "inkjet",
@@ -461,7 +506,12 @@ const inferProcessTypeKey = (type: string): string => {
   };
 
   const normalizedType = type.toLowerCase().trim();
-  return typeMap[normalizedType] || "insert"; // Default to 'insert' if unknown
+  const inferredKey = typeMap[normalizedType] || "insert";
+
+  // Log when inference is used to help debug mapping issues
+  console.log(`[inferProcessTypeKey] Inferring process type from machine type "${type}" -> "${inferredKey}"`);
+
+  return inferredKey;
 };
 
 // Create a new machine
@@ -516,11 +566,13 @@ export const createMachine = async (
         insert: "Inserter",
         fold: "Folder",
         laser: "HP Press",
+        hppress: "HP Press", // Added to handle hpPress key
         inkjet: "Inkjetter",
         affix: "Affixer",
         sort: "Sorter",
       };
       type = typeMap[processTypeKey.toLowerCase()] || String((machineData as any).name);
+      console.log(`[createMachine] Derived type "${type}" from process_type_key "${processTypeKey}"`);
     } else {
       type = String((machineData as any).name);
     }
@@ -544,8 +596,7 @@ export const createMachine = async (
     shift_capacity: machineData.shiftCapacity?.toString() || "",
     jobs_id: 0,
     pockets: pockets,
-    details: machineData.capabilities || {},
-    capabilities: capabilities,
+    capabilities: machineData.capabilities || {}, // Standardized: only use capabilities field
     people_per_process: machineData.people_per_process || 1,
     designation: designation,
   };
@@ -589,15 +640,21 @@ export const createMachine = async (
     machineResult = result;
   }
 
+  console.log("[createMachine] Extracted machineResult:", machineResult);
+  console.log("[createMachine] machineResult.capabilities:", machineResult.capabilities);
+
+  // Parse capabilities from response - prefer capabilities field
+  const parsedCapabilities = parseCapabilities(machineResult.capabilities);
+
   // Transform API response to frontend format
-  return {
+  const createdMachine: Machine = {
     ...machineResult,
     line: machineResult.line
       ? typeof machineResult.line === "number"
         ? machineResult.line
         : parseInt(machineResult.line)
       : 0,
-    capabilities: machineResult.details || machineResult.capabilities || {},
+    capabilities: parsedCapabilities,
     speed_hr: machineResult.speed_hr
       ? typeof machineResult.speed_hr === "number"
         ? machineResult.speed_hr
@@ -606,6 +663,9 @@ export const createMachine = async (
     process_type_key:
       machineResult.process_type_key || inferProcessTypeKey(machineResult.type),
   };
+
+  console.log("[createMachine] Created machine with capabilities:", createdMachine.capabilities);
+  return createdMachine;
 };
 
 // Update an existing machine
@@ -1570,6 +1630,26 @@ export const createVariableCombination = async (ruleData: {
     body: JSON.stringify(ruleData),
   });
   console.log("[createVariableCombination] Variable combination created:", result);
+  return result;
+};
+
+/**
+ * Create a new machine group (variable combination marked as a group)
+ * @param groupData - The group data including name, description, and process type
+ * @returns The created group with its ID
+ */
+export const createMachineGroup = async (groupData: {
+  rule_name: string;
+  description?: string;
+  process_type?: string;
+  is_grouped: boolean;
+}): Promise<any> => {
+  console.log("[createMachineGroup] Creating machine group:", groupData);
+  const result = await apiFetch<any>("/variable_combinations", {
+    method: "POST",
+    body: JSON.stringify(groupData),
+  });
+  console.log("[createMachineGroup] Machine group created:", result);
   return result;
 };
 

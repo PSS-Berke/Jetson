@@ -1,34 +1,36 @@
 "use client";
 
 interface ProcessViewToggleProps {
-  currentMode: "consolidated" | "expanded";
-  onModeChange: (mode: "consolidated" | "expanded") => void;
+  showExpanded: boolean;
+  onToggle: (show: boolean) => void;
 }
 
 export default function ProcessViewToggle({
-  currentMode,
-  onModeChange,
+  showExpanded,
+  onToggle,
 }: ProcessViewToggleProps) {
-  const modes: { value: "consolidated" | "expanded"; label: string }[] = [
-    { value: "consolidated", label: "Consolidated" },
-    { value: "expanded", label: "Expanded" },
-  ];
-
   return (
     <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-      {modes.map((mode) => (
-        <button
-          key={mode.value}
-          onClick={() => onModeChange(mode.value)}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-            currentMode === mode.value
-              ? "bg-white text-purple-600 shadow-sm"
-              : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
-          }`}
-        >
-          {mode.label}
-        </button>
-      ))}
+      <button
+        onClick={() => onToggle(false)}
+        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+          !showExpanded
+            ? "bg-white text-green-600 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        Jobs
+      </button>
+      <button
+        onClick={() => onToggle(true)}
+        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+          showExpanded
+            ? "bg-white text-purple-600 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        Processes
+      </button>
     </div>
   );
 }

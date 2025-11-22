@@ -21,12 +21,17 @@ import {
   updateMachine,
   deleteMachine,
   getMachineRules,
+  getMachines,
   api,
 } from "@/lib/api";
 import { formatConditions } from "@/lib/rulesEngine";
 import DynamicMachineCapabilityFields from "../../components/DynamicMachineCapabilityFields";
 import { FaPen, FaTrash } from "react-icons/fa6";
 import { FaTimes, FaSave } from "react-icons/fa";
+import MachinesTabView from "../../components/machines/MachinesTabView";
+import ProcessesTabView from "../../components/machines/ProcessesTabView";
+import GroupsTabView from "../../components/machines/GroupsTabView";
+import DeleteMachineModal from "../../components/DeleteMachineModal";
 /* import {
   ArrowPathIcon,
   CalendarIcon,
@@ -97,29 +102,32 @@ const machineTypeConfig: Record<
 > = {
   inserters: {
     label: "Inserter Machines",
-    filterFn: (machine) => machine.type.toLowerCase().includes("insert"),
+    filterFn: (machine) => machine.type?.toLowerCase()?.includes("insert") ?? false,
   },
   folders: {
     label: "Folder Machines",
     filterFn: (machine) =>
-      machine.type.toLowerCase().includes("folder") ||
-      machine.type.toLowerCase().includes("fold"),
+      machine.type?.toLowerCase()?.includes("folder") ||
+      machine.type?.toLowerCase()?.includes("fold") ||
+      false,
   },
   "hp-press": {
     label: "HP Press Machines",
     filterFn: (machine) =>
-      machine.type.toLowerCase().includes("hp") ||
-      machine.type.toLowerCase().includes("press"),
+      machine.type?.toLowerCase()?.includes("hp") ||
+      machine.type?.toLowerCase()?.includes("press") ||
+      false,
   },
   inkjetters: {
     label: "Inkjet Machines",
-    filterFn: (machine) => machine.type.toLowerCase().includes("inkjet"),
+    filterFn: (machine) => machine.type?.toLowerCase()?.includes("inkjet") ?? false,
   },
   affixers: {
     label: "Affixer Machines",
     filterFn: (machine) =>
-      machine.type.toLowerCase().includes("affixer") ||
-      machine.type.toLowerCase().includes("affix"),
+      machine.type?.toLowerCase()?.includes("affixer") ||
+      machine.type?.toLowerCase()?.includes("affix") ||
+      false,
   },
 };
 
@@ -127,10 +135,13 @@ export default function MachineTypePage() {
   const params = useParams();
   const machineType = params.type as string;
 
+  const [viewMode, setViewMode] = useState<"machines" | "processes" | "groups">("machines");
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
   const [isAddMachineModalOpen, setIsAddMachineModalOpen] = useState(false);
   const [isFormBuilderOpen, setIsFormBuilderOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [machineToDelete, setMachineToDelete] = useState<{id: number; line: number | string; name?: string; type?: string} | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [showNewMachineRow, setShowNewMachineRow] = useState(false);
@@ -169,16 +180,8 @@ export default function MachineTypePage() {
   const fetchRawMachinesResponse = async () => {
     setRawResponseLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterStatus && filterStatus !== "") {
-        params.append("status", filterStatus);
-      }
-      if (filterFacility && filterFacility > 0) {
-        params.append("facilities_id", filterFacility.toString());
-      }
-      const queryString = params.toString();
-      const endpoint = queryString ? `/machines?${queryString}` : "/machines";
-      const rawData = await api.get<any[]>(endpoint);
+      // Use getMachines instead of api.get to ensure capabilities are properly parsed
+      const rawData = await getMachines(filterStatus, filterFacility || undefined);
       setRawMachinesResponse(rawData);
     } catch (error) {
       console.error("[MachineTypePage] Error fetching raw machines:", error);
@@ -530,18 +533,28 @@ export default function MachineTypePage() {
     setErrors({});
   };
 
-  const handleDeleteClick = async (machineId: number) => {
-    if (!confirm("Are you sure you want to delete this machine?")) {
-      return;
-    }
+  const handleDeleteClick = (machine: Machine) => {
+    setMachineToDelete({
+      id: machine.id,
+      line: machine.line,
+      name: machine.name,
+      type: machine.type,
+    });
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!machineToDelete) return;
 
     try {
-      await deleteMachine(machineId);
+      await deleteMachine(machineToDelete.id);
       refetch(filterStatus, filterFacility || undefined);
       await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);
       setErrors({});
+      setIsDeleteModalOpen(false);
+      setMachineToDelete(null);
     } catch (error) {
       console.error("Error deleting machine:", error);
       setErrors((prev) => ({
@@ -549,6 +562,11 @@ export default function MachineTypePage() {
         general: "Failed to delete machine. Please try again.",
       }));
     }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setMachineToDelete(null);
   };
 
   return (
@@ -561,7 +579,7 @@ export default function MachineTypePage() {
         onLogout={logout}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Breadcrumb Navigation */}
         <nav className="mb-6">
           <ol className="flex items-center gap-2 text-sm">
@@ -594,335 +612,127 @@ export default function MachineTypePage() {
           </div>
         </div>
 
-        {/* Status Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        {/* View Mode Tabs */}
+        <div className="flex border-b border-[var(--border)] mb-6">
           <button
-            onClick={() => handleFilterChange("")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filterStatus === ""
-                ? "bg-[var(--primary-blue)] text-white"
-                : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+            onClick={() => setViewMode("machines")}
+            className={`px-6 py-3 font-medium transition-colors ${
+              viewMode === "machines"
+                ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
             }`}
           >
-            All
+            Machines
           </button>
           <button
-            onClick={() => handleFilterChange("running")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filterStatus === "running"
-                ? "bg-[var(--primary-blue)] text-white"
-                : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+            onClick={() => setViewMode("processes")}
+            className={`px-6 py-3 font-medium transition-colors ${
+              viewMode === "processes"
+                ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
             }`}
           >
-            Running
+            Processes & Capabilities
           </button>
           <button
-            onClick={() => handleFilterChange("avalible")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filterStatus === "avalible"
-                ? "bg-[var(--primary-blue)] text-white"
-                : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+            onClick={() => setViewMode("groups")}
+            className={`px-6 py-3 font-medium transition-colors ${
+              viewMode === "groups"
+                ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
             }`}
           >
-            Available
-          </button>
-          <button
-            onClick={() => handleFilterChange("maintenance")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filterStatus === "maintenance"
-                ? "bg-[var(--primary-blue)] text-white"
-                : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
-            }`}
-          >
-            Maintenance
+            Groups & Rules
           </button>
         </div>
 
-        {/* Raw Response Display */}
-        <div className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <svg
-                className="w-6 h-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Machines
-            </h3>
-            {filteredRawMachinesResponse && (
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                {filteredRawMachinesResponse.length} machine{filteredRawMachinesResponse.length !== 1 ? 's' : ''}
-              </span>
-            )}
+        {/* Status Filters - Only shown on Machines tab */}
+        {viewMode === "machines" && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              onClick={() => handleFilterChange("")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filterStatus === ""
+                  ? "bg-[var(--primary-blue)] text-white"
+                  : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => handleFilterChange("running")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filterStatus === "running"
+                  ? "bg-[var(--primary-blue)] text-white"
+                  : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+              }`}
+            >
+              Running
+            </button>
+            <button
+              onClick={() => handleFilterChange("avalible")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filterStatus === "avalible"
+                  ? "bg-[var(--primary-blue)] text-white"
+                  : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+              }`}
+            >
+              Available
+            </button>
+            <button
+              onClick={() => handleFilterChange("maintenance")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filterStatus === "maintenance"
+                  ? "bg-[var(--primary-blue)] text-white"
+                  : "bg-white text-[var(--text-dark)] border border-[var(--border)] hover:bg-gray-50"
+              }`}
+            >
+              Maintenance
+            </button>
           </div>
-          {rawResponseLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Loading response...</span>
-            </div>
-          ) : filteredRawMachinesResponse && filteredRawMachinesResponse.length > 0 ? (
-            <div className="space-y-4">
-              {filteredRawMachinesResponse.map((machine: any, index: number) => {
-                // Convert raw machine to Machine type for handlers
-                const machineForHandlers: Machine = {
-                  id: machine.id,
-                  created_at: machine.created_at,
-                  line: typeof machine.line === 'string' ? parseInt(machine.line) : machine.line,
-                  type: machine.type || '',
-                  status: (machine.status || 'available') as MachineStatus,
-                  facilities_id: machine.facilities_id,
-                  jobs_id: machine.jobs_id,
-                  name: machine.name || '',
-                  capabilities: machine.capabilities || {},
-                  process_type_key: machine.process_type_key || '',
-                  designation: machine.designation || '',
-                  speed_hr: machine.speed_hr ?? 0,
-                };
+        )}
 
-                return (
-                  <div
-                    key={index}
-                    className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow relative"
-                  >
-                    {/* Edit and Delete Buttons */}
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedMachine(machineForHandlers);
-                        }}
-                        className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors shadow-sm"
-                        title="Edit"
-                      >
-                        <FaPen size="0.875em" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteClick(machine.id);
-                        }}
-                        className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors shadow-sm"
-                        title="Delete"
-                      >
-                        <FaTrash size="0.875em" />
-                      </button>
-                    </div>
-
-                    {(machine.name || machine.designation) && (
-                      <div className="mb-4 pb-4 border-b border-gray-200 pr-20">
-                        {machine.name && (
-                          <div className="text-2xl font-bold text-gray-900">
-                            {machine.name}
-                          </div>
-                        )}
-                        {machine.designation && (
-                          <div className="text-sm text-gray-600 mt-1">
-                            {machine.designation}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Created At
-                        </div>
-                        <div className="text-sm text-gray-900">
-                          {machine.created_at
-                            ? new Date(machine.created_at).toLocaleString()
-                            : 'N/A'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Line
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {machine.line ?? 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Type
-                        </div>
-                        <div className="text-sm font-medium text-blue-700">
-                          {machine.type ?? 'N/A'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Status
-                        </div>
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${
-                            machine.status === 'running'
-                              ? 'bg-blue-100 text-blue-800'
-                              : machine.status === 'available' || machine.status === 'avalible'
-                                ? 'bg-green-100 text-green-800'
-                                : machine.status === 'maintenance'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {machine.status ?? 'N/A'}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Facility ID
-                        </div>
-                        <div className="text-sm text-gray-900">
-                          {machine.facilities_id ?? 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Job ID
-                        </div>
-                        <div className="text-sm text-gray-900">
-                          {machine.jobs_id ?? 'N/A'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          Process Type Key
-                        </div>
-                        <div className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                          {machine.process_type_key || <span className="text-gray-400 italic">Empty</span>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {machine.capabilities && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                          Capabilities
-                        </div>
-                        <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                          {machine.capabilities && typeof machine.capabilities === 'object' && Object.keys(machine.capabilities).length > 0 ? (
-                            <div className="space-y-2">
-                              {Object.entries(machine.capabilities).map(([key, value]) => (
-                                <div key={key} className="flex items-start gap-2">
-                                  <div className="text-xs font-semibold text-gray-600 min-w-[120px] capitalize">
-                                    {key.replace(/_/g, ' ')}:
-                                  </div>
-                                  <div className="text-sm text-gray-900 flex-1">
-                                    {Array.isArray(value) ? (
-                                      <div className="flex flex-wrap gap-1">
-                                        {value.map((item: any, idx: number) => (
-                                          <span
-                                            key={idx}
-                                            className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium"
-                                          >
-                                            {String(item)}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    ) : value === null || value === undefined ? (
-                                      <span className="text-gray-400 italic">null</span>
-                                    ) : typeof value === 'object' ? (
-                                      <span className="text-gray-600">{JSON.stringify(value)}</span>
-                                    ) : (
-                                      <span className="font-medium">{String(value)}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : machine.capabilities === null ? (
-                            <span className="text-sm text-gray-400 italic">null</span>
-                          ) : (
-                            <span className="text-sm text-gray-900">{String(machine.capabilities)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <svg
-                className="w-12 h-12 mx-auto mb-3 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                />
-              </svg>
-              <p>No data available</p>
-            </div>
-          )}
-        </div>
-
-        {/* Active Rules Section */}
-        {activeRules.length > 0 && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                ></path>
-              </svg>
-              Active Rules for {config.label} ({activeRules.length})
-            </h3>
-            <div className="space-y-2">
-              {activeRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className="bg-white border border-green-200 rounded p-3"
+        {/* Tab Content */}
+        {viewMode === "machines" && (
+          <div className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <svg
+                  className="w-6 h-6 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="font-medium text-gray-900">
-                      {rule.name}
-                    </span>
-                    <div className="flex items-center gap-3 text-sm text-gray-600">
-                      <span>Speed: {rule.outputs.speed_modifier}%</span>
-                      <span>People: {rule.outputs.people_required}</span>
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    <span className="font-medium">Conditions:</span>{" "}
-                    {formatConditions(rule.conditions)}
-                  </div>
-                  {rule.outputs.notes && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      {rule.outputs.notes}
-                    </div>
-                  )}
-                </div>
-              ))}
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Machines
+              </h3>
+              {filteredRawMachinesResponse && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  {filteredRawMachinesResponse.length} machine{filteredRawMachinesResponse.length !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
+            <MachinesTabView
+              machines={filteredRawMachinesResponse || []}
+              loading={rawResponseLoading}
+              onEditClick={(machine) => setSelectedMachine(machine)}
+              onDeleteClick={handleDeleteClick}
+            />
           </div>
+        )}
+
+        {viewMode === "processes" && (
+          <ProcessesTabView machineType={machineType} />
+        )}
+
+        {viewMode === "groups" && (
+          <GroupsTabView machineType={machineType} />
         )}
 
       </main>
@@ -947,6 +757,16 @@ export default function MachineTypePage() {
         onClose={handleMachineModalClose}
         onSuccess={handleMachineModalClose}
         user={user}
+      />
+
+      {/* Delete Machine Modal */}
+      <DeleteMachineModal
+        isOpen={isDeleteModalOpen}
+        machineLine={machineToDelete?.line || ""}
+        machineName={machineToDelete?.name}
+        machineType={machineToDelete?.type}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
       />
 
       {/* Dynamic Form Builder Modal */}

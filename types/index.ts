@@ -21,7 +21,102 @@ export type MachineCategory = "conveyance" | "ancillary";
 /**
  * Machine capability values - can be strings, numbers, or arrays of strings
  */
-export type MachineCapabilityValue = string | number | string[] | undefined;
+export type MachineCapabilityValue = string | number | string[] | boolean | undefined;
+
+// ============================================================================
+// Typed Capability Interfaces for Each Process Type
+// ============================================================================
+
+/**
+ * Base interface for all machine capabilities
+ */
+export interface BaseCapabilities {
+  // Common fields across all types
+  price_per_m?: number;
+}
+
+/**
+ * Insert machine capabilities
+ */
+export interface InsertCapabilities extends BaseCapabilities {
+  supported_paper_sizes?: string[];
+  min_pockets?: number;
+  max_pockets?: number;
+}
+
+/**
+ * Sort machine capabilities
+ */
+export interface SortCapabilities extends BaseCapabilities {
+  supported_sort_types?: string[];
+  supported_paper_sizes?: string[];
+}
+
+/**
+ * Label/Apply machine capabilities
+ */
+export interface LabelApplyCapabilities extends BaseCapabilities {
+  supported_application_types?: string[];
+  supported_label_sizes?: string[];
+  supported_paper_sizes?: string[];
+}
+
+/**
+ * Fold machine capabilities
+ */
+export interface FoldCapabilities extends BaseCapabilities {
+  supported_fold_types?: string[];
+  supported_paper_stocks?: string[];
+  supported_paper_sizes?: string[];
+}
+
+/**
+ * Laser machine capabilities
+ */
+export interface LaserCapabilities extends BaseCapabilities {
+  supported_print_types?: string[];
+  supported_paper_stocks?: string[];
+  supported_paper_sizes?: string[];
+  supported_colors?: string[];
+}
+
+/**
+ * HP Press machine capabilities
+ */
+export interface HpPressCapabilities extends BaseCapabilities {
+  supported_print_types?: string[];
+  supported_paper_stocks?: string[];
+  supported_paper_sizes?: string[];
+  supported_colors?: string[];
+}
+
+/**
+ * Union type of all process-specific capabilities
+ */
+export type ProcessSpecificCapabilities =
+  | InsertCapabilities
+  | SortCapabilities
+  | LabelApplyCapabilities
+  | FoldCapabilities
+  | LaserCapabilities
+  | HpPressCapabilities;
+
+/**
+ * Custom capability fields added via form builder
+ * These are prefixed with 'custom_' to avoid collisions
+ */
+export interface CustomCapabilityField {
+  fieldName: string; // Must start with 'custom_'
+  fieldValue: string | number | boolean | string[];
+}
+
+/**
+ * Complete machine capabilities combining process-specific and custom fields
+ */
+export interface MachineCapabilities {
+  // Process-specific fields (typed based on process_type_key)
+  [key: string]: MachineCapabilityValue;
+}
 
 /**
  * Machine entity from the API

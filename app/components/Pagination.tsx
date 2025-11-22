@@ -13,9 +13,9 @@ export default function Pagination({
   onPageChange,
   onItemsPerPageChange,
 }: PaginationProps) {
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startItem = totalItems === 0 ? 0 : itemsPerPage === -1 ? 1 : (currentPage - 1) * itemsPerPage + 1;
+  const endItem = itemsPerPage === -1 ? totalItems : Math.min(currentPage * itemsPerPage, totalItems);
 
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
@@ -70,6 +70,36 @@ export default function Pagination({
     return null;
   }
 
+  // When showing all items, hide pagination buttons
+  if (itemsPerPage === -1) {
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pb-4">
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-gray-600">
+            Showing <span className="font-semibold">all {totalItems}</span> jobs
+          </p>
+          <div className="flex items-center gap-2">
+            <label htmlFor="items-per-page" className="text-sm text-gray-600">
+              Per page:
+            </label>
+            <select
+              id="items-per-page"
+              value={itemsPerPage}
+              onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={-1}>All</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pb-4">
       {/* Items info and per-page selector */}
@@ -93,6 +123,7 @@ export default function Pagination({
             <option value={25}>25</option>
             <option value={50}>50</option>
             <option value={100}>100</option>
+            <option value={-1}>All</option>
           </select>
         </div>
       </div>

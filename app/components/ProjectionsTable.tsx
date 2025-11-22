@@ -41,8 +41,7 @@ interface ProjectionsTableProps {
   globalTimeScrollIndex?: number;
   onGlobalTimeScrollIndexChange?: (index: number) => void;
   dataDisplayMode?: "pieces" | "revenue";
-  viewMode?: "jobs" | "processes";
-  processViewMode?: "consolidated" | "expanded";
+  showExpandedProcesses?: boolean;
   showNotes?: boolean;
   onShowNotesChange?: (show: boolean) => void;
 }
@@ -112,7 +111,6 @@ const ProjectionTableRow = memo(
 
     return (
       <tr
-        key={job.id}
         className={`cursor-pointer ${rowBgColor}`}
         style={
           hasNotes && noteColor && showNotes && !isSelected
@@ -421,7 +419,6 @@ const ProcessProjectionTableRow = memo(
 
     return (
       <tr
-        key={`${job.id}-${processProjection.processType}`}
         className={`cursor-pointer border-l-4 ${
           isSelected ? "bg-blue-100 border-l-blue-500" : "border-l-gray-300"
         } ${isFirstInGroup ? "border-t-2 border-t-gray-400" : ""}`}
@@ -776,7 +773,6 @@ const ProjectionMobileCard = memo(
 
     return (
       <div
-        key={job.id}
         className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-md transition-shadow ${
           isSelected
             ? "ring-2 ring-blue-500 bg-blue-50 border-blue-500"
@@ -1081,8 +1077,7 @@ export default function ProjectionsTable({
   globalTimeScrollIndex = 0,
   onGlobalTimeScrollIndexChange,
   dataDisplayMode = "pieces",
-  viewMode = "jobs",
-  processViewMode = "consolidated",
+  showExpandedProcesses = true,
   showNotes: showNotesProp = false,
   onShowNotesChange,
 }: ProjectionsTableProps) {
@@ -1125,11 +1120,11 @@ export default function ProjectionsTable({
 
   // Transform data for process view
   const displayProjections = useMemo(() => {
-    if (viewMode === "processes" && processViewMode === "expanded") {
+    if (showExpandedProcesses) {
       return expandJobProjectionsToProcesses(jobProjections);
     }
     return jobProjections;
-  }, [viewMode, processViewMode, jobProjections]);
+  }, [showExpandedProcesses, jobProjections]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
 
@@ -1476,7 +1471,7 @@ export default function ProjectionsTable({
 
   // Sort projections (handles both jobs and processes)
   const sortedJobProjections = useMemo(() => {
-    if (viewMode === "processes" && processViewMode === "expanded") {
+    if (showExpandedProcesses) {
       const processProjections = displayProjections as ProcessProjection[];
       return [...processProjections].sort((a, b) => {
         let compareValue = 0;
@@ -1569,7 +1564,7 @@ export default function ProjectionsTable({
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [displayProjections, sortField, sortDirection, viewMode, processViewMode]);
+  }, [displayProjections, sortField, sortDirection, showExpandedProcesses]);
 
   // Render sort icon
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -1825,22 +1820,20 @@ export default function ProjectionsTable({
               </th>
               <th
                 onClick={() =>
-                  viewMode === "processes" && processViewMode === "expanded"
+                  showExpandedProcesses
                     ? handleSort("process_type")
                     : undefined
                 }
                 className={`px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-                  viewMode === "processes" && processViewMode === "expanded"
+                  showExpandedProcesses
                     ? "cursor-pointer hover:bg-gray-100"
                     : ""
                 }`}
               >
-                {viewMode === "processes" && processViewMode === "expanded" ? (
+                {showExpandedProcesses ? (
                   <div className="flex items-center gap-1">
                     Process <SortIcon field="process_type" />
                   </div>
-                ) : viewMode === "processes" ? (
-                  "Process"
                 ) : (
                   "Processes"
                 )}
@@ -1913,7 +1906,7 @@ export default function ProjectionsTable({
                   No jobs found for the selected criteria
                 </td>
               </tr>
-            ) : viewMode === "processes" && processViewMode === "expanded" ? (
+            ) : showExpandedProcesses ? (
               // Expanded Process view - each process on its own line, sortable
               (sortedJobProjections as ProcessProjection[]).map(
                 (processProjection, index, array) => {
@@ -1929,7 +1922,7 @@ export default function ProjectionsTable({
 
                   return (
                     <ProcessProjectionTableRow
-                      key={`${processProjection.jobId}-${processProjection.processType}`}
+                      key={`${processProjection.jobId}-${processProjection.processType}-${index}`}
                       processProjection={processProjection}
                       timeRanges={timeRanges}
                       isFirstInGroup={isFirstInGroup}
@@ -1956,14 +1949,14 @@ export default function ProjectionsTable({
               )
             ) : (
               // Jobs view or Consolidated view (standard jobs table)
-              (sortedJobProjections as JobProjection[]).map((projection) => {
+              (sortedJobProjections as JobProjection[]).map((projection, index) => {
                 const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
                 const hasNotes = jobNotes.length > 0;
                 const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
-                
+
                 return (
                   <ProjectionTableRow
-                    key={projection.job.id}
+                    key={`job-${projection.job.id}-${index}`}
                     projection={projection}
                     timeRanges={timeRanges}
                     onJobClick={handleJobClick}
@@ -2105,9 +2098,9 @@ export default function ProjectionsTable({
                     </td>
                   </tr>
                 ) : (
-                  sortedJobProjections.map((projection) => (
+                  sortedJobProjections.map((projection, index) => (
                     <MobileTableRow
-                      key={projection.job.id}
+                      key={`mobile-${projection.job.id}-${index}`}
                       projection={projection}
                       visibleTimeRanges={mobileTableVisibleRanges}
                       onJobClick={handleJobClick}
@@ -2130,9 +2123,9 @@ export default function ProjectionsTable({
                 No jobs found for the selected criteria
               </div>
             ) : (
-              sortedJobProjections.map((projection) => (
+              sortedJobProjections.map((projection, index) => (
                 <ProjectionMobileCard
-                  key={projection.job.id}
+                  key={`card-${projection.job.id}-${index}`}
                   projection={projection}
                   timeRanges={timeRanges}
                   onJobClick={handleJobClick}

@@ -6,6 +6,10 @@ import FacilityToggle from "./FacilityToggle";
 import { MachineCapabilityValue, MachineStatus, User } from "@/types";
 import { createMachine } from "@/lib/api";
 import Toast from "./Toast";
+import {
+  validateCapabilities,
+  getAllValidationMessages,
+} from "@/lib/capabilityValidation";
 
 interface AddMachineModalProps {
   isOpen: boolean;
@@ -89,9 +93,24 @@ export default function AddMachineModal({
   };
 
   const handleProcessTypeChange = (processTypeKey: string) => {
+    // Auto-populate the type field based on process type key
+    const typeMap: { [key: string]: string } = {
+      insert: "Inserter",
+      fold: "Folder",
+      laser: "HP Press",
+      hpPress: "HP Press",
+      inkjet: "Inkjetter",
+      affix: "Affixer",
+      sort: "Sorter",
+    };
+
+    const suggestedType = typeMap[processTypeKey] || "";
+
     setFormData((prev) => ({
       ...prev,
       process_type_key: processTypeKey,
+      // Auto-populate type if it's empty, or update if it doesn't match
+      type: suggestedType || prev.type,
       // Reset capabilities when process type changes
       capabilities: {},
     }));
@@ -109,6 +128,30 @@ export default function AddMachineModal({
     if (!formData.process_type_key) {
       newErrors.process_type_key = "Process type is required";
     }
+
+    // Validate that type matches process_type_key
+    if (formData.type && formData.process_type_key) {
+      const typeToProcessMap: { [key: string]: string[] } = {
+        insert: ["insert", "inserter"],
+        fold: ["fold", "folder"],
+        laser: ["laser", "hp", "press"],
+        hpPress: ["laser", "hp", "press"],
+        inkjet: ["inkjet"],
+        affix: ["affix"],
+        sort: ["sort"],
+      };
+
+      const expectedKeywords = typeToProcessMap[formData.process_type_key] || [];
+      const typeLower = formData.type.toLowerCase();
+      const matchesExpected = expectedKeywords.some((keyword) =>
+        typeLower.includes(keyword)
+      );
+
+      if (!matchesExpected) {
+        newErrors.type = `Machine type "${formData.type}" doesn't match the selected process type. Expected type containing: ${expectedKeywords.join(" or ")}`;
+      }
+    }
+
     if (!formData.facilities_id) {
       newErrors.facilities_id = "Facility is required";
     }
@@ -133,6 +176,35 @@ export default function AddMachineModal({
     setSubmitting(true);
 
     try {
+      // Validate capabilities before submitting
+      const validationResult = validateCapabilities(
+        formData.process_type_key,
+        formData.capabilities
+      );
+
+      if (!validationResult.valid) {
+        const messages = getAllValidationMessages(validationResult);
+        const errorMessages = messages.filter((m) => m.startsWith("❌"));
+
+        if (errorMessages.length > 0) {
+          setErrors({
+            capabilities: errorMessages.join("\n"),
+          });
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // Log warnings but continue
+      if (validationResult.warnings.length > 0) {
+        const warningMessages = getAllValidationMessages(validationResult)
+          .filter((m) => m.startsWith("⚠️"));
+        console.warn(
+          "[AddMachineModal] Capability validation warnings:",
+          warningMessages.join("\n")
+        );
+      }
+
       // Prepare the machine data
       const machineData = {
         line: parseInt(formData.line),
@@ -294,9 +366,14 @@ export default function AddMachineModal({
                           ? "border-red-300 focus:border-red-500 focus:ring-red-200"
                           : "border-gray-300 focus:ring-blue-200 focus:border-[var(--primary-blue)]"
                       }`}
-                      placeholder="e.g., Inserter, Folder, Laser"
+                      placeholder="e.g., Inserter, Folder, Inkjetter"
                       required
                     />
+                    {formData.process_type_key && !errors.type && (
+                      <p className="mt-1.5 text-sm text-gray-500">
+                        Auto-populated based on process type selection
+                      </p>
+                    )}
                     {errors.type && (
                       <p className="mt-1.5 text-sm text-red-600">
                         {errors.type}

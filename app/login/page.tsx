@@ -31,6 +31,7 @@ export default function LoginPage() {
             height={75}
             className="mb-6 w-auto h-auto max-w-[300px]"
             priority
+            unoptimized
           />
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
             Sign in to your account

@@ -15,7 +15,6 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import ViewModeToggle from "./ViewModeToggle";
 import ProcessViewToggle from "./ProcessViewToggle";
 
 interface ProjectionFiltersProps {
@@ -37,10 +36,8 @@ interface ProjectionFiltersProps {
   onFilterViewModeChange: (mode: "simple" | "advanced") => void;
   dataDisplayMode: "pieces" | "revenue";
   onDataDisplayModeChange: (mode: "pieces" | "revenue") => void;
-  viewMode?: "jobs" | "processes";
-  onViewModeChange?: (mode: "jobs" | "processes") => void;
-  processViewMode?: "consolidated" | "expanded";
-  onProcessViewModeChange?: (mode: "consolidated" | "expanded") => void;
+  showExpandedProcesses?: boolean;
+  onShowExpandedProcessesChange?: (show: boolean) => void;
   mobileViewMode?: "cards" | "table";
   onMobileViewModeChange?: (mode: "cards" | "table") => void;
   showOnlyInDateRange: boolean;
@@ -72,10 +69,8 @@ export default function ProjectionFilters({
   onFilterViewModeChange,
   dataDisplayMode,
   onDataDisplayModeChange,
-  viewMode = "jobs",
-  onViewModeChange,
-  processViewMode = "consolidated",
-  onProcessViewModeChange,
+  showExpandedProcesses = true,
+  onShowExpandedProcessesChange,
   mobileViewMode = "cards",
   onMobileViewModeChange,
   showOnlyInDateRange,
@@ -698,19 +693,11 @@ export default function ProjectionFilters({
               </div>
             )}
 
-            {/* Jobs vs Processes View Toggle */}
-            {onViewModeChange && (
-              <ViewModeToggle
-                currentMode={viewMode}
-                onModeChange={onViewModeChange}
-              />
-            )}
-
-            {/* Consolidated vs Expanded Toggle - Only visible when in process view */}
-            {viewMode === "processes" && onProcessViewModeChange && (
+            {/* Process Expansion Toggle */}
+            {onShowExpandedProcessesChange && (
               <ProcessViewToggle
-                currentMode={processViewMode}
-                onModeChange={onProcessViewModeChange}
+                showExpanded={showExpandedProcesses}
+                onToggle={onShowExpandedProcessesChange}
               />
             )}
 

@@ -293,7 +293,18 @@ export default function MachineRulesModal({
       }
     } catch (error) {
       console.error("[MachineRulesModal] Error saving rule:", error);
-      alert("Failed to save rule. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      // Check if it's a "Unable to locate request" error (endpoint not configured)
+      if (errorMessage.includes("Unable to locate request")) {
+        alert(
+          "The machine rules endpoint is not configured yet in the backend. " +
+          "Please create the /machine_rules endpoint in Xano first.\n\n" +
+          "See MACHINE_RULES_SUMMARY.md for details."
+        );
+      } else {
+        alert(`Failed to save rule: ${errorMessage}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -328,7 +339,16 @@ export default function MachineRulesModal({
       await loadExistingRules();
     } catch (error) {
       console.error("[MachineRulesModal] Error deleting rule:", error);
-      alert("Failed to delete rule. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      if (errorMessage.includes("Unable to locate request")) {
+        alert(
+          "The machine rules endpoint is not configured yet in the backend. " +
+          "Please create the /machine_rules endpoint in Xano first."
+        );
+      } else {
+        alert(`Failed to delete rule: ${errorMessage}`);
+      }
     }
   };
 
