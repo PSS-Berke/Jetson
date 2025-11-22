@@ -18,6 +18,7 @@ interface ProcessTypeSelectorProps {
   onSelectCustom: (name: string) => void;
   onCancelCustom: () => void;
   onEditField?: (fieldLabel: string) => void;
+  onDeleteField?: (processTypeKey: string, fieldName: string) => void;
   error?: string;
 }
 
@@ -35,6 +36,7 @@ export default function ProcessTypeSelector({
   onSelectCustom,
   onCancelCustom,
   onEditField,
+  onDeleteField,
   error,
 }: ProcessTypeSelectorProps) {
   const [showCustomForm, setShowCustomForm] = useState(isCustom);
@@ -349,6 +351,24 @@ export default function ProcessTypeSelector({
                                         type="button"
                                         className="p-1 text-red-500 hover:text-red-700"
                                         title="Remove"
+                                        onClick={() => {
+                                          if (onDeleteField && fieldName) {
+                                            onDeleteField(apiType.key, fieldName);
+                                            // Remove from local state to update UI immediately
+                                            setExpandedVariables((prev) => ({
+                                              ...prev,
+                                              [apiType.key]: (prev[apiType.key] || []).filter(
+                                                (v: any) =>
+                                                  (v.fieldName || v.variable_name) !== fieldName
+                                              ),
+                                            }));
+                                            // Update count
+                                            setVariableCounts((prev) => ({
+                                              ...prev,
+                                              [apiType.key]: Math.max(0, (prev[apiType.key] || 0) - 1),
+                                            }));
+                                          }
+                                        }}
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>

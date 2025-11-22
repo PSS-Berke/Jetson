@@ -91,6 +91,7 @@ export default function StepCapabilities({
     addToJobInput: false,
   });
   const editFormRef = useRef<HTMLDivElement>(null);
+  const pendingEditFieldNameRef = useRef<string | null>(null);
   // Store available fields from saved process type (for selection)
   const [availableFields, setAvailableFields] = useState<FormBuilderField[]>(
     [],
@@ -399,7 +400,7 @@ export default function StepCapabilities({
       }
     } else {
       onAddFormBuilderField(newField);
-      // Save to API immediately when adding a new field (even if auto-save is disabled)
+      // Save to API immediately when adding a new field
       // Include all existing fields plus the new field
       const fieldsWithNewField = [...formBuilderFields, newField];
       if (machineVariablesId) {
@@ -434,27 +435,144 @@ export default function StepCapabilities({
   };
 
   const handleEditFieldByLabel = (fieldLabel: string) => {
-    const index = formBuilderFields.findIndex(
+    // First, try to find the field in formBuilderFields (already selected)
+    let index = formBuilderFields.findIndex(
       (field) => field.fieldLabel === fieldLabel,
     );
+    
+    let fieldToEdit: FormBuilderField | null = null;
+    
     if (index !== -1) {
-      handleEditField(index);
-      // Scroll to edit form after a short delay to ensure it's rendered
-      setTimeout(() => {
-        editFormRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
+      // Field is already in formBuilderFields, use it
+      fieldToEdit = formBuilderFields[index];
+    } else {
+      // Field is not in formBuilderFields yet, check availableFields
+      const availableField = availableFields.find(
+        (field) => field.fieldLabel === fieldLabel,
+      );
+      
+      if (availableField) {
+        // Create a new field from availableField and add it to formBuilderFields
+        const newField: FormBuilderField = {
+          ...availableField,
+          id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        };
+        // Populate the edit form with the field's data first
+        setFieldFormData({
+          fieldName: newField.fieldName,
+          fieldLabel: newField.fieldLabel,
+          fieldType: newField.fieldType,
+          fieldValue: String(newField.fieldValue || ""),
+          options: newField.options?.join(", ") || "",
+          required: newField.required || false,
+          addToJobInput: (newField as any).addToJobInput || false,
         });
-      }, 100);
+        // Store the fieldName to find it after state update (useEffect will handle it)
+        pendingEditFieldNameRef.current = newField.fieldName;
+        // Add the field - useEffect will set editingFieldIndex when it's added
+        onAddFormBuilderField(newField);
+        return; // Early return, useEffect will handle the rest
+      } else {
+        // Field not found, can't edit
+        console.warn(`[StepCapabilities] Field with label "${fieldLabel}" not found`);
+        return;
+      }
+    }
+    
+    if (fieldToEdit) {
+      // Populate the edit form with the field's data
+      setFieldFormData({
+        fieldName: fieldToEdit.fieldName,
+        fieldLabel: fieldToEdit.fieldLabel,
+        fieldType: fieldToEdit.fieldType,
+        fieldValue: String(fieldToEdit.fieldValue || ""),
+        options: fieldToEdit.options?.join(", ") || "",
+        required: fieldToEdit.required || false,
+        addToJobInput: (fieldToEdit as any).addToJobInput || false,
+      });
+      
+      // If field was already in formBuilderFields, set index immediately
+      if (index !== -1) {
+        setEditingFieldIndex(index);
+        // Scroll to edit form after a short delay to ensure it's rendered
+        setTimeout(() => {
+          editFormRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100);
+      }
     }
   };
 
   const handleRemoveField = (id: string) => {
-    onRemoveFormBuilderField(id);
-    // Save to API immediately when removing a field (even if auto-save is disabled)
+    // Calculate the fields after removal
     const fieldsAfterRemoval = formBuilderFields.filter((field) => field.id !== id);
-    if (machineVariablesId) {
-      saveFieldsToAPI(fieldsAfterRemoval);
+    
+    // Update the state first
+    onRemoveFormBuilderField(id);
+    
+    // Only save to API if auto-save is enabled (edit mode) and we have a machineVariablesId
+    if (!disableAutoSave && machineVariablesId) {
+      // Use setTimeout to ensure state has updated before saving
+      setTimeout(() => {
+        saveFieldsToAPI(fieldsAfterRemoval);
+      }, 0);
+    }
+  };
+
+  const handleDeleteFieldFromProcessType = async (
+    processTypeKeyParam: string,
+    fieldName: string,
+  ) => {
+    // Find the field in formBuilderFields by fieldName and remove it
+    const fieldToRemove = formBuilderFields.find(
+      (field) => field.fieldName === fieldName,
+    );
+    
+    if (fieldToRemove) {
+      // Remove from formBuilderFields
+      onRemoveFormBuilderField(fieldToRemove.id);
+      
+      // If auto-save is enabled, save the updated fields to API
+      if (!disableAutoSave && machineVariablesId) {
+        const fieldsAfterRemoval = formBuilderFields.filter(
+          (field) => field.id !== fieldToRemove.id,
+        );
+        setTimeout(() => {
+          saveFieldsToAPI(fieldsAfterRemoval);
+        }, 0);
+      }
+    }
+
+    // If we have machineVariablesId and the process type matches, update the API
+    // This removes the field from the saved process type definition
+    if (machineVariablesId && processTypeKeyParam === processTypeKey) {
+      try {
+        // Get current variables
+        const machineVariablesData = await getMachineVariablesById(
+          machineVariablesId,
+        );
+        
+        if (machineVariablesData.variables && typeof machineVariablesData.variables === "object") {
+          const variables = { ...machineVariablesData.variables };
+          // Remove the field from variables
+          delete variables[fieldName];
+          
+          // Save updated variables
+          await updateMachineVariables(machineVariablesId, variables);
+          
+          // Update availableFields to reflect the deletion
+          setAvailableFields((prev) =>
+            prev.filter((field) => field.fieldName !== fieldName),
+          );
+        }
+      } catch (error) {
+        console.error(
+          "[StepCapabilities] Error deleting field from process type:",
+          error,
+        );
+      }
     }
   };
 
@@ -502,6 +620,26 @@ export default function StepCapabilities({
       // Don't show error to user - silent failure
     }
   };
+
+  // Handle pending edit after field is added to formBuilderFields
+  useEffect(() => {
+    if (pendingEditFieldNameRef.current) {
+      const index = formBuilderFields.findIndex(
+        (field) => field.fieldName === pendingEditFieldNameRef.current,
+      );
+      if (index !== -1) {
+        setEditingFieldIndex(index);
+        pendingEditFieldNameRef.current = null;
+        // Scroll to edit form
+        setTimeout(() => {
+          editFormRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100);
+      }
+    }
+  }, [formBuilderFields]);
 
   // Debounced auto-save when formBuilderFields change
   useEffect(() => {
@@ -586,6 +724,7 @@ export default function StepCapabilities({
         onSelectCustom={onSelectCustomProcessType}
         onCancelCustom={onCancelCustomProcessType}
         onEditField={handleEditFieldByLabel}
+        onDeleteField={handleDeleteFieldFromProcessType}
         error={errors.process_type_key || errors.customProcessTypeName}
       />
 
@@ -713,7 +852,9 @@ export default function StepCapabilities({
                 className="bg-gray-50 p-4 rounded-lg border border-gray-200"
               >
                 <h4 className="font-semibold text-gray-900 mb-4">
-                  {editingFieldIndex !== null ? "Edit Field" : "Add New Field"}
+                  {editingFieldIndex !== null
+                    ? `Edit Field: ${formBuilderFields[editingFieldIndex]?.fieldLabel || ""}`
+                    : "Add New Field"}
                 </h4>
 
                 <div className="space-y-4">
@@ -912,14 +1053,58 @@ export default function StepCapabilities({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {formBuilderFields.map((field) => (
-                    <div key={field.id}>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {field.fieldLabel}
-                        {field.required && (
-                          <span className="text-red-500 ml-1">*</span>
-                        )}
-                      </label>
+                  {formBuilderFields.map((field, index) => (
+                    <div key={field.id} className="bg-white p-4 rounded-lg border border-green-200">
+                      <div className="flex items-start justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {field.fieldLabel}
+                          {field.required && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditField(index)}
+                            className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit field"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveField(field.id)}
+                            className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            title="Delete field"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
 
                       {field.fieldType === "select" && field.options ? (
                         <select
