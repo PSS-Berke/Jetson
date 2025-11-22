@@ -10,9 +10,9 @@ import { getMachineVariables, getCapabilityBuckets, type CapabilityBucket } from
 interface DynamicRequirementFieldsProps {
   requirement: {
     process_type: string;
-    [key: string]: string | number | undefined;
+    [key: string]: string | number | boolean | undefined;
   };
-  onChange: (field: string, value: string | number) => void;
+  onChange: (field: string, value: string | number | boolean) => void;
   errors?: Record<string, string>;
   disableRequired?: boolean;
 }

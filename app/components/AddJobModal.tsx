@@ -19,7 +19,7 @@ interface Requirement {
   process_type: string;
   price_per_m?: string;
   // Dynamic fields based on process type
-  [key: string]: string | number | undefined;
+  [key: string]: string | number | boolean | undefined;
 }
 
 interface JobFormData {
@@ -426,7 +426,7 @@ export default function AddJobModal({
   const handleRequirementChange = (
     requirementIndex: number,
     field: keyof Requirement,
-    value: string | number,
+    value: string | number | boolean,
   ) => {
     setFormData((prev) => ({
       ...prev,

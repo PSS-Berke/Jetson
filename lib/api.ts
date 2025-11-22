@@ -836,7 +836,7 @@ export const updateMachine = async (
   // API expects: machines_id, line, type, status, facilities_id, name, capabilities, process_type_key, designation
   const apiData: any = {
     machines_id: machineId,
-    line: machineData.line !== undefined ? (typeof machineData.line === 'number' ? machineData.line.toString() : machineData.line) : "",
+    line: machineData.line !== undefined ? String(machineData.line) : "",
     type: machineData.type || "",
     status: machineData.status || "",
     facilities_id: machineData.facilities_id || 0,

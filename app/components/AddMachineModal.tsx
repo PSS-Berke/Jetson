@@ -39,7 +39,7 @@ export default function AddMachineModal({
 }: AddMachineModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [createdMachineLine, setCreatedMachineLine] = useState<number | null>(
+  const [createdMachineLine, setCreatedMachineLine] = useState<string | null>(
     null,
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
