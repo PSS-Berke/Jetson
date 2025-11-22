@@ -437,7 +437,7 @@ export default function GroupsTabView({ machineType }: GroupsTabViewProps) {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-yellow-800">
                 Note: The RuleCreationForm component requires a processTypeKey and machineVariablesId.
-                This integration is simplified for demonstration. You'll need to pass the appropriate
+                This integration is simplified for demonstration. You&apos;ll need to pass the appropriate
                 values based on the selected group.
               </p>
             </div>

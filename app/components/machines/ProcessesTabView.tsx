@@ -332,7 +332,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
               </button>
             </div>
             <p className="text-sm text-green-700">
-              You're editing the {selectedType.label} process type configuration
+              You&apos;re editing the {selectedType.label} process type configuration
               {newProcessTypeFields.length > 0 && ` (${newProcessTypeFields.length} field${newProcessTypeFields.length !== 1 ? 's' : ''})`}
             </p>
           </div>
