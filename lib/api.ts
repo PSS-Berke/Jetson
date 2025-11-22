@@ -391,21 +391,53 @@ const parseCapabilities = (capabilities: any): Record<string, any> => {
   return {};
 };
 
+/**
+ * Map URL machine type to API type format
+ * URL types: inserters, folders, hp-press, inkjetters, affixers
+ * API types: inserts, folders, hp press, inkjetters, affixers
+ */
+const mapMachineTypeToAPI = (type?: string): string | undefined => {
+  if (!type) return undefined;
+  
+  const typeMap: Record<string, string> = {
+    inserters: "inserts",
+    folders: "folders",
+    "hp-press": "hp press",
+    inkjetters: "inkjetters",
+    affixers: "affixers",
+    // Also handle direct API types
+    inserts: "inserts",
+    "hp press": "hp press",
+  };
+  
+  return typeMap[type.toLowerCase()] || undefined;
+};
+
 // Get all machines
 export const getMachines = async (
   status?: string,
   facilitiesId?: number,
+  type?: string,
 ): Promise<Machine[]> => {
+  // Map the type to API format
+  const apiType = mapMachineTypeToAPI(type);
+  
+  // Build query parameters - API expects GET with query params
   const params = new URLSearchParams();
-
+  
   // Only append status parameter if it has a value
   if (status && status !== "") {
     params.append("status", status);
   }
-
+  
   // Only append facilities_id parameter if it has a value
   if (facilitiesId && facilitiesId > 0) {
     params.append("facilities_id", facilitiesId.toString());
+  }
+  
+  // Only append type parameter if it has a value
+  if (apiType) {
+    params.append("type", apiType);
   }
 
   const queryString = params.toString();

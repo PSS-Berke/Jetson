@@ -161,7 +161,7 @@ export default function MachineTypePage() {
     isLoading: machinesLoading,
     error: machinesError,
     refetch,
-  } = useMachines(filterStatus, filterFacility || undefined);
+  } = useMachines(filterStatus, filterFacility || undefined, machineType);
   const { logout } = useAuth();
 
   // Get configuration for this machine type
@@ -181,7 +181,7 @@ export default function MachineTypePage() {
     setRawResponseLoading(true);
     try {
       // Use getMachines instead of api.get to ensure capabilities are properly parsed
-      const rawData = await getMachines(filterStatus, filterFacility || undefined);
+      const rawData = await getMachines(filterStatus, filterFacility || undefined, machineType);
       setRawMachinesResponse(rawData);
     } catch (error) {
       console.error("[MachineTypePage] Error fetching raw machines:", error);
@@ -222,13 +222,13 @@ export default function MachineTypePage() {
 
   const handleMachineModalClose = async () => {
     setSelectedMachine(null);
-    refetch(filterStatus, filterFacility || undefined);
+    refetch(filterStatus, filterFacility || undefined, machineType);
     await fetchRawMachinesResponse();
   };
 
   const handleAddMachineSuccess = () => {
     setIsAddMachineModalOpen(false);
-    refetch(filterStatus, filterFacility || undefined);
+    refetch(filterStatus, filterFacility || undefined, machineType);
   };
 
   // Helper to render capability values
@@ -391,7 +391,7 @@ export default function MachineTypePage() {
       setShowNewMachineRow(false);
       setNewMachineFormData(null);
       setErrors({});
-      refetch(filterStatus, filterFacility || undefined);
+      refetch(filterStatus, filterFacility || undefined, machineType);
     } catch (error) {
       console.error("Error creating machine:", error);
       setErrors((prev) => ({
@@ -513,7 +513,7 @@ export default function MachineTypePage() {
 
     try {
       await updateMachine(editingMachineId, editedMachine as Machine);
-      refetch(filterStatus, filterFacility || undefined);
+      refetch(filterStatus, filterFacility || undefined, machineType);
       await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);
@@ -548,7 +548,7 @@ export default function MachineTypePage() {
 
     try {
       await deleteMachine(machineToDelete.id);
-      refetch(filterStatus, filterFacility || undefined);
+      refetch(filterStatus, filterFacility || undefined, machineType);
       await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);

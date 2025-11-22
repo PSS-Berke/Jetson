@@ -9,28 +9,29 @@ interface UseMachinesReturn {
   machines: Machine[];
   isLoading: boolean;
   error: string | null;
-  refetch: (status?: string, facilitiesId?: number) => Promise<void>;
+  refetch: (status?: string, facilitiesId?: number, type?: string) => Promise<void>;
 }
 
 // SWR fetcher for machines
-const machinesFetcher = async (status?: string, facilitiesId?: number) => {
-  return await getMachines(status, facilitiesId);
+const machinesFetcher = async (status?: string, facilitiesId?: number, type?: string) => {
+  return await getMachines(status, facilitiesId, type);
 };
 
 export const useMachines = (
   initialStatus?: string,
   initialFacilityId?: number,
+  initialType?: string,
 ): UseMachinesReturn => {
   // Create unique SWR key
   const key = useMemo(
-    () => ["machines", initialStatus, initialFacilityId],
-    [initialStatus, initialFacilityId],
+    () => ["machines", initialStatus, initialFacilityId, initialType],
+    [initialStatus, initialFacilityId, initialType],
   );
 
   // Use SWR for data fetching with caching
   const { data, error, isLoading, mutate } = useSWR(
     key,
-    () => machinesFetcher(initialStatus, initialFacilityId),
+    () => machinesFetcher(initialStatus, initialFacilityId, initialType),
     {
       revalidateOnFocus: false,
       dedupingInterval: 10000,
@@ -52,13 +53,14 @@ export const useMachines = (
     machines,
     isLoading,
     error: error?.message ?? null,
-    refetch: async (status?: string, facilitiesId?: number) => {
+    refetch: async (status?: string, facilitiesId?: number, type?: string) => {
       // If parameters are provided, use them; otherwise use initial values
       const newStatus = status !== undefined ? status : initialStatus;
       const newFacilityId =
         facilitiesId !== undefined ? facilitiesId : initialFacilityId;
+      const newType = type !== undefined ? type : initialType;
 
-      await mutate(machinesFetcher(newStatus, newFacilityId), {
+      await mutate(machinesFetcher(newStatus, newFacilityId, newType), {
         revalidate: true,
       });
     },
