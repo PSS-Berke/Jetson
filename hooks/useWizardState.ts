@@ -121,6 +121,7 @@ export interface FormBuilderField {
   options?: string[];
   required?: boolean;
   addToJobInput?: boolean;
+  showInAdditionalFields?: boolean;
 }
 
 export interface WizardState {

@@ -24,6 +24,8 @@ export default function DynamicRequirementFields({
   disableRequired = false,
 }: DynamicRequirementFieldsProps) {
   const [dynamicFields, setDynamicFields] = useState<FieldConfig[]>([]);
+  const [additionalFields, setAdditionalFields] = useState<FieldConfig[]>([]);
+  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
   const [isLoadingFields, setIsLoadingFields] = useState(false);
   const [useCapabilityBucket, setUseCapabilityBucket] = useState(false);
   const [isBucketExpanded, setIsBucketExpanded] = useState(true);
@@ -89,12 +91,17 @@ export default function DynamicRequirementFields({
             const variables = machineVariable.variables;
 
             // Filter variables where addToJobInput === true and map to FieldConfig
-            const mappedFields: FieldConfig[] = Object.entries(variables)
+            // Split into basic fields (shown immediately) and additional fields (behind button)
+            const allJobInputFields = Object.entries(variables)
               .filter(([varName, varConfig]: [string, any]) => {
                 // Only include variables where addToJobInput is true
                 return varConfig.addToJobInput === true;
-              })
-              .map(([varName, varConfig]: [string, any]) => {
+              });
+
+            const basicFields: FieldConfig[] = [];
+            const additionalFieldsList: FieldConfig[] = [];
+
+            allJobInputFields.forEach(([varName, varConfig]: [string, any]) => {
                 // Map variable type to FieldConfig type
                 let fieldType: FieldConfig["type"] = "text";
                 if (varConfig.type === "select" || varConfig.type === "dropdown") {
@@ -129,7 +136,12 @@ export default function DynamicRequirementFields({
                   ...(varConfig.type === "integer" && { originalType: "integer" }),
                 } as FieldConfig & { originalType?: string };
 
-                return fieldConfig;
+                // Push to appropriate array based on showInAdditionalFields flag
+                if (varConfig.showInAdditionalFields === true) {
+                  additionalFieldsList.push(fieldConfig);
+                } else {
+                  basicFields.push(fieldConfig);
+                }
               });
 
             // Pre-populate field values from API response
@@ -157,10 +169,15 @@ export default function DynamicRequirementFields({
             }
 
             console.log(
-              "[DynamicRequirementFields] Mapped fields:",
-              mappedFields,
+              "[DynamicRequirementFields] Basic fields:",
+              basicFields,
             );
-            setDynamicFields(mappedFields);
+            console.log(
+              "[DynamicRequirementFields] Additional fields:",
+              additionalFieldsList,
+            );
+            setDynamicFields(basicFields);
+            setAdditionalFields(additionalFieldsList);
           } else {
             // Fallback to static config if API returns no variables
             console.log(
@@ -652,10 +669,41 @@ export default function DynamicRequirementFields({
             <span>Loading fields...</span>
           </div>
         </div>
-      ) : !useCapabilityBucket && requirement.process_type && fieldsToRender.length > 0 ? (
-        <div className="flex flex-wrap gap-4">
-          {fieldsToRender.map((field, index) => renderField(field, index))}
-        </div>
+      ) : !useCapabilityBucket && requirement.process_type && (fieldsToRender.length > 0 || additionalFields.length > 0) ? (
+        <>
+          {fieldsToRender.length > 0 && (
+            <div className="flex flex-wrap gap-4">
+              {fieldsToRender.map((field, index) => renderField(field, index))}
+            </div>
+          )}
+
+          {/* Additional Fields Section - only show if there are additional fields */}
+          {additionalFields.length > 0 && (
+            <div className="w-full">
+              <button
+                type="button"
+                onClick={() => setShowAdditionalFields(!showAdditionalFields)}
+                className="w-full px-4 py-3 text-sm font-semibold text-[var(--primary-blue)] bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>{showAdditionalFields ? 'Hide' : 'Add'} Additional Info</span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${showAdditionalFields ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showAdditionalFields && (
+                <div className="flex flex-wrap gap-4 mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  {additionalFields.map((field, index) => renderField(field, index + fieldsToRender.length))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : null}
 
       {/* Help Text */}
