@@ -284,6 +284,7 @@ export default function BulkJobUploadModal({
       return {
         job_number: pj.job_number,
         clients_id: mapping?.clientId || undefined,
+        client: { name: "" },
         sub_clients_id: undefined, // Will be created if needed
         facilities_id: pj.facility
           ? pj.facility.toLowerCase().includes("lemont") ||
