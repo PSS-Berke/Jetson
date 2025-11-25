@@ -198,7 +198,7 @@ export default function AlertDetailsModal({
                           {job.sub_client && (
                             <span className="text-gray-400">
                               {" "}
-                              / {job.sub_client.name}
+                              / {job.sub_client}
                             </span>
                           )}
                         </td>

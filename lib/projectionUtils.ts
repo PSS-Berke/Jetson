@@ -1,5 +1,6 @@
 import { ParsedJob } from "@/hooks/useJobs";
 import { getDaysBetween, MonthRange, QuarterRange } from "./dateUtils";
+import { normalizeProcessType } from "./processTypeConfig";
 
 export interface WeekRange {
   weekNumber: number;
@@ -55,7 +56,7 @@ export interface ProcessProjection {
   totalQuantity: number;
   totalRevenue: number;
   jobId: number;
-  jobNumber: number;
+  jobNumber: string;
 }
 
 /**
@@ -655,6 +656,137 @@ export function calculateProcessTypeSummaries(
   return Array.from(summaryMap.values()).sort((a, b) =>
     a.processType.localeCompare(b.processType),
   );
+}
+
+/**
+ * Calculate breakdown of a specific process type by a dynamic field value
+ * Used to show expandable sub-rows under process type summaries
+ *
+ * @param jobProjections - All job projections (already filtered)
+ * @param timeRanges - Time periods to calculate quantities for
+ * @param processType - The process type to break down (e.g., "insert", "laser")
+ * @param fieldName - The dynamic field to group by (e.g., "paper_size", "basic_oe")
+ * @returns Array of breakdowns, one per unique field value
+ */
+export function calculateProcessTypeBreakdownByField(
+  jobProjections: JobProjection[],
+  timeRanges: TimeRange[],
+  processType: string,
+  fieldName: string,
+): import("@/types").ProcessTypeBreakdown[] {
+  const normalizedProcessType = processType.toLowerCase();
+  const breakdownMap = new Map<any, import("@/types").ProcessTypeBreakdown>();
+
+  // Track jobs that have been counted for this breakdown (to avoid double-counting)
+  const jobsCountedPerValue = new Map<any, Set<number>>();
+
+  console.log(`[calculateProcessTypeBreakdownByField] Looking for processType="${normalizedProcessType}", field="${fieldName}", in ${jobProjections.length} projections`);
+
+  let matchedRequirements = 0;
+  let skippedEmptyFields = 0;
+  const foundProcessTypes = new Set<string>();
+
+  jobProjections.forEach((projection) => {
+    const job = projection.job;
+    const numProcesses = job.requirements?.length || 0;
+
+    if (numProcesses === 0) {
+      return;
+    }
+
+    // Process each requirement
+    job.requirements.forEach((requirement) => {
+      const rawProcessType = requirement.process_type || "Unknown";
+      const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
+      foundProcessTypes.add(`${rawProcessType} -> ${reqProcessType}`);
+
+      // Only process requirements matching the target process type
+      if (reqProcessType !== normalizedProcessType) {
+        return;
+      }
+
+      matchedRequirements++;
+
+      // Get the field value for this requirement
+      const fieldValue = requirement[fieldName];
+
+      // Skip if field value is undefined, null, or empty string
+      if (fieldValue === undefined || fieldValue === null || fieldValue === "") {
+        skippedEmptyFields++;
+        console.log(`[calculateProcessTypeBreakdownByField] Job ${job.job_number}: field "${fieldName}" is empty/undefined. Requirement:`, requirement);
+        return;
+      }
+
+      // Initialize breakdown for this field value if not exists
+      if (!breakdownMap.has(fieldValue)) {
+        const quantities: { [timeRangeKey: string]: number } = {};
+        timeRanges.forEach((range) => {
+          quantities[range.label] = 0;
+        });
+
+        // Generate a display label for the field value
+        let fieldLabel: string;
+        if (typeof fieldValue === "boolean") {
+          fieldLabel = fieldValue ? "Yes" : "No";
+        } else {
+          fieldLabel = String(fieldValue);
+        }
+
+        breakdownMap.set(fieldValue, {
+          processType: normalizedProcessType,
+          fieldName,
+          fieldValue,
+          fieldLabel,
+          quantities,
+          totalQuantity: 0,
+          jobCount: 0,
+        });
+
+        // Initialize job tracking set for this value
+        jobsCountedPerValue.set(fieldValue, new Set<number>());
+      }
+
+      const breakdown = breakdownMap.get(fieldValue)!;
+
+      // Add quantities for each time period
+      // Quantities are distributed equally among all processes in the job
+      projection.weeklyQuantities.forEach((quantity, label) => {
+        const processQty = Math.round(quantity / numProcesses);
+        breakdown.quantities[label] = (breakdown.quantities[label] || 0) + processQty;
+      });
+
+      // Update total quantity
+      const totalProcessQuantity = Math.round(projection.totalQuantity / numProcesses);
+      breakdown.totalQuantity += totalProcessQuantity;
+
+      // Track unique jobs for job count
+      const jobsSet = jobsCountedPerValue.get(fieldValue)!;
+      if (!jobsSet.has(job.id)) {
+        jobsSet.add(job.id);
+        breakdown.jobCount++;
+      }
+    });
+  });
+
+  console.log(`[calculateProcessTypeBreakdownByField] Summary: matched ${matchedRequirements} requirements, skipped ${skippedEmptyFields} with empty field, found ${breakdownMap.size} unique values`);
+  console.log(`[calculateProcessTypeBreakdownByField] Process types found in requirements:`, Array.from(foundProcessTypes));
+
+  // Convert to array and sort by field value
+  const result = Array.from(breakdownMap.values()).sort((a, b) => {
+    // Sort booleans with true first
+    if (typeof a.fieldValue === "boolean" && typeof b.fieldValue === "boolean") {
+      return a.fieldValue === b.fieldValue ? 0 : a.fieldValue ? -1 : 1;
+    }
+    // Sort numbers numerically
+    if (typeof a.fieldValue === "number" && typeof b.fieldValue === "number") {
+      return a.fieldValue - b.fieldValue;
+    }
+    // Sort strings alphabetically
+    return String(a.fieldValue).localeCompare(String(b.fieldValue));
+  });
+
+  console.log(`[calculateProcessTypeBreakdownByField] Returning ${result.length} breakdown entries`);
+  return result;
 }
 
 /**

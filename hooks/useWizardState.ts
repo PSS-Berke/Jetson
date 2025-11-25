@@ -13,11 +13,12 @@ import type { RuleCondition, RuleOutputs } from "@/types";
 
 export interface CustomFormField {
   id: string;
-  type: "text" | "number" | "select";
+  type: "text" | "number" | "select" | "boolean" | "currency";
   label: string;
   placeholder?: string;
   required?: boolean;
   options?: string[];
+  locked?: boolean; // If true, field cannot be deleted (but can be edited/reordered)
 }
 
 export interface RuleFormData {
@@ -116,11 +117,13 @@ export interface FormBuilderField {
   id: string;
   fieldName: string;
   fieldLabel: string;
-  fieldType: "text" | "number" | "select" | "boolean";
+  fieldType: "text" | "number" | "select" | "boolean" | "currency";
   fieldValue: string | number | boolean;
   options?: string[];
   required?: boolean;
   addToJobInput?: boolean;
+  showInAdditionalFields?: boolean;
+  locked?: boolean; // If true, field cannot be deleted (but can be edited/reordered)
 }
 
 export interface WizardState {

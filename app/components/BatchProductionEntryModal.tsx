@@ -20,7 +20,7 @@ interface BatchProductionEntryModalProps {
 
 interface JobEntryData {
   job_id: number;
-  job_number: number;
+  job_number: string;
   job_name: string;
   client_name: string;
   projected_quantity: number;

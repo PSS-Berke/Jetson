@@ -105,12 +105,20 @@ export default function GroupsTabView({ machineType }: GroupsTabViewProps) {
       try {
         setLoadingRules(true);
 
-        // Fetch all rules, groups, and machines in parallel
-        const [rulesData, groupsData, machinesData] = await Promise.all([
+        // Fetch rules and groups first
+        const [rulesData, groupsData] = await Promise.all([
           getMachineRules(),
           getAllVariableCombinations(),
-          getMachines(), // Use getMachines() instead of api.get to properly handle the response
         ]);
+
+        // Fetch machines separately with error handling
+        let machinesData: MachineData[] = [];
+        try {
+          machinesData = await getMachines();
+        } catch (machineError) {
+          console.error("[GroupsTabView] Error fetching machines:", machineError);
+          // Continue without machine data - rules can still be displayed
+        }
 
         // Create lookup maps
         const groupMap = new Map(groupsData.map((g) => [g.id, g.rule_name || `Group ${g.id}`]));

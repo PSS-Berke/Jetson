@@ -647,7 +647,7 @@ export default function ProductionComparisonTable({
                     {comparison.job.sub_client && (
                       <span className="text-gray-400">
                         {" "}
-                        / {comparison.job.sub_client}
+                        / {comparison.job.sub_client.name}
                       </span>
                     )}
                   </td>

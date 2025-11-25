@@ -118,12 +118,14 @@ export const calculateDailySummaries = (
       machineCount: 0,
       processTypeCounts: {
         insert: 0,
-        sort: 0,
         inkjet: 0,
-        labelApply: 0,
+        labeling: 0,
         fold: 0,
         laser: 0,
         hpPress: 0,
+        sort: 0,
+        affix: 0,
+        data: 0,
       },
     });
   });
@@ -168,18 +170,23 @@ export const calculateDailySummaries = (
             case "insert":
               summary.processTypeCounts.insert += dailyPieces;
               break;
-            case "sort":
-              summary.processTypeCounts.sort += dailyPieces;
-              break;
             case "inkjet":
             case "ij":
             case "ink jet":
+            case "ink jet+":
               summary.processTypeCounts.inkjet += dailyPieces;
               break;
             case "label/apply":
             case "l/a":
             case "label/affix":
-              summary.processTypeCounts.labelApply += dailyPieces;
+            case "labeling":
+              summary.processTypeCounts.labeling += dailyPieces;
+              break;
+            case "affix":
+            case "affix glue+":
+            case "affix label+":
+            case "affix with glue":
+              summary.processTypeCounts.affix += dailyPieces;
               break;
             case "fold":
               summary.processTypeCounts.fold += dailyPieces;
@@ -188,7 +195,14 @@ export const calculateDailySummaries = (
               summary.processTypeCounts.laser += dailyPieces;
               break;
             case "hp press":
+            case "hp":
               summary.processTypeCounts.hpPress += dailyPieces;
+              break;
+            case "data":
+              summary.processTypeCounts.data += dailyPieces;
+              break;
+            case "sort":
+              summary.processTypeCounts.sort += dailyPieces;
               break;
           }
         });
@@ -474,7 +488,6 @@ export const getDayBreakdown = (
 export const getServiceTypeColor = (serviceType: string): string => {
   const colors: { [key: string]: string } = {
     Insert: "#3B82F6", // Blue
-    Sort: "#10B981", // Green
     Inkjet: "#F59E0B", // Orange
     IJ: "#F59E0B", // Orange (legacy support)
     "Label/Apply": "#8B5CF6", // Purple
@@ -493,13 +506,16 @@ export const getServiceTypeColor = (serviceType: string): string => {
  */
 export const getProcessTypeColor = (processType: string): string => {
   const colors: { [key: string]: string } = {
-    insert: "#3B82F6", // Blue
-    sort: "#10B981", // Green
-    inkjet: "#F59E0B", // Orange
-    labelApply: "#8B5CF6", // Purple
-    fold: "#EC4899", // Pink
+    data: "#14B8A6", // Teal
+    hp: "#6366F1", // Indigo
+    hpPress: "#6366F1", // Indigo (legacy)
     laser: "#EF4444", // Red
-    hpPress: "#14B8A6", // Teal
+    fold: "#EC4899", // Pink
+    affix: "#F59E0B", // Orange
+    insert: "#3B82F6", // Blue
+    inkjet: "#8B5CF6", // Purple
+    labeling: "#10B981", // Green
+    labelApply: "#10B981", // Green (legacy)
   };
 
   return colors[processType] || "#6B7280"; // Default to gray if not found

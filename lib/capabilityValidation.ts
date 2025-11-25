@@ -6,7 +6,6 @@
 import {
   MachineCapabilityValue,
   InsertCapabilities,
-  SortCapabilities,
   LabelApplyCapabilities,
   FoldCapabilities,
   LaserCapabilities,
@@ -343,43 +342,6 @@ function validateInsertCapabilities(
   return errors;
 }
 
-/**
- * Validate Sort machine capabilities
- */
-function validateSortCapabilities(
-  capabilities: Record<string, any>
-): ValidationError[] {
-  const errors: ValidationError[] = [];
-
-  const allowedSortTypes = [
-    "Standard Sort",
-    "Presort",
-    "EDDM",
-    "Full Service",
-  ];
-
-  errors.push(
-    ...validateArrayEnum(
-      "supported_sort_types",
-      capabilities.supported_sort_types,
-      allowedSortTypes
-    )
-  );
-
-  errors.push(
-    ...validateArrayEnum(
-      "supported_paper_sizes",
-      capabilities.supported_paper_sizes,
-      COMMON_PAPER_SIZES
-    )
-  );
-
-  errors.push(
-    ...validateNumber("price_per_m", capabilities.price_per_m, { min: 0 })
-  );
-
-  return errors;
-}
 
 /**
  * Validate Label/Apply machine capabilities
@@ -615,15 +577,7 @@ export function validateCapabilities(
     case "insert":
     case "insertplus":
     case "insert+":
-    case "insert9to12":
-    case "9-12 in+":
-    case "insert13plus":
-    case "13+ in+":
       errors.push(...validateInsertCapabilities(capabilities));
-      break;
-
-    case "sort":
-      errors.push(...validateSortCapabilities(capabilities));
       break;
 
     case "labelapply":

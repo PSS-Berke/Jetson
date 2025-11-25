@@ -66,7 +66,7 @@ export default function JobDetailsModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
-  const [deletedJobNumber, setDeletedJobNumber] = useState<number | null>(null);
+  const [deletedJobNumber, setDeletedJobNumber] = useState<string | null>(null);
 
   // State for edit mode
   const [submitting, setSubmitting] = useState(false);
@@ -155,8 +155,8 @@ export default function JobDetailsModal({
 
       const clientId = job.client?.id || null;
       const clientName = job.client?.name || "";
-      const subClientId = job.sub_client?.id || null;
-      const subClientName = job.sub_client?.name || "";
+      const subClientId = null; // sub_client is now just a string, not an object with an id
+      const subClientName = job.sub_client || "";
 
       let weeklySplit: number[] = [];
       let lockedWeeks: boolean[] = [];
@@ -646,7 +646,7 @@ export default function JobDetailsModal({
 
       const payload: Partial<{
         jobs_id: number;
-        job_number: number;
+        job_number: string;
         service_type: string;
         quantity: number;
         description: string;
@@ -655,6 +655,7 @@ export default function JobDetailsModal({
         time_estimate: number | null;
         clients_id: number;
         sub_clients_id: number;
+        sub_client: string;
         machines_id: string;
         requirements: string;
         job_name: string;
@@ -670,7 +671,7 @@ export default function JobDetailsModal({
         confirmed: boolean;
       }> = {
         jobs_id: job.id,
-        job_number: parseInt(formData.job_number),
+        job_number: formData.job_number,
         service_type: formData.service_type,
         quantity: quantity,
         description: formData.description,
@@ -692,6 +693,11 @@ export default function JobDetailsModal({
 
       if (formData.sub_clients_id !== null) {
         payload.sub_clients_id = formData.sub_clients_id;
+      }
+
+      // Include sub_client name in the payload
+      if (formData.sub_client_name) {
+        payload.sub_client = formData.sub_client_name;
       }
 
       if (startDateTimestamp && startDateTimestamp > 0) {
@@ -858,7 +864,7 @@ export default function JobDetailsModal({
                     Sub Client
                   </label>
                   <p className="text-base text-[var(--text-dark)]">
-                    {job.sub_client.name}
+                    {job.sub_client}
                   </p>
                 </div>
               )}
@@ -1512,14 +1518,14 @@ export default function JobDetailsModal({
 
                 {/* Weekly Split Section */}
                 {formData.weekly_split.length > 0 && (
-                  <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-[var(--text-dark)]">
+                  <div className="bg-white border border-[var(--border)] rounded-lg p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-base font-semibold text-[var(--dark-blue)]">
                         Weekly Quantity Split ({formData.weekly_split.length}{" "}
-                        weeks)
+                        {formData.weekly_split.length === 1 ? "week" : "weeks"})
                       </h4>
                       <div
-                        className={`text-sm font-semibold ${
+                        className={`text-base font-semibold ${
                           getWeeklySplitDifference() === 0
                             ? "text-green-600"
                             : "text-red-600"
@@ -1527,12 +1533,6 @@ export default function JobDetailsModal({
                       >
                         Total: {getWeeklySplitSum().toLocaleString()} /{" "}
                         {parseInt(formData.quantity || "0").toLocaleString()}
-                        {getWeeklySplitDifference() !== 0 && (
-                          <span className="ml-1">
-                            ({getWeeklySplitDifference() > 0 ? "+" : ""}
-                            {getWeeklySplitDifference()})
-                          </span>
-                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1541,7 +1541,7 @@ export default function JobDetailsModal({
                         return (
                           <div key={index} className="relative">
                             <div className="flex items-center justify-between mb-1">
-                              <label className="block text-xs font-medium text-[var(--text-light)]">
+                              <label className="block text-sm font-medium text-gray-600">
                                 Week {index + 1}
                               </label>
                               {isLocked && (
@@ -1581,10 +1581,10 @@ export default function JobDetailsModal({
                                 onChange={(e) =>
                                   handleWeeklySplitChange(index, e.target.value)
                                 }
-                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
+                                className={`w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-base font-semibold ${
                                   isLocked
-                                    ? "bg-blue-50 border-blue-300 font-semibold pr-8"
-                                    : "border-[var(--border)]"
+                                    ? "bg-blue-50 border-blue-300 pr-8"
+                                    : "bg-white border-gray-200"
                                 }`}
                                 title={
                                   isLocked
@@ -1622,8 +1622,11 @@ export default function JobDetailsModal({
                       })}
                     </div>
                     {getWeeklySplitDifference() !== 0 && (
-                      <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                        ⚠️ Weekly split total must equal the total quantity
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                        <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span>Weekly split total must equal the total quantity</span>
                       </div>
                     )}
                   </div>

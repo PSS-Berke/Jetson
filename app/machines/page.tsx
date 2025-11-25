@@ -61,9 +61,6 @@ export default function Machines() {
   // Map process type keys to their routes
   const processTypeToRoute: Record<string, string> = {
     "insert": "/machines/inserters",
-    "insertPlus": "/machines/inserters",
-    "insert9to12": "/machines/inserters",
-    "insert13Plus": "/machines/inserters",
     "fold": "/machines/folders",
     "hpPress": "/machines/hp-press",
     "inkjet": "/machines/inkjetters",

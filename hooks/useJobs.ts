@@ -21,7 +21,7 @@ export interface ParsedRequirement {
 export interface ParsedJob
   extends Omit<Job, "client" | "sub_client" | "machines" | "requirements"> {
   client: { id: number; name: string };
-  sub_client?: { id: number; name: string } | null;
+  sub_client?: string; // Sub-client name as a plain string
   machines: { id: number; line: string }[];
   requirements: ParsedRequirement[];
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
@@ -129,17 +129,37 @@ const parseJob = (job: Job): ParsedJob => {
       }
     }
 
-    // Parse sub_client if it exists
-    let parsedSubClient: { id: number; name: string } | null = null;
+    // Parse sub_client if it exists - keep as string
+    let parsedSubClient: string | undefined = undefined;
+
     if (job.sub_client) {
       try {
         if (typeof job.sub_client === "string") {
-          parsedSubClient = JSON.parse(job.sub_client);
-        } else if (typeof job.sub_client === "object") {
-          parsedSubClient = job.sub_client as { id: number; name: string };
+          // Check if it's a JSON string that needs to be parsed
+          const trimmed = job.sub_client.trim();
+
+          if (trimmed.startsWith('{')) {
+            // It's a JSON object string, extract the name property
+            const parsed = JSON.parse(trimmed);
+            // Only use the name if it's not null/undefined/empty
+            if (parsed.name && parsed.name !== null && parsed.name !== "null") {
+              parsedSubClient = parsed.name;
+            }
+            // Otherwise leave parsedSubClient as undefined (will display as "-")
+          } else {
+            // It's already a plain string, use it directly
+            parsedSubClient = trimmed;
+          }
+        } else if (typeof job.sub_client === "object" && job.sub_client !== null) {
+          // It's already an object, extract the name
+          const name = (job.sub_client as any).name;
+          if (name && name !== null && name !== "null") {
+            parsedSubClient = name;
+          }
         }
-      } catch {
-        // Silently fail
+      } catch (err) {
+        // If parsing fails, leave it undefined
+        console.warn(`[parseJob] Failed to parse sub_client for job ${job.job_number}:`, job.sub_client, err);
       }
     }
 
@@ -184,7 +204,7 @@ const parseJob = (job: Job): ParsedJob => {
     return {
       ...job,
       client: { id: job.clients_id || 0, name: "Unknown" },
-      sub_client: null,
+      sub_client: undefined,
       machines: [],
       requirements: [],
     };

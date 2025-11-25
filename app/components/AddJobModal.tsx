@@ -788,7 +788,7 @@ export default function AddJobModal({
     if (creationMode === "template") {
       if (isCreatingTemplate) {
         if (step === 1) return "Job Details";
-        if (step === 2) return "Requirements";
+        if (step === 2) return "Services";
         if (step === 3) return "Review";
       } else {
         if (step === 1) return "Select Client";
@@ -797,7 +797,7 @@ export default function AddJobModal({
       }
     } else {
       if (step === 1) return "Job Details";
-      if (step === 2) return "Requirements";
+      if (step === 2) return "Services";
       if (step === 3) return "Review";
     }
     return "";
@@ -956,13 +956,13 @@ export default function AddJobModal({
       const token = getToken();
 
       // Calculate total billing from requirements
-      const quantity = parseInt(formData.quantity);
+      const quantity = parseInt(formData.quantity) || 0;
       const calculatedRevenue = formData.requirements.reduce((total, req) => {
-        const pricePerM = parseFloat(req.price_per_m || "0");
+        const pricePerM = parseFloat(String(req.price_per_m || "0")) || 0;
         return total + (quantity / 1000) * pricePerM;
       }, 0);
 
-      const addOnCharges = parseFloat(formData.add_on_charges) || 0;
+      const addOnCharges = parseFloat(String(formData.add_on_charges || "0")) || 0;
       const calculatedTotalBilling = calculatedRevenue + addOnCharges;
 
       // Convert date strings to timestamps
@@ -996,17 +996,17 @@ export default function AddJobModal({
         clients_id: formData.clients_id,
         sub_clients_id: formData.sub_clients_id,
         machines_id: formData.machines_id,
-        job_number: parseInt(formData.job_number),
+        job_number: formData.job_number,
         service_type: formData.service_type,
-        pockets: parseInt(formData.pockets),
+        pockets: parseInt(formData.pockets) || 0,
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
         data_type: formData.data_type,
-        price_per_m: (parseFloat(formData.price_per_m) || 0).toString(),
-        add_on_charges: addOnCharges.toString(),
-        ext_price: (parseFloat(formData.ext_price) || 0).toString(),
-        total_billing: calculatedTotalBilling.toString(),
+        price_per_m: (parseFloat(String(formData.price_per_m || "0")) || 0).toFixed(2),
+        add_on_charges: addOnCharges.toFixed(2),
+        ext_price: (parseFloat(String(formData.ext_price || "0")) || 0).toFixed(2),
+        total_billing: calculatedTotalBilling.toFixed(2),
         requirements: JSON.stringify(formData.requirements),
         daily_split: dailyBreakdown,
         weekly_split: formData.weekly_split,
@@ -1680,11 +1680,11 @@ export default function AddJobModal({
             </div>
           )}
 
-          {/* Step 2: Requirements (New Job Mode or Template Creation Mode) */}
+          {/* Step 2: Services (New Job Mode or Template Creation Mode) */}
           {currentStep === 2 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">
-                Job Requirements
+                Job Services
               </h3>
 
               {formData.requirements.map((requirement, index) => (
@@ -1692,10 +1692,10 @@ export default function AddJobModal({
                   key={index}
                   className="border border-[var(--border)] rounded-lg p-6 space-y-4"
                 >
-                  {/* Requirement Header */}
+                  {/* Service Header */}
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-semibold text-[var(--text-dark)]">
-                      Requirement {index + 1}
+                      Service {index + 1}
                     </h4>
                     {index > 0 && (
                       <button
@@ -1708,7 +1708,7 @@ export default function AddJobModal({
                     )}
                   </div>
 
-                  {/* Dynamic Requirement Fields */}
+                  {/* Dynamic Service Fields */}
                   <DynamicRequirementFields
                     requirement={requirement}
                     onChange={(field, value) =>
@@ -1718,13 +1718,13 @@ export default function AddJobModal({
                 </div>
               ))}
 
-              {/* Add Requirement Button */}
+              {/* Add Service Button */}
               <button
                 type="button"
                 onClick={addRequirement}
                 className="w-full px-6 py-3 border-2 border-dashed border-[var(--border)] rounded-lg font-semibold text-[var(--primary-blue)] hover:bg-blue-50 transition-colors"
               >
-                + Add Another Requirement
+                + Add Another Service
               </button>
             </div>
           )}
@@ -1830,7 +1830,7 @@ export default function AddJobModal({
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-[var(--text-dark)]">
-                    Job Requirements & Pricing
+                    Job Services & Pricing
                   </h3>
                   {!isCreatingTemplate && (
                     <button
@@ -1844,7 +1844,7 @@ export default function AddJobModal({
                       }}
                       className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
                     >
-                      Edit Requirements
+                      Edit Services
                     </button>
                   )}
                 </div>
@@ -1862,7 +1862,7 @@ export default function AddJobModal({
                       <div className="text-sm">
                         <div className="mb-2">
                           <span className="text-[var(--text-light)]">
-                            Requirement {index + 1}:{" "}
+                            Service {index + 1}:{" "}
                           </span>
                           <span className="font-semibold text-[var(--text-dark)]">
                             {processConfig?.label || req.process_type}

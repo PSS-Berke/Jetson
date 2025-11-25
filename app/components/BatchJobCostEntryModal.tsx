@@ -29,7 +29,7 @@ interface BatchJobCostEntryModalProps {
 
 interface JobCostEntryData {
   job_id: number;
-  job_number: number;
+  job_number: string;
   job_name: string;
   client_name: string;
   quantity: number;

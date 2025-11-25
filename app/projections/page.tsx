@@ -86,6 +86,8 @@ export default function ProjectionsPage() {
   const [showNotes, setShowNotes] = useState(false);
   const [groupByFacility, setGroupByFacility] = useState(false);
   const [financialsSubView, setFinancialsSubView] = useState<"dashboard" | "revenue-table">("dashboard");
+  const [dynamicFieldFilters, setDynamicFieldFilters] = useState<import("@/types").DynamicFieldFilter[]>([]);
+  const [dynamicFieldFilterLogic, setDynamicFieldFilterLogic] = useState<"and" | "or">("and");
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
@@ -104,6 +106,8 @@ export default function ProjectionsPage() {
     filterMode,
     showOnlyInDateRange,
     groupByFacility,
+    dynamicFieldFilters,
+    dynamicFieldFilterLogic,
   };
 
   const {
@@ -389,6 +393,10 @@ export default function ProjectionsPage() {
             onShowNotesChange={setShowNotes}
             groupByFacility={groupByFacility}
             onGroupByFacilityChange={setGroupByFacility}
+            dynamicFieldFilters={dynamicFieldFilters}
+            onDynamicFieldFiltersChange={setDynamicFieldFilters}
+            dynamicFieldFilterLogic={dynamicFieldFilterLogic}
+            onDynamicFieldFilterLogicChange={setDynamicFieldFilterLogic}
           />
         </div>
 
@@ -439,6 +447,8 @@ export default function ProjectionsPage() {
                     showExpandedProcesses={showExpandedProcesses}
                     showNotes={showNotes}
                     onShowNotesChange={setShowNotes}
+                    granularity={granularity}
+                    fullFilteredProjections={filteredJobProjections}
                   />
 
                   {/* Pagination */}

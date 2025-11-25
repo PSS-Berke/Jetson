@@ -102,7 +102,12 @@ const machineTypeConfig: Record<
 > = {
   inserters: {
     label: "Inserter Machines",
-    filterFn: (machine) => machine.type?.toLowerCase()?.includes("insert") ?? false,
+    filterFn: (machine) => {
+      const type = machine.type?.toLowerCase();
+      const processTypeKey = (machine as any).process_type_key?.toLowerCase();
+      // Include machines with "insert" in type, but exclude "insertplus" and process_type_key="insertplus"
+      return (type?.includes("insert") && !type?.includes("insertplus") && processTypeKey !== "insertplus") ?? false;
+    },
   },
   folders: {
     label: "Folder Machines",

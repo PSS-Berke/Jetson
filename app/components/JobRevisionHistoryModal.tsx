@@ -8,7 +8,7 @@ interface JobRevisionHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   jobId: number;
-  jobNumber: number;
+  jobNumber: string;
   jobName?: string;
 }
 
