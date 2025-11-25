@@ -16,6 +16,8 @@ import {
   EyeOff,
 } from "lucide-react";
 import ProcessViewToggle from "./ProcessViewToggle";
+import DynamicFieldFilter from "./DynamicFieldFilter";
+import { getProcessTypeOptions } from "@/lib/processTypeConfig";
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -46,6 +48,10 @@ interface ProjectionFiltersProps {
   onShowNotesChange?: (show: boolean) => void;
   groupByFacility?: boolean;
   onGroupByFacilityChange?: (groupByFacility: boolean) => void;
+  dynamicFieldFilters?: import("@/types").DynamicFieldFilter[];
+  onDynamicFieldFiltersChange?: (filters: import("@/types").DynamicFieldFilter[]) => void;
+  dynamicFieldFilterLogic?: "and" | "or";
+  onDynamicFieldFilterLogicChange?: (logic: "and" | "or") => void;
 }
 
 export default function ProjectionFilters({
@@ -77,6 +83,10 @@ export default function ProjectionFilters({
   onShowNotesChange,
   groupByFacility = false,
   onGroupByFacilityChange,
+  dynamicFieldFilters = [],
+  onDynamicFieldFiltersChange,
+  dynamicFieldFilterLogic = "and",
+  onDynamicFieldFilterLogicChange,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -122,29 +132,27 @@ export default function ProjectionFilters({
     });
   }, [jobs]);
 
-  // Map legacy process type names to new full names
-  const normalizeProcessType = (processType: string): string => {
-    const mapping: Record<string, string> = {
-      IJ: "Inkjet",
-      "L/A": "Label/Apply",
-    };
-    return mapping[processType] || processType;
-  };
-
-  // Extract unique process types from requirements and normalize them
+  // Get process types from configuration (same as Dynamic Field filter)
   const serviceTypes = useMemo(() => {
-    const types = new Set<string>();
-    jobs.forEach((job) => {
-      if (job.requirements && job.requirements.length > 0) {
-        job.requirements.forEach((req) => {
-          if (req.process_type) {
-            types.add(normalizeProcessType(req.process_type));
-          }
-        });
-      }
-    });
-    return Array.from(types).sort();
-  }, [jobs]);
+    const deprecatedTypes = ['9-12 in+', 'sort', 'insert +', 'insert+', '13+ in+', '13+'];
+
+    return getProcessTypeOptions()
+      .filter((opt) => {
+        const normalizedValue = opt.value.toLowerCase().trim();
+
+        // Exclude Capability Bucket
+        if (opt.value === "Capability Bucket") return false;
+
+        // Exclude deprecated types
+        if (deprecatedTypes.some(dep => dep.toLowerCase() === normalizedValue)) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((opt) => opt.label)
+      .sort();
+  }, []);
 
   const handleClientToggle = (clientId: number) => {
     if (selectedClients.includes(clientId)) {
@@ -332,144 +340,7 @@ export default function ProjectionFilters({
             />
           </div>
 
-          {/* Date Range Selector - Only on first row in simple mode */}
-          {filterViewMode === "simple" && (
-            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-              <button
-                onClick={handleToday}
-                className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                {getTodayButtonLabel()}
-              </button>
-              <button
-                onClick={handlePrevious}
-                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Previous ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
-              >
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <DateRangePicker
-                dateRange={{ start: startDate, end: getEndDate() }}
-                onDateRangeChange={handleDateRangeChange}
-              />
-              <button
-                onClick={handleNext}
-                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Next ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
-              >
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Second Row - Shows in simple mode OR advanced mode */}
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
-          {/* Date Range Selector - On second row in advanced mode */}
-          {filterViewMode === "advanced" && (
-            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-              <button
-                onClick={handleToday}
-                className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                {getTodayButtonLabel()}
-              </button>
-              <button
-                onClick={handlePrevious}
-                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Previous ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
-              >
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <DateRangePicker
-                dateRange={{ start: startDate, end: getEndDate() }}
-                onDateRangeChange={handleDateRangeChange}
-              />
-              <button
-                onClick={handleNext}
-                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Next ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
-              >
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-          )}
-
-          {/* Date Range Filter Toggle - Advanced Mode */}
-          {filterViewMode === "advanced" && (
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
-              <button
-                onClick={() => onDateRangeToggleChange(true)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  showOnlyInDateRange
-                    ? "bg-white text-[var(--primary-blue)] shadow-sm"
-                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
-                }`}
-              >
-                Date Range Only
-              </button>
-              <button
-                onClick={() => onDateRangeToggleChange(false)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                  !showOnlyInDateRange
-                    ? "bg-white text-[var(--dark-blue)] shadow-sm"
-                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
-                }`}
-              >
-                All Jobs
-              </button>
-            </div>
-          )}
-
-          {/* Clients Filter - Advanced mode only */}
+          {/* Clients Filter - Advanced mode only on first row */}
           {filterViewMode === "advanced" && (
             <div className="relative" ref={clientDropdownRef}>
             <button
@@ -535,7 +406,7 @@ export default function ProjectionFilters({
           </div>
           )}
 
-          {/* Process Type Filter - Advanced mode only */}
+          {/* Process Type Filter - Advanced mode only on first row */}
           {filterViewMode === "advanced" && (
             <div className="relative" ref={serviceDropdownRef}>
             <button
@@ -600,7 +471,142 @@ export default function ProjectionFilters({
             )}
           </div>
           )}
+
+          {/* Date Range Selector - Only on first row in simple mode */}
+          {filterViewMode === "simple" && (
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+              <button
+                onClick={handleToday}
+                className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                {getTodayButtonLabel()}
+              </button>
+              <button
+                onClick={handlePrevious}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Previous ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+              >
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+              <DateRangePicker
+                dateRange={{ start: startDate, end: getEndDate() }}
+                onDateRangeChange={handleDateRangeChange}
+              />
+              <button
+                onClick={handleNext}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Next ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+              >
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Second Row - Date Range and Toggle in advanced mode */}
+        {filterViewMode === "advanced" && (
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+            {/* Date Range Selector - On second row in advanced mode */}
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+              <button
+                onClick={handleToday}
+                className="px-2 sm:px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs sm:text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                {getTodayButtonLabel()}
+              </button>
+              <button
+                onClick={handlePrevious}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Previous ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+              >
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+              <DateRangePicker
+                dateRange={{ start: startDate, end: getEndDate() }}
+                onDateRangeChange={handleDateRangeChange}
+              />
+              <button
+                onClick={handleNext}
+                className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label={`Next ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+              >
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Date Range Filter Toggle - Advanced Mode */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+              <button
+                onClick={() => onDateRangeToggleChange(true)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  showOnlyInDateRange
+                    ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                }`}
+              >
+                Date Range Only
+              </button>
+              <button
+                onClick={() => onDateRangeToggleChange(false)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  !showOnlyInDateRange
+                    ? "bg-white text-[var(--dark-blue)] shadow-sm"
+                    : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                }`}
+              >
+                All Jobs
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Third Row - Advanced Filters Only */}
         {filterViewMode === "advanced" && (
@@ -700,6 +706,19 @@ export default function ProjectionFilters({
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Dynamic Field Filters - Advanced Mode Only */}
+        {filterViewMode === "advanced" && onDynamicFieldFiltersChange && onDynamicFieldFilterLogicChange && (
+          <div className="w-full">
+            <DynamicFieldFilter
+              filters={dynamicFieldFilters}
+              onChange={onDynamicFieldFiltersChange}
+              filterLogic={dynamicFieldFilterLogic}
+              onFilterLogicChange={onDynamicFieldFilterLogicChange}
+              jobs={jobs}
+            />
           </div>
         )}
 

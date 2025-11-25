@@ -246,20 +246,16 @@ function findJobByJobNumber(
   jobNumber: number | string,
   jobs: ParsedJob[],
 ): ParsedJob | undefined {
-  // Normalize job number to number for comparison
-  const normalizedJobNumber =
-    typeof jobNumber === "string" ? parseFloat(jobNumber) : jobNumber;
+  // Normalize job number to string for comparison
+  const normalizedJobNumber = String(jobNumber).trim();
 
-  if (isNaN(normalizedJobNumber)) {
+  if (!normalizedJobNumber) {
     return undefined;
   }
 
   return jobs.find((job) => {
-    // Compare as numbers (handles "00123" vs 123)
-    return (
-      job.job_number === normalizedJobNumber ||
-      job.job_number === Math.floor(normalizedJobNumber)
-    );
+    // Direct string comparison
+    return job.job_number === normalizedJobNumber;
   });
 }
 

@@ -30,6 +30,7 @@ import ProductionPDFHeader from "../components/ProductionPDFHeader";
 import ProductionPDFSummary from "../components/ProductionPDFSummary";
 import ProductionPDFTable from "../components/ProductionPDFTable";
 import { calculateProductionSummary } from "@/lib/productionUtils";
+import { applyDynamicFieldFilters } from "@/lib/dynamicFieldFilters";
 import type { ProductionComparison } from "@/types";
 
 // Dynamically import modals - only loaded when opened
@@ -84,6 +85,8 @@ export default function ProductionPage() {
   const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">(
     "table",
   );
+  const [dynamicFieldFilters, setDynamicFieldFilters] = useState<import("@/types").DynamicFieldFilter[]>([]);
+  const [dynamicFieldFilterLogic, setDynamicFieldFilterLogic] = useState<"and" | "or">("and");
 
   // PDF export ref
   const printRef = useRef<HTMLDivElement>(null);
@@ -139,13 +142,19 @@ export default function ProductionPage() {
 
   const isLoading = jobsLoading || productionLoading;
 
-  // Map legacy process type names to new full names for filtering
-  const normalizeProcessType = (processType: string): string => {
-    const mapping: Record<string, string> = {
-      IJ: "Inkjet",
-      "L/A": "Label/Apply",
+  // Map process type labels to their normalized keys for comparison
+  const getProcessTypeKey = (label: string): string => {
+    const labelToKeyMap: Record<string, string> = {
+      "Data": "data",
+      "HP": "hp",
+      "Laser": "laser",
+      "Fold": "fold",
+      "Affix with Glue": "affix",
+      "Insert": "insert",
+      "Ink Jet": "inkjet",
+      "Labeling": "labeling",
     };
-    return mapping[processType] || processType;
+    return labelToKeyMap[label] || label.toLowerCase();
   };
 
   // Filter comparisons based on selected filters
@@ -181,13 +190,21 @@ export default function ProductionPage() {
       const processTypeMatch =
         selectedServiceTypes.length === 0 ||
         (job.requirements &&
-          job.requirements.some(
-            (req) =>
-              req.process_type &&
-              selectedServiceTypes.includes(
-                normalizeProcessType(req.process_type),
-              ),
-          ));
+          job.requirements.some((req) => {
+            if (!req.process_type) return false;
+            // Normalize the requirement's process type
+            const { normalizeProcessType } = require("@/lib/processTypeConfig");
+            const normalizedReqType = normalizeProcessType(req.process_type);
+            // Convert selected labels to keys and check if any match
+            return selectedServiceTypes.some(
+              (selectedLabel) => getProcessTypeKey(selectedLabel) === normalizedReqType
+            );
+          }));
+
+      // Dynamic field filter
+      const dynamicFieldMatch =
+        dynamicFieldFilters.length === 0 ||
+        applyDynamicFieldFilters(job, dynamicFieldFilters, dynamicFieldFilterLogic);
 
       // Apply filter mode (AND/OR)
       if (filterMode === "and") {
@@ -195,6 +212,7 @@ export default function ProductionPage() {
         const activeFilters = [
           selectedClients.length > 0,
           selectedServiceTypes.length > 0,
+          dynamicFieldFilters.length > 0,
         ];
 
         // If no filters are active, show all (after search)
@@ -203,13 +221,15 @@ export default function ProductionPage() {
         // Must match all active filters
         return (
           (!activeFilters[0] || clientMatch) &&
-          (!activeFilters[1] || processTypeMatch)
+          (!activeFilters[1] || processTypeMatch) &&
+          (!activeFilters[2] || dynamicFieldMatch)
         );
       } else {
         // For OR mode: must match at least one active filter
         const activeFilters = [
           selectedClients.length > 0,
           selectedServiceTypes.length > 0,
+          dynamicFieldFilters.length > 0,
         ];
 
         // If no filters are active, show all (after search)
@@ -218,7 +238,8 @@ export default function ProductionPage() {
         // Must match at least one active filter
         return (
           (activeFilters[0] && clientMatch) ||
-          (activeFilters[1] && processTypeMatch)
+          (activeFilters[1] && processTypeMatch) ||
+          (activeFilters[2] && dynamicFieldMatch)
         );
       }
     });
@@ -229,6 +250,8 @@ export default function ProductionPage() {
     searchQuery,
     filterMode,
     scheduleFilter,
+    dynamicFieldFilters,
+    dynamicFieldFilterLogic,
   ]);
 
   // Handle successful batch entry
@@ -436,6 +459,10 @@ export default function ProductionPage() {
           onDateRangeChange={handleDateRangeChange}
           onExportPDF={handlePrint}
           onBulkUpload={() => setIsExcelUploadModalOpen(true)}
+          dynamicFieldFilters={dynamicFieldFilters}
+          onDynamicFieldFiltersChange={setDynamicFieldFilters}
+          dynamicFieldFilterLogic={dynamicFieldFilterLogic}
+          onDynamicFieldFilterLogicChange={setDynamicFieldFilterLogic}
         />
 
         {/* Loading State */}

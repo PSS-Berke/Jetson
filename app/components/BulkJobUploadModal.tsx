@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   X,
   Upload,
@@ -13,9 +13,9 @@ import {
   Edit2,
 } from "lucide-react";
 import ExcelUploadZone from "./ExcelUploadZone";
-import { parseJobCsv, type ParsedBulkJob } from "@/lib/jobCsvParser";
+import { parseJobCsv, type ParsedBulkJob, type SkippedRow } from "@/lib/jobCsvParser";
 import { downloadJobTemplate } from "@/lib/jobCsvTemplate";
-import { batchCreateJobs, getToken } from "@/lib/api";
+import { batchCreateJobs } from "@/lib/api";
 import type { Job } from "@/types";
 
 interface BulkJobUploadModalProps {
@@ -24,19 +24,7 @@ interface BulkJobUploadModalProps {
   onSuccess: () => void;
 }
 
-interface ClientMapping {
-  subClient: string;
-  clientId: number | null;
-  subClientName: string;
-}
-
-interface Client {
-  id: number;
-  name: string;
-  created_at: number;
-}
-
-type UploadStep = "upload" | "mapping" | "preview" | "uploading" | "complete";
+type UploadStep = "upload" | "preview" | "uploading" | "complete";
 
 export default function BulkJobUploadModal({
   isOpen,
@@ -47,8 +35,7 @@ export default function BulkJobUploadModal({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [file, setFile] = useState<File | null>(null);
   const [parsedJobs, setParsedJobs] = useState<ParsedBulkJob[]>([]);
-  const [subClients, setSubClients] = useState<string[]>([]);
-  const [clientMappings, setClientMappings] = useState<ClientMapping[]>([]);
+  const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
   const [uploadProgress, setUploadProgress] = useState({
     current: 0,
     total: 0,
@@ -60,46 +47,6 @@ export default function BulkJobUploadModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [editingJob, setEditingJob] = useState<number | null>(null);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loadingClients, setLoadingClients] = useState(false);
-
-  // Fetch clients from API
-  useEffect(() => {
-    const fetchClients = async () => {
-      setLoadingClients(true);
-      try {
-        const token = getToken();
-        const response = await fetch(
-          "https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setClients(data);
-        } else {
-          console.error(
-            "Error fetching clients:",
-            response.status,
-            await response.text(),
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching clients:", error);
-      } finally {
-        setLoadingClients(false);
-      }
-    };
-
-    if (isOpen) {
-      fetchClients();
-    }
-  }, [isOpen]);
 
   const handleFileUpload = async (uploadedFile: File) => {
     setFile(uploadedFile);
@@ -114,39 +61,20 @@ export default function BulkJobUploadModal({
       }
 
       setParsedJobs(result.jobs);
-      setSubClients(result.subClients);
+      setSkippedRows(result.skippedRows || []);
 
-      // Initialize client mappings with automatic matching
-      const mappings: ClientMapping[] = result.subClients.map((sc) => {
-        // Try to find an existing client with matching name (case-insensitive)
-        const existingClient = clients.find(
-          (c) => c.name.toLowerCase() === sc.toLowerCase(),
-        );
-
-        return {
-          subClient: sc,
-          clientId: existingClient?.id || null,
-          subClientName: sc,
-        };
-      });
-      setClientMappings(mappings);
-
-      // If no sub-clients to map, skip to preview
-      if (result.subClients.length === 0) {
-        setStep("preview");
-      } else {
-        setStep("mapping");
+      // Log skipped rows summary
+      if (result.skippedRows && result.skippedRows.length > 0) {
+        console.log(`[BulkJobUpload] ${result.skippedRows.length} rows were skipped during parsing:`, result.skippedRows);
       }
+
+      // Go directly to preview - no client mapping step
+      setStep("preview");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to parse file",
       );
     }
-  };
-
-  const handleMappingComplete = () => {
-    setErrorMessage("");
-    setStep("preview");
   };
 
   const handleUpload = async () => {
@@ -162,74 +90,14 @@ export default function BulkJobUploadModal({
       return;
     }
 
-    // First, create any new clients that don't exist yet
-    const token = getToken();
-    const updatedMappings = [...clientMappings];
-
-    for (let i = 0; i < updatedMappings.length; i++) {
-      const mapping = updatedMappings[i];
-
-      // If no client is mapped, create a new client with the sub-client name
-      if (!mapping.clientId) {
-        try {
-          const response = await fetch(
-            "https://xnpm-iauo-ef2d.n7e.xano.io/api:a2ap84-I/clients",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                name: mapping.subClient,
-              }),
-            },
-          );
-
-          if (response.ok) {
-            const newClient = await response.json();
-            updatedMappings[i].clientId = newClient.id;
-            console.log(
-              `[BulkJobUpload] Created new client: ${mapping.subClient} with ID ${newClient.id}`,
-            );
-          } else {
-            console.error(
-              `[BulkJobUpload] Failed to create client ${mapping.subClient}:`,
-              await response.text(),
-            );
-          }
-        } catch (error) {
-          console.error(
-            `[BulkJobUpload] Error creating client ${mapping.subClient}:`,
-            error,
-          );
-        }
-      }
-    }
-
-    // Update the mappings state with new client IDs
-    setClientMappings(updatedMappings);
-
     // Convert parsed jobs to API format
     const jobsToCreate: Partial<Job>[] = validJobs.map((pj) => {
-      // Find client mapping for this job's sub_client (use updatedMappings which now has new client IDs)
-      const mapping = updatedMappings.find(
-        (m) => m.subClient === pj.sub_client,
-      );
-
       console.log(`[BulkJobUpload] Job ${pj.job_number}:`, {
+        client_from_csv: pj.client,
         sub_client_from_csv: pj.sub_client,
-        found_mapping: mapping,
-        mapped_client_id: mapping?.clientId,
-        all_mappings: updatedMappings,
+        will_set_client_to: pj.client || pj.sub_client || "",
+        will_set_sub_client_to: pj.sub_client || undefined,
       });
-
-      // Warn if no client mapping found
-      if (!mapping && pj.sub_client) {
-        console.warn(
-          `[BulkJobUpload] WARNING: No client mapping found for job ${pj.job_number}, sub_client: "${pj.sub_client}"`,
-        );
-      }
 
       // Calculate weekly split if dates are provided
       let weekly_split: number[] | undefined;
@@ -281,17 +149,30 @@ export default function BulkJobUploadModal({
               .toFixed(2)
           : "0";
 
+      const csvClientName = pj.client?.trim();
+      const subClientName = pj.sub_client?.trim();
+      const clientPayloadName = csvClientName || subClientName;
+
+      const clientPayload = clientPayloadName
+        ? JSON.stringify({ id: null, name: clientPayloadName })
+        : undefined;
+
+      const subClientPayload = subClientName
+        ? JSON.stringify({ id: null, name: subClientName })
+        : undefined;
+
       return {
         job_number: pj.job_number,
-        clients_id: mapping?.clientId || undefined,
-        sub_clients_id: undefined, // Will be created if needed
+        clients_id: undefined, // Not setting clients_id - using sub_client instead
+        client: clientPayload,
+        sub_client: subClientPayload,
         facilities_id: pj.facility
           ? pj.facility.toLowerCase().includes("lemont") ||
             pj.facility.toLowerCase().includes("shakopee")
             ? 2
             : 1
           : 1,
-        job_name: pj.description || undefined,
+        job_name: pj.name || undefined,
         description: pj.description || undefined,
         quantity: pj.quantity,
         start_date: pj.start_date?.getTime(),
@@ -317,13 +198,30 @@ export default function BulkJobUploadModal({
     });
 
     try {
+      console.log(`[BulkJobUpload] Starting upload of ${jobsToCreate.length} jobs`);
+      console.log(`[BulkJobUpload] ${invalidJobsCount} jobs were excluded due to validation errors`);
+      console.log(`[BulkJobUpload] ${skippedRows.length} rows were skipped during parsing`);
+
       const results = await batchCreateJobs(jobsToCreate, (current, total) => {
         setUploadProgress({ current, total });
       });
 
+      console.log(`[BulkJobUpload] Upload complete:`, {
+        successful: results.success.length,
+        failed: results.failures.length,
+        skippedDuringParsing: skippedRows.length,
+        invalidJobs: invalidJobsCount,
+        totalProcessed: results.success.length + results.failures.length + skippedRows.length + invalidJobsCount
+      });
+
+      if (results.failures.length > 0) {
+        console.log(`[BulkJobUpload] Failed jobs:`, results.failures);
+      }
+
       setUploadResults(results);
       setStep("complete");
     } catch (error) {
+      console.error(`[BulkJobUpload] Upload failed:`, error);
       setErrorMessage(error instanceof Error ? error.message : "Upload failed");
       setStep("preview");
     }
@@ -346,9 +244,9 @@ export default function BulkJobUploadModal({
     // Update the field
     switch (field) {
       case "job_number":
-        job.job_number = parseInt(value) || 0;
+        job.job_number = value;
         job.errors = job.errors.filter((e) => !e.includes("job_number"));
-        if (isNaN(job.job_number)) {
+        if (!value || value.trim() === "") {
           job.errors.push("Invalid job_number");
         }
         break;
@@ -361,13 +259,9 @@ export default function BulkJobUploadModal({
         break;
       case "sub_client":
         job.sub_client = value;
-        if (value && !subClients.includes(value)) {
-          setSubClients([...subClients, value]);
-          setClientMappings([
-            ...clientMappings,
-            { subClient: value, clientId: null, subClientName: value },
-          ]);
-        }
+        break;
+      case "client":
+        job.client = value;
         break;
       case "description":
         job.description = value;
@@ -394,8 +288,6 @@ export default function BulkJobUploadModal({
     setStep("upload");
     setFile(null);
     setParsedJobs([]);
-    setSubClients([]);
-    setClientMappings([]);
     setUploadProgress({ current: 0, total: 0 });
     setUploadResults(null);
     setErrorMessage("");
@@ -470,104 +362,7 @@ export default function BulkJobUploadModal({
             </div>
           )}
 
-          {/* Step 2: Client Mapping */}
-          {step === "mapping" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Map Sub-Clients to Clients
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Match the sub-clients from your CSV file to existing clients,
-                  or leave blank to create new clients automatically. Clients
-                  are automatically matched by name where possible.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {clientMappings.map((mapping, index) => (
-                  <div
-                    key={mapping.subClient}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-4"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          CSV Sub-Client
-                        </label>
-                        <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900">
-                          {mapping.subClient}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Select Client
-                        </label>
-                        <select
-                          value={mapping.clientId || ""}
-                          onChange={(e) => {
-                            const newMappings = [...clientMappings];
-                            newMappings[index].clientId = e.target.value
-                              ? parseInt(e.target.value)
-                              : null;
-                            setClientMappings(newMappings);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          disabled={loadingClients}
-                        >
-                          <option value="">
-                            {loadingClients
-                              ? "Loading clients..."
-                              : "Create new client"}
-                          </option>
-                          {clients.map((client) => (
-                            <option key={client.id} value={client.id}>
-                              {client.name}
-                            </option>
-                          ))}
-                        </select>
-                        {!mapping.clientId && (
-                          <p className="text-xs text-blue-600 mt-1">
-                            ✓ Will create new client: &quot;{mapping.subClient}
-                            &quot;
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {errorMessage && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-red-800">Error</p>
-                      <p className="text-sm text-red-600">{errorMessage}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setStep("upload")}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleMappingComplete}
-                  className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                >
-                  Continue to Preview
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Preview */}
+          {/* Step 2: Preview */}
           {step === "preview" && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -594,6 +389,30 @@ export default function BulkJobUploadModal({
                 </div>
               </div>
 
+              {/* Summary Banner */}
+              {(invalidJobsCount > 0 || skippedRows.length > 0) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 mb-2 text-sm">
+                    Upload Summary
+                  </h4>
+                  <div className="space-y-1 text-sm text-blue-800">
+                    <p>
+                      <span className="font-semibold">{validJobsCount}</span> jobs ready to upload
+                    </p>
+                    {invalidJobsCount > 0 && (
+                      <p className="text-red-700">
+                        <span className="font-semibold">{invalidJobsCount}</span> jobs have validation errors (won&apos;t be uploaded)
+                      </p>
+                    )}
+                    {skippedRows.length > 0 && (
+                      <p className="text-orange-700">
+                        <span className="font-semibold">{skippedRows.length}</span> rows were skipped during CSV parsing
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="overflow-y-auto max-h-[500px]">
                   <div className="space-y-2 p-2">
@@ -601,12 +420,6 @@ export default function BulkJobUploadModal({
                       const hasErrors = job.errors.length > 0;
                       const hasWarnings = job.warnings.length > 0;
                       const isExpanded = expandedRows.has(index);
-                      const mapping = clientMappings.find(
-                        (m) => m.subClient === job.sub_client,
-                      );
-                      const clientName = mapping
-                        ? clients.find((c) => c.id === mapping.clientId)?.name
-                        : job.sub_client;
 
                       return (
                         <div
@@ -633,17 +446,20 @@ export default function BulkJobUploadModal({
                                   <ChevronDown className="w-4 h-4 text-gray-500" />
                                 )}
                               </div>
-                              <div className="flex-1 grid grid-cols-6 gap-4 text-sm">
+                              <div className="flex-1 grid grid-cols-7 gap-4 text-sm">
                                 <div>
                                   <span className="font-medium">
                                     Job #
-                                    {isNaN(job.job_number)
+                                    {!job.job_number || job.job_number === ""
                                       ? "N/A"
                                       : job.job_number}
                                   </span>
                                 </div>
                                 <div className="text-gray-600">
-                                  {clientName || "-"}
+                                  {job.client || "-"}
+                                </div>
+                                <div className="text-gray-600">
+                                  {job.sub_client || "-"}
                                 </div>
                                 <div className="text-gray-600">
                                   {isNaN(job.quantity)
@@ -737,12 +553,8 @@ export default function BulkJobUploadModal({
                                         Job Number *
                                       </label>
                                       <input
-                                        type="number"
-                                        value={
-                                          isNaN(job.job_number)
-                                            ? ""
-                                            : job.job_number
-                                        }
+                                        type="text"
+                                        value={job.job_number || ""}
                                         onChange={(e) =>
                                           handleEditJob(
                                             index,
@@ -768,6 +580,23 @@ export default function BulkJobUploadModal({
                                           handleEditJob(
                                             index,
                                             "quantity",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Client
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={job.client || ""}
+                                        onChange={(e) =>
+                                          handleEditJob(
+                                            index,
+                                            "client",
                                             e.target.value,
                                           )
                                         }
@@ -929,9 +758,7 @@ export default function BulkJobUploadModal({
 
               <div className="flex justify-end gap-3">
                 <button
-                  onClick={() =>
-                    setStep(subClients.length > 0 ? "mapping" : "upload")
-                  }
+                  onClick={() => setStep("upload")}
                   className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
                 >
                   Back
@@ -982,16 +809,59 @@ export default function BulkJobUploadModal({
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Upload Complete!
                 </h3>
-                <p className="text-sm text-gray-600">
-                  {uploadResults.success.length} job
-                  {uploadResults.success.length !== 1 ? "s" : ""} created
-                  successfully
+
+                {/* Summary Statistics */}
+                <div className="mt-4 bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold text-green-700">
+                      {uploadResults.success.length} job{uploadResults.success.length !== 1 ? "s" : ""}
+                    </span>
+                    {" "}created successfully
+                  </div>
+
                   {uploadResults.failures.length > 0 && (
-                    <>, {uploadResults.failures.length} failed</>
+                    <div className="text-sm text-gray-700">
+                      <span className="font-semibold text-red-700">
+                        {uploadResults.failures.length} job{uploadResults.failures.length !== 1 ? "s" : ""}
+                      </span>
+                      {" "}failed to upload
+                    </div>
                   )}
-                </p>
+
+                  {skippedRows.length > 0 && (
+                    <div className="text-sm text-gray-700">
+                      <span className="font-semibold text-orange-700">
+                        {skippedRows.length} row{skippedRows.length !== 1 ? "s" : ""}
+                      </span>
+                      {" "}skipped during parsing
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-gray-200 mt-2">
+                    <p className="text-xs text-gray-500">
+                      Total rows processed: {uploadResults.success.length + uploadResults.failures.length + skippedRows.length}
+                    </p>
+                  </div>
+                </div>
               </div>
 
+              {/* Skipped Rows Section */}
+              {skippedRows.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <p className="font-semibold text-orange-800 mb-2">
+                    Skipped Rows:
+                  </p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {skippedRows.map((skipped, index) => (
+                      <div key={index} className="text-sm text-orange-700">
+                        Row {skipped.row}: {skipped.reason}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Failed Jobs Section */}
               {uploadResults.failures.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <p className="font-semibold text-red-800 mb-2">

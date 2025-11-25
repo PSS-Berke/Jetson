@@ -66,7 +66,7 @@ export default function JobDetailsModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
-  const [deletedJobNumber, setDeletedJobNumber] = useState<number | null>(null);
+  const [deletedJobNumber, setDeletedJobNumber] = useState<string | null>(null);
 
   // State for edit mode
   const [submitting, setSubmitting] = useState(false);
@@ -155,8 +155,8 @@ export default function JobDetailsModal({
 
       const clientId = job.client?.id || null;
       const clientName = job.client?.name || "";
-      const subClientId = job.sub_client?.id || null;
-      const subClientName = job.sub_client?.name || "";
+      const subClientId = null; // sub_client is now just a string, not an object with an id
+      const subClientName = job.sub_client || "";
 
       let weeklySplit: number[] = [];
       let lockedWeeks: boolean[] = [];
@@ -646,7 +646,7 @@ export default function JobDetailsModal({
 
       const payload: Partial<{
         jobs_id: number;
-        job_number: number;
+        job_number: string;
         service_type: string;
         quantity: number;
         description: string;
@@ -670,7 +670,7 @@ export default function JobDetailsModal({
         confirmed: boolean;
       }> = {
         jobs_id: job.id,
-        job_number: parseInt(formData.job_number),
+        job_number: formData.job_number,
         service_type: formData.service_type,
         quantity: quantity,
         description: formData.description,
@@ -858,7 +858,7 @@ export default function JobDetailsModal({
                     Sub Client
                   </label>
                   <p className="text-base text-[var(--text-dark)]">
-                    {job.sub_client.name}
+                    {job.sub_client}
                   </p>
                 </div>
               )}

@@ -86,14 +86,36 @@ const apiFetch = async <T = unknown>(
     let errorText: string = "";
     try {
       errorText = await response.text();
-      console.log("[apiFetch] Raw error response:", errorText);
+      console.log("[apiFetch] Raw error response:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText,
+        endpoint: endpoint,
+      });
       try {
         error = JSON.parse(errorText);
+        // If error is an empty object or has no useful info, add status info
+        if (Object.keys(error).length === 0 || (!error.message && !error.error && !error.detail)) {
+          error = {
+            message: `HTTP ${response.status}: ${response.statusText}`,
+            status: response.status,
+            statusText: response.statusText,
+            rawResponse: errorText,
+          };
+        }
       } catch {
-        error = { message: errorText || "Request failed" };
+        error = {
+          message: errorText || `HTTP ${response.status}: ${response.statusText}`,
+          status: response.status,
+          statusText: response.statusText,
+        };
       }
     } catch {
-      error = { message: "Request failed" };
+      error = {
+        message: `HTTP ${response.status}: ${response.statusText}`,
+        status: response.status,
+        statusText: response.statusText,
+      };
     }
 
     // Suppress error logging for endpoints that may not be configured yet
@@ -122,11 +144,11 @@ const apiFetch = async <T = unknown>(
         status: response.status,
         statusText: response.statusText,
         error,
+        errorMessage: error.message || error.error || error.detail || 'No error message',
         errorString: JSON.stringify(error, null, 2),
-        requestBody: options.body,
-        requestBodyParsed: options.body
-          ? JSON.parse(options.body as string)
-          : null,
+        rawErrorText: errorText,
+        requestBody: options.body || 'No request body',
+        requestMethod: options.method || 'GET',
       });
     }
 
@@ -237,6 +259,13 @@ export interface JobNote {
   color?: string;
   email?: string;
   name?: string;
+
+  // Cell-level note fields (optional for backward compatibility)
+  is_cell_note?: boolean;
+  cell_job_id?: number;
+  cell_period_key?: string;        // e.g., "weekly:1693008000:1693612800"
+  cell_period_label?: string;      // e.g., "8/25", "Nov '24"
+  cell_granularity?: "weekly" | "monthly" | "quarterly";
 }
 
 // Get all job notes
@@ -253,7 +282,15 @@ export const getJobNotes = async (): Promise<JobNote[]> => {
 
 // Create job note
 export const createJobNote = async (
-  jobNote: { jobs_id: number[]; notes: string },
+  jobNote: {
+    jobs_id: number[];
+    notes: string;
+    is_cell_note?: boolean;
+    cell_job_id?: number;
+    cell_period_key?: string;
+    cell_period_label?: string;
+    cell_granularity?: "weekly" | "monthly" | "quarterly";
+  },
 ): Promise<JobNote> => {
   const data = await apiFetch<JobNote>(
     "/job_notes",
@@ -269,7 +306,15 @@ export const createJobNote = async (
 // Update job note
 export const updateJobNote = async (
   jobNoteId: number,
-  jobNote: { jobs_id: number[]; notes: string },
+  jobNote: {
+    jobs_id: number[];
+    notes: string;
+    is_cell_note?: boolean;
+    cell_job_id?: number;
+    cell_period_key?: string;
+    cell_period_label?: string;
+    cell_granularity?: "weekly" | "monthly" | "quarterly";
+  },
 ): Promise<JobNote> => {
   const data = await apiFetch<JobNote>(
     `/job_notes/${jobNoteId}`,
@@ -600,7 +645,6 @@ export const createMachine = async (
         hppress: "HP Press", // Added to handle hpPress key
         inkjet: "Inkjetter",
         affix: "Affixer",
-        sort: "Sorter",
       };
       type = typeMap[processTypeKey.toLowerCase()] || String((machineData as any).name);
       console.log(`[createMachine] Derived type "${type}" from process_type_key "${processTypeKey}"`);
@@ -744,7 +788,6 @@ export const createMachinesBulk = async (bulkData: {
       hppress: "HP Press",
       inkjet: "Inkjetter",
       affix: "Affixer",
-      sort: "Sorter",
     };
     type = typeMap[processTypeKey.toLowerCase()] || bulkData.name;
   } else {
@@ -963,8 +1006,16 @@ export const batchCreateJobs = async (
       chunk.map(async (job) => {
         try {
           console.log(
-            `[batchCreateJobs] Creating job with clients_id:`,
-            job.clients_id,
+            `[batchCreateJobs] Creating job:`,
+            {
+              job_number: job.job_number,
+              clients_id: job.clients_id,
+              facilities_id: job.facilities_id,
+              quantity: job.quantity,
+              start_date: job.start_date,
+              due_date: job.due_date,
+              fullJobData: job,
+            }
           );
           const createdJob = await apiFetch<Job>(
             "/jobs",
@@ -983,15 +1034,25 @@ export const batchCreateJobs = async (
           });
           return createdJob;
         } catch (error) {
+          console.error(`[batchCreateJobs] Failed to create job:`, {
+            jobNumber: job.job_number,
+            clientsId: job.clients_id,
+            facilitiesId: job.facilities_id,
+            jobData: JSON.stringify(job, null, 2),
+            error: error,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorDetails: JSON.stringify(error, null, 2),
+            errorStack: error instanceof Error ? error.stack : undefined,
+          });
           throw {
             job,
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: error instanceof Error ? error.message : String(error),
           };
         }
       }),
     );
 
-    chunkResults.forEach((result) => {
+    chunkResults.forEach((result, idx) => {
       if (result.status === "fulfilled") {
         success.push(result.value);
       } else {
@@ -999,6 +1060,11 @@ export const batchCreateJobs = async (
           job: Partial<Job>;
           error: string;
         };
+        console.log(`[batchCreateJobs] Job ${i + idx + 1} failed:`, {
+          jobNumber: failureData.job.job_number,
+          error: failureData.error,
+          reason: result.reason
+        });
         failures.push(failureData);
       }
     });

@@ -45,14 +45,6 @@ export interface InsertCapabilities extends BaseCapabilities {
 }
 
 /**
- * Sort machine capabilities
- */
-export interface SortCapabilities extends BaseCapabilities {
-  supported_sort_types?: string[];
-  supported_paper_sizes?: string[];
-}
-
-/**
  * Label/Apply machine capabilities
  */
 export interface LabelApplyCapabilities extends BaseCapabilities {
@@ -91,15 +83,34 @@ export interface HpPressCapabilities extends BaseCapabilities {
 }
 
 /**
+ * Ink Jet machine capabilities
+ */
+export interface InkJetCapabilities extends BaseCapabilities {
+  supported_print_types?: string[];
+  supported_paper_sizes?: string[];
+  supported_colors?: string[];
+}
+
+/**
+ * Labeling machine capabilities
+ */
+export interface LabelingCapabilities extends BaseCapabilities {
+  supported_label_sizes?: string[];
+  supported_paper_sizes?: string[];
+  supported_label_types?: string[];
+}
+
+/**
  * Union type of all process-specific capabilities
  */
 export type ProcessSpecificCapabilities =
   | InsertCapabilities
-  | SortCapabilities
   | LabelApplyCapabilities
   | FoldCapabilities
   | LaserCapabilities
-  | HpPressCapabilities;
+  | HpPressCapabilities
+  | InkJetCapabilities
+  | LabelingCapabilities;
 
 /**
  * Custom capability fields added via form builder
@@ -187,7 +198,7 @@ export interface MachineGroup {
 export interface Job {
   id: number;
   created_at: number;
-  job_number: number;
+  job_number: string;
   service_type: string;
   quantity: number;
   description: string;
@@ -206,7 +217,7 @@ export interface Job {
   ext_price: string;
   total_billing: string;
   client: string;
-  sub_client?: string;
+  sub_client?: string; // Sub-client name as a string (not an object)
   machines: string;
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
   weekly_split?: number[]; // Array of quantities per week (used in frontend forms)
@@ -407,3 +418,167 @@ export interface ProductionComparison {
   entry_ids: number[]; // Array of production entry IDs for this job in the period
   last_updated_at?: number; // Timestamp of most recent production entry for this job
 }
+
+// ============================================================================
+// Dynamic Field Filter Types
+// ============================================================================
+
+/**
+ * Operator types for dynamic field filtering
+ */
+export type DynamicFieldOperator =
+  | "equals"
+  | "not_equals"
+  | "in"
+  | "not_in"
+  | "contains"
+  | "not_contains"
+  | "greater_than"
+  | "less_than"
+  | "greater_than_or_equal"
+  | "less_than_or_equal"
+  | "between"
+  | "is_true"
+  | "is_false"
+  | "is_empty"
+  | "is_not_empty";
+
+/**
+ * Filter value types based on operator
+ */
+export type DynamicFieldFilterValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | { min: number; max: number }
+  | null;
+
+/**
+ * Field type from machine variables
+ */
+export type DynamicFieldType =
+  | "text"
+  | "number"
+  | "integer"
+  | "boolean"
+  | "select"
+  | "dropdown"
+  | "currency";
+
+/**
+ * Field definition from machine variables
+ */
+export interface DynamicFieldDefinition {
+  name: string; // Field key (e.g., "basic_oe", "paper_size")
+  label: string; // Display label (e.g., "Basic OE", "Paper Size")
+  type: DynamicFieldType;
+  options?: string[]; // Available options for dropdown/select fields
+  required?: boolean;
+  validation?: {
+    min?: number;
+    max?: number;
+    step?: number;
+  };
+}
+
+/**
+ * A single dynamic field filter configuration
+ */
+export interface DynamicFieldFilter {
+  id: string; // Unique ID for React keys
+  processType: string; // Normalized process type (e.g., "insert", "laser")
+  fieldName: string; // Field key to filter on
+  fieldLabel: string; // Display label for the field
+  fieldType: DynamicFieldType; // Type of the field
+  operator: DynamicFieldOperator; // How to compare values
+  value: DynamicFieldFilterValue; // The filter value
+  options?: string[]; // Available options for dropdown/select fields
+}
+
+// ============================================================================
+// Process Type Breakdown Types
+// ============================================================================
+
+/**
+ * Breakdown of a process type by a specific dynamic field value
+ * Used to show sub-rows under process type summaries
+ */
+export interface ProcessTypeBreakdown {
+  processType: string; // Normalized process type (e.g., "insert", "laser")
+  fieldName: string; // The field being grouped by (e.g., "paper_size", "basic_oe")
+  fieldValue: any; // The specific value for this breakdown row (e.g., "6x9", true)
+  fieldLabel: string; // Display label for the field value
+  quantities: { [timeRangeKey: string]: number }; // Quantities per time period
+  totalQuantity: number; // Sum of all quantities
+  jobCount: number; // Number of unique jobs in this breakdown
+  revenue?: number; // Optional: total revenue for this breakdown
+}
+
+// ============================================================================
+// Cell-Level Notes Types
+// ============================================================================
+
+/**
+ * Granularity of time periods for cell-level notes
+ */
+export type CellGranularity = "weekly" | "monthly" | "quarterly";
+
+/**
+ * Identifier for a specific cell in the projections table
+ * Used to attach notes to specific time period cells rather than entire jobs
+ */
+export interface CellIdentifier {
+  jobId: number;
+  periodLabel: string; // Human-readable label (e.g., "8/25", "Nov '24", "Q4 '24")
+  periodStart: number; // Unix timestamp for period start
+  periodEnd: number; // Unix timestamp for period end
+  granularity: CellGranularity; // Time period granularity
+}
+
+/**
+ * Generate a unique key for a cell identifier
+ * Format: "{jobId}:{granularity}:{periodStart}:{periodEnd}"
+ */
+export const getCellKey = (cellId: CellIdentifier): string => {
+  return `${cellId.jobId}:${cellId.granularity}:${cellId.periodStart}:${cellId.periodEnd}`;
+};
+
+/**
+ * Generate the period key component for API storage
+ * Format: "{granularity}:{periodStart}:{periodEnd}"
+ */
+export const getPeriodKey = (cellId: CellIdentifier): string => {
+  return `${cellId.granularity}:${cellId.periodStart}:${cellId.periodEnd}`;
+};
+
+/**
+ * Parse a cell key back into its components
+ */
+export const parseCellKey = (cellKey: string): CellIdentifier | null => {
+  const parts = cellKey.split(":");
+  if (parts.length !== 4) return null;
+
+  const [jobIdStr, granularity, periodStartStr, periodEndStr] = parts;
+  const jobId = parseInt(jobIdStr, 10);
+  const periodStart = parseInt(periodStartStr, 10);
+  const periodEnd = parseInt(periodEndStr, 10);
+
+  if (
+    isNaN(jobId) ||
+    isNaN(periodStart) ||
+    isNaN(periodEnd) ||
+    !["weekly", "monthly", "quarterly"].includes(granularity)
+  ) {
+    return null;
+  }
+
+  return {
+    jobId,
+    periodLabel: "", // Not stored in key
+    periodStart,
+    periodEnd,
+    granularity: granularity as CellGranularity,
+  };
+};

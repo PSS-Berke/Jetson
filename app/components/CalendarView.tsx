@@ -99,10 +99,16 @@ const MemoizedDateHeader = memo(
             color: getProcessTypeColor("inkjet"),
           },
           {
-            key: "labelApply",
-            label: "Label/Apply",
-            count: summary.processTypeCounts.labelApply,
-            color: getProcessTypeColor("labelApply"),
+            key: "labeling",
+            label: "Labeling",
+            count: summary.processTypeCounts.labeling,
+            color: getProcessTypeColor("labeling"),
+          },
+          {
+            key: "affix",
+            label: "Affix with Glue",
+            count: summary.processTypeCounts.affix,
+            color: getProcessTypeColor("affix"),
           },
           {
             key: "fold",
@@ -462,10 +468,17 @@ export default function CalendarView({
             )
               return true;
             if (
-              processType === "labelApply" &&
+              processType === "labeling" &&
               (normalized === "label/apply" ||
                 normalized === "l/a" ||
-                normalized === "label/affix")
+                normalized === "labeling")
+            )
+              return true;
+            if (
+              processType === "affix" &&
+              (normalized === "affix" ||
+                normalized === "affix glue+" ||
+                normalized === "affix label+")
             )
               return true;
             if (processType === "fold" && normalized === "fold") return true;

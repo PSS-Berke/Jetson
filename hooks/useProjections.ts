@@ -23,6 +23,7 @@ import { aggregateProductionByJob } from "@/lib/productionUtils";
 import type { Granularity } from "@/app/components/GranularityToggle";
 import type { ProductionEntry } from "@/types";
 import { normalizeProcessType } from "@/lib/processTypeConfig";
+import { applyDynamicFieldFilters } from "@/lib/dynamicFieldFilters";
 
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
@@ -88,6 +89,8 @@ export interface ProjectionFilters {
   filterMode?: "and" | "or";
   showOnlyInDateRange?: boolean;
   groupByFacility?: boolean;
+  dynamicFieldFilters?: import("@/types").DynamicFieldFilter[];
+  dynamicFieldFilterLogic?: "and" | "or";
 }
 
 // Helper function to count process types from job projections
@@ -345,6 +348,8 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     const hasSearchFilter = filters.searchQuery.trim().length > 0;
     const hasScheduleFilter =
       filters.scheduleFilter && filters.scheduleFilter !== "all";
+    const hasDynamicFieldFilter =
+      filters.dynamicFieldFilters && filters.dynamicFieldFilters.length > 0;
     const filterMode = filters.filterMode || "and";
 
     if (filterMode === "or") {
@@ -353,7 +358,8 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           !hasClientFilter &&
           !hasServiceTypeFilter &&
           !hasSearchFilter &&
-          !hasScheduleFilter
+          !hasScheduleFilter &&
+          !hasDynamicFieldFilter
         ) {
           return true;
         }
@@ -364,11 +370,25 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           hasServiceTypeFilter &&
           p.job.requirements &&
           p.job.requirements.length > 0 &&
-          p.job.requirements.some(
-            (req) =>
-              req.process_type &&
-              filters.serviceTypes.includes(req.process_type),
-          );
+          p.job.requirements.some((req) => {
+            if (!req.process_type) return false;
+            // Normalize the process type and check against selected labels
+            const normalized = normalizeProcessType(req.process_type);
+            // Map selected labels to their keys for comparison
+            const labelToKeyMap: Record<string, string> = {
+              "Data": "data",
+              "HP": "hp",
+              "Laser": "laser",
+              "Fold": "fold",
+              "Affix with Glue": "affix",
+              "Insert": "insert",
+              "Ink Jet": "inkjet",
+              "Labeling": "labeling",
+            };
+            return filters.serviceTypes.some(
+              (label) => (labelToKeyMap[label] || label.toLowerCase()) === normalized
+            );
+          });
         const matchesSearch =
           hasSearchFilter &&
           (() => {
@@ -389,12 +409,20 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
               ? isConfirmed
               : !isConfirmed;
           })();
+        const matchesDynamicFields =
+          hasDynamicFieldFilter &&
+          applyDynamicFieldFilters(
+            p.job,
+            filters.dynamicFieldFilters!,
+            filters.dynamicFieldFilterLogic || "and",
+          );
 
         return (
           matchesClient ||
           matchesServiceType ||
           matchesSearch ||
-          matchesSchedule
+          matchesSchedule ||
+          matchesDynamicFields
         );
       });
     } else {
@@ -409,11 +437,25 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       if (hasServiceTypeFilter) {
         result = result.filter((p) => {
           if (p.job.requirements && p.job.requirements.length > 0) {
-            return p.job.requirements.some(
-              (req) =>
-                req.process_type &&
-                filters.serviceTypes.includes(req.process_type),
-            );
+            return p.job.requirements.some((req) => {
+              if (!req.process_type) return false;
+              // Normalize the process type and check against selected labels
+              const normalized = normalizeProcessType(req.process_type);
+              // Map selected labels to their keys for comparison
+              const labelToKeyMap: Record<string, string> = {
+                "Data": "data",
+                "HP": "hp",
+                "Laser": "laser",
+                "Fold": "fold",
+                "Affix with Glue": "affix",
+                "Insert": "insert",
+                "Ink Jet": "inkjet",
+                "Labeling": "labeling",
+              };
+              return filters.serviceTypes.some(
+                (label) => (labelToKeyMap[label] || label.toLowerCase()) === normalized
+              );
+            });
           }
           return false;
         });
@@ -442,6 +484,16 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           }
           return true;
         });
+      }
+
+      if (hasDynamicFieldFilter) {
+        result = result.filter((p) =>
+          applyDynamicFieldFilters(
+            p.job,
+            filters.dynamicFieldFilters!,
+            filters.dynamicFieldFilterLogic || "and",
+          ),
+        );
       }
 
       return result;

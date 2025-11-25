@@ -68,6 +68,27 @@ export default function ProcessTypeSelector({
         setLoadingCounts(true);
         const allVariables = await getAllMachineVariables();
 
+        // Allowed core process types
+        const ALLOWED_CORE_TYPES = ['data', 'hp', 'laser', 'fold', 'affix', 'insert', 'inkjet', 'labeling'];
+
+        // Deprecated process types to filter out
+        const deprecatedTypes = [
+          "insert9to12",
+          "9-12 in+",
+          "insert13plus",
+          "13+ in+",
+          "sort",
+          "hp press",
+          "hp-press",
+          "label/apply",
+          "labelapply",
+          "affix glue+",
+          "affix label+",
+          "ink jet+",
+          "inkjet+",
+          "insert+",
+        ];
+
         // Group by type and count variables, collect ALL process types from API
         const counts: Record<string, number> = {};
         const apiTypes: Array<{ key: string; label: string; color: string }> =
@@ -77,6 +98,29 @@ export default function ProcessTypeSelector({
 
         allVariables.forEach((group: MachineVariableGroup) => {
           if (group.type) {
+            // Skip deprecated process types
+            const normalizedType = group.type.toLowerCase().trim();
+            if (deprecatedTypes.some(dep => dep.toLowerCase() === normalizedType)) {
+              console.log(`[ProcessTypeSelector] Filtering out deprecated process type: ${group.type}`);
+              return;
+            }
+
+            // Check if it's in the config (core type)
+            const configMatch = PROCESS_TYPE_CONFIGS.find(
+              (c) => c.key === group.type,
+            );
+
+            // Only include if:
+            // 1. It's an allowed core type, OR
+            // 2. It's a custom type (not in PROCESS_TYPE_CONFIGS)
+            const isAllowedCoreType = ALLOWED_CORE_TYPES.includes(normalizedType);
+            const isCustomType = !configMatch;
+
+            if (!isAllowedCoreType && !isCustomType) {
+              console.log(`[ProcessTypeSelector] Filtering out non-allowed process type: ${group.type}`);
+              return;
+            }
+
             // Store the ID mapping
             if (group.id) {
               idMap[group.type] = group.id;
@@ -94,10 +138,6 @@ export default function ProcessTypeSelector({
 
             // Add all process types from API (check if we already added it)
             if (!apiTypes.find((t) => t.key === group.type)) {
-              // Check if it exists in config for label/color, otherwise use defaults
-              const configMatch = PROCESS_TYPE_CONFIGS.find(
-                (c) => c.key === group.type,
-              );
               apiTypes.push({
                 key: group.type,
                 label:
@@ -105,6 +145,24 @@ export default function ProcessTypeSelector({
                   group.type.charAt(0).toUpperCase() + group.type.slice(1),
                 color: configMatch?.color || "#6B7280",
               });
+            }
+          }
+        });
+
+        // Ensure all allowed core process types are shown, even if not in the database yet
+        ALLOWED_CORE_TYPES.forEach((coreType) => {
+          if (!apiTypes.find((t) => t.key === coreType)) {
+            const configMatch = PROCESS_TYPE_CONFIGS.find((c) => c.key === coreType);
+            if (configMatch) {
+              apiTypes.push({
+                key: configMatch.key,
+                label: configMatch.label,
+                color: configMatch.color,
+              });
+              // Set count to 0 if not in database
+              if (counts[coreType] === undefined) {
+                counts[coreType] = 0;
+              }
             }
           }
         });

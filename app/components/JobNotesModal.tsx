@@ -1,14 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Edit2, Save } from "lucide-react";
+import { X, Plus, Trash2, Edit2, Save, Calendar, Unlock, RotateCcw } from "lucide-react";
 import {
   getJobNotes,
   createJobNote,
   updateJobNote,
   type JobNote,
+  getJobs,
+  updateJob,
+  type Job,
 } from "@/lib/api";
 import { useUser } from "@/hooks/useUser";
+import {
+  type CellGranularity,
+  type Period,
+  convertWeeklyToGranularity,
+  convertGranularityToWeekly,
+  redistributeQuantity,
+  resetToEvenDistribution,
+} from "@/lib/granularityConversion";
 
 interface JobNotesModalProps {
   isOpen: boolean;
@@ -25,36 +36,113 @@ export default function JobNotesModal({
 }: JobNotesModalProps) {
   const { user } = useUser();
   const [notes, setNotes] = useState<JobNote[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
 
+  // Weekly split state - Map of jobId to weekly split and locked weeks
+  const [editedWeeklySplits, setEditedWeeklySplits] = useState<Map<number, number[]>>(new Map());
+  const [editedLockedWeeks, setEditedLockedWeeks] = useState<Map<number, boolean[]>>(new Map());
+  const [pendingRedistribution, setPendingRedistribution] = useState<{
+    jobId: number;
+    periodIndex: number;
+    newValue: number;
+  } | null>(null);
+  const [showBackwardWarning, setShowBackwardWarning] = useState(false);
+
+  // Granularity state
+  const [selectedGranularity, setSelectedGranularity] = useState<CellGranularity>("weekly");
+  const [displayPeriods, setDisplayPeriods] = useState<Map<number, Period[]>>(new Map());
+
   // Get user's notes color or default
   const notesColor = user?.notes_color || "#000000";
 
-  // Load existing notes for selected jobs
+  // Load existing notes and jobs for selected jobs
   useEffect(() => {
     if (isOpen && selectedJobIds.length > 0) {
-      loadNotes();
+      loadData();
     }
   }, [isOpen, selectedJobIds]);
 
-  const loadNotes = async () => {
+  // Initialize display periods when jobs load or granularity changes
+  useEffect(() => {
+    if (jobs.length === 0) return;
+
+    const newDisplayPeriods = new Map<number, Period[]>();
+    jobs.forEach((job) => {
+      const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
+      const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
+
+      if (weeklySplit.length > 0) {
+        const periods = convertWeeklyToGranularity(
+          weeklySplit,
+          lockedWeeks,
+          job.start_date,
+          job.due_date,
+          selectedGranularity
+        );
+        newDisplayPeriods.set(job.id, periods);
+      }
+    });
+
+    setDisplayPeriods(newDisplayPeriods);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, selectedGranularity]); // jobs includes the full array, will trigger when loadData completes
+
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const allNotes = await getJobNotes();
+      // Load notes and jobs in parallel
+      const [allNotes, allJobs] = await Promise.all([
+        getJobNotes(),
+        getJobs(),
+      ]);
+
       // Filter notes that include any of the selected job IDs
+      const relevantNotes = allNotes.filter((note) =>
+        note.jobs_id.some((jobId) => selectedJobIds.includes(jobId)),
+      );
+      setNotes(relevantNotes);
+
+      // Filter jobs that match selected IDs
+      const selectedJobs = allJobs.filter((job) =>
+        selectedJobIds.includes(job.id)
+      );
+      setJobs(selectedJobs);
+
+      // Initialize weekly split state from jobs (useEffect will handle displayPeriods)
+      const newWeeklySplits = new Map<number, number[]>();
+      const newLockedWeeks = new Map<number, boolean[]>();
+
+      selectedJobs.forEach((job) => {
+        if (job.weekly_split && job.weekly_split.length > 0) {
+          newWeeklySplits.set(job.id, [...job.weekly_split]);
+          newLockedWeeks.set(job.id, job.locked_weeks ? [...job.locked_weeks] : []);
+        }
+      });
+
+      setEditedWeeklySplits(newWeeklySplits);
+      setEditedLockedWeeks(newLockedWeeks);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      alert("Failed to load data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadNotes = async () => {
+    try {
+      const allNotes = await getJobNotes();
       const relevantNotes = allNotes.filter((note) =>
         note.jobs_id.some((jobId) => selectedJobIds.includes(jobId)),
       );
       setNotes(relevantNotes);
     } catch (error) {
       console.error("Failed to load notes:", error);
-      alert("Failed to load notes. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -178,16 +266,183 @@ export default function JobNotesModal({
     }
   };
 
+  // Granularity change handler
+  const handleGranularityChange = (newGranularity: CellGranularity) => {
+    setSelectedGranularity(newGranularity);
+
+    // Convert all jobs to new granularity
+    const newDisplayPeriods = new Map<number, Period[]>();
+    jobs.forEach((job) => {
+      const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
+      const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
+
+      if (weeklySplit.length > 0) {
+        const periods = convertWeeklyToGranularity(
+          weeklySplit,
+          lockedWeeks,
+          job.start_date,
+          job.due_date,
+          newGranularity
+        );
+        newDisplayPeriods.set(job.id, periods);
+      }
+    });
+    setDisplayPeriods(newDisplayPeriods);
+  };
+
+  // Period split handlers
+  const handlePeriodChange = (jobId: number, periodIndex: number, value: string) => {
+    const cleanedValue = value.replace(/,/g, "");
+    const newValue = parseInt(cleanedValue) || 0;
+    performRedistribution(jobId, periodIndex, newValue, false);
+  };
+
+  const performRedistribution = (
+    jobId: number,
+    periodIndex: number,
+    newValue: number,
+    allowBackward: boolean
+  ) => {
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+
+    const currentPeriods = displayPeriods.get(jobId) || [];
+    if (currentPeriods.length === 0) return;
+
+    // Check if redistribution would need to go backward
+    const unlockedPeriodsAfter = currentPeriods
+      .map((_, idx) => idx)
+      .filter((idx) => idx > periodIndex && !currentPeriods[idx].isLocked);
+
+    if (unlockedPeriodsAfter.length === 0 && !allowBackward) {
+      setPendingRedistribution({ jobId, periodIndex, newValue });
+      setShowBackwardWarning(true);
+      return;
+    }
+
+    const newPeriods = redistributeQuantity(
+      currentPeriods,
+      periodIndex,
+      newValue,
+      job.quantity,
+      allowBackward
+    );
+
+    setDisplayPeriods(new Map(displayPeriods.set(jobId, newPeriods)));
+
+    // Convert back to weekly_split for storage
+    const { weekly_split, locked_weeks } = convertGranularityToWeekly(
+      newPeriods,
+      job.start_date,
+      job.due_date,
+      selectedGranularity,
+      job.quantity
+    );
+
+    setEditedWeeklySplits(new Map(editedWeeklySplits.set(jobId, weekly_split)));
+    setEditedLockedWeeks(new Map(editedLockedWeeks.set(jobId, locked_weeks)));
+  };
+
+  const handleBackwardRedistributeConfirm = () => {
+    if (pendingRedistribution) {
+      performRedistribution(
+        pendingRedistribution.jobId,
+        pendingRedistribution.periodIndex,
+        pendingRedistribution.newValue,
+        true
+      );
+      setPendingRedistribution(null);
+    }
+    setShowBackwardWarning(false);
+  };
+
+  const handleBackwardRedistributeCancel = () => {
+    setPendingRedistribution(null);
+    setShowBackwardWarning(false);
+  };
+
+  const handleUnlockPeriod = (jobId: number, periodIndex: number) => {
+    const currentPeriods = displayPeriods.get(jobId) || [];
+    const newPeriods = [...currentPeriods];
+    newPeriods[periodIndex] = { ...newPeriods[periodIndex], isLocked: false };
+    setDisplayPeriods(new Map(displayPeriods.set(jobId, newPeriods)));
+
+    // Also update weekly locks if in weekly mode
+    if (selectedGranularity === "weekly") {
+      const currentLocked = editedLockedWeeks.get(jobId) || [];
+      const newLockedWeeks = [...currentLocked];
+      newLockedWeeks[periodIndex] = false;
+      setEditedLockedWeeks(new Map(editedLockedWeeks.set(jobId, newLockedWeeks)));
+    }
+  };
+
+  const handleResetToEvenDistribution = (jobId: number) => {
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+
+    const currentPeriods = displayPeriods.get(jobId) || [];
+    const { quantities, locks } = resetToEvenDistribution(
+      currentPeriods.length,
+      job.quantity
+    );
+
+    const newPeriods = currentPeriods.map((period, idx) => ({
+      ...period,
+      quantity: quantities[idx],
+      isLocked: locks[idx],
+    }));
+
+    setDisplayPeriods(new Map(displayPeriods.set(jobId, newPeriods)));
+
+    // Convert back to weekly_split
+    const { weekly_split, locked_weeks } = convertGranularityToWeekly(
+      newPeriods,
+      job.start_date,
+      job.due_date,
+      selectedGranularity,
+      job.quantity
+    );
+
+    setEditedWeeklySplits(new Map(editedWeeklySplits.set(jobId, weekly_split)));
+    setEditedLockedWeeks(new Map(editedLockedWeeks.set(jobId, locked_weeks)));
+  };
+
+  const handleSaveWeeklySplits = async () => {
+    setIsSaving(true);
+    try {
+      const updates = jobs.map(async (job) => {
+        const weeklySplit = editedWeeklySplits.get(job.id);
+        const lockedWeeks = editedLockedWeeks.get(job.id);
+
+        if (weeklySplit) {
+          await updateJob(job.id, {
+            weekly_split: weeklySplit,
+            locked_weeks: lockedWeeks || [],
+          });
+        }
+      });
+
+      await Promise.all(updates);
+      alert("Weekly projections saved successfully!");
+      onSuccess?.();
+    } catch (error) {
+      console.error("Failed to save weekly splits:", error);
+      alert("Failed to save weekly projections. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col relative z-10">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-[var(--dark-blue)]">
-            Job Notes ({selectedJobIds.length} job{selectedJobIds.length > 1 ? "s" : ""})
+            Job Notes & Projections ({selectedJobIds.length} job{selectedJobIds.length > 1 ? "s" : ""})
           </h2>
           <button
             onClick={onClose}
@@ -202,7 +457,7 @@ export default function JobNotesModal({
           {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary-blue)] mx-auto"></div>
-              <p className="mt-4 text-[var(--text-light)]">Loading notes...</p>
+              <p className="mt-4 text-[var(--text-light)]">Loading data...</p>
             </div>
           ) : (
             <>
@@ -306,6 +561,207 @@ export default function JobNotesModal({
                 )}
               </div>
 
+              {/* Projections Section */}
+              {jobs.length > 0 && (
+                <div className="border-t border-gray-200 pt-6 mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-[var(--primary-blue)]" />
+                      <h3 className="text-lg font-semibold text-[var(--dark-blue)]">
+                        Quantity Projections
+                      </h3>
+                    </div>
+                    {/* Granularity Selector */}
+                    <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                      {(["daily", "weekly", "monthly", "quarterly"] as CellGranularity[]).map((gran) => (
+                        <button
+                          key={gran}
+                          onClick={() => handleGranularityChange(gran)}
+                          disabled={isSaving}
+                          className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                            selectedGranularity === gran
+                              ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                              : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                          } disabled:opacity-50 disabled:cursor-not-allowed capitalize`}
+                        >
+                          {gran}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    {jobs.map((job) => {
+                      const periods = displayPeriods.get(job.id) || [];
+                      const currentTotal = periods.reduce((sum, p) => sum + p.quantity, 0);
+                      const totalMismatch = currentTotal !== job.quantity;
+
+                      // Don't render if periods haven't loaded yet
+                      if (periods.length === 0) {
+                        return null;
+                      }
+
+                      return (
+                        <div key={job.id} className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
+                          {/* Job Header */}
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <h3 className="text-sm font-medium text-[var(--text-dark)]">
+                                Job #{job.job_number} - {job.job_name}
+                              </h3>
+                              <p className="text-xs text-[var(--text-light)] mt-1">
+                                Total: {job.quantity.toLocaleString()} | Current: {currentTotal.toLocaleString()}
+                                {totalMismatch && (
+                                  <span className="text-red-600 ml-2 font-medium">
+                                    (Difference: {(currentTotal - job.quantity).toLocaleString()})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleResetToEvenDistribution(job.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-white transition-colors"
+                              title="Reset to even distribution"
+                              disabled={isSaving}
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Reset
+                            </button>
+                          </div>
+
+                          {/* Period Split Grid */}
+                          <div className={`grid gap-3 mb-4 ${
+                            selectedGranularity === "daily"
+                              ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-7"
+                              : selectedGranularity === "weekly"
+                              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+                              : selectedGranularity === "monthly"
+                              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                              : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                          }`}>
+                            {periods.map((period, periodIndex) => {
+                              const isLocked = period.isLocked || false;
+
+                              return (
+                                <div
+                                  key={periodIndex}
+                                  className={`relative border rounded-lg p-2 ${
+                                    isLocked ? "bg-blue-50 border-blue-300" : "bg-white border-gray-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-medium text-[var(--text-dark)]">
+                                      {period.label}
+                                    </span>
+                                    {isLocked && (
+                                      <button
+                                        onClick={() => handleUnlockPeriod(job.id, periodIndex)}
+                                        className="p-0.5 text-blue-600 hover:text-blue-800 transition-opacity hover:opacity-70"
+                                        title="Unlock this period to allow auto-redistribution"
+                                        disabled={isSaving}
+                                      >
+                                        <Unlock className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={period.quantity.toLocaleString()}
+                                      onChange={(e) => handlePeriodChange(job.id, periodIndex, e.target.value)}
+                                      disabled={isSaving}
+                                      className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                                        isLocked
+                                          ? "bg-blue-50 border-blue-300 font-semibold pr-7"
+                                          : "border-gray-300"
+                                      }`}
+                                      title={
+                                        isLocked
+                                          ? "This period is locked and won't be auto-adjusted"
+                                          : "Edit to lock this period"
+                                      }
+                                    />
+                                    {isLocked && (
+                                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <svg
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="#2563eb"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-[var(--text-light)] mt-1">
+                                    {job.quantity > 0 ? ((period.quantity / job.quantity) * 100).toFixed(1) : 0}%
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Visual Progress Bar */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs text-[var(--text-light)]">
+                              <Calendar className="w-3 h-3" />
+                              <span>Distribution Timeline</span>
+                            </div>
+                            <div className="flex h-6 rounded-lg overflow-hidden bg-gray-200">
+                              {periods.map((period, idx) => {
+                                const percentage = job.quantity > 0 ? (period.quantity / job.quantity) * 100 : 0;
+                                if (percentage === 0) return null;
+
+                                const isLocked = period.isLocked || false;
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{ width: `${percentage}%` }}
+                                    className={`flex items-center justify-center text-xs text-white font-medium ${
+                                      isLocked ? "bg-blue-500" : "bg-[var(--primary-blue)]"
+                                    }`}
+                                    title={`${period.label}: ${period.quantity.toLocaleString()} (${percentage.toFixed(1)}%)`}
+                                  >
+                                    {percentage > 8 && period.label}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Save Button for Projections */}
+                    <div className="flex justify-end pt-4 border-t border-gray-200">
+                      <button
+                        onClick={handleSaveWeeklySplits}
+                        disabled={isSaving}
+                        className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-[var(--dark-blue)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            <span>Save Quantity Projections</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Add New Note */}
               <div className="border-t border-gray-200 pt-6">
                 <label className="block text-sm font-medium text-[var(--text-dark)] mb-2">
@@ -358,6 +814,35 @@ export default function JobNotesModal({
           </button>
         </div>
       </div>
+
+      {/* Backward Redistribution Warning Dialog */}
+      {showBackwardWarning && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="absolute inset-0 bg-black/30" onClick={handleBackwardRedistributeCancel} />
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative z-10">
+            <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-3">
+              Redistribute Past Weeks?
+            </h3>
+            <p className="text-sm text-[var(--text-dark)] mb-4">
+              No unlocked weeks available after this week. Do you want to redistribute the difference across past weeks?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={handleBackwardRedistributeCancel}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-[var(--text-dark)] hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBackwardRedistributeConfirm}
+                className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg hover:bg-[var(--dark-blue)] transition-colors"
+              >
+                Redistribute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

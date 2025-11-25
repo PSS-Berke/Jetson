@@ -140,7 +140,7 @@ const RevenueTableRow = memo(
           {job.client?.name || "Unknown"}
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-          {job.sub_client?.name || "-"}
+          {job.sub_client || "-"}
         </td>
         <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
           <div className="flex flex-wrap gap-1">
@@ -437,7 +437,7 @@ const ProcessRevenueTableRow = memo(
               {job.client?.name || "Unknown"}
             </td>
             <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-              {job.sub_client?.name || "-"}
+              {job.sub_client || "-"}
             </td>
           </>
         ) : (
@@ -1385,10 +1385,10 @@ export default function RevenueProjectionsTable({
             if (compareValue !== 0) {
               return sortDirection === "asc" ? compareValue : -compareValue;
             }
-            return a.jobNumber - b.jobNumber;
+            return a.jobNumber.localeCompare(b.jobNumber);
 
           case "job_number":
-            compareValue = a.jobNumber - b.jobNumber;
+            compareValue = a.jobNumber.localeCompare(b.jobNumber);
             if (compareValue !== 0) {
               return sortDirection === "asc" ? compareValue : -compareValue;
             }
@@ -1400,7 +1400,7 @@ export default function RevenueProjectionsTable({
             break;
 
           default:
-            compareValue = a.jobNumber - b.jobNumber;
+            compareValue = a.jobNumber.localeCompare(b.jobNumber);
             if (compareValue !== 0) return compareValue;
             return a.processType.localeCompare(b.processType);
         }
@@ -1430,8 +1430,8 @@ export default function RevenueProjectionsTable({
           bValue = bJob.job.client?.name?.toLowerCase() || "";
           break;
         case "sub_client":
-          aValue = aJob.job.sub_client?.name?.toLowerCase() || "";
-          bValue = bJob.job.sub_client?.name?.toLowerCase() || "";
+          aValue = aJob.job.sub_client?.toLowerCase() || "";
+          bValue = bJob.job.sub_client?.toLowerCase() || "";
           break;
         case "description":
           aValue = aJob.job.description?.toLowerCase() || "";

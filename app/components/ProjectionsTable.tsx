@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, memo, useMemo, useEffect, useRef } from "react";
+import React, { useState, memo, useMemo, useEffect, useRef } from "react";
 import { ParsedJob } from "@/hooks/useJobs";
 import { JobProjection, ServiceTypeSummary, ProcessTypeSummary, ProcessTypeFacilitySummary } from "@/hooks/useProjections";
 import {
@@ -8,12 +8,18 @@ import {
   TimeRange,
   ProcessProjection,
   expandJobProjectionsToProcesses,
+  calculateProcessTypeBreakdownByField,
 } from "@/lib/projectionUtils";
 import JobDetailsModal from "./JobDetailsModal";
 import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
+import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
+import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
 import { Trash, Lock, Unlock, ChevronDown, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
-import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote } from "@/lib/api";
+import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
+import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
+import type { CellIdentifier } from "@/types";
+import { useCellNotes } from "@/hooks/useCellNotes";
 
 type SortField =
   | "job_number"
@@ -43,6 +49,8 @@ interface ProjectionsTableProps {
   showExpandedProcesses?: boolean;
   showNotes?: boolean;
   onShowNotesChange?: (show: boolean) => void;
+  granularity?: "weekly" | "monthly" | "quarterly"; // NEW: for cell-level notes
+  fullFilteredProjections?: JobProjection[]; // NEW: Full filtered data for breakdown calculations
 }
 
 // Type guard to check if summary has facility information
@@ -71,6 +79,8 @@ const ProjectionTableRow = memo(
     onTextChange,
     isSavingNote,
     onOpenNotesModal,
+    granularity,
+    cellNotesMap,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -87,10 +97,25 @@ const ProjectionTableRow = memo(
     onSaveEdit?: (noteId: number) => void;
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
-    onOpenNotesModal?: (jobId: number) => void;
+    onOpenNotesModal?: (cellId: CellIdentifier) => void;
+    granularity?: "weekly" | "monthly" | "quarterly";
+    cellNotesMap?: Map<string, JobNote[]>;
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
+
+    // Helper to get cell key
+    const getCellKeyForRange = (range: TimeRange): string => {
+      return `${job.id}:${granularity || "weekly"}:${range.startDate.getTime()}:${range.endDate.getTime()}`;
+    };
+
+    // Helper to check if a cell has notes
+    const cellHasNotesForRange = (range: TimeRange): boolean => {
+      if (!cellNotesMap) return false;
+      const cellKey = getCellKeyForRange(range);
+      const notes = cellNotesMap.get(cellKey);
+      return notes !== undefined && notes.length > 0;
+    };
     
     // Helper function to convert hex to rgba with opacity
     const hexToRgba = (hex: string, opacity: number) => {
@@ -131,7 +156,7 @@ const ProjectionTableRow = memo(
           {job.client?.name || "Unknown"}
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-          {job.sub_client?.name || "-"}
+          {job.sub_client || "-"}
         </td>
         <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
           <div className="flex flex-wrap gap-1">
@@ -187,19 +212,29 @@ const ProjectionTableRow = memo(
         {timeRanges.map((range, index) => {
           const quantity = projection.weeklyQuantities.get(range.label) || 0;
           const displayValue = formatQuantity(quantity);
+          const hasCellNote = cellHasNotesForRange(range);
 
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer relative ${
                 index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-              }`}
+              } ${hasCellNote ? "ring-2 ring-inset ring-blue-400 bg-blue-50/50" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenNotesModal?.(job.id);
+                onOpenNotesModal?.({
+                  jobId: job.id,
+                  periodLabel: range.label,
+                  periodStart: range.startDate.getTime(),
+                  periodEnd: range.endDate.getTime(),
+                  granularity: granularity || "weekly",
+                });
               }}
             >
               {displayValue}
+              {hasCellNote && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+              )}
             </td>
           );
         })}
@@ -207,10 +242,34 @@ const ProjectionTableRow = memo(
           {formatQuantity(projection.totalQuantity)}
         </td>
         {showNotes && (
-          <td 
+          <td
             className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Show cell-specific notes in compressed format */}
+            {cellNotesMap && cellNotesMap.size > 0 && (
+              <div className="mb-2 space-y-0.5">
+                {Array.from(cellNotesMap.entries())
+                  .filter(([cellKey]) => cellKey.startsWith(`${job.id}:`))
+                  .map(([cellKey, notes]) => {
+                    const parts = cellKey.split(":");
+                    const periodLabel = notes[0]?.cell_period_label || parts[1] || "";
+                    return notes.map((note, idx) => (
+                      <div
+                        key={`${cellKey}-${idx}`}
+                        className="text-[10px] text-gray-600 truncate"
+                        title={`${note.name || "Unknown"} - ${periodLabel}: ${note.notes}`}
+                      >
+                        <span className="font-medium">{note.name || "Unknown"}</span>
+                        <span className="mx-1">•</span>
+                        <span className="text-gray-500">{periodLabel}</span>
+                      </div>
+                    ));
+                  })}
+              </div>
+            )}
+
+            {/* Show job-level notes (existing functionality) */}
             {hasNotes ? (
               <div className="space-y-1">
                 {jobNotes!.filter((note) => note && note.notes).map((note, idx) => {
@@ -366,6 +425,8 @@ const ProcessProjectionTableRow = memo(
     onTextChange,
     isSavingNote,
     onOpenNotesModal,
+    granularity,
+    cellNotesMap,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -383,10 +444,25 @@ const ProcessProjectionTableRow = memo(
     onSaveEdit?: (noteId: number) => void;
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
-    onOpenNotesModal?: (jobId: number) => void;
+    onOpenNotesModal?: (cellId: CellIdentifier) => void;
+    granularity?: "weekly" | "monthly" | "quarterly";
+    cellNotesMap?: Map<string, JobNote[]>;
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
+
+    // Helper to get cell key
+    const getCellKeyForRange = (range: TimeRange): string => {
+      return `${job.id}:${granularity || "weekly"}:${range.startDate.getTime()}:${range.endDate.getTime()}`;
+    };
+
+    // Helper to check if a cell has notes
+    const cellHasNotesForRange = (range: TimeRange): boolean => {
+      if (!cellNotesMap) return false;
+      const cellKey = getCellKeyForRange(range);
+      const notes = cellNotesMap.get(cellKey);
+      return notes !== undefined && notes.length > 0;
+    };
 
     // Helper function to convert hex to rgba with opacity
     const hexToRgba = (hex: string, opacity: number) => {
@@ -430,7 +506,7 @@ const ProcessProjectionTableRow = memo(
               {job.client?.name || "Unknown"}
             </td>
             <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-              {job.sub_client?.name || "-"}
+              {job.sub_client || "-"}
             </td>
           </>
         ) : (
@@ -487,19 +563,29 @@ const ProcessProjectionTableRow = memo(
           const quantity =
             processProjection.weeklyQuantities.get(range.label) || 0;
           const displayValue = formatQuantity(quantity);
+          const hasCellNote = cellHasNotesForRange(range);
 
           return (
             <td
               key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer ${
+              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer relative ${
                 index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-              }`}
+              } ${hasCellNote ? "ring-2 ring-inset ring-blue-400 bg-blue-50/50" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenNotesModal?.(job.id);
+                onOpenNotesModal?.({
+                  jobId: job.id,
+                  periodLabel: range.label,
+                  periodStart: range.startDate.getTime(),
+                  periodEnd: range.endDate.getTime(),
+                  granularity: granularity || "weekly",
+                });
               }}
             >
               {displayValue}
+              {hasCellNote && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+              )}
             </td>
           );
         })}
@@ -1002,6 +1088,8 @@ export default function ProjectionsTable({
   showExpandedProcesses = true,
   showNotes: showNotesProp = false,
   onShowNotesChange,
+  granularity = "weekly",
+  fullFilteredProjections,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -1029,16 +1117,44 @@ export default function ProjectionsTable({
   // Notes modal state
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [isSingleJobNoteModal, setIsSingleJobNoteModal] = useState(false);
+  const [selectedCellId, setSelectedCellId] = useState<CellIdentifier | null>(null);
 
   // View notes toggle state (use prop or default to false)
   const showNotes = showNotesProp;
   const [jobNotesMap, setJobNotesMap] = useState<Map<number, JobNote[]>>(new Map());
   const [isLoadingNotes, setIsLoadingNotes] = useState(false);
 
+  // Cell-level notes hook for incremental updates
+  const { cellNotesMap, loadNotes: loadCellNotes, cellHasNotes } = useCellNotes();
+
   // Inline note editing state
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // Process type breakdown state
+  const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
+  const [machineVariables, setMachineVariables] = useState<any[]>([]);
+
+  // Load machine variables for field definitions
+  useEffect(() => {
+    getAllMachineVariables()
+      .then((variables) => setMachineVariables(variables))
+      .catch((err) => console.error("Failed to load machine variables:", err));
+  }, []);
+
+  // Handler for expansion
+  const handleToggleExpand = (processType: string) => {
+    setExpandedSummaries((prev) => {
+      const next = new Set(prev);
+      if (next.has(processType)) {
+        next.delete(processType);
+      } else {
+        next.add(processType);
+      }
+      return next;
+    });
+  };
 
   // Transform data for process view
   const displayProjections = useMemo(() => {
@@ -1055,20 +1171,25 @@ export default function ProjectionsTable({
     setIsLoadingNotes(true);
     try {
       const allNotes = await getJobNotes();
-      // Create a map of job ID to notes array
+
+      // Also load cell-level notes
+      await loadCellNotes();
+
+      // Create a map of job ID to notes array (job-level notes only)
       const notesMap = new Map<number, JobNote[]>();
 
-      // Filter out invalid notes (must have notes text and jobs_id array)
-      const validNotes = allNotes.filter((note) =>
+      // Filter for job-level notes only (not cell-level notes)
+      const validJobNotes = allNotes.filter((note) =>
         note &&
         note.notes &&
         typeof note.notes === 'string' &&
         note.notes.trim().length > 0 &&
         Array.isArray(note.jobs_id) &&
-        note.jobs_id.length > 0
+        note.jobs_id.length > 0 &&
+        !note.is_cell_note // Exclude cell-level notes from job notes map
       );
 
-      validNotes.forEach((note) => {
+      validJobNotes.forEach((note) => {
         note.jobs_id.forEach((jobId) => {
           if (!notesMap.has(jobId)) {
             notesMap.set(jobId, []);
@@ -1156,8 +1277,9 @@ export default function ProjectionsTable({
     setShowNotesModal(true);
   };
 
-  const handleOpenNotesModal = (jobId: number) => {
-    setSelectedJobIds(new Set([jobId]));
+  const handleOpenNotesModal = (cellId: CellIdentifier) => {
+    setSelectedJobIds(new Set([cellId.jobId]));
+    setSelectedCellId(cellId);
     setIsSingleJobNoteModal(true);
     setShowNotesModal(true);
   };
@@ -1407,10 +1529,10 @@ export default function ProjectionsTable({
               return sortDirection === "asc" ? compareValue : -compareValue;
             }
             // Secondary sort by job number
-            return a.jobNumber - b.jobNumber;
+            return a.jobNumber.localeCompare(b.jobNumber);
 
           case "job_number":
-            compareValue = a.jobNumber - b.jobNumber;
+            compareValue = a.jobNumber.localeCompare(b.jobNumber);
             if (compareValue !== 0) {
               return sortDirection === "asc" ? compareValue : -compareValue;
             }
@@ -1424,7 +1546,7 @@ export default function ProjectionsTable({
 
           default:
             // Default: group by job, then by process type
-            compareValue = a.jobNumber - b.jobNumber;
+            compareValue = a.jobNumber.localeCompare(b.jobNumber);
             if (compareValue !== 0) return compareValue;
             return a.processType.localeCompare(b.processType);
         }
@@ -1454,8 +1576,8 @@ export default function ProjectionsTable({
           bValue = bJob.job.client?.name?.toLowerCase() || "";
           break;
         case "sub_client":
-          aValue = aJob.job.sub_client?.name?.toLowerCase() || "";
-          bValue = bJob.job.sub_client?.name?.toLowerCase() || "";
+          aValue = aJob.job.sub_client?.toLowerCase() || "";
+          bValue = bJob.job.sub_client?.toLowerCase() || "";
           break;
         case "description":
           aValue = aJob.job.description?.toLowerCase() || "";
@@ -1632,62 +1754,77 @@ export default function ProjectionsTable({
             {processTypeSummaries && processTypeSummaries.length > 0 && (
               <>
                 {processTypeSummaries.map((summary) => {
-                  const displayValue = summary.grandTotal;
-                  const formattedTotal = formatQuantity(Math.round(displayValue));
-
                   // Create unique key based on whether it's a facility summary
                   const summaryKey = isFacilitySummary(summary)
                     ? `${summary.processType}-${summary.facilityId}`
                     : summary.processType;
 
-                  // Create display label
-                  const displayLabel = isFacilitySummary(summary)
-                    ? `${summary.processType} (${summary.facilityName})`
-                    : summary.processType;
+                  const normalizedProcessType = normalizeProcessType(summary.processType);
+                  const isExpanded = expandedSummaries.has(summaryKey);
+
+                  // Get available fields for this process type
+                  const availableFields = getBreakdownableFields(
+                    normalizedProcessType,
+                    machineVariables
+                  );
+
+                  // Debug logging
+                  console.log(`[Breakdown Debug] Process: ${summary.processType}, Normalized: ${normalizedProcessType}, Available Fields:`, availableFields);
+
+                  // Calculate breakdowns for ALL fields if expanded
+                  const allBreakdowns: Array<{
+                    field: { name: string; label: string; type: string };
+                    breakdowns: import("@/types").ProcessTypeBreakdown[];
+                  }> = [];
+
+                  if (isExpanded && availableFields.length > 0) {
+                    console.log(`[Breakdown Debug] Expanding ${summary.processType}, using ${(fullFilteredProjections || jobProjections).length} projections`);
+                    availableFields.forEach((field) => {
+                      const fieldBreakdowns = calculateProcessTypeBreakdownByField(
+                        fullFilteredProjections || jobProjections,
+                        timeRanges,
+                        normalizedProcessType,
+                        field.name
+                      );
+                      console.log(`[Breakdown Debug] Field "${field.name}" has ${fieldBreakdowns.length} breakdown entries:`, fieldBreakdowns);
+                      // Only include fields that have actual breakdowns (multiple values)
+                      if (fieldBreakdowns.length > 0) {
+                        allBreakdowns.push({
+                          field,
+                          breakdowns: fieldBreakdowns,
+                        });
+                      }
+                    });
+                    console.log(`[Breakdown Debug] Total breakdowns to display: ${allBreakdowns.length}`);
+                  }
 
                   return (
-                    <tr key={summaryKey} className="bg-blue-50 font-semibold text-sm border-b border-blue-200">
-                      {/* Empty checkbox column */}
-                      <th className="px-2 py-2 w-12"></th>
-                      {/* Job # column */}
-                      <th className="px-2 py-2"></th>
-                      {/* Client column */}
-                      <th className="px-2 py-2"></th>
-                      {/* Sub-client column */}
-                      <th className="px-2 py-2"></th>
-                      {/* Process column */}
-                      <th className="px-2 py-2"></th>
-                      {/* Description column */}
-                      <th className="px-2 py-2"></th>
-                      {/* Qty column */}
-                      <th className="px-2 py-2"></th>
-                      {/* Start & End columns - Process type name spanning both */}
-                      <th colSpan={2} className="px-2 py-2 text-center text-gray-800 font-semibold">
-                        {displayLabel}
-                      </th>
-                      {/* Time period totals */}
-                      {timeRanges.map((range, index) => {
-                        const periodValue = summary.weeklyTotals.get(range.label) || 0;
-                        const formattedValue = formatQuantity(Math.round(periodValue));
-
-                        return (
-                          <th
-                            key={range.label}
-                            className={`px-2 py-2 text-center text-xs font-semibold ${
-                              index % 2 === 0 ? "bg-blue-100" : "bg-blue-50"
-                            }`}
-                          >
-                            {formattedValue}
-                          </th>
-                        );
-                      })}
-                      {/* Grand total */}
-                      <th className="px-2 py-2 text-center text-gray-800 font-semibold">
-                        {formattedTotal}
-                      </th>
-                      {/* Empty notes column if visible */}
-                      {showNotes && <th className="px-2 py-2"></th>}
-                    </tr>
+                    <React.Fragment key={summaryKey}>
+                      <ProcessTypeSummaryRow
+                        summary={summary}
+                        timeRanges={timeRanges}
+                        showNotes={showNotes}
+                        isExpanded={isExpanded}
+                        hasBreakdowns={availableFields.length > 0}
+                        onToggleExpand={() => handleToggleExpand(summaryKey)}
+                        isFacilitySummary={isFacilitySummary(summary)}
+                        facilityName={isFacilitySummary(summary) ? summary.facilityName : undefined}
+                      />
+                      {/* Render breakdown rows for all fields if expanded */}
+                      {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
+                        <React.Fragment key={`${summaryKey}-field-${field.name}`}>
+                          {breakdowns.map((breakdown) => (
+                            <ProcessTypeBreakdownRow
+                              key={`${summaryKey}-${field.name}-${breakdown.fieldValue}`}
+                              breakdown={breakdown}
+                              fieldDisplayLabel={field.label}
+                              timeRanges={timeRanges}
+                              showNotes={showNotes}
+                            />
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </React.Fragment>
                   );
                 })}
               </>
@@ -1856,6 +1993,8 @@ export default function ProjectionsTable({
                       onTextChange={setEditingText}
                       isSavingNote={isSavingNote}
                       onOpenNotesModal={handleOpenNotesModal}
+                      granularity={granularity}
+                      cellNotesMap={cellNotesMap}
                     />
                   );
                 },
@@ -1886,6 +2025,8 @@ export default function ProjectionsTable({
                     onTextChange={setEditingText}
                     isSavingNote={isSavingNote}
                     onOpenNotesModal={handleOpenNotesModal}
+                    granularity={granularity}
+                    cellNotesMap={cellNotesMap}
                   />
                 );
               })

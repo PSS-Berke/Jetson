@@ -76,7 +76,7 @@ export interface MachineDayDetail {
  * How a specific job contributes to a machine's workload
  */
 export interface MachineJobAllocation {
-  jobNumber: number;
+  jobNumber: string;
   jobName: string;
   clientName: string;
   hours: number;
@@ -119,10 +119,12 @@ export interface ProcessTypeCounts {
   insert: number;
   sort: number;
   inkjet: number;
-  labelApply: number;
+  labeling: number;
   fold: number;
   laser: number;
   hpPress: number;
+  affix: number;
+  data: number;
 }
 
 /**

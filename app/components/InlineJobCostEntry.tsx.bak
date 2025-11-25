@@ -110,7 +110,7 @@ export default function InlineJobCostEntry({
             const currentCost = costsMap.get(job.id) || 0;
             const clientName = job.client?.name || "Unknown";
             const fullClientName = job.sub_client
-              ? `${clientName} / ${job.sub_client}`
+              ? `${clientName} / ${job.sub_client.name}`
               : clientName;
 
             return {

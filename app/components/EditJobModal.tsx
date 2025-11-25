@@ -151,8 +151,8 @@ export default function EditJobModal({
 
       const clientId = job.client?.id || null;
       const clientName = job.client?.name || "";
-      const subClientId = job.sub_client?.id || null;
-      const subClientName = job.sub_client?.name || "";
+      const subClientId = null; // sub_client is now just a string, not an object with an id
+      const subClientName = job.sub_client || "";
 
       console.log("EditJobModal - Setting formData with:", {
         clientId,
@@ -638,7 +638,7 @@ export default function EditJobModal({
 
       const payload: Partial<{
         jobs_id: number;
-        job_number: number;
+        job_number: string;
         service_type: string;
         quantity: number;
         description: string;
@@ -662,7 +662,7 @@ export default function EditJobModal({
         confirmed: boolean;
       }> = {
         jobs_id: job.id,
-        job_number: parseInt(formData.job_number),
+        job_number: formData.job_number,
         service_type: formData.service_type,
         quantity: quantity,
         description: formData.description,

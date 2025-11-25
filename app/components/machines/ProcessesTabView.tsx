@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getAllMachineVariables, api, getCapabilityBuckets, createCapabilityBucket, updateCapabilityBucket, deleteCapabilityBucket, type CapabilityBucket } from "@/lib/api";
-import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
+import { PROCESS_TYPE_CONFIGS, normalizeProcessType } from "@/lib/processTypeConfig";
 import { Plus, Edit2, Trash2, X } from "lucide-react";
 import CustomProcessTypeBuilder from "../wizard/CustomProcessTypeBuilder";
+import { useToast } from "@/app/components/ui/Toast";
 
 interface MachineVariableGroup {
   id?: number;
@@ -19,23 +20,31 @@ interface ProcessesTabViewProps {
 
 interface FormField {
   id: string;
-  type: "text" | "number" | "select";
+  type: "text" | "number" | "select" | "boolean" | "currency";
   label: string;
   placeholder?: string;
   required?: boolean;
   options?: string[];
+  addToJobInput?: boolean;
+  showInAdditionalFields?: boolean;
+  order?: number;
+  locked?: boolean; // If true, field cannot be deleted (but can be edited/reordered)
 }
 
 // Helper function to get filter function for machine type
 const getTypeFilterFn = (machineType: string) => {
   const typeFilters: Record<string, (machine: any) => boolean> = {
+    data: (machine) =>
+      machine.type.toLowerCase().includes("data") ||
+      machine.type.toLowerCase().includes("sort"),
+    hp: (machine) =>
+      machine.type.toLowerCase().includes("hp"),
+    "hp-press": (machine) =>
+      machine.type.toLowerCase().includes("hp"),
     inserters: (machine) => machine.type.toLowerCase().includes("insert"),
     folders: (machine) =>
       machine.type.toLowerCase().includes("folder") ||
       machine.type.toLowerCase().includes("fold"),
-    "hp-press": (machine) =>
-      machine.type.toLowerCase().includes("hp") ||
-      machine.type.toLowerCase().includes("press"),
     inkjetters: (machine) => machine.type.toLowerCase().includes("inkjet"),
     affixers: (machine) =>
       machine.type.toLowerCase().includes("affixer") ||
@@ -46,8 +55,10 @@ const getTypeFilterFn = (machineType: string) => {
 };
 
 export default function ProcessesTabView({ machineType }: ProcessesTabViewProps) {
+  const { showToast } = useToast();
+
   const [apiProcessTypes, setApiProcessTypes] = useState<
-    Array<{ key: string; label: string; color: string; id?: number }>
+    Array<{ key: string; label: string; color: string; id?: number; sourceTypes?: string[] }>
   >([]);
   const [loadingProcessTypes, setLoadingProcessTypes] = useState(true);
   const [variableCounts, setVariableCounts] = useState<Record<string, number>>(
@@ -59,7 +70,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
   const [newProcessTypeFields, setNewProcessTypeFields] = useState<FormField[]>([]);
   const [machineProcessTypes, setMachineProcessTypes] = useState<string[]>([]);
   const [loadingFields, setLoadingFields] = useState(false);
-  
+
   // Capability buckets state
   const [capabilityBuckets, setCapabilityBuckets] = useState<CapabilityBucket[]>([]);
   const [loadingBuckets, setLoadingBuckets] = useState(false);
@@ -71,6 +82,209 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
   const [loadingMachineVariables, setLoadingMachineVariables] = useState(false);
   const [showFieldSelector, setShowFieldSelector] = useState(false);
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
+
+  // Auto-save state
+  const [saveQueue, setSaveQueue] = useState<Array<() => Promise<void>>>([]);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const isProcessingQueueRef = useRef(false);
+  const isInitialMountRef = useRef(true);
+
+  // Queue system for managing saves
+  const queueSave = useCallback((saveOperation: () => Promise<void>) => {
+    setSaveQueue(prev => [...prev, saveOperation]);
+  }, []);
+
+  const processSaveQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current || saveQueue.length === 0) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+
+    try {
+      while (saveQueue.length > 0) {
+        const operation = saveQueue[0];
+        await operation();
+        setSaveQueue(prev => prev.slice(1));
+      }
+    } finally {
+      isProcessingQueueRef.current = false;
+    }
+  }, [saveQueue]);
+
+  // Process queue when new operations are added
+  useEffect(() => {
+    if (saveQueue.length > 0) {
+      processSaveQueue();
+    }
+  }, [saveQueue, processSaveQueue]);
+
+  // Save fields to API
+  const saveFieldsToAPI = useCallback(async (fieldsToSave: FormField[]) => {
+    // Don't save if creating a new custom type (no ID yet)
+    if (isCreatingCustom) {
+      return;
+    }
+
+    // Find the selected process type record
+    const selectedType = apiProcessTypes.find((pt) => pt.key === selectedProcessType);
+
+    if (!selectedType || !selectedType.id) {
+      console.error("[ProcessesTabView] Cannot save: No process type ID found");
+      return;
+    }
+
+    try {
+      setSaveStatus('saving');
+      setSaveError(null);
+
+      // Convert FormField[] to variables object
+      const variables: Record<string, any> = {};
+      fieldsToSave.forEach((field, index) => {
+        variables[field.id] = {
+          label: field.label,
+          type: field.type,
+          required: field.required || false,
+          order: index,
+          ...(field.options && { options: field.options }),
+          ...(field.placeholder && { placeholder: field.placeholder }),
+          ...(field.addToJobInput !== undefined && { addToJobInput: field.addToJobInput }),
+          ...(field.showInAdditionalFields !== undefined && { showInAdditionalFields: field.showInAdditionalFields }),
+          ...(field.locked !== undefined && { locked: field.locked }), // Persist locked status
+        };
+      });
+
+      // PATCH existing process type
+      await api.patch(`/machine_variables/${selectedType.id}`, {
+        type: selectedProcessType,
+        variables: variables,
+      });
+
+      setSaveStatus('saved');
+
+      // Auto-clear saved status after 2 seconds
+      setTimeout(() => {
+        setSaveStatus('idle');
+      }, 2000);
+
+    } catch (error) {
+      setSaveStatus('error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save changes';
+      setSaveError(errorMessage);
+      showToast({
+        type: 'error',
+        message: `Failed to save: ${errorMessage}`,
+        duration: 5000,
+      });
+    }
+  }, [apiProcessTypes, selectedProcessType, isCreatingCustom, showToast]);
+
+  // Track if user has made changes (to prevent auto-save on initial load)
+  const hasUserChangesRef = useRef(false);
+
+  // Store showToast in a ref to avoid it being a dependency
+  const showToastRef = useRef(showToast);
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
+
+  // Handle field changes with auto-save
+  const handleFieldsChange = useCallback((updatedFields: FormField[]) => {
+    setNewProcessTypeFields(updatedFields);
+    // Mark that user has made changes (not just loading from API)
+    hasUserChangesRef.current = true;
+  }, []);
+
+  // Debounced auto-save for process type fields
+  const processTypeSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Store apiProcessTypes in a ref to avoid it being a dependency
+  const apiProcessTypesRef = useRef(apiProcessTypes);
+  useEffect(() => {
+    apiProcessTypesRef.current = apiProcessTypes;
+  }, [apiProcessTypes]);
+
+  useEffect(() => {
+    // Skip auto-save when fields are being loaded from API
+    if (loadingFields) {
+      return;
+    }
+
+    // Only auto-save when:
+    // 1. User has made changes (not just initial load)
+    // 2. Editing an existing process type (not creating new)
+    // 3. There are fields to save
+    if (hasUserChangesRef.current && !isCreatingCustom && selectedProcessType && newProcessTypeFields.length > 0) {
+      // Clear any existing timeout
+      if (processTypeSaveTimeoutRef.current) {
+        clearTimeout(processTypeSaveTimeoutRef.current);
+      }
+
+      // Set a new timeout for debounced save (2 seconds delay)
+      processTypeSaveTimeoutRef.current = setTimeout(async () => {
+        console.log("[ProcessesTabView] Auto-saving process type fields...");
+
+        // Find the selected process type record
+        const selectedType = apiProcessTypesRef.current.find((pt) => pt.key === selectedProcessType);
+
+        if (!selectedType || !selectedType.id) {
+          console.error("[ProcessesTabView] Cannot auto-save: No process type ID found");
+          return;
+        }
+
+        try {
+          setSaveStatus('saving');
+          setSaveError(null);
+
+          // Convert FormField[] to variables object
+          const variables: Record<string, any> = {};
+          newProcessTypeFields.forEach((field, index) => {
+            variables[field.id] = {
+              label: field.label,
+              type: field.type,
+              required: field.required || false,
+              order: index,
+              ...(field.options && { options: field.options }),
+              ...(field.placeholder && { placeholder: field.placeholder }),
+              ...(field.addToJobInput !== undefined && { addToJobInput: field.addToJobInput }),
+              ...(field.showInAdditionalFields !== undefined && { showInAdditionalFields: field.showInAdditionalFields }),
+            };
+          });
+
+          // PATCH existing process type
+          await api.patch(`/machine_variables/${selectedType.id}`, {
+            type: selectedProcessType,
+            variables: variables,
+          });
+
+          setSaveStatus('saved');
+
+          // Auto-clear saved status after 2 seconds
+          setTimeout(() => {
+            setSaveStatus('idle');
+          }, 2000);
+
+        } catch (error) {
+          setSaveStatus('error');
+          const errorMessage = error instanceof Error ? error.message : 'Failed to save changes';
+          setSaveError(errorMessage);
+          showToastRef.current({
+            type: 'error',
+            message: `Failed to save: ${errorMessage}`,
+            duration: 5000,
+          });
+        }
+      }, 2000);
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (processTypeSaveTimeoutRef.current) {
+        clearTimeout(processTypeSaveTimeoutRef.current);
+      }
+    };
+  }, [newProcessTypeFields, isCreatingCustom, selectedProcessType, loadingFields]);
 
   // Fetch machines of this type to get their process types (only when machineType prop is set)
   useEffect(() => {
@@ -128,37 +342,63 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         label: string;
         color: string;
         id?: number;
+        sourceTypes?: string[];
       }> = [];
+
+      // Track which IDs belong to which normalized type for consolidation
+      const normalizedCounts: Record<string, number> = {};
+      const normalizedSources: Record<string, string[]> = {};
+      const normalizedPrimaryIds: Record<string, number> = {}; // Track the first ID for saving
 
       allVariables.forEach((group: MachineVariableGroup) => {
         if (group.type) {
-          // Count variables
+          // Normalize the process type (e.g., "HP Press" -> "hp", "Label/Apply" -> "affix")
+          const normalizedType = normalizeProcessType(group.type);
+
+          // Count variables for the normalized type
+          let varCount = 0;
           if (Array.isArray(group.variables)) {
-            counts[group.type] = group.variables.length;
+            varCount = group.variables.length;
           } else if (group.variables && typeof group.variables === "object") {
-            counts[group.type] = Object.keys(group.variables).length;
-          } else {
-            counts[group.type] = 0;
+            varCount = Object.keys(group.variables).length;
           }
 
-          // Add process type if not already added
-          if (!apiTypes.find((t) => t.key === group.type)) {
-            const configMatch = PROCESS_TYPE_CONFIGS.find(
-              (c) => c.key === group.type
-            );
-            apiTypes.push({
-              key: group.type,
-              label:
-                configMatch?.label ||
-                group.type.charAt(0).toUpperCase() + group.type.slice(1),
-              color: configMatch?.color || "#6B7280",
-              id: group.id,
-            });
+          // Accumulate counts for normalized types
+          normalizedCounts[normalizedType] = (normalizedCounts[normalizedType] || 0) + varCount;
+
+          // Track the original source types that map to this normalized type
+          if (!normalizedSources[normalizedType]) {
+            normalizedSources[normalizedType] = [];
+          }
+          if (!normalizedSources[normalizedType].includes(group.type)) {
+            normalizedSources[normalizedType].push(group.type);
+          }
+
+          // Track the primary ID (first record) for each normalized type
+          if (!normalizedPrimaryIds[normalizedType] && group.id) {
+            normalizedPrimaryIds[normalizedType] = group.id;
           }
         }
       });
 
-      setVariableCounts(counts);
+      // Create the consolidated list of process types
+      Object.keys(normalizedCounts).forEach((normalizedType) => {
+        const configMatch = PROCESS_TYPE_CONFIGS.find(
+          (c) => c.key === normalizedType
+        );
+
+        apiTypes.push({
+          key: normalizedType,
+          label:
+            configMatch?.label ||
+            normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1),
+          color: configMatch?.color || "#6B7280",
+          sourceTypes: normalizedSources[normalizedType] || [],
+          id: normalizedPrimaryIds[normalizedType], // Primary ID for saving
+        });
+      });
+
+      setVariableCounts(normalizedCounts);
       setApiProcessTypes(apiTypes);
     } catch (error) {
       console.error(
@@ -173,6 +413,90 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
   useEffect(() => {
     fetchProcessTypes();
   }, [fetchProcessTypes]);
+
+  // Handle deleting a field from a process type
+  const handleDeleteField = useCallback(async (fieldId: string) => {
+    if (!selectedProcessType) {
+      console.error("[ProcessesTabView] No process type selected for deletion");
+      return;
+    }
+
+    try {
+      // Find the selected process type config to get all source types
+      const selectedConfig = apiProcessTypes.find(pt => pt.key === selectedProcessType);
+      if (!selectedConfig) {
+        console.error("[ProcessesTabView] Could not find process type config");
+        return;
+      }
+
+      const sourceTypes = selectedConfig.sourceTypes || [selectedProcessType];
+
+      // Fetch all machine variables
+      const allVariables = await getAllMachineVariables();
+
+      // Track if we successfully deleted from at least one record
+      let deletedFromAny = false;
+      const updatePromises: Promise<any>[] = [];
+
+      // Update ALL source records that contain this field
+      for (const sourceType of sourceTypes) {
+        const group = allVariables.find((g: MachineVariableGroup) => g.type === sourceType);
+
+        if (group && group.id && group.variables) {
+          const variables = typeof group.variables === 'object' && !Array.isArray(group.variables)
+            ? { ...group.variables }
+            : {};
+
+          // Check if this record has the field
+          if (variables[fieldId]) {
+            // Remove the field
+            delete variables[fieldId];
+            deletedFromAny = true;
+
+            // Queue the update
+            updatePromises.push(
+              api.patch(`/machine_variables/${group.id}`, {
+                type: sourceType,
+                variables: variables,
+              })
+            );
+          }
+        }
+      }
+
+      if (!deletedFromAny) {
+        showToast({
+          type: 'error',
+          message: 'Field not found in any source records',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Execute all updates
+      await Promise.all(updatePromises);
+
+      // Update local state immediately
+      setNewProcessTypeFields(prev => prev.filter(field => field.id !== fieldId));
+
+      // Refresh the process types list to update counts
+      await fetchProcessTypes();
+
+      showToast({
+        type: 'success',
+        message: 'Field deleted successfully',
+        duration: 2000,
+      });
+
+    } catch (error) {
+      console.error("[ProcessesTabView] Error deleting field:", error);
+      showToast({
+        type: 'error',
+        message: 'Failed to delete field. Please try again.',
+        duration: 5000,
+      });
+    }
+  }, [selectedProcessType, apiProcessTypes, showToast, fetchProcessTypes]);
 
   // Fetch capability buckets
   useEffect(() => {
@@ -202,35 +526,91 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         setLoadingFields(true);
         const allVariables = await getAllMachineVariables();
 
-        // Find the variable group for this process type
-        const variableGroup = allVariables.find(
-          (group: MachineVariableGroup) => group.type === selectedProcessType
+        // Find the selected process type config to get source types
+        const selectedConfig = apiProcessTypes.find(pt => pt.key === selectedProcessType);
+        const sourceTypes = selectedConfig?.sourceTypes || [selectedProcessType];
+
+        // Find ALL variable groups that map to this normalized process type
+        const matchingGroups = allVariables.filter(
+          (group: MachineVariableGroup) => sourceTypes.includes(group.type)
         );
 
-        if (variableGroup && variableGroup.variables) {
-          // Convert variables object to FormField array
-          const fieldsArray: FormField[] = [];
-          const vars = variableGroup.variables;
+        console.log(`[ProcessesTabView] Loading fields for "${selectedProcessType}"`);
+        console.log(`  Source types to match: [${sourceTypes.join(', ')}]`);
+        console.log(`  Found ${matchingGroups.length} matching record(s):`);
+        matchingGroups.forEach((group: MachineVariableGroup, index) => {
+          const varCount = group.variables && typeof group.variables === 'object' && !Array.isArray(group.variables)
+            ? Object.keys(group.variables).length
+            : 0;
+          console.log(`    Record ${index + 1}: type="${group.type}", id=${group.id}, fields=${varCount}`);
+        });
 
-          if (typeof vars === "object" && !Array.isArray(vars)) {
-            // Variables is an object with keys
-            Object.entries(vars).forEach(([key, value]: [string, any]) => {
-              fieldsArray.push({
-                id: key,
-                type: value.type || "text",
-                label: value.label || key,
-                placeholder: value.placeholder,
-                required: value.required || false,
-                options: value.options,
+        // Consolidate all fields from all matching groups
+        const fieldsArray: FormField[] = [];
+        const fieldMap = new Map<string, FormField>(); // To avoid duplicates
+
+        matchingGroups.forEach((group: MachineVariableGroup) => {
+          if (group.variables) {
+            const vars = group.variables;
+
+            if (typeof vars === "object" && !Array.isArray(vars)) {
+              // Variables is an object with keys
+              Object.entries(vars).forEach(([key, value]: [string, any]) => {
+                // Only add if we haven't seen this field ID before
+                if (!fieldMap.has(key)) {
+                  const field: FormField = {
+                    id: key,
+                    type: value.type || "text",
+                    label: value.label || key,
+                    placeholder: value.placeholder,
+                    required: value.required || false,
+                    options: value.options,
+                    addToJobInput: value.addToJobInput !== undefined ? value.addToJobInput : true,
+                    showInAdditionalFields: value.showInAdditionalFields || false,
+                    order: value.order,
+                    locked: value.locked || (key === 'price_per_m'), // Lock price_per_m field
+                  };
+                  fieldMap.set(key, field);
+                  fieldsArray.push(field);
+                }
               });
-            });
+            }
           }
+        });
 
-          setNewProcessTypeFields(fieldsArray);
-        } else {
-          // No existing fields, start with empty array
-          setNewProcessTypeFields([]);
+        // Check if price_per_m exists in fieldsArray, if not create it from processTypeConfig
+        const hasPricePerM = fieldsArray.some(f => f.id === 'price_per_m');
+        if (!hasPricePerM) {
+          // Get the price_per_m config from processTypeConfig
+          const processConfig = PROCESS_TYPE_CONFIGS.find(c => c.key === selectedProcessType);
+          const pricePerMConfig = processConfig?.fields.find(f => f.name === 'price_per_m');
+
+          if (pricePerMConfig) {
+            const pricePerMField: FormField = {
+              id: 'price_per_m',
+              type: 'currency', // Use currency type for money fields
+              label: pricePerMConfig.label,
+              placeholder: pricePerMConfig.placeholder,
+              required: pricePerMConfig.required,
+              addToJobInput: true, // Always add to job input
+              showInAdditionalFields: false,
+              order: 999, // Put at the end by default
+              locked: true, // Always locked
+            };
+            fieldsArray.push(pricePerMField);
+          }
         }
+
+        // Sort fields by order property (fields without order go to the end)
+        fieldsArray.sort((a, b) => {
+          const orderA = a.order ?? 999;
+          const orderB = b.order ?? 999;
+          return orderA - orderB;
+        });
+
+        setNewProcessTypeFields(fieldsArray);
+        // Reset the user changes flag when loading fields from API
+        hasUserChangesRef.current = false;
       } catch (error) {
         console.error(
           "[ProcessesTabView] Error loading process type fields:",
@@ -242,7 +622,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     };
 
     loadProcessTypeFields();
-  }, [selectedProcessType]);
+  }, [selectedProcessType, apiProcessTypes]);
 
 
   // Fetch machine variables for field selection
@@ -410,7 +790,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     });
   };
 
-  const handleAddSelectedFields = () => {
+  const handleAddSelectedFields = async () => {
     if (selectedFields.size === 0) {
       alert("Please select at least one field to add.");
       return;
@@ -450,18 +830,40 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
       return;
     }
 
-    // Add all selected fields at once with full definitions
-    setBucketCapabilities((prev) => {
-      const updated = { ...prev };
-      fieldsToAdd.forEach(({ key, definition }) => {
-        updated[key] = definition;
-      });
-      return updated;
+    // Build the updated capabilities with new fields
+    const updatedCapabilities = { ...bucketCapabilities };
+    fieldsToAdd.forEach(({ key, definition }) => {
+      updatedCapabilities[key] = definition;
     });
+
+    // Update local state
+    setBucketCapabilities(updatedCapabilities);
 
     // Clear selections and close selector
     setSelectedFields(new Set());
     setShowFieldSelector(false);
+
+    // Auto-save if we're editing an existing bucket (has ID and name)
+    if (isEditingBucket && isEditingBucket.id && bucketName.trim()) {
+      try {
+        await updateCapabilityBucket(isEditingBucket.id, {
+          name: bucketName,
+          capabilities: updatedCapabilities,
+        });
+        showToast({
+          type: 'success',
+          message: 'Fields added and saved successfully',
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error("[ProcessesTabView] Error auto-saving after adding fields:", error);
+        showToast({
+          type: 'error',
+          message: 'Fields added but failed to save. Please click Save to try again.',
+          duration: 5000,
+        });
+      }
+    }
   };
 
   const handleSelectAllAvailableFields = () => {
@@ -501,33 +903,90 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     setShowFieldSelector(true);
   };
 
-  const handleRemoveCapabilityField = (key: string) => {
+  const handleRemoveCapabilityField = async (key: string) => {
     const newCapabilities = { ...bucketCapabilities };
     delete newCapabilities[key];
     setBucketCapabilities(newCapabilities);
+
+    // Auto-save if we're editing an existing bucket (has ID and name)
+    if (isEditingBucket && isEditingBucket.id && bucketName.trim()) {
+      try {
+        await updateCapabilityBucket(isEditingBucket.id, {
+          name: bucketName,
+          capabilities: newCapabilities,
+        });
+        showToast({
+          type: 'success',
+          message: 'Field removed and saved successfully',
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error("[ProcessesTabView] Error auto-saving after removing field:", error);
+        showToast({
+          type: 'error',
+          message: 'Field removed but failed to save. Please click Save to try again.',
+          duration: 5000,
+        });
+      }
+    }
   };
+
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleUpdateCapabilityField = (key: string, value: any) => {
     setBucketCapabilities((prev) => {
       const currentField = prev[key];
-      
+
+      let updatedCapabilities;
       // If the current field is already a full definition object, update just the value
       if (currentField && typeof currentField === "object" && !Array.isArray(currentField) && currentField.type) {
-        return {
+        updatedCapabilities = {
           ...prev,
           [key]: {
             ...currentField,
             value: value,
           },
         };
+      } else {
+        // Otherwise, if it's just a value, we need to check if we can find the original definition
+        // For now, if it's a simple value, replace it (backward compatibility)
+        updatedCapabilities = {
+          ...prev,
+          [key]: value,
+        };
       }
-      
-      // Otherwise, if it's just a value, we need to check if we can find the original definition
-      // For now, if it's a simple value, replace it (backward compatibility)
-      return {
-        ...prev,
-        [key]: value,
-      };
+
+      // Debounced auto-save if we're editing an existing bucket
+      if (isEditingBucket && isEditingBucket.id && bucketName.trim()) {
+        // Clear any existing timeout
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
+        }
+
+        // Set a new timeout for debounced save (1 second delay)
+        autoSaveTimeoutRef.current = setTimeout(async () => {
+          try {
+            await updateCapabilityBucket(isEditingBucket.id, {
+              name: bucketName,
+              capabilities: updatedCapabilities,
+            });
+            showToast({
+              type: 'success',
+              message: 'Changes saved',
+              duration: 2000,
+            });
+          } catch (error) {
+            console.error("[ProcessesTabView] Error auto-saving field update:", error);
+            showToast({
+              type: 'error',
+              message: 'Failed to save changes',
+              duration: 3000,
+            });
+          }
+        }, 1000);
+      }
+
+      return updatedCapabilities;
     });
   };
 
@@ -601,10 +1060,40 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     }
   };
 
-  // Filter process types if machineType prop is set (for individual type pages)
+  // Define allowed core process types
+  const ALLOWED_CORE_TYPES = ['data', 'hp', 'laser', 'fold', 'affix', 'insert', 'inkjet', 'labeling'];
+
+  // Define deprecated process types to hide
+  const DEPRECATED_TYPES = ['9-12 in+', 'sort', 'insert +', 'insert+', '13+ in+', '13+'];
+
+  // Define all known config types (including deprecated ones we want to hide)
+  const ALL_CONFIG_TYPES = PROCESS_TYPE_CONFIGS.map(c => c.key.toLowerCase());
+
+  // Filter process types to show only:
+  // 1. Allowed core types (data, hp, laser, affix, insert)
+  // 2. Custom process types (not in PROCESS_TYPE_CONFIGS)
+  // 3. Exclude deprecated types
+  const allowedProcessTypes = apiProcessTypes.filter((pt) => {
+    const normalizedKey = pt.key.toLowerCase().trim();
+
+    // Always exclude deprecated types
+    if (DEPRECATED_TYPES.includes(normalizedKey)) {
+      return false;
+    }
+
+    // If it's in PROCESS_TYPE_CONFIGS, only show if it's in ALLOWED_CORE_TYPES
+    if (ALL_CONFIG_TYPES.includes(normalizedKey)) {
+      return ALLOWED_CORE_TYPES.includes(normalizedKey);
+    }
+
+    // If it's not in PROCESS_TYPE_CONFIGS, it's a custom type - allow it
+    return true;
+  });
+
+  // Further filter by machineType if prop is set (for individual type pages)
   const filteredProcessTypes = machineType
-    ? apiProcessTypes.filter((pt) => machineProcessTypes.includes(pt.key))
-    : apiProcessTypes;
+    ? allowedProcessTypes.filter((pt) => machineProcessTypes.includes(pt.key))
+    : allowedProcessTypes;
 
   if (loadingProcessTypes) {
     return (
@@ -635,10 +1124,10 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
       <div className="space-y-4">
         {/* Selected Process Type Display */}
         {!isCreatingCustom && selectedType && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <svg
-                className="w-5 h-5 text-green-500"
+                className="w-5 h-5 text-blue-500"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -648,7 +1137,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="font-medium text-green-900">
+              <span className="font-medium text-blue-900">
                 {selectedType.label} Selected
               </span>
               <button
@@ -661,10 +1150,46 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
                 Change
               </button>
             </div>
-            <p className="text-sm text-green-700">
-              You&apos;re editing the {selectedType.label} process type configuration
-              {newProcessTypeFields.length > 0 && ` (${newProcessTypeFields.length} field${newProcessTypeFields.length !== 1 ? 's' : ''})`}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-blue-700">
+                You&apos;re editing the {selectedType.label} process type configuration
+                {newProcessTypeFields.length > 0 && ` (${newProcessTypeFields.length} field${newProcessTypeFields.length !== 1 ? 's' : ''})`}
+              </p>
+
+              {/* Save Status Indicator */}
+              {!isCreatingCustom && (
+                <div className="ml-4 flex items-center gap-2">
+                  {saveStatus === 'saving' && (
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+                      <span>Saving...</span>
+                    </div>
+                  )}
+                  {saveStatus === 'saved' && (
+                    <div className="flex items-center gap-1.5 text-sm text-green-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Saved</span>
+                    </div>
+                  )}
+                  {saveStatus === 'error' && saveError && (
+                    <div className="flex items-center gap-1.5 text-sm text-red-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span>Failed to save</span>
+                      <button
+                        onClick={() => queueSave(() => saveFieldsToAPI(newProcessTypeFields))}
+                        className="ml-1 text-xs underline hover:no-underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -687,33 +1212,11 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         {/* Process Type Field Builder */}
         <CustomProcessTypeBuilder
           processTypeName={displayName || "New Process Type"}
+          processTypeKey={selectedProcessType || undefined}
           fields={newProcessTypeFields}
-          onChange={setNewProcessTypeFields}
+          onChange={handleFieldsChange}
+          onDeleteField={handleDeleteField}
         />
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={handleSaveCapability}
-            disabled={(!newProcessTypeName.trim() && isCreatingCustom) || newProcessTypeFields.length === 0}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            Save Process Type
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedProcessType(null);
-              setIsCreatingCustom(false);
-              setNewProcessTypeName("");
-              setNewProcessTypeFields([]);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
     );
   }
@@ -828,9 +1331,9 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
               ) : (
                 <div className="max-h-96 overflow-y-auto space-y-4">
                   {availableMachineVariables
-                    .filter((group) => 
-                      group.variables && 
-                      typeof group.variables === "object" && 
+                    .filter((group) =>
+                      group.variables &&
+                      typeof group.variables === "object" &&
                       !Array.isArray(group.variables) &&
                       Object.keys(group.variables).length > 0
                     )

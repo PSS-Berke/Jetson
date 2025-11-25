@@ -85,7 +85,7 @@ export default function StepCapabilities({
   const [fieldFormData, setFieldFormData] = useState({
     fieldName: "",
     fieldLabel: "",
-    fieldType: "text" as "text" | "number" | "select" | "boolean",
+    fieldType: "text" as "text" | "number" | "select" | "boolean" | "currency",
     fieldValue: "",
     options: "",
     required: false,
@@ -180,6 +180,26 @@ export default function StepCapabilities({
       return;
     }
 
+    // Deprecated process types to filter out
+    const deprecatedTypes = [
+      "insert9to12",
+      "9-12 in+",
+      "insert13plus",
+      "13+ in+",
+      "sort",
+    ];
+
+    // Check if this is a deprecated process type
+    const normalizedProcessKey = processKey.toLowerCase().trim();
+    if (deprecatedTypes.some(dep => dep.toLowerCase() === normalizedProcessKey)) {
+      console.warn(`[StepCapabilities] Attempted to load deprecated process type: ${processKey}`);
+      onSetMachineVariables([]);
+      onSetMachineVariablesId(null);
+      onSetFormBuilderFields([]);
+      setAvailableFields([]);
+      return;
+    }
+
     try {
       // Fetch machine variables by ID directly (skip the first GET /machine_variables call)
       // We need to find the ID first, but we'll use a more efficient approach
@@ -231,6 +251,7 @@ export default function StepCapabilities({
                   options: v.options,
                   required: v.required || false,
                   addToJobInput: v.addToJobInput || false,
+                  locked: v.locked || false,
                 };
               },
             );
@@ -239,7 +260,7 @@ export default function StepCapabilities({
               ([key, value], index) => {
                 const val = value as any;
                 const fieldType = (val.type as "text" | "number" | "select" | "boolean") || "text";
-                const fieldValue = typeof val === "object" 
+                const fieldValue = typeof val === "object"
                   ? getFieldValue(val.value, fieldType)
                   : getFieldValue(val, fieldType);
                 return {
@@ -251,6 +272,7 @@ export default function StepCapabilities({
                   options: val.options,
                   required: val.required || false,
                   addToJobInput: val.addToJobInput || false,
+                  locked: val.locked || false,
                 };
               },
             );
@@ -295,6 +317,7 @@ export default function StepCapabilities({
                       required: v.required || false,
                       addToJobInput: v.addToJobInput || false,
                       showInAdditionalFields: v.showInAdditionalFields || false,
+                      locked: v.locked || false,
                     };
                   },
                 );
@@ -303,7 +326,7 @@ export default function StepCapabilities({
                   ([key, value], index) => {
                     const val = value as any;
                     const fieldType = (val.type as "text" | "number" | "select" | "boolean") || "text";
-                    const fieldValue = typeof val === "object" 
+                    const fieldValue = typeof val === "object"
                       ? getFieldValue(val.value, fieldType)
                       : getFieldValue(val, fieldType);
                     return {
@@ -316,6 +339,7 @@ export default function StepCapabilities({
                       required: val.required || false,
                       addToJobInput: val.addToJobInput || false,
                       showInAdditionalFields: val.showInAdditionalFields || false,
+                      locked: val.locked || false,
                     };
                   },
                 );
@@ -330,13 +354,64 @@ export default function StepCapabilities({
           }
         }
 
+        // Mark price_per_m as locked if it exists, or create it if it doesn't
+        let fieldsWithLocked = fields.map(field => {
+          if (field.fieldName === 'price_per_m') {
+            return {
+              ...field,
+              locked: true,
+              addToJobInput: true, // Ensure it shows in job wizard
+            };
+          }
+          return field;
+        });
+
+        // If price_per_m doesn't exist in fields, create it from processTypeConfig
+        const hasPricePerM = fieldsWithLocked.some(f => f.fieldName === 'price_per_m');
+        if (!hasPricePerM) {
+          // Import processTypeConfig to get the price_per_m field definition
+          import('@/lib/processTypeConfig').then((config) => {
+            const processConfig = config.getProcessTypeConfig(processKey);
+            const pricePerMConfig = processConfig?.fields.find(f => f.name === 'price_per_m');
+
+            if (pricePerMConfig) {
+              const newPricePerMField: FormBuilderField = {
+                id: `available_price_per_m`,
+                fieldName: 'price_per_m',
+                fieldLabel: pricePerMConfig.label,
+                fieldType: 'currency', // Use currency type for money fields
+                fieldValue: 0,
+                required: pricePerMConfig.required,
+                addToJobInput: true,
+                locked: true,
+              };
+
+              fieldsWithLocked = [...fieldsWithLocked, newPricePerMField];
+              setAvailableFields(fieldsWithLocked);
+            }
+          });
+        }
+
         // Store as available fields for user selection (don't auto-add)
-        setAvailableFields(fields);
+        setAvailableFields(fieldsWithLocked);
+
         // Clear existing form builder fields when process type changes
         // User will need to select which fields they want
         // EXCEPT when in edit mode - preserve pre-loaded fields from saved machine data
         if (!isEditMode) {
-          onSetFormBuilderFields([]);
+          // Auto-add price_per_m as a locked field if it exists in available fields
+          const pricePerMField = fieldsWithLocked.find(f => f.fieldName === 'price_per_m');
+          if (pricePerMField) {
+            onSetFormBuilderFields([{
+              ...pricePerMField,
+              id: `field_${Date.now()}_price_per_m`,
+              // Ensure addToJobInput is true so it shows in job creation wizard
+              addToJobInput: true,
+              locked: true,
+            }]);
+          } else {
+            onSetFormBuilderFields([]);
+          }
         }
       } else {
         // No variables for this process type
@@ -436,18 +511,10 @@ export default function StepCapabilities({
       updatedFields[editingFieldIndex] = newField;
       onSetFormBuilderFields(updatedFields);
       setEditingFieldIndex(null);
-      // Save to API immediately when updating a field (use queue)
-      if (machineVariablesId) {
-        queueSave(() => saveFieldsToAPI(updatedFields));
-      }
+      // Auto-save will be triggered by useEffect
     } else {
       onAddFormBuilderField(newField);
-      // Save to API immediately when adding a new field (use queue)
-      // Include all existing fields plus the new field
-      const fieldsWithNewField = [...formBuilderFields, newField];
-      if (machineVariablesId) {
-        queueSave(() => saveFieldsToAPI(fieldsWithNewField));
-      }
+      // Auto-save will be triggered by useEffect
     }
 
     // Reset form
@@ -552,19 +619,14 @@ export default function StepCapabilities({
   };
 
   const handleRemoveField = (id: string) => {
-    // Calculate the fields after removal
-    const fieldsAfterRemoval = formBuilderFields.filter((field) => field.id !== id);
-
-    // Update the state first
-    onRemoveFormBuilderField(id);
-
-    // Only save to API if auto-save is enabled (edit mode) and we have a machineVariablesId
-    if (!disableAutoSave && machineVariablesId) {
-      // Use setTimeout to ensure state has updated before saving, then queue it
-      setTimeout(() => {
-        queueSave(() => saveFieldsToAPI(fieldsAfterRemoval));
-      }, 0);
+    // Check if the field is locked before removing
+    const fieldToRemove = formBuilderFields.find(field => field.id === id);
+    if (fieldToRemove?.locked) {
+      // Don't remove locked fields
+      return;
     }
+    // Update the state - auto-save will be triggered by useEffect
+    onRemoveFormBuilderField(id);
   };
 
   const handleDeleteFieldFromProcessType = async (
@@ -661,7 +723,7 @@ export default function StepCapabilities({
   };
 
   // Helper function to save fields to API with debouncing
-  const saveFieldsToAPI = async (fieldsToSave: FormBuilderField[]) => {
+  const saveFieldsToAPI = async (fieldsToSave: FormBuilderField[], showSuccessToast: boolean = false) => {
     if (!machineVariablesId) {
       return;
     }
@@ -683,6 +745,7 @@ export default function StepCapabilities({
           required: field.required,
           addToJobInput: (field as any).addToJobInput,
           showInAdditionalFields: (field as any).showInAdditionalFields,
+          locked: field.locked, // Persist locked status
         };
       });
 
@@ -696,11 +759,15 @@ export default function StepCapabilities({
 
       // Set status to saved
       setSaveStatus('saved');
-      showToast({
-        type: 'success',
-        message: 'Changes saved successfully',
-        duration: 3000,
-      });
+
+      // Only show success toast if explicitly requested (manual saves)
+      if (showSuccessToast) {
+        showToast({
+          type: 'success',
+          message: 'Changes saved successfully',
+          duration: 3000,
+        });
+      }
 
       // Auto-clear saved status after 2 seconds
       setTimeout(() => {
@@ -713,7 +780,7 @@ export default function StepCapabilities({
         error,
       );
 
-      // Set error status and show error to user
+      // Set error status and show error to user (always show errors)
       setSaveStatus('error');
       const errorMessage = error instanceof Error ? error.message : 'Failed to save changes';
       setSaveError(errorMessage);
@@ -763,12 +830,12 @@ export default function StepCapabilities({
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Set a new timeout for debounced save (500ms delay)
+    // Set a new timeout for debounced save (2000ms delay)
     if (machineVariablesId) {
       saveTimeoutRef.current = setTimeout(() => {
         // Queue the save operation instead of calling directly
         queueSave(() => saveFieldsToAPI(formBuilderFields));
-      }, 500);
+      }, 2000);
     }
 
     // Cleanup timeout on unmount
@@ -1050,6 +1117,7 @@ export default function StepCapabilities({
                     >
                       <option value="text">Text</option>
                       <option value="number">Number</option>
+                      <option value="currency">Currency (Money)</option>
                       <option value="select">Select (Dropdown)</option>
                       <option value="boolean">Boolean (Checkbox)</option>
                     </select>
@@ -1099,10 +1167,11 @@ export default function StepCapabilities({
                     ) : (
                       <input
                         type={
-                          fieldFormData.fieldType === "number"
+                          fieldFormData.fieldType === "number" || fieldFormData.fieldType === "currency"
                             ? "number"
                             : "text"
                         }
+                        step={fieldFormData.fieldType === "currency" ? "0.01" : undefined}
                         value={fieldFormData.fieldValue}
                         onChange={(e) =>
                           setFieldFormData({
@@ -1230,10 +1299,15 @@ export default function StepCapabilities({
                   {formBuilderFields.map((field, index) => (
                     <div key={field.id} className="bg-white p-4 rounded-lg border border-green-200">
                       <div className="flex items-start justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                           {field.fieldLabel}
                           {field.required && (
                             <span className="text-red-500 ml-1">*</span>
+                          )}
+                          {field.locked && (
+                            <span title="This field is required and cannot be deleted">
+                              🔒
+                            </span>
                           )}
                         </label>
                         <div className="flex items-center gap-2">
@@ -1260,8 +1334,13 @@ export default function StepCapabilities({
                           <button
                             type="button"
                             onClick={() => handleRemoveField(field.id)}
-                            className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                            title="Delete field"
+                            disabled={field.locked}
+                            className={`p-1.5 rounded transition-colors ${
+                              field.locked
+                                ? "text-gray-300 cursor-not-allowed"
+                                : "text-red-600 hover:text-red-800 hover:bg-red-50"
+                            }`}
+                            title={field.locked ? "This field cannot be deleted" : "Delete field"}
                           >
                             <svg
                               className="w-4 h-4"
@@ -1313,21 +1392,29 @@ export default function StepCapabilities({
                           </span>
                         </div>
                       ) : (
-                        <input
-                          type={
-                            field.fieldType === "number" ? "number" : "text"
-                          }
-                          value={String(field.fieldValue || "")}
-                          onChange={(e) => {
-                            const value =
-                              field.fieldType === "number"
-                                ? parseFloat(e.target.value) || 0
-                                : e.target.value;
-                            handleFieldValueChange(field.id, value);
-                          }}
-                          placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
-                        />
+                        <div className={field.fieldType === "currency" ? "relative" : ""}>
+                          {field.fieldType === "currency" && (
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                              $
+                            </span>
+                          )}
+                          <input
+                            type={
+                              field.fieldType === "number" || field.fieldType === "currency" ? "number" : "text"
+                            }
+                            step={field.fieldType === "currency" ? "0.01" : undefined}
+                            value={String(field.fieldValue || "")}
+                            onChange={(e) => {
+                              const value =
+                                field.fieldType === "number" || field.fieldType === "currency"
+                                  ? parseFloat(e.target.value) || 0
+                                  : e.target.value;
+                              handleFieldValueChange(field.id, value);
+                            }}
+                            placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white ${field.fieldType === "currency" ? "pl-7" : ""}`}
+                          />
+                        </div>
                       )}
                     </div>
                   ))}
