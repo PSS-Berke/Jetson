@@ -381,8 +381,10 @@ export default function FinancialsPDFTables({
                     {job.job_number || "N/A"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900">
-                    {typeof job.facility === "object" && job.facility
-                      ? (job.facility as { name: string }).name
+                    {job.facilities_id === 1
+                      ? "Bolingbrook"
+                      : job.facilities_id === 2
+                      ? "Lemont"
                       : "Unknown"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-right text-gray-900 font-semibold">
