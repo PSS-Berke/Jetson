@@ -77,11 +77,16 @@ export default function JobNotesModal({
       const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
 
       if (weeklySplit.length > 0) {
+        // Use current date as fallback for missing dates
+        const now = Date.now();
+        const startDate = job.start_date || now;
+        const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
+
         const periods = convertWeeklyToGranularity(
           weeklySplit,
           lockedWeeks,
-          job.start_date,
-          job.due_date,
+          startDate,
+          dueDate,
           selectedGranularity
         );
         newDisplayPeriods.set(job.id, periods);
@@ -90,7 +95,7 @@ export default function JobNotesModal({
 
     setDisplayPeriods(newDisplayPeriods);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobs, selectedGranularity]); // jobs includes the full array, will trigger when loadData completes
+  }, [jobs, selectedGranularity, editedWeeklySplits, editedLockedWeeks]); // Trigger when edited splits change
 
   const loadData = async () => {
     setIsLoading(true);
@@ -121,6 +126,24 @@ export default function JobNotesModal({
         if (job.weekly_split && job.weekly_split.length > 0) {
           newWeeklySplits.set(job.id, [...job.weekly_split]);
           newLockedWeeks.set(job.id, job.locked_weeks ? [...job.locked_weeks] : []);
+        } else if (job.start_date && job.due_date) {
+          // Initialize with even distribution if no weekly_split exists
+          const weeks = Math.ceil(
+            (job.due_date - job.start_date) / (7 * 24 * 60 * 60 * 1000)
+          );
+          const numWeeks = Math.max(1, weeks);
+          const { quantities, locks } = resetToEvenDistribution(numWeeks, job.quantity);
+          newWeeklySplits.set(job.id, quantities);
+          newLockedWeeks.set(job.id, locks);
+        } else {
+          // Job missing start_date or due_date - log warning but still initialize with 1 week
+          console.warn(
+            `[JobNotesModal] Job #${job.job_number} (ID: ${job.id}) is missing start_date or due_date. Initializing with 1 week default.`,
+            { start_date: job.start_date, due_date: job.due_date }
+          );
+          const { quantities, locks } = resetToEvenDistribution(1, job.quantity);
+          newWeeklySplits.set(job.id, quantities);
+          newLockedWeeks.set(job.id, locks);
         }
       });
 
@@ -277,11 +300,16 @@ export default function JobNotesModal({
       const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
 
       if (weeklySplit.length > 0) {
+        // Use current date as fallback for missing dates
+        const now = Date.now();
+        const startDate = job.start_date || now;
+        const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
+
         const periods = convertWeeklyToGranularity(
           weeklySplit,
           lockedWeeks,
-          job.start_date,
-          job.due_date,
+          startDate,
+          dueDate,
           newGranularity
         );
         newDisplayPeriods.set(job.id, periods);
@@ -610,6 +638,11 @@ export default function JobNotesModal({
                               </h3>
                               <p className="text-xs text-[var(--text-light)] mt-1">
                                 Total: {job.quantity.toLocaleString()} | Current: {currentTotal.toLocaleString()}
+                                {selectedGranularity === "weekly" && (
+                                  <span className="ml-2">
+                                    • {periods.length} {periods.length === 1 ? "week" : "weeks"}
+                                  </span>
+                                )}
                                 {totalMismatch && (
                                   <span className="text-red-600 ml-2 font-medium">
                                     (Difference: {(currentTotal - job.quantity).toLocaleString()})
@@ -628,25 +661,30 @@ export default function JobNotesModal({
                             </button>
                           </div>
 
-                          {/* Period Split Grid */}
-                          <div className={`grid gap-3 mb-4 ${
-                            selectedGranularity === "daily"
-                              ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-7"
-                              : selectedGranularity === "weekly"
-                              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
-                              : selectedGranularity === "monthly"
-                              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
-                              : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
-                          }`}>
+                          {/* Period Split Grid - Use horizontal scroll for many weekly periods */}
+                          <div className={
+                            selectedGranularity === "weekly" && periods.length > 12
+                              ? "flex gap-3 mb-4 overflow-x-auto pb-2"
+                              : `grid gap-3 mb-4 ${
+                                  selectedGranularity === "daily"
+                                    ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-7"
+                                    : selectedGranularity === "weekly"
+                                    ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12"
+                                    : selectedGranularity === "monthly"
+                                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                                    : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                                }`
+                          }>
                             {periods.map((period, periodIndex) => {
                               const isLocked = period.isLocked || false;
+                              const useHorizontalScroll = selectedGranularity === "weekly" && periods.length > 12;
 
                               return (
                                 <div
                                   key={periodIndex}
                                   className={`relative border rounded-lg p-2 ${
                                     isLocked ? "bg-blue-50 border-blue-300" : "bg-white border-gray-200"
-                                  }`}
+                                  } ${useHorizontalScroll ? "flex-shrink-0 w-32" : ""}`}
                                 >
                                   <div className="flex items-center justify-between mb-1">
                                     <span className="text-xs font-medium text-[var(--text-dark)]">
