@@ -231,6 +231,11 @@ export default function BulkJobUploadModal({
         );
       }
 
+      // Get client name from mapping or use sub_client name
+      const clientName = mapping?.clientId
+        ? clients.find((c) => c.id === mapping.clientId)?.name || pj.sub_client
+        : pj.sub_client;
+
       // Calculate weekly split if dates are provided
       let weekly_split: number[] | undefined;
       if (pj.start_date && pj.end_date) {
@@ -282,9 +287,11 @@ export default function BulkJobUploadModal({
           : "0";
 
       return {
-        job_number: pj.job_number,
+        job_number: pj.job_number.toString(),
         clients_id: mapping?.clientId || undefined,
         sub_clients_id: undefined, // Will be created if needed
+        sub_client: pj.sub_client || undefined,
+        client: clientName || undefined,
         facilities_id: pj.facility
           ? pj.facility.toLowerCase().includes("lemont") ||
             pj.facility.toLowerCase().includes("shakopee")
@@ -309,7 +316,8 @@ export default function BulkJobUploadModal({
         add_on_charges: "0",
         ext_price: "0",
         total_billing: totalBilling,
-        daily_split,
+        daily_split: daily_split,
+        weekly_split: weekly_split,
         confirmed: pj.schedule_type
           ? pj.schedule_type.toLowerCase().includes("hard")
           : false,
@@ -346,9 +354,9 @@ export default function BulkJobUploadModal({
     // Update the field
     switch (field) {
       case "job_number":
-        job.job_number = parseInt(value) || 0;
+        job.job_number = value || "";
         job.errors = job.errors.filter((e) => !e.includes("job_number"));
-        if (isNaN(job.job_number)) {
+        if (!job.job_number || isNaN(parseInt(job.job_number))) {
           job.errors.push("Invalid job_number");
         }
         break;
@@ -637,7 +645,7 @@ export default function BulkJobUploadModal({
                                 <div>
                                   <span className="font-medium">
                                     Job #
-                                    {isNaN(job.job_number)
+                                    {!job.job_number || isNaN(parseInt(job.job_number))
                                       ? "N/A"
                                       : job.job_number}
                                   </span>
@@ -737,12 +745,8 @@ export default function BulkJobUploadModal({
                                         Job Number *
                                       </label>
                                       <input
-                                        type="number"
-                                        value={
-                                          isNaN(job.job_number)
-                                            ? ""
-                                            : job.job_number
-                                        }
+                                        type="text"
+                                        value={job.job_number || ""}
                                         onChange={(e) =>
                                           handleEditJob(
                                             index,
