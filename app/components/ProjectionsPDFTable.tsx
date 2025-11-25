@@ -38,7 +38,7 @@ export default function ProjectionsPDFTable({
               Job #
             </th>
             <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-              Client
+              Facility
             </th>
             <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px]">
               Process Types
@@ -104,7 +104,7 @@ export default function ProjectionsPDFTable({
                     {job.job_number}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900">
-                    {job.client?.name || "Unknown"}
+                    {job.facility?.name || "Unknown"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900 min-w-[80px] max-w-[100px]">
                     <div className="break-words whitespace-normal leading-tight">

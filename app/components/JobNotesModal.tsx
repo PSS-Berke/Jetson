@@ -664,12 +664,12 @@ export default function JobNotesModal({
                           {/* Period Split Grid - Use horizontal scroll for many weekly periods */}
                           <div className={
                             selectedGranularity === "weekly" && periods.length > 12
-                              ? "flex gap-3 mb-4 overflow-x-auto pb-2"
-                              : `grid gap-3 mb-4 ${
+                              ? "flex gap-4 mb-4 overflow-x-auto pb-2 p-3 bg-gray-50 rounded-lg"
+                              : `grid gap-4 mb-4 p-3 bg-gray-50 rounded-lg ${
                                   selectedGranularity === "daily"
                                     ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-7"
                                     : selectedGranularity === "weekly"
-                                    ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12"
+                                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8"
                                     : selectedGranularity === "monthly"
                                     ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
                                     : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
@@ -682,9 +682,9 @@ export default function JobNotesModal({
                               return (
                                 <div
                                   key={periodIndex}
-                                  className={`relative border rounded-lg p-2 ${
+                                  className={`relative border rounded-lg p-2 shadow-sm ${
                                     isLocked ? "bg-blue-50 border-blue-300" : "bg-white border-gray-200"
-                                  } ${useHorizontalScroll ? "flex-shrink-0 w-32" : ""}`}
+                                  } ${useHorizontalScroll ? "flex-shrink-0 w-40 min-w-[160px]" : ""}`}
                                 >
                                   <div className="flex items-center justify-between mb-1">
                                     <span className="text-xs font-medium text-[var(--text-dark)]">
@@ -704,10 +704,10 @@ export default function JobNotesModal({
                                   <div className="relative">
                                     <input
                                       type="text"
-                                      value={period.quantity.toLocaleString()}
+                                      value={(period.quantity || 0).toLocaleString()}
                                       onChange={(e) => handlePeriodChange(job.id, periodIndex, e.target.value)}
                                       disabled={isSaving}
-                                      className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                                      className={`w-full px-3 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] disabled:bg-gray-100 disabled:cursor-not-allowed ${
                                         isLocked
                                           ? "bg-blue-50 border-blue-300 font-semibold pr-7"
                                           : "border-gray-300"
@@ -737,7 +737,7 @@ export default function JobNotesModal({
                                     )}
                                   </div>
                                   <div className="text-xs text-[var(--text-light)] mt-1">
-                                    {job.quantity > 0 ? ((period.quantity / job.quantity) * 100).toFixed(1) : 0}%
+                                    {job.quantity > 0 ? (((period.quantity || 0) / job.quantity) * 100).toFixed(1) : 0}%
                                   </div>
                                 </div>
                               );

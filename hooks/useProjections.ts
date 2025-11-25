@@ -81,7 +81,6 @@ export interface ProjectionsData {
 
 export interface ProjectionFilters {
   facility: number | null;
-  clients: number[];
   serviceTypes: string[];
   searchQuery: string;
   granularity?: Granularity;
@@ -343,7 +342,6 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     }
 
     // Determine which filters are active
-    const hasClientFilter = filters.clients.length > 0;
     const hasServiceTypeFilter = filters.serviceTypes.length > 0;
     const hasSearchFilter = filters.searchQuery.trim().length > 0;
     const hasScheduleFilter =
@@ -355,7 +353,6 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     if (filterMode === "or") {
       return projectionsToFilter.filter((p) => {
         if (
-          !hasClientFilter &&
           !hasServiceTypeFilter &&
           !hasSearchFilter &&
           !hasScheduleFilter &&
@@ -363,9 +360,6 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         ) {
           return true;
         }
-
-        const matchesClient =
-          hasClientFilter && filters.clients.includes(p.job.client?.id);
         const matchesServiceType =
           hasServiceTypeFilter &&
           p.job.requirements &&
@@ -418,7 +412,6 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           );
 
         return (
-          matchesClient ||
           matchesServiceType ||
           matchesSearch ||
           matchesSchedule ||
@@ -427,12 +420,6 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       });
     } else {
       let result = projectionsToFilter;
-
-      if (hasClientFilter) {
-        result = result.filter((p) =>
-          filters.clients.includes(p.job.client?.id),
-        );
-      }
 
       if (hasServiceTypeFilter) {
         result = result.filter((p) => {

@@ -60,7 +60,6 @@ export default function ProjectionsPage() {
   const [granularity, setGranularity] = useState<Granularity>("weekly");
   const [startDate, setStartDate] = useState<Date>(getStartOfWeek());
   const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
-  const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>(
     [],
   );
@@ -98,7 +97,6 @@ export default function ProjectionsPage() {
 
   const filters: ProjectionFilters = {
     facility: selectedFacility,
-    clients: selectedClients,
     serviceTypes: selectedServiceTypes,
     searchQuery,
     granularity,
@@ -180,17 +178,6 @@ export default function ProjectionsPage() {
         return "month";
     }
   };
-
-  // Get client names for PDF header
-  const selectedClientNames = useMemo(() => {
-    return jobProjections
-      .filter(
-        (proj) =>
-          proj.job.client && selectedClients.includes(proj.job.client.id),
-      )
-      .map((proj) => proj.job.client?.name || "Unknown")
-      .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
-  }, [jobProjections, selectedClients]);
 
   // PDF print handler for projections
   const handlePrint = useReactToPrint({
@@ -366,8 +353,6 @@ export default function ProjectionsPage() {
             jobs={jobProjections.map((p) => p.job)}
             startDate={startDate}
             onStartDateChange={setStartDate}
-            selectedClients={selectedClients}
-            onClientsChange={setSelectedClients}
             selectedServiceTypes={selectedServiceTypes}
             onServiceTypesChange={setSelectedServiceTypes}
             searchQuery={searchQuery}
@@ -470,7 +455,6 @@ export default function ProjectionsPage() {
                   <EmbeddedCalendar
                     startDate={startDate}
                     selectedFacility={selectedFacility}
-                    selectedClients={selectedClients}
                     selectedServiceTypes={selectedServiceTypes}
                     searchQuery={searchQuery}
                     scheduleFilter={scheduleFilter}
@@ -524,7 +508,6 @@ export default function ProjectionsPage() {
                       }
                       facilitiesId={selectedFacility || undefined}
                       granularity={granularity}
-                      selectedClients={selectedClientNames}
                       selectedServiceTypes={selectedServiceTypes}
                       searchQuery={searchQuery}
                       filterMode={filterMode.toUpperCase() as "AND" | "OR"}
@@ -587,7 +570,6 @@ export default function ProjectionsPage() {
             startDate={startDate}
             granularity={granularity}
             facility={selectedFacility}
-            selectedClients={selectedClientNames}
             selectedServiceTypes={selectedServiceTypes}
             searchQuery={searchQuery}
             scheduleFilter={scheduleFilter}
@@ -627,7 +609,6 @@ export default function ProjectionsPage() {
             }}
             granularity={granularity}
             facility={selectedFacility}
-            selectedClients={selectedClientNames}
             selectedServiceTypes={selectedServiceTypes}
             searchQuery={searchQuery}
             filterMode={filterMode.toUpperCase() as "AND" | "OR"}

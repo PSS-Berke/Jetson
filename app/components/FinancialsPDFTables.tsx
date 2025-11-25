@@ -355,7 +355,7 @@ export default function FinancialsPDFTables({
                   Job #
                 </th>
                 <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-700">
-                  Client
+                  Facility
                 </th>
                 <th className="border border-gray-300 px-2 py-2 text-right font-semibold text-gray-700">
                   Revenue
@@ -381,9 +381,9 @@ export default function FinancialsPDFTables({
                     {job.job_number || "N/A"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-gray-900">
-                    {typeof job.client === "object" && job.client
-                      ? (job.client as { name: string }).name
-                      : job.client || "Unknown"}
+                    {typeof job.facility === "object" && job.facility
+                      ? (job.facility as { name: string }).name
+                      : "Unknown"}
                   </td>
                   <td className="border border-gray-300 px-2 py-2 text-right text-gray-900 font-semibold">
                     {(() => {

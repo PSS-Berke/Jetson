@@ -12,6 +12,7 @@ interface ProcessTypeSummaryRowProps {
   onToggleExpand: () => void;
   isFacilitySummary?: boolean;
   facilityName?: string;
+  expandCollapseAllButton?: React.ReactNode;
 }
 
 export function ProcessTypeSummaryRow({
@@ -23,6 +24,7 @@ export function ProcessTypeSummaryRow({
   onToggleExpand,
   isFacilitySummary = false,
   facilityName,
+  expandCollapseAllButton,
 }: ProcessTypeSummaryRowProps) {
   const displayValue = summary.grandTotal;
   const formattedTotal = formatQuantity(Math.round(displayValue));
@@ -34,8 +36,14 @@ export function ProcessTypeSummaryRow({
 
   return (
     <tr className="bg-blue-50 font-semibold text-sm border-b border-blue-200">
-      {/* Empty checkbox column */}
-      <th className="px-2 py-2 w-12"></th>
+      {/* Checkbox column - with expand/collapse all button on first row */}
+      <th className="px-2 py-2 w-12">
+        {expandCollapseAllButton && (
+          <div onClick={(e) => e.stopPropagation()}>
+            {expandCollapseAllButton}
+          </div>
+        )}
+      </th>
       {/* Job # column */}
       <th className="px-2 py-2"></th>
       {/* Client column */}

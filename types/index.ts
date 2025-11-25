@@ -245,6 +245,10 @@ export interface ParsedJob extends Omit<Job, "client" | "machines"> {
     id: number;
     name: string;
   } | null;
+  facility: {
+    id: number;
+    name: string;
+  } | null;
   machines: { id: number; line: string }[];
   parsedRequirements: JobRequirement[];
 }

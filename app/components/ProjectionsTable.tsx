@@ -15,7 +15,7 @@ import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
 import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
 import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
-import { Trash, Lock, Unlock, ChevronDown, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
+import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
 import type { CellIdentifier } from "@/types";
@@ -23,7 +23,7 @@ import { useCellNotes } from "@/hooks/useCellNotes";
 
 type SortField =
   | "job_number"
-  | "client"
+  | "facility"
   | "sub_client"
   | "process_type"
   | "description"
@@ -153,7 +153,7 @@ const ProjectionTableRow = memo(
           {job.job_number}
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-          {job.client?.name || "Unknown"}
+          {job.facility?.name || "Unknown"}
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
           {job.sub_client || "-"}
@@ -503,7 +503,7 @@ const ProcessProjectionTableRow = memo(
               {job.job_number}
             </td>
             <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-              {job.client?.name || "Unknown"}
+              {job.facility?.name || "Unknown"}
             </td>
             <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
               {job.sub_client || "-"}
@@ -1050,7 +1050,7 @@ const MobileTableRow = memo(
           {job.job_number}
         </td>
         <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
-          {job.client?.name || "Unknown"}
+          {job.facility?.name || "Unknown"}
         </td>
         {visibleTimeRanges.map((range, index) => {
           const quantity = projection.weeklyQuantities.get(range.label) || 0;
@@ -1154,6 +1154,27 @@ export default function ProjectionsTable({
       }
       return next;
     });
+  };
+
+  // Handlers for expand/collapse all
+  const handleExpandAll = () => {
+    if (!processTypeSummaries) return;
+    const allKeys = new Set<string>();
+    processTypeSummaries.forEach((summary) => {
+      const summaryKey = isFacilitySummary(summary)
+        ? `${summary.processType}-${summary.facilityId}`
+        : summary.processType;
+      const normalizedProcessType = normalizeProcessType(summary.processType);
+      const availableFields = getBreakdownableFields(normalizedProcessType, machineVariables);
+      if (availableFields.length > 0) {
+        allKeys.add(summaryKey);
+      }
+    });
+    setExpandedSummaries(allKeys);
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedSummaries(new Set());
   };
 
   // Transform data for process view
@@ -1571,9 +1592,9 @@ export default function ProjectionsTable({
           aValue = aJob.job.job_number;
           bValue = bJob.job.job_number;
           break;
-        case "client":
-          aValue = aJob.job.client?.name?.toLowerCase() || "";
-          bValue = bJob.job.client?.name?.toLowerCase() || "";
+        case "facility":
+          aValue = aJob.job.facility?.name?.toLowerCase() || "";
+          bValue = bJob.job.facility?.name?.toLowerCase() || "";
           break;
         case "sub_client":
           aValue = aJob.job.sub_client?.toLowerCase() || "";
@@ -1753,7 +1774,7 @@ export default function ProjectionsTable({
             {/* Process Type Summary Rows */}
             {processTypeSummaries && processTypeSummaries.length > 0 && (
               <>
-                {processTypeSummaries.map((summary) => {
+                {processTypeSummaries.map((summary, index) => {
                   // Create unique key based on whether it's a facility summary
                   const summaryKey = isFacilitySummary(summary)
                     ? `${summary.processType}-${summary.facilityId}`
@@ -1778,10 +1799,17 @@ export default function ProjectionsTable({
                   }> = [];
 
                   if (isExpanded && availableFields.length > 0) {
-                    console.log(`[Breakdown Debug] Expanding ${summary.processType}, using ${(fullFilteredProjections || jobProjections).length} projections`);
+                    // Filter projections by facility if this is a facility summary
+                    const projectionsToUse = fullFilteredProjections || jobProjections;
+                    const facilityFilteredProjections = isFacilitySummary(summary)
+                      ? projectionsToUse.filter(p => p.job.facilities_id === summary.facilityId)
+                      : projectionsToUse;
+
+                    console.log(`[Breakdown Debug] Expanding ${summary.processType}${isFacilitySummary(summary) ? ` (Facility: ${summary.facilityName})` : ''}, using ${facilityFilteredProjections.length} projections (filtered from ${projectionsToUse.length})`);
+
                     availableFields.forEach((field) => {
                       const fieldBreakdowns = calculateProcessTypeBreakdownByField(
-                        fullFilteredProjections || jobProjections,
+                        facilityFilteredProjections,
                         timeRanges,
                         normalizedProcessType,
                         field.name
@@ -1798,6 +1826,49 @@ export default function ProjectionsTable({
                     console.log(`[Breakdown Debug] Total breakdowns to display: ${allBreakdowns.length}`);
                   }
 
+                  // For the first row, check if we need expand/collapse all button
+                  const isFirstRow = index === 0;
+                  let expandCollapseAllButton = null;
+
+                  if (isFirstRow) {
+                    // Check if any summaries have breakdowns
+                    const summariesWithBreakdowns = processTypeSummaries.filter((s) => {
+                      const norm = normalizeProcessType(s.processType);
+                      const fields = getBreakdownableFields(norm, machineVariables);
+                      return fields.length > 0;
+                    });
+
+                    if (summariesWithBreakdowns.length > 0) {
+                      // Check if all expandable summaries are expanded
+                      const allExpanded = summariesWithBreakdowns.every((s) => {
+                        const key = isFacilitySummary(s)
+                          ? `${s.processType}-${s.facilityId}`
+                          : s.processType;
+                        return expandedSummaries.has(key);
+                      });
+
+                      expandCollapseAllButton = (
+                        <button
+                          onClick={allExpanded ? handleCollapseAll : handleExpandAll}
+                          className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                          title={allExpanded ? "Collapse all summaries" : "Expand all summaries"}
+                        >
+                          {allExpanded ? (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              <span>Collapse All</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronRight className="w-3 h-3" />
+                              <span>Expand All</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
+                  }
+
                   return (
                     <React.Fragment key={summaryKey}>
                       <ProcessTypeSummaryRow
@@ -1809,6 +1880,7 @@ export default function ProjectionsTable({
                         onToggleExpand={() => handleToggleExpand(summaryKey)}
                         isFacilitySummary={isFacilitySummary(summary)}
                         facilityName={isFacilitySummary(summary) ? summary.facilityName : undefined}
+                        expandCollapseAllButton={expandCollapseAllButton}
                       />
                       {/* Render breakdown rows for all fields if expanded */}
                       {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
@@ -1854,11 +1926,11 @@ export default function ProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort("client")}
+                onClick={() => handleSort("facility")}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
-                  Client <SortIcon field="client" />
+                  Facility <SortIcon field="facility" />
                 </div>
               </th>
               <th
@@ -2123,7 +2195,7 @@ export default function ProjectionsTable({
                     Job #
                   </th>
                   <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
-                    Client
+                    Facility
                   </th>
                   {mobileTableVisibleRanges.map((range, index) => (
                     <th

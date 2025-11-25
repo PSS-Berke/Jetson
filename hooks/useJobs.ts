@@ -21,6 +21,7 @@ export interface ParsedRequirement {
 export interface ParsedJob
   extends Omit<Job, "client" | "sub_client" | "machines" | "requirements"> {
   client: { id: number; name: string };
+  facility: { id: number; name: string } | null;
   sub_client?: string; // Sub-client name as a plain string
   machines: { id: number; line: string }[];
   requirements: ParsedRequirement[];
@@ -188,11 +189,37 @@ const parseJob = (job: Job): ParsedJob => {
       parsedClient = { id: job.clients_id || 0, name: "Unknown" };
     }
 
+    // Parse machines first to potentially infer facility
+    const parsedMachines = JSON.parse(job.machines);
+
+    // Parse facility field based on facilities_id
+    // The API might return facilities_id as a number or as an object (similar to client)
+    let parsedFacility: { id: number; name: string } | null = null;
+
+    // Check if facilities_id is an object (like client field) or a number
+    if (job.facilities_id !== undefined && job.facilities_id !== null && job.facilities_id !== 0) {
+      // If it's already an object with id and name, use it directly
+      if (typeof job.facilities_id === 'object' && 'id' in job.facilities_id) {
+        const facilityObj = job.facilities_id as any;
+        parsedFacility = { id: facilityObj.id, name: facilityObj.name || "Unknown" };
+      } else {
+        // It's a number, map it to the facility name
+        const facilityId = typeof job.facilities_id === 'number' ? job.facilities_id : parseInt(String(job.facilities_id));
+        const facilityName = facilityId === 1 ? "Bolingbrook" : facilityId === 2 ? "Lemont" : "Unknown";
+        parsedFacility = { id: facilityId, name: facilityName };
+      }
+    } else {
+      // If job doesn't have facilities_id, default to Bolingbrook (ID 1)
+      console.warn(`[parseJob] Job ${job.job_number} has no facilities_id, defaulting to Bolingbrook`);
+      parsedFacility = { id: 1, name: "Bolingbrook" };
+    }
+
     return {
       ...job,
       client: parsedClient,
+      facility: parsedFacility,
       sub_client: parsedSubClient,
-      machines: JSON.parse(job.machines),
+      machines: parsedMachines,
       requirements: parsedRequirements,
       daily_split: parsedDailySplit,
     };
@@ -201,9 +228,26 @@ const parseJob = (job: Job): ParsedJob => {
       `[parseJob] Critical error parsing job ${job.job_number}:`,
       e,
     );
+
+    // Try to set facility even in error case
+    let fallbackFacility: { id: number; name: string } | null = null;
+    if (job.facilities_id) {
+      if (typeof job.facilities_id === 'object' && 'id' in job.facilities_id) {
+        const facilityObj = job.facilities_id as any;
+        fallbackFacility = { id: facilityObj.id, name: facilityObj.name || "Unknown" };
+      } else {
+        const facilityId = typeof job.facilities_id === 'number' ? job.facilities_id : parseInt(String(job.facilities_id));
+        const facilityName = facilityId === 1 ? "Bolingbrook" : facilityId === 2 ? "Lemont" : "Unknown";
+        fallbackFacility = { id: facilityId, name: facilityName };
+      }
+    } else {
+      fallbackFacility = { id: 1, name: "Bolingbrook" };
+    }
+
     return {
       ...job,
       client: { id: job.clients_id || 0, name: "Unknown" },
+      facility: fallbackFacility,
       sub_client: undefined,
       machines: [],
       requirements: [],

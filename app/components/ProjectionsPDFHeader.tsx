@@ -4,7 +4,6 @@ interface ProjectionsPDFHeaderProps {
   startDate: Date;
   granularity: "weekly" | "monthly" | "quarterly";
   facility: number | null;
-  selectedClients: string[];
   selectedServiceTypes: string[];
   searchQuery: string;
   scheduleFilter: "all" | "confirmed" | "soft";
@@ -15,7 +14,6 @@ export default function ProjectionsPDFHeader({
   startDate,
   granularity,
   facility,
-  selectedClients,
   selectedServiceTypes,
   searchQuery,
   scheduleFilter,
@@ -45,7 +43,6 @@ export default function ProjectionsPDFHeader({
   };
 
   const hasFilters =
-    selectedClients.length > 0 ||
     selectedServiceTypes.length > 0 ||
     searchQuery ||
     facility !== null ||
@@ -146,14 +143,6 @@ export default function ProjectionsPDFHeader({
                 <span className="font-medium text-gray-600">Facility:</span>
                 <span className="ml-2 text-blue-800 font-semibold">
                   {getFacilityName()}
-                </span>
-              </div>
-            )}
-            {selectedClients.length > 0 && (
-              <div className="bg-white rounded px-3 py-2 col-span-2">
-                <span className="font-medium text-gray-600">Clients:</span>
-                <span className="ml-2 text-blue-800 font-semibold">
-                  {selectedClients.join(", ")}
                 </span>
               </div>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, memo, useMemo, useEffect, useRef } from "react";
+import React, { useState, memo, useMemo, useEffect, useRef } from "react";
 import { ParsedJob } from "@/hooks/useJobs";
 import { JobProjection, ServiceTypeSummary, ProcessTypeSummary, ProcessTypeFacilitySummary } from "@/hooks/useProjections";
 import {
@@ -11,12 +11,17 @@ import {
 import JobDetailsModal from "./JobDetailsModal";
 import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
-import { Trash, Lock, Unlock, ChevronDown, FileText, Edit2, Save, X } from "lucide-react";
-import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote } from "@/lib/api";
+import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Edit2, Save, X } from "lucide-react";
+import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
+import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
+import { calculateProcessTypeBreakdownByField } from "@/lib/projectionUtils";
+import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
+import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
+import { getFacilityName, getFacilityColors } from "@/lib/facilityUtils";
 
 type SortField =
   | "job_number"
-  | "client"
+  | "facility"
   | "sub_client"
   | "process_type"
   | "description"
@@ -137,7 +142,15 @@ const RevenueTableRow = memo(
           {job.job_number}
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-          {job.client?.name || "Unknown"}
+          <span
+            className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold border ${
+              getFacilityColors(job.facilities_id).bg
+            } ${getFacilityColors(job.facilities_id).text} ${
+              getFacilityColors(job.facilities_id).border
+            }`}
+          >
+            {getFacilityName(job.facilities_id)}
+          </span>
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
           {job.sub_client || "-"}
@@ -434,7 +447,15 @@ const ProcessRevenueTableRow = memo(
               {job.job_number}
             </td>
             <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-              {job.client?.name || "Unknown"}
+              <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold border ${
+                  getFacilityColors(job.facilities_id).bg
+                } ${getFacilityColors(job.facilities_id).text} ${
+                  getFacilityColors(job.facilities_id).border
+                }`}
+              >
+                {getFacilityName(job.facilities_id)}
+              </span>
             </td>
             <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
               {job.sub_client || "-"}
@@ -768,8 +789,16 @@ const RevenueMobileCard = memo(
             <div className="text-sm font-semibold text-[var(--text-dark)]">
               Job #{job.job_number}
             </div>
-            <div className="text-xs text-[var(--text-light)] mt-1">
-              {job.client?.name || "Unknown"}
+            <div className="mt-2">
+              <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold border ${
+                  getFacilityColors(job.facilities_id).bg
+                } ${getFacilityColors(job.facilities_id).text} ${
+                  getFacilityColors(job.facilities_id).border
+                }`}
+              >
+                {getFacilityName(job.facilities_id)}
+              </span>
             </div>
           </div>
           <div className="text-right">
@@ -967,8 +996,16 @@ const MobileRevenueTableRow = memo(
         <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]">
           {job.job_number}
         </td>
-        <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
-          {job.client?.name || "Unknown"}
+        <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${
+              getFacilityColors(job.facilities_id).bg
+            } ${getFacilityColors(job.facilities_id).text} ${
+              getFacilityColors(job.facilities_id).border
+            }`}
+          >
+            {getFacilityName(job.facilities_id)}
+          </span>
         </td>
         {visibleTimeRanges.map((range, index) => {
           const revenue = projection.weeklyRevenues.get(range.label) || 0;
@@ -1042,6 +1079,51 @@ export default function RevenueProjectionsTable({
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // Expand/collapse state for summary breakdowns
+  const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
+  const [machineVariables, setMachineVariables] = useState<any[]>([]);
+
+  // Load machine variables for breakdown fields
+  useEffect(() => {
+    getAllMachineVariables()
+      .then((variables) => setMachineVariables(variables))
+      .catch((err) => console.error("Failed to load machine variables:", err));
+  }, []);
+
+  // Handler for expansion
+  const handleToggleExpand = (processType: string) => {
+    setExpandedSummaries((prev) => {
+      const next = new Set(prev);
+      if (next.has(processType)) {
+        next.delete(processType);
+      } else {
+        next.add(processType);
+      }
+      return next;
+    });
+  };
+
+  // Handlers for expand/collapse all
+  const handleExpandAll = () => {
+    if (!processTypeSummaries) return;
+    const allKeys = new Set<string>();
+    processTypeSummaries.forEach((summary) => {
+      const summaryKey = isFacilitySummary(summary)
+        ? `${summary.processType}-${summary.facilityId}`
+        : summary.processType;
+      const normalizedProcessType = normalizeProcessType(summary.processType);
+      const availableFields = getBreakdownableFields(normalizedProcessType, machineVariables);
+      if (availableFields.length > 0) {
+        allKeys.add(summaryKey);
+      }
+    });
+    setExpandedSummaries(allKeys);
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedSummaries(new Set());
+  };
 
   // Transform data for process view
   const displayProjections = useMemo(() => {
@@ -1425,9 +1507,9 @@ export default function RevenueProjectionsTable({
           aValue = aJob.job.job_number;
           bValue = bJob.job.job_number;
           break;
-        case "client":
-          aValue = aJob.job.client?.name?.toLowerCase() || "";
-          bValue = bJob.job.client?.name?.toLowerCase() || "";
+        case "facility":
+          aValue = aJob.job.facility?.name?.toLowerCase() || "";
+          bValue = bJob.job.facility?.name?.toLowerCase() || "";
           break;
         case "sub_client":
           aValue = aJob.job.sub_client?.toLowerCase() || "";
@@ -1607,7 +1689,7 @@ export default function RevenueProjectionsTable({
             {/* Process Type Summary Rows */}
             {processTypeSummaries && processTypeSummaries.length > 0 && (
               <>
-                {processTypeSummaries.map((summary) => {
+                {processTypeSummaries.map((summary, index) => {
                   const displayValue = summary.grandRevenue;
                   const formattedTotal = `$${Math.round(displayValue).toLocaleString()}`;
 
@@ -1615,42 +1697,161 @@ export default function RevenueProjectionsTable({
                     ? `${summary.processType}-${summary.facilityId}`
                     : summary.processType;
 
+                  const normalizedProcessType = normalizeProcessType(summary.processType);
+                  const isExpanded = expandedSummaries.has(summaryKey);
+
+                  // Get available fields for this process type
+                  const availableFields = getBreakdownableFields(
+                    normalizedProcessType,
+                    machineVariables
+                  );
+
+                  // Calculate breakdowns for ALL fields if expanded
+                  const allBreakdowns: Array<{
+                    field: { name: string; label: string; type: string };
+                    breakdowns: import("@/types").ProcessTypeBreakdown[];
+                  }> = [];
+
+                  if (isExpanded && availableFields.length > 0) {
+                    // Filter projections by facility if this is a facility summary
+                    const facilityFilteredProjections = isFacilitySummary(summary)
+                      ? jobProjections.filter(p => p.job.facilities_id === summary.facilityId)
+                      : jobProjections;
+
+                    availableFields.forEach((field) => {
+                      const fieldBreakdowns = calculateProcessTypeBreakdownByField(
+                        facilityFilteredProjections,
+                        timeRanges,
+                        normalizedProcessType,
+                        field.name
+                      );
+                      if (fieldBreakdowns.length > 0) {
+                        allBreakdowns.push({
+                          field,
+                          breakdowns: fieldBreakdowns,
+                        });
+                      }
+                    });
+                  }
+
                   const displayLabel = isFacilitySummary(summary)
                     ? `${summary.processType} (${summary.facilityName})`
                     : summary.processType;
 
-                  return (
-                    <tr key={summaryKey} className="bg-green-50 font-semibold text-sm border-b border-green-200">
-                      <th className="px-2 py-2 w-12"></th>
-                      <th className="px-2 py-2"></th>
-                      <th className="px-2 py-2"></th>
-                      <th className="px-2 py-2"></th>
-                      <th className="px-2 py-2"></th>
-                      <th className="px-2 py-2"></th>
-                      <th className="px-2 py-2"></th>
-                      <th colSpan={2} className="px-2 py-2 text-center text-gray-800 font-semibold">
-                        {displayLabel}
-                      </th>
-                      {timeRanges.map((range, index) => {
-                        const periodValue = summary.weeklyRevenues.get(range.label) || 0;
-                        const formattedValue = periodValue > 0 ? `$${Math.round(periodValue).toLocaleString()}` : "";
+                  // For the first row, check if we need expand/collapse all button
+                  const isFirstRow = index === 0;
+                  let expandCollapseAllButton = null;
 
-                        return (
-                          <th
-                            key={range.label}
-                            className={`px-2 py-2 text-center text-xs font-semibold ${
-                              index % 2 === 0 ? "bg-green-100" : "bg-green-50"
-                            }`}
-                          >
-                            {formattedValue}
-                          </th>
-                        );
-                      })}
-                      <th className="px-2 py-2 text-center text-gray-800 font-semibold">
-                        {formattedTotal}
-                      </th>
-                      {showNotes && <th className="px-2 py-2"></th>}
-                    </tr>
+                  if (isFirstRow) {
+                    // Check if any summaries have breakdowns
+                    const summariesWithBreakdowns = processTypeSummaries.filter((s) => {
+                      const norm = normalizeProcessType(s.processType);
+                      const fields = getBreakdownableFields(norm, machineVariables);
+                      return fields.length > 0;
+                    });
+
+                    if (summariesWithBreakdowns.length > 0) {
+                      // Check if all expandable summaries are expanded
+                      const allExpanded = summariesWithBreakdowns.every((s) => {
+                        const key = isFacilitySummary(s)
+                          ? `${s.processType}-${s.facilityId}`
+                          : s.processType;
+                        return expandedSummaries.has(key);
+                      });
+
+                      expandCollapseAllButton = (
+                        <button
+                          onClick={allExpanded ? handleCollapseAll : handleExpandAll}
+                          className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                          title={allExpanded ? "Collapse all summaries" : "Expand all summaries"}
+                        >
+                          {allExpanded ? (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              <span>Collapse All</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronRight className="w-3 h-3" />
+                              <span>Expand All</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
+                  }
+
+                  return (
+                    <React.Fragment key={summaryKey}>
+                      <tr className="bg-green-50 font-semibold text-sm border-b border-green-200">
+                        <th className="px-2 py-2 w-12">
+                          {expandCollapseAllButton && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              {expandCollapseAllButton}
+                            </div>
+                          )}
+                        </th>
+                        <th className="px-2 py-2"></th>
+                        <th className="px-2 py-2"></th>
+                        <th className="px-2 py-2"></th>
+                        <th className="px-2 py-2"></th>
+                        <th className="px-2 py-2"></th>
+                        <th className="px-2 py-2"></th>
+                        <th colSpan={2} className="px-2 py-2 text-left">
+                          <div className="flex items-center gap-2">
+                            {/* Expand/collapse button */}
+                            {availableFields.length > 0 && (
+                              <button
+                                onClick={() => handleToggleExpand(summaryKey)}
+                                className="p-1 hover:bg-green-200 rounded transition-colors"
+                                title={isExpanded ? "Collapse breakdown" : "Expand breakdown"}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-gray-700" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-gray-700" />
+                                )}
+                              </button>
+                            )}
+                            {/* Process type label */}
+                            <span className="text-gray-800 font-semibold">{displayLabel}</span>
+                          </div>
+                        </th>
+                        {timeRanges.map((range, index) => {
+                          const periodValue = summary.weeklyRevenues.get(range.label) || 0;
+                          const formattedValue = periodValue > 0 ? `$${Math.round(periodValue).toLocaleString()}` : "";
+
+                          return (
+                            <th
+                              key={range.label}
+                              className={`px-2 py-2 text-center text-xs font-semibold ${
+                                index % 2 === 0 ? "bg-green-100" : "bg-green-50"
+                              }`}
+                            >
+                              {formattedValue}
+                            </th>
+                          );
+                        })}
+                        <th className="px-2 py-2 text-center text-gray-800 font-semibold">
+                          {formattedTotal}
+                        </th>
+                        {showNotes && <th className="px-2 py-2"></th>}
+                      </tr>
+                      {/* Render breakdown rows for all fields if expanded */}
+                      {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
+                        <React.Fragment key={`${summaryKey}-field-${field.name}`}>
+                          {breakdowns.map((breakdown) => (
+                            <ProcessTypeBreakdownRow
+                              key={`${summaryKey}-${field.name}-${breakdown.fieldValue}`}
+                              breakdown={breakdown}
+                              fieldDisplayLabel={field.label}
+                              timeRanges={timeRanges}
+                              showNotes={showNotes}
+                            />
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </React.Fragment>
                   );
                 })}
               </>
@@ -1680,11 +1881,11 @@ export default function RevenueProjectionsTable({
                 </div>
               </th>
               <th
-                onClick={() => handleSort("client")}
+                onClick={() => handleSort("facility")}
                 className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-1">
-                  Client <SortIcon field="client" />
+                  Facility <SortIcon field="facility" />
                 </div>
               </th>
               <th

@@ -139,9 +139,10 @@ export function convertWeeklyToGranularity(
     const daysInWeek = getDaysBetween(week.startDate, week.endDate);
     const dailyQuantity = weekQuantity / daysInWeek;
 
-    let currentDay = new Date(week.startDate);
-    while (currentDay <= week.endDate) {
-      const dateKey = currentDay.toISOString().split("T")[0];
+    let currentDay = normalizeToMidnight(week.startDate);
+    const endDay = normalizeToMidnight(week.endDate);
+    while (currentDay <= endDay) {
+      const dateKey = getDateKey(currentDay);
       dailyQuantities.set(dateKey, dailyQuantity);
       currentDay.setDate(currentDay.getDate() + 1);
     }
@@ -150,17 +151,21 @@ export function convertWeeklyToGranularity(
   // Aggregate daily quantities into target periods
   return targetPeriods.map((period) => {
     let periodQuantity = 0;
-    let currentDay = new Date(period.startDate);
+    let currentDay = normalizeToMidnight(period.startDate);
+    const endDay = normalizeToMidnight(period.endDate);
 
-    while (currentDay <= period.endDate) {
-      const dateKey = currentDay.toISOString().split("T")[0];
+    while (currentDay <= endDay) {
+      const dateKey = getDateKey(currentDay);
       periodQuantity += dailyQuantities.get(dateKey) || 0;
       currentDay.setDate(currentDay.getDate() + 1);
     }
 
+    // Ensure we never return NaN or negative quantities
+    const finalQuantity = Math.round(periodQuantity);
+
     return {
       ...period,
-      quantity: Math.round(periodQuantity),
+      quantity: isNaN(finalQuantity) ? 0 : Math.max(0, finalQuantity),
       isLocked: false, // Locks don't translate to other granularities
     };
   });
@@ -194,9 +199,10 @@ export function convertGranularityToWeekly(
     const daysInPeriod = getDaysBetween(period.startDate, period.endDate);
     const dailyQuantity = period.quantity / daysInPeriod;
 
-    let currentDay = new Date(period.startDate);
-    while (currentDay <= period.endDate) {
-      const dateKey = currentDay.toISOString().split("T")[0];
+    let currentDay = normalizeToMidnight(period.startDate);
+    const endDay = normalizeToMidnight(period.endDate);
+    while (currentDay <= endDay) {
+      const dateKey = getDateKey(currentDay);
       dailyQuantities.set(dateKey, dailyQuantity);
       currentDay.setDate(currentDay.getDate() + 1);
     }
@@ -205,10 +211,11 @@ export function convertGranularityToWeekly(
   // Aggregate daily quantities into weeks
   const weekly_split = weekPeriods.map((week) => {
     let weekQuantity = 0;
-    let currentDay = new Date(week.startDate);
+    let currentDay = normalizeToMidnight(week.startDate);
+    const endDay = normalizeToMidnight(week.endDate);
 
-    while (currentDay <= week.endDate) {
-      const dateKey = currentDay.toISOString().split("T")[0];
+    while (currentDay <= endDay) {
+      const dateKey = getDateKey(currentDay);
       weekQuantity += dailyQuantities.get(dateKey) || 0;
       currentDay.setDate(currentDay.getDate() + 1);
     }
@@ -229,6 +236,25 @@ export function convertGranularityToWeekly(
   const locked_weeks = weekly_split.map(() => false);
 
   return { weekly_split, locked_weeks };
+}
+
+/**
+ * Helper function to normalize a date to midnight local time
+ */
+function normalizeToMidnight(date: Date): Date {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
+/**
+ * Helper function to get date key in YYYY-MM-DD format (local time)
+ */
+function getDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
