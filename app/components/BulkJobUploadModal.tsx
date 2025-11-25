@@ -318,9 +318,7 @@ export default function BulkJobUploadModal({
         total_billing: totalBilling,
         daily_split: daily_split,
         weekly_split: weekly_split,
-        confirmed: pj.schedule_type
-          ? pj.schedule_type.toLowerCase().includes("hard")
-          : false,
+        schedule_type: pj.schedule_type || "",
       };
     });
 
