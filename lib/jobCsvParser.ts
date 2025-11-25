@@ -581,11 +581,6 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
               .filter((pt) => pt);
             processTypes.forEach((pt) => processTypesSet.add(pt));
           }
-
-          const sortValueRaw = findColumnValue(row, "sort_type");
-          if (hasSortRequirement(sortValueRaw)) {
-            processTypesSet.add("sort");
-          }
         });
 
         const uniqueProcessTypes = Array.from(processTypesSet);
@@ -766,10 +761,6 @@ export function parseJobCsv(file: File): Promise<JobCsvParseResult> {
           const sort_type = sortRequired
             ? sortValueString || "TRUE"
             : undefined;
-
-          if (sortRequired && !process_types.includes("sort")) {
-            process_types.push("sort");
-          }
           const print_coverage =
             String(findColumnValue(row, "print_coverage") || "").trim() ||
             undefined;

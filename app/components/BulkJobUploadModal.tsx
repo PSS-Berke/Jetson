@@ -157,9 +157,7 @@ export default function BulkJobUploadModal({
         ? JSON.stringify({ id: null, name: clientPayloadName })
         : undefined;
 
-      const subClientPayload = subClientName
-        ? JSON.stringify({ id: null, name: subClientName })
-        : undefined;
+      const subClientPayload = subClientName || undefined;
 
       return {
         job_number: pj.job_number,
@@ -201,6 +199,17 @@ export default function BulkJobUploadModal({
       console.log(`[BulkJobUpload] Starting upload of ${jobsToCreate.length} jobs`);
       console.log(`[BulkJobUpload] ${invalidJobsCount} jobs were excluded due to validation errors`);
       console.log(`[BulkJobUpload] ${skippedRows.length} rows were skipped during parsing`);
+
+      // Log first job payload for debugging
+      if (jobsToCreate.length > 0) {
+        console.log(`[BulkJobUpload] Sample job payload (first job):`, {
+          job_number: jobsToCreate[0].job_number,
+          client: jobsToCreate[0].client,
+          sub_client: jobsToCreate[0].sub_client,
+          sub_client_type: typeof jobsToCreate[0].sub_client,
+          facilities_id: jobsToCreate[0].facilities_id,
+        });
+      }
 
       const results = await batchCreateJobs(jobsToCreate, (current, total) => {
         setUploadProgress({ current, total });
