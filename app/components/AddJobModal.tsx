@@ -5,6 +5,7 @@ import SmartClientSelect from "./SmartClientSelect";
 import FacilityToggle from "./FacilityToggle";
 import ScheduleToggle from "./ScheduleToggle";
 import DynamicRequirementFields from "./DynamicRequirementFields";
+import RecommendedMachines from "./RecommendedMachines";
 import { getToken, getJobTemplates, createJobTemplate } from "@/lib/api";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
 import Toast from "./Toast";
@@ -458,6 +459,21 @@ export default function AddJobModal({
         ),
       }));
     }
+  };
+
+  // Machine selection handlers
+  const handleSelectMachine = (machineId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      machines_id: [...prev.machines_id, machineId],
+    }));
+  };
+
+  const handleDeselectMachine = (machineId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      machines_id: prev.machines_id.filter((id) => id !== machineId),
+    }));
   };
 
   const handleWeeklySplitChange = (weekIndex: number, value: string) => {
@@ -1726,6 +1742,45 @@ export default function AddJobModal({
               >
                 + Add Another Service
               </button>
+
+              {/* Recommended Machines - Show for each requirement that has a process type */}
+              {formData.requirements.map((requirement, index) => {
+                // Only show recommendations if we have:
+                // 1. A process type selected
+                // 2. Quantity entered
+                // 3. Start and due dates set
+                if (!requirement.process_type || !formData.quantity || !formData.start_date || !formData.due_date) {
+                  return null;
+                }
+
+                // Check if there are any filled capability fields (excluding metadata)
+                const filledCapabilityFields = Object.keys(requirement).filter(
+                  k => k !== 'process_type' && k !== 'price_per_m' && k !== 'id' &&
+                       requirement[k] !== undefined && requirement[k] !== null && requirement[k] !== ''
+                ).length;
+
+                // Show recommendations if we have at least one capability field filled
+                if (filledCapabilityFields === 0) {
+                  return null;
+                }
+
+                console.log('[AddJobModal] Rendering RecommendedMachines for requirement:', requirement);
+
+                return (
+                  <RecommendedMachines
+                    key={`recommended-${index}`}
+                    processType={requirement.process_type}
+                    jobRequirements={requirement}
+                    quantity={parseInt(formData.quantity) || 0}
+                    startDate={formData.start_date}
+                    dueDate={formData.due_date}
+                    facilityId={formData.facilities_id}
+                    selectedMachineIds={formData.machines_id}
+                    onSelectMachine={handleSelectMachine}
+                    onDeselectMachine={handleDeselectMachine}
+                  />
+                );
+              })}
             </div>
           )}
 
@@ -1943,6 +1998,87 @@ export default function AddJobModal({
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Selected Machines Section */}
+              <div className="bg-white border border-[var(--border)] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-[var(--text-dark)]">
+                    Assigned Machines
+                  </h3>
+                  {!isCreatingTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
+                    >
+                      Edit Machines
+                    </button>
+                  )}
+                </div>
+                {formData.machines_id.length === 0 ? (
+                  <div className="text-center py-6 px-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <svg
+                      className="w-10 h-10 text-yellow-500 mx-auto mb-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <p className="text-sm font-medium text-yellow-800">
+                      No machines selected
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Go back to Services step to select machines from recommendations
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.machines_id.map((machineId) => (
+                      <div
+                        key={machineId}
+                        className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <svg
+                            className="w-5 h-5 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+                            />
+                          </svg>
+                          <div>
+                            <p className="font-semibold text-blue-900">
+                              Machine ID: {machineId}
+                            </p>
+                            <p className="text-xs text-blue-700">
+                              Assigned to this job
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeselectMachine(machineId)}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {!isCreatingTemplate && (

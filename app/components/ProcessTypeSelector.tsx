@@ -6,7 +6,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PROCESS_TYPE_CONFIGS } from "@/lib/processTypeConfig";
 import { getAllMachineVariables, getMachineVariablesById } from "@/lib/api";
 import { Pen, Trash2 } from "lucide-react";
 
@@ -68,9 +67,6 @@ export default function ProcessTypeSelector({
         setLoadingCounts(true);
         const allVariables = await getAllMachineVariables();
 
-        // Allowed core process types
-        const ALLOWED_CORE_TYPES = ['data', 'hp', 'laser', 'fold', 'affix', 'insert', 'inkjet', 'labeling'];
-
         // Deprecated process types to filter out
         const deprecatedTypes = [
           "insert9to12",
@@ -105,22 +101,6 @@ export default function ProcessTypeSelector({
               return;
             }
 
-            // Check if it's in the config (core type)
-            const configMatch = PROCESS_TYPE_CONFIGS.find(
-              (c) => c.key === group.type,
-            );
-
-            // Only include if:
-            // 1. It's an allowed core type, OR
-            // 2. It's a custom type (not in PROCESS_TYPE_CONFIGS)
-            const isAllowedCoreType = ALLOWED_CORE_TYPES.includes(normalizedType);
-            const isCustomType = !configMatch;
-
-            if (!isAllowedCoreType && !isCustomType) {
-              console.log(`[ProcessTypeSelector] Filtering out non-allowed process type: ${group.type}`);
-              return;
-            }
-
             // Store the ID mapping
             if (group.id) {
               idMap[group.type] = group.id;
@@ -136,33 +116,14 @@ export default function ProcessTypeSelector({
               counts[group.type] = 0;
             }
 
-            // Add all process types from API (check if we already added it)
+            // Add all process types from API - use database values for label and color
+            // Fallback to computed values if not yet migrated
             if (!apiTypes.find((t) => t.key === group.type)) {
               apiTypes.push({
                 key: group.type,
-                label:
-                  configMatch?.label ||
-                  group.type.charAt(0).toUpperCase() + group.type.slice(1),
-                color: configMatch?.color || "#6B7280",
+                label: (group as any).label || group.type.charAt(0).toUpperCase() + group.type.slice(1),
+                color: (group as any).color || "#6B7280", // Gray fallback
               });
-            }
-          }
-        });
-
-        // Ensure all allowed core process types are shown, even if not in the database yet
-        ALLOWED_CORE_TYPES.forEach((coreType) => {
-          if (!apiTypes.find((t) => t.key === coreType)) {
-            const configMatch = PROCESS_TYPE_CONFIGS.find((c) => c.key === coreType);
-            if (configMatch) {
-              apiTypes.push({
-                key: configMatch.key,
-                label: configMatch.label,
-                color: configMatch.color,
-              });
-              // Set count to 0 if not in database
-              if (counts[coreType] === undefined) {
-                counts[coreType] = 0;
-              }
             }
           }
         });
@@ -275,18 +236,15 @@ export default function ProcessTypeSelector({
     onCancelCustom();
   };
 
-  const selectedConfig = PROCESS_TYPE_CONFIGS.find(
-    (c) => c.key === selectedProcessType,
-  );
   const selectedApiType = apiProcessTypes.find(
     (t) => t.key === selectedProcessType,
   );
   const selectedTypeLabel =
-    selectedConfig?.label || selectedApiType?.label || selectedProcessType;
+    selectedApiType?.label || selectedProcessType.charAt(0).toUpperCase() + selectedProcessType.slice(1);
   const selectedTypeColor =
-    selectedConfig?.color || selectedApiType?.color || "#6B7280";
+    selectedApiType?.color || "#6B7280";
   const selectedTypeFieldCount =
-    variableCounts[selectedProcessType] ?? selectedConfig?.fields.length ?? 0;
+    variableCounts[selectedProcessType] ?? 0;
 
   return (
     <div className="space-y-4">

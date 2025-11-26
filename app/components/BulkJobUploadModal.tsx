@@ -15,7 +15,8 @@ import {
 import ExcelUploadZone from "./ExcelUploadZone";
 import { parseJobCsv, type ParsedBulkJob } from "@/lib/jobCsvParser";
 import { downloadJobTemplate } from "@/lib/jobCsvTemplate";
-import { batchCreateJobs, getToken } from "@/lib/api";
+import { batchCreateJobs, getToken, getMachines, getJobs } from "@/lib/api";
+import { findBestMachine } from "@/lib/machineMatching";
 import type { Job } from "@/types";
 
 interface BulkJobUploadModalProps {
@@ -166,6 +167,19 @@ export default function BulkJobUploadModal({
     const token = getToken();
     const updatedMappings = [...clientMappings];
 
+    // Load machines and existing jobs for auto-matching
+    let allMachines: any[] = [];
+    let existingJobs: any[] = [];
+    try {
+      console.log("[BulkJobUpload] Loading machines and jobs for auto-matching...");
+      allMachines = await getMachines();
+      existingJobs = await getJobs();
+      console.log(`[BulkJobUpload] Loaded ${allMachines.length} machines and ${existingJobs.length} jobs`);
+    } catch (error) {
+      console.error("[BulkJobUpload] Error loading data for auto-matching:", error);
+      // Continue without auto-matching if this fails
+    }
+
     for (let i = 0; i < updatedMappings.length; i++) {
       const mapping = updatedMappings[i];
 
@@ -210,8 +224,8 @@ export default function BulkJobUploadModal({
     // Update the mappings state with new client IDs
     setClientMappings(updatedMappings);
 
-    // Convert parsed jobs to API format
-    const jobsToCreate: Partial<Job>[] = validJobs.map((pj) => {
+    // Convert parsed jobs to API format with auto-matching
+    const jobsToCreate: Partial<Job>[] = await Promise.all(validJobs.map(async (pj) => {
       // Find client mapping for this job's sub_client (use updatedMappings which now has new client IDs)
       const mapping = updatedMappings.find(
         (m) => m.subClient === pj.sub_client,
@@ -307,7 +321,59 @@ export default function BulkJobUploadModal({
         pockets: pj.requirements[0]?.pockets?.toString() || "2",
         csr: undefined,
         prgm: undefined,
-        machines_id: "",
+        machines_id: await (async () => {
+          // Auto-match machine for this job
+          if (allMachines.length === 0 || pj.requirements.length === 0) {
+            console.log(`[BulkJobUpload] Job ${pj.job_number}: No auto-matching (no machines or requirements)`);
+            return "";
+          }
+
+          try {
+            // Use the first requirement for matching (most jobs have one primary process)
+            const primaryRequirement = pj.requirements[0];
+            const processType = primaryRequirement.process_type || pj.process_types[0] || "insert";
+
+            console.log(`[BulkJobUpload] Job ${pj.job_number}: Attempting auto-match for process type ${processType}`);
+
+            const bestMatch = await findBestMachine(
+              {
+                processType,
+                jobRequirements: primaryRequirement,
+                quantity: pj.quantity,
+                startDate: pj.start_date?.getTime() || Date.now(),
+                dueDate: pj.end_date?.getTime() || Date.now() + 7 * 24 * 60 * 60 * 1000,
+                facilityId: pj.facility
+                  ? pj.facility.toLowerCase().includes("lemont") ||
+                    pj.facility.toLowerCase().includes("shakopee")
+                    ? 2
+                    : 1
+                  : undefined,
+              },
+              allMachines,
+              existingJobs.map((job: any) => ({
+                machines_id: Array.isArray(job.machines_id)
+                  ? job.machines_id
+                  : typeof job.machines_id === "string"
+                  ? JSON.parse(job.machines_id || "[]")
+                  : [],
+                start_date: job.start_date,
+                due_date: job.due_date,
+                quantity: job.quantity,
+              }))
+            );
+
+            if (bestMatch) {
+              console.log(`[BulkJobUpload] Job ${pj.job_number}: Auto-matched to Machine ${bestMatch.machine.id} (Line ${bestMatch.machine.line}) with score ${bestMatch.matchScore}%`);
+              return JSON.stringify([bestMatch.machine.id]);
+            } else {
+              console.log(`[BulkJobUpload] Job ${pj.job_number}: No suitable machine found`);
+              return "";
+            }
+          } catch (error) {
+            console.error(`[BulkJobUpload] Job ${pj.job_number}: Error during auto-matching:`, error);
+            return "";
+          }
+        })(),
         requirements:
           pj.requirements.length > 0
             ? JSON.stringify(pj.requirements)
@@ -320,7 +386,7 @@ export default function BulkJobUploadModal({
         weekly_split: weekly_split,
         schedule_type: pj.schedule_type || "",
       };
-    });
+    }));
 
     try {
       const results = await batchCreateJobs(jobsToCreate, (current, total) => {

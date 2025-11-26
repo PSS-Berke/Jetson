@@ -19,6 +19,8 @@ import {
   getAllMachineVariables,
   getMachineVariablesById,
   updateMachineVariables,
+  getCapabilityBuckets,
+  type CapabilityBucket,
 } from "@/lib/api";
 import {
   validateFieldName,
@@ -109,6 +111,10 @@ export default function StepCapabilities({
   const [saveQueue, setSaveQueue] = useState<Array<() => Promise<void>>>([]);
   const isProcessingQueueRef = useRef(false);
 
+  // Capability buckets for quick-apply templates
+  const [capabilityBuckets, setCapabilityBuckets] = useState<CapabilityBucket[]>([]);
+  const [loadingBuckets, setLoadingBuckets] = useState(false);
+
   // Auto-generate field name from field label (convert to snake_case)
   const generateFieldName = (label: string): string => {
     const baseName = label
@@ -135,6 +141,64 @@ export default function StepCapabilities({
     }
     // For other types, use the value or default to empty string
     return value !== undefined && value !== null ? value : "";
+  };
+
+  // Fetch capability buckets when component mounts
+  useEffect(() => {
+    const fetchBuckets = async () => {
+      try {
+        setLoadingBuckets(true);
+        const buckets = await getCapabilityBuckets();
+        setCapabilityBuckets(buckets);
+      } catch (error) {
+        console.error("[StepCapabilities] Error fetching capability buckets:", error);
+        setCapabilityBuckets([]);
+      } finally {
+        setLoadingBuckets(false);
+      }
+    };
+
+    fetchBuckets();
+  }, []);
+
+  // Apply capability bucket to pre-fill all fields
+  const handleApplyCapabilityBucket = (bucketId: number) => {
+    const bucket = capabilityBuckets.find(b => b.id === bucketId);
+    if (!bucket) return;
+
+    console.log("[StepCapabilities] Applying capability bucket:", bucket);
+
+    // Extract capabilities from bucket and apply them to form builder fields
+    if (bucket.capabilities && typeof bucket.capabilities === 'object') {
+      Object.entries(bucket.capabilities).forEach(([fieldName, fieldConfig]: [string, any]) => {
+        // Find the field in formBuilderFields
+        const existingField = formBuilderFields.find(f => f.fieldName === fieldName);
+
+        if (existingField) {
+          // Update the field value
+          onUpdateFormBuilderField(existingField.id, {
+            fieldValue: fieldConfig.value || fieldConfig
+          });
+        } else {
+          // Check if field exists in availableFields and add it
+          const availableField = availableFields.find(f => f.fieldName === fieldName);
+          if (availableField) {
+            const newField: FormBuilderField = {
+              ...availableField,
+              id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+              fieldValue: fieldConfig.value || fieldConfig,
+            };
+            onAddFormBuilderField(newField);
+          }
+        }
+      });
+
+      showToast({
+        type: 'success',
+        message: `Applied template: ${bucket.name}`,
+        duration: 3000,
+      });
+    }
   };
 
   // Request queue functions
@@ -944,6 +1008,59 @@ export default function StepCapabilities({
         onDeleteField={handleDeleteFieldFromProcessType}
         error={errors.process_type_key || errors.customProcessTypeName}
       />
+
+      {/* Capability Bucket Quick-Apply */}
+      {processTypeKey && !isCustomProcessType && capabilityBuckets.length > 0 && (
+        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-lg p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <svg className="w-6 h-6 text-purple-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-purple-900">
+                Quick Start with Template
+              </h3>
+              <p className="mt-1 text-sm text-purple-700">
+                Apply a pre-configured template to instantly fill in common capability values.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-purple-900">
+              Select Template
+            </label>
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleApplyCapabilityBucket(parseInt(e.target.value));
+                  e.target.value = ''; // Reset selection
+                }
+              }}
+              className="w-full px-4 py-3 bg-white border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
+              disabled={loadingBuckets}
+            >
+              <option value="">
+                {loadingBuckets ? 'Loading templates...' : '-- Select a template to apply --'}
+              </option>
+              {capabilityBuckets.map((bucket) => (
+                <option key={bucket.id} value={bucket.id}>
+                  {bucket.name}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex items-start gap-2 text-xs text-purple-600 bg-purple-100 rounded-lg p-3">
+              <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <span>
+                Templates automatically fill field values based on common configurations. You can still edit values after applying a template.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Custom Process Type Builder */}
       {isCustomProcessType && customProcessTypeName && (

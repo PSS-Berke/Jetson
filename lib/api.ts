@@ -466,36 +466,52 @@ export const getMachines = async (
   facilitiesId?: number,
   type?: string,
 ): Promise<Machine[]> => {
-  // Map the type to API format
-  const apiType = mapMachineTypeToAPI(type);
-  
   // Build query parameters - API expects GET with query params
+  // NOTE: We removed type filtering from the API call because Xano has inconsistent
+  // capitalization (e.g., "Insert" vs "insert"). We'll filter client-side instead.
   const params = new URLSearchParams();
-  
-  // Only append status parameter if it has a value
-  if (status && status !== "") {
-    params.append("status", status);
+
+  // Only append status parameter if it has a valid value
+  if (status && status.trim() !== "" && status !== "undefined" && status !== "null") {
+    params.append("status", status.trim());
   }
-  
-  // Only append facilities_id parameter if it has a value
-  if (facilitiesId && facilitiesId > 0) {
+
+  // Only append facilities_id parameter if it has a valid value
+  if (facilitiesId !== undefined && facilitiesId !== null && facilitiesId > 0 && !isNaN(facilitiesId)) {
     params.append("facilities_id", facilitiesId.toString());
-  }
-  
-  // Only append type parameter if it has a value
-  if (apiType) {
-    params.append("type", apiType);
   }
 
   const queryString = params.toString();
   const endpoint = queryString ? `/machines?${queryString}` : "/machines";
+
+  console.log("[getMachines] Fetching machines with endpoint:", endpoint, {
+    status,
+    facilitiesId,
+    type,
+  });
 
   const data = await apiFetch<any[]>(endpoint, {
     method: "GET",
   });
 
   // Transform API response to match Machine interface
-  return data.map((machine) => {
+  const transformedMachines = data.map((machine) => {
+    // Normalize process_type_key (handle capitalization and extra text)
+    const normalizeProcessTypeKey = (key: string | undefined): string => {
+      if (!key) return "";
+      const normalized = key.toLowerCase().trim();
+
+      // Map common variations to standard keys
+      if (normalized.includes("insert")) return "insert";
+      if (normalized.includes("fold")) return "fold";
+      if (normalized.includes("affix") || normalized.includes("glue")) return "affix";
+      if (normalized.includes("ink") || normalized.includes("jet")) return "inkjet";
+      if (normalized.includes("laser") || normalized.includes("hp") || normalized.includes("press")) return "hpPress";
+      if (normalized.includes("data")) return "data";
+
+      return normalized;
+    };
+
     // Normalize status (convert "Offline" to "offline", etc.)
     const normalizeStatus = (status: string): MachineStatus => {
       const normalized = status.toLowerCase().trim();
@@ -554,11 +570,42 @@ export const getMachines = async (
         parseShiftCapacity(machine.shift_capacity) ||
         parseShiftCapacity(machine.shiftCapacity),
       status: normalizeStatus(machine.status || "available"),
-      // Infer process_type_key from machine type if not provided
-      process_type_key:
-        machine.process_type_key || inferProcessTypeKey(machine.type),
+      // Normalize process_type_key to handle capitalization and extra text
+      process_type_key: normalizeProcessTypeKey(machine.process_type_key) ||
+        inferProcessTypeKey(machine.type),
     };
   });
+
+  // Apply client-side type filtering if specified
+  if (type) {
+    const normalizedFilterType = type.toLowerCase().trim();
+    return transformedMachines.filter((machine) => {
+      const machineType = machine.type?.toLowerCase() || "";
+      const processTypeKey = machine.process_type_key?.toLowerCase() || "";
+
+      // Map filter type to what we should match against
+      if (normalizedFilterType === "inserters" || normalizedFilterType === "insert") {
+        return machineType.includes("insert") || processTypeKey === "insert";
+      }
+      if (normalizedFilterType === "folders" || normalizedFilterType === "fold") {
+        return machineType.includes("fold") || processTypeKey === "fold";
+      }
+      if (normalizedFilterType === "hp-press" || normalizedFilterType === "hppress") {
+        return machineType.includes("hp") || machineType.includes("press") || processTypeKey === "hppress";
+      }
+      if (normalizedFilterType === "inkjetters" || normalizedFilterType === "inkjet") {
+        return machineType.includes("inkjet") || processTypeKey === "inkjet";
+      }
+      if (normalizedFilterType === "affixers" || normalizedFilterType === "affix") {
+        return machineType.includes("affix") || processTypeKey === "affix";
+      }
+
+      // Default: try to match type directly
+      return machineType.includes(normalizedFilterType) || processTypeKey === normalizedFilterType;
+    });
+  }
+
+  return transformedMachines;
 };
 
 // Helper function to infer process_type_key from machine type
@@ -1448,6 +1495,98 @@ export const getAllMachineVariables = async (): Promise<any[]> => {
 };
 
 /**
+ * Get process type color from database
+ * Falls back to gray if not found
+ * @param processTypeKey - The process type key (e.g., 'insert', 'fold')
+ * @param allVariables - Optional cached array of all machine variables to avoid extra API call
+ * @returns Hex color code
+ */
+export const getProcessTypeColor = async (
+  processTypeKey: string,
+  allVariables?: any[],
+): Promise<string> => {
+  try {
+    const variables = allVariables || (await getAllMachineVariables());
+    const processType = variables.find((v) => v.type === processTypeKey);
+    return processType?.color || "#6B7280"; // Gray fallback
+  } catch (error) {
+    console.error("[getProcessTypeColor] Error fetching color:", error);
+    return "#6B7280"; // Gray fallback
+  }
+};
+
+/**
+ * Get process type label from database
+ * Falls back to capitalized type key if not found
+ * @param processTypeKey - The process type key (e.g., 'insert', 'fold')
+ * @param allVariables - Optional cached array of all machine variables to avoid extra API call
+ * @returns Display label
+ */
+export const getProcessTypeLabel = async (
+  processTypeKey: string,
+  allVariables?: any[],
+): Promise<string> => {
+  try {
+    const variables = allVariables || (await getAllMachineVariables());
+    const processType = variables.find((v) => v.type === processTypeKey);
+    return (
+      processType?.label ||
+      processTypeKey.charAt(0).toUpperCase() + processTypeKey.slice(1)
+    );
+  } catch (error) {
+    console.error("[getProcessTypeLabel] Error fetching label:", error);
+    return processTypeKey.charAt(0).toUpperCase() + processTypeKey.slice(1);
+  }
+};
+
+/**
+ * Get all process type colors as a map
+ * Useful for batch operations to avoid multiple API calls
+ * @returns Record of process type key to color
+ */
+export const getAllProcessTypeColors = async (): Promise<
+  Record<string, string>
+> => {
+  try {
+    const variables = await getAllMachineVariables();
+    const colorMap: Record<string, string> = {};
+    variables.forEach((v) => {
+      if (v.type && v.color) {
+        colorMap[v.type] = v.color;
+      }
+    });
+    return colorMap;
+  } catch (error) {
+    console.error("[getAllProcessTypeColors] Error:", error);
+    return {};
+  }
+};
+
+/**
+ * Get all process type labels as a map
+ * Useful for batch operations to avoid multiple API calls
+ * @returns Record of process type key to label
+ */
+export const getAllProcessTypeLabels = async (): Promise<
+  Record<string, string>
+> => {
+  try {
+    const variables = await getAllMachineVariables();
+    const labelMap: Record<string, string> = {};
+    variables.forEach((v) => {
+      if (v.type) {
+        labelMap[v.type] =
+          v.label || v.type.charAt(0).toUpperCase() + v.type.slice(1);
+      }
+    });
+    return labelMap;
+  } catch (error) {
+    console.error("[getAllProcessTypeLabels] Error:", error);
+    return {};
+  }
+};
+
+/**
  * Get machine variables by ID
  * @param machineVariablesId - The ID of the machine variables record
  * @returns Machine variables configuration
@@ -1806,21 +1945,27 @@ export const getVariableCombinations = async (
   );
 
   try {
-    const params = new URLSearchParams();
-    params.append("machine_variables_id", machineVariablesId.toString());
-
-    const endpoint = `/variable_combinations?${params.toString()}`;
+    // Try fetching without filter first (some Xano endpoints don't support filtering)
+    const endpoint = `/variable_combinations`;
 
     const result = await apiFetch<any[]>(endpoint, {
       method: "GET",
     });
 
+    // Filter client-side by machine_variables_id
+    const filtered = result.filter((combo: any) =>
+      combo.machine_variables_id === machineVariablesId
+    );
+
     console.log(
       "[getVariableCombinations] Received",
       result.length,
-      "variable combinations",
+      "variable combinations,",
+      filtered.length,
+      "match machine_variables_id",
+      machineVariablesId,
     );
-    return result;
+    return filtered;
   } catch (error) {
     console.log(
       "[getVariableCombinations] Endpoint not available or error occurred, returning empty array",

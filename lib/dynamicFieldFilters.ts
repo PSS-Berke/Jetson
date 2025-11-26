@@ -171,15 +171,21 @@ export function evaluateFilter(
     return !isEmpty;
   }
 
-  // If field is empty and we're not checking for emptiness, return false
+  // If field is empty and we're not checking for emptiness, handle based on operator
   if (isEmpty) {
-    return false;
+    // For negative operators (not_equals, not_contains, not_in), an empty field
+    // doesn't match the filter value, so it should pass
+    const negativeOperators: DynamicFieldOperator[] = ["not_equals", "not_contains", "not_in"];
+    if (negativeOperators.includes(operator)) {
+      return true; // Empty field doesn't equal/contain the value, so it passes
+    }
+    return false; // Empty field can't equal/contain a value, so it fails
   }
 
-  // Convert values for comparison
-  const normalizedFieldValue = String(fieldValue).toLowerCase();
+  // Convert values for comparison (trim whitespace and normalize case)
+  const normalizedFieldValue = String(fieldValue).trim().toLowerCase();
   const normalizedFilterValue =
-    typeof filterValue === "string" ? filterValue.toLowerCase() : filterValue;
+    typeof filterValue === "string" ? filterValue.trim().toLowerCase() : filterValue;
 
   switch (operator) {
     case "equals":
@@ -271,11 +277,30 @@ export function applyDynamicFieldFilters(
   }
 
   const results = filters.map((filter) => {
+    // First check if job has any requirements
+    if (!job.requirements || job.requirements.length === 0) {
+      console.log(`[DynamicFilter] Job ${job.job_number} has no requirements, excluding`);
+      return false;
+    }
+
+    // Check if job has this process type at all
+    const filterProcessType = normalizeProcessType(filter.processType);
+    const hasProcessType = job.requirements.some((req: any) => {
+      const reqProcessType = normalizeProcessType(req.process_type);
+      return reqProcessType === filterProcessType;
+    });
+
+    if (!hasProcessType) {
+      console.log(
+        `[DynamicFilter] Job ${job.job_number} doesn't have process type "${filter.processType}", excluding`
+      );
+      return false;
+    }
+
     // Check if any requirement matches this filter
-    const hasMatchingRequirement = job.requirements?.some((req: any) => {
+    const hasMatchingRequirement = job.requirements.some((req: any) => {
       // Normalize process types for comparison
       const reqProcessType = normalizeProcessType(req.process_type);
-      const filterProcessType = normalizeProcessType(filter.processType);
 
       // Skip if requirement doesn't match filter's process type
       if (reqProcessType !== filterProcessType) {
@@ -285,19 +310,37 @@ export function applyDynamicFieldFilters(
       // Get the field value from the requirement
       const fieldValue = req[filter.fieldName];
 
+      // Log for debugging
+      console.log(`[DynamicFilter] Evaluating job ${job.job_number}:`, {
+        processType: filter.processType,
+        fieldName: filter.fieldName,
+        fieldLabel: filter.fieldLabel,
+        operator: filter.operator,
+        filterValue: filter.value,
+        actualValue: fieldValue,
+      });
+
       // Evaluate the filter
-      return evaluateFilter(fieldValue, filter.operator, filter.value);
+      const result = evaluateFilter(fieldValue, filter.operator, filter.value);
+
+      console.log(`[DynamicFilter] Filter result: ${result}`);
+
+      return result;
     });
 
     return hasMatchingRequirement || false;
   });
 
   // Apply AND or OR logic
-  if (filterLogic === "and") {
-    return results.every((result) => result === true);
-  } else {
-    return results.some((result) => result === true);
-  }
+  const finalResult = filterLogic === "and"
+    ? results.every((result) => result === true)
+    : results.some((result) => result === true);
+
+  console.log(
+    `[DynamicFilter] Final result for job ${job.job_number}: ${finalResult} (logic: ${filterLogic})`
+  );
+
+  return finalResult;
 }
 
 /**
