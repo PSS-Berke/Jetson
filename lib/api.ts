@@ -467,8 +467,6 @@ export const getMachines = async (
   type?: "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer",
 ): Promise<Machine[]> => {
   // Build query parameters - API expects GET with query params
-  // NOTE: We removed type filtering from the API call because Xano has inconsistent
-  // capitalization (e.g., "Insert" vs "insert"). We'll filter client-side instead.
   const params = new URLSearchParams();
 
   // Only append status parameter if it has a valid value
@@ -479,6 +477,11 @@ export const getMachines = async (
   // Only append facilities_id parameter if it has a valid value
   if (facilitiesId !== undefined && facilitiesId !== null && facilitiesId > 0 && !isNaN(facilitiesId)) {
     params.append("facilities_id", facilitiesId.toString());
+  }
+
+  // Only append type parameter if it has a valid value
+  if (type && type.trim() !== "" && type !== "undefined" && type !== "null") {
+    params.append("type", type.trim());
   }
 
   const queryString = params.toString();
