@@ -770,6 +770,7 @@ export default function AddJobModal({
         } else {
           setCurrentStep(currentStep - 1);
         }
+        console.log("");
       } else if (currentStep === 1 && creationMode === "template") {
         // Go back to mode selection
         setCurrentStep(0);
