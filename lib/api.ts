@@ -464,7 +464,7 @@ const mapMachineTypeToAPI = (type?: string): string | undefined => {
 export const getMachines = async (
   status?: string,
   facilitiesId?: number,
-  type?: string,
+  type?: "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer",
 ): Promise<Machine[]> => {
   // Build query parameters - API expects GET with query params
   // NOTE: We removed type filtering from the API call because Xano has inconsistent
