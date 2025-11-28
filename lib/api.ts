@@ -1085,7 +1085,7 @@ export const getJobsV2 = async (
   const {
     facilities_id = 0,
     page = 1,
-    per_page = 15,
+    per_page = 1000,
     search = "",
   } = params;
 

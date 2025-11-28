@@ -143,7 +143,7 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
   const {
     facilities_id = 0,
     page = 1,
-    per_page = 15,
+    per_page = 1000,
     search = "",
     fetchAll = true, // Default to fetching all for projections
   } = params;
