@@ -178,14 +178,14 @@ export const parseJob = (job: Job): ParsedJob => {
         parsedClient = job.client as { id: number; name: string };
       }
     } catch (clientError) {
-      console.error(
+     /* console.error(
         `[parseJob] Failed to parse client for job ${job.job_number}:`,
         {
           error: clientError,
           client_value: job.client,
           clients_id: job.clients_id,
         },
-      );
+      );*/
       parsedClient = { id: job.clients_id || 0, name: "Unknown" };
     }
 
