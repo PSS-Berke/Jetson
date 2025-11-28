@@ -36,7 +36,7 @@ interface UseJobsReturn {
 }
 
 // Job parsing logic extracted for reuse
-const parseJob = (job: Job): ParsedJob => {
+export const parseJob = (job: Job): ParsedJob => {
   try {
     // Parse requirements - handle multiple formats
     let parsedRequirements: ParsedRequirement[] = [];

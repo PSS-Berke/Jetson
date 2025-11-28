@@ -1007,6 +1007,119 @@ export const getJobs = async (facilitiesId?: number): Promise<Job[]> => {
   );
 };
 
+// ============================================================================
+// Jobs V2 API (Paginated with time_split)
+// ============================================================================
+
+/**
+ * Time split data structure for jobs v2 API
+ */
+export interface TimeSplit {
+  id: number;
+  daily: Array<{
+    date: string; // Format: "YYYY-MM-DD"
+    quantity: number;
+    year: number;
+  }>;
+  weekly: Array<{
+    week_start: string; // Format: "YYYY-MM-DD"
+    year: number;
+    quantity: number;
+  }>;
+  monthly: Array<{
+    month_start: string; // Format: "YYYY-MM-DD"
+    year: number;
+    quantity: number;
+  }>;
+  quarterly: Array<{
+    quarter: number; // 1-4
+    year: number;
+    quantity: number;
+  }>;
+}
+
+/**
+ * Job with time_split data from v2 API
+ */
+export interface JobV2 extends Omit<Job, "machines_id"> {
+  machines_id: number[]; // Array instead of string
+  time_split: TimeSplit | null;
+  sub_client_id?: number;
+  schedule_type?: string;
+  sub_client?: string;
+  facility?: string;
+  client?: string;
+}
+
+/**
+ * Paginated response from jobs v2 API
+ */
+export interface JobsV2Response {
+  itemsReceived: number;
+  curPage: number;
+  nextPage: number | null;
+  prevPage: number | null;
+  offset: number;
+  perPage: number;
+  items: JobV2[];
+}
+
+/**
+ * Parameters for jobs v2 API request
+ */
+export interface GetJobsV2Params {
+  facilities_id?: number; // 0, 1, or 2 (0 = all facilities)
+  page?: number;
+  per_page?: number;
+  search?: string;
+}
+
+/**
+ * Get jobs with pagination and time_split data (v2 API)
+ * @param params - Query parameters for filtering and pagination
+ * @returns Paginated response with jobs and time_split data
+ */
+export const getJobsV2 = async (
+  params: GetJobsV2Params = {},
+): Promise<JobsV2Response> => {
+  const {
+    facilities_id = 0,
+    page = 1,
+    per_page = 15,
+    search = "",
+  } = params;
+
+  console.log("[getJobsV2] Fetching jobs with params:", {
+    facilities_id,
+    page,
+    per_page,
+    search,
+  });
+
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  queryParams.append("facilities_id", facilities_id.toString());
+  queryParams.append("page", page.toString());
+  queryParams.append("per_page", per_page.toString());
+  if (search) {
+    queryParams.append("search", search);
+  }
+
+  const endpoint = `/jobs/v2?${queryParams.toString()}`;
+  const fullUrl = `${JOBS_BASE_URL}${endpoint}`;
+
+  console.log("[getJobsV2] Full URL:", fullUrl);
+  console.log("[getJobsV2] Endpoint:", endpoint);
+
+  return apiFetch<JobsV2Response>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+};
+
 // Update a job
 export const updateJob = async (
   jobId: number,

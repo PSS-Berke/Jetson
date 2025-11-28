@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
-import { useJobs, type ParsedJob } from "./useJobs";
+import { useJobsV2 } from "./useJobsV2";
+import type { ParsedJob } from "./useJobs";
 import {
   generateWeekRanges,
   calculateJobProjections,
@@ -195,12 +196,17 @@ function calculateProcessTypeCounts(
 
 export function useProjections(startDate: Date, filters: ProjectionFilters) {
   // Fetch both jobs and production entries in parallel
+  // Use v2 API which includes time_split data for more accurate projections
+  // Note: Search filtering is handled client-side to work with other filters
   const {
     jobs,
     isLoading,
     error,
     refetch: refetchJobs,
-  } = useJobs(filters.facility);
+  } = useJobsV2({
+    facilities_id: filters.facility || 0,
+    fetchAll: true, // Fetch all jobs for projections
+  });
   const granularity = filters.granularity || "weekly";
 
   // Fetch production entries to adjust projections (in parallel with jobs)

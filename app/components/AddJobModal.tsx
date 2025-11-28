@@ -3,7 +3,6 @@
 import { useState, FormEvent, useEffect } from "react";
 import SmartClientSelect from "./SmartClientSelect";
 import FacilityToggle from "./FacilityToggle";
-import ScheduleToggle from "./ScheduleToggle";
 import DynamicRequirementFields from "./DynamicRequirementFields";
 import RecommendedMachines from "./RecommendedMachines";
 import { getToken, getJobTemplates, createJobTemplate } from "@/lib/api";
@@ -73,7 +72,7 @@ export default function AddJobModal({
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [canSubmit, setCanSubmit] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false); // true = Schedule, false = Soft Schedule
+  const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "Hard Schedule", "soft schedule", "Cancelled", "projected", "completed"
   const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
     useState(false);
   const [pendingRedistribution, setPendingRedistribution] = useState<{
@@ -81,6 +80,14 @@ export default function AddJobModal({
     newValue: number;
   } | null>(null);
   const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
+  const [runSaturdays, setRunSaturdays] = useState<boolean>(false);
+  const [splitResults, setSplitResults] = useState<Array<{
+    Date: string;
+    CalendarDayInWeek: number;
+    CalendarWeek: number;
+    Quantity: number;
+  }>>([]);
+  const [loadingSplit, setLoadingSplit] = useState<boolean>(false);
 
   // Template selection state
   const [selectedTemplateClientId, setSelectedTemplateClientId] = useState<number | null>(null);
@@ -122,57 +129,7 @@ export default function AddJobModal({
     total_billing: "",
   });
 
-  // Calculate weeks and split quantity when dates or quantity changes
-  useEffect(() => {
-    if (formData.start_date && formData.due_date && formData.quantity) {
-      const startDate = new Date(formData.start_date);
-      const dueDate = new Date(formData.due_date);
-      const quantity = parseInt(formData.quantity);
 
-      if (!isNaN(quantity) && quantity > 0 && dueDate >= startDate) {
-        // Calculate number of weeks (ceiling to capture partial weeks)
-        const daysDiff =
-          Math.ceil(
-            (dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-          ) + 1;
-        const weeks = Math.ceil(daysDiff / 7);
-
-        if (weeks > 0) {
-          // Only recalculate from scratch if weekly_split is empty or length changed
-          if (
-            formData.weekly_split.length === 0 ||
-            formData.weekly_split.length !== weeks
-          ) {
-            // Split quantity evenly across weeks
-            const baseAmount = Math.floor(quantity / weeks);
-            const remainder = quantity % weeks;
-
-            // Create array with base amounts
-            const newSplit = Array(weeks).fill(baseAmount);
-
-            // Distribute remainder across first weeks
-            for (let i = 0; i < remainder; i++) {
-              newSplit[i]++;
-            }
-
-            // Initialize locked_weeks as all false
-            const newLockedWeeks = Array(weeks).fill(false);
-
-            setFormData((prev) => ({
-              ...prev,
-              weekly_split: newSplit,
-              locked_weeks: newLockedWeeks,
-            }));
-          }
-        }
-      }
-    }
-  }, [
-    formData.start_date,
-    formData.due_date,
-    formData.quantity,
-    formData.weekly_split.length,
-  ]);
 
   // Handle quantity changes when weekly_split already exists - respect locked weeks
   useEffect(() => {
@@ -248,6 +205,9 @@ export default function AddJobModal({
       setTemplates([]);
       setSelectedTemplate(null);
       setIsCreatingTemplate(false);
+      setRunSaturdays(false);
+      setSplitResults([]);
+      setScheduleType("soft schedule");
       setFormData({
         job_number: "",
         clients_id: null,
@@ -406,6 +366,55 @@ export default function AddJobModal({
       ...formData,
       quantity: cleanedValue,
     });
+  };
+
+  const handleCalculateSplit = async () => {
+    if (!formData.start_date || !formData.due_date || !formData.quantity) {
+      alert("Please fill in start date, due date, and quantity before calculating split");
+      return;
+    }
+
+    setLoadingSplit(true);
+    try {
+      const token = getToken();
+      const quantity = parseInt(formData.quantity) || 0;
+      
+      // Use ISO date strings (YYYY-MM-DD format)
+      const startDate = formData.start_date;
+      const endDate = formData.due_date;
+
+      const params = new URLSearchParams({
+        start: startDate,
+        end: endDate,
+        quantity: quantity.toString(),
+        saturday: runSaturdays.toString(),
+      });
+
+      const response = await fetch(
+        `https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/quantity_split?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to calculate split: ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      setSplitResults(data);
+    } catch (error) {
+      console.error("Error calculating split:", error);
+      alert("Failed to calculate split. Please try again.");
+      setSplitResults([]);
+    } finally {
+      setLoadingSplit(false);
+    }
   };
 
   const handleClientChange = (clientId: number, clientName: string) => {
@@ -687,7 +696,7 @@ export default function AddJobModal({
       // Load template and go to review
       loadTemplateIntoForm(selectedTemplate);
       setCurrentStep(3);
-      setIsConfirmed(false);
+      setScheduleType("soft schedule");
       return;
     }
 
@@ -755,7 +764,7 @@ export default function AddJobModal({
         return;
       }
       setCurrentStep(3);
-      setIsConfirmed(false);
+      setScheduleType("soft schedule");
       return;
     }
   };
@@ -989,59 +998,47 @@ export default function AddJobModal({
         ? new Date(formData.due_date).getTime()
         : undefined;
 
-      // Convert weekly split to daily breakdown
-      const dailyBreakdown = convertWeeklySplitToDailyBreakdown(
-        formData.weekly_split,
-        formData.start_date,
-        formData.due_date,
-      );
-
-      console.log(
-        "[AddJobModal] Weekly split converted to daily breakdown:",
-        dailyBreakdown,
-      );
-      console.log(
-        "[AddJobModal] Daily breakdown format example:",
-        JSON.stringify(dailyBreakdown, null, 2),
-      );
-
-      // Prepare the payload according to the API specification
-      const payload: Record<string, unknown> = {
-        description: formData.description,
-        quantity: quantity,
-        clients_id: formData.clients_id,
-        sub_clients_id: formData.sub_clients_id,
-        machines_id: formData.machines_id,
-        job_number: formData.job_number,
-        service_type: formData.service_type,
-        pockets: parseInt(formData.pockets) || 0,
-        job_name: formData.job_name,
-        prgm: formData.prgm,
-        csr: formData.csr,
-        data_type: formData.data_type,
-        price_per_m: (parseFloat(String(formData.price_per_m || "0")) || 0).toFixed(2),
-        add_on_charges: addOnCharges.toFixed(2),
-        ext_price: (parseFloat(String(formData.ext_price || "0")) || 0).toFixed(2),
-        total_billing: calculatedTotalBilling.toFixed(2),
-        requirements: JSON.stringify(formData.requirements),
-        daily_split: dailyBreakdown,
-        weekly_split: formData.weekly_split,
-        locked_weeks: formData.locked_weeks,
-        confirmed: isConfirmed,
+      // Convert splitResults to daily_split format for new API
+      // Format: [{ date: "01.01.2026", quantity: 1000 }]
+      // Date format: DD.MM.YYYY
+      const formatDateToDDMMYYYY = (dateString: string): string => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
       };
 
-      // Only include dates if they are valid timestamps (not 0 or undefined)
-      if (startDateTimestamp && startDateTimestamp > 0) {
-        payload.start_date = startDateTimestamp;
-      }
-      if (dueDateTimestamp && dueDateTimestamp > 0) {
-        payload.due_date = dueDateTimestamp;
-      }
+      const dailySplit = splitResults.length > 0
+        ? splitResults.map((item) => ({
+            date: formatDateToDDMMYYYY(item.Date),
+            quantity: item.Quantity,
+          }))
+        : [];
 
-      // Only include facilities_id if it's not null
-      if (formData.facilities_id !== null) {
-        payload.facilities_id = formData.facilities_id;
-      }
+      // Use the selected schedule type directly
+
+      // Prepare the payload according to the new v2 API specification
+      const payload: Record<string, unknown> = {
+        job_number: formData.job_number || "",
+        service_type: formData.service_type || "",
+        quantity: quantity,
+        description: formData.description || "",
+        start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : null,
+        due_date: dueDateTimestamp && dueDateTimestamp > 0 ? dueDateTimestamp : null,
+        time_estimate: null,
+        clients_id: formData.clients_id || 0,
+        machines_id: formData.machines_id || [],
+        job_name: formData.job_name || "",
+        prgm: formData.prgm || "",
+        csr: formData.csr || "",
+        requirements: formData.requirements || {},
+        total_billing: calculatedTotalBilling > 0 ? calculatedTotalBilling : null,
+        facilities_id: formData.facilities_id,
+        daily_split: dailySplit,
+        sub_client_id: formData.sub_clients_id || 0,
+        schedule_type: scheduleType || "soft schedule",
+      };
 
       console.log(
         "[AddJobModal] Requirements before stringify:",
@@ -1066,7 +1063,7 @@ export default function AddJobModal({
       );
 
       const response = await fetch(
-        "https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs",
+        "https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/v2",
         {
           method: "POST",
           headers: {
@@ -1147,6 +1144,7 @@ export default function AddJobModal({
         ext_price: "",
         total_billing: "",
       });
+      setScheduleType("soft schedule");
       setCurrentStep(1);
 
       // Delay closing to show toast
@@ -1546,20 +1544,117 @@ export default function AddJobModal({
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Quantity
                   </label>
-                  <input
-                    type="text"
-                    name="quantity"
-                    value={
-                      formData.quantity
-                        ? parseInt(formData.quantity).toLocaleString()
-                        : ""
-                    }
-                    onChange={handleQuantityChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="e.g., 73"
-                  />
+                  <div className="flex gap-4 items-center justify-between">
+                    <div className="flex gap-4 items-center flex-1">
+                      <input
+                        type="text"
+                        name="quantity"
+                        value={
+                          formData.quantity
+                            ? parseInt(formData.quantity).toLocaleString()
+                            : ""
+                        }
+                        onChange={handleQuantityChange}
+                        className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                        placeholder="e.g., 73"
+                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          id="runSaturdays"
+                          checked={runSaturdays}
+                          onChange={(e) => setRunSaturdays(e.target.checked)}
+                          className="w-4 h-4 text-[var(--primary-blue)] border-[var(--border)] rounded focus:ring-[var(--primary-blue)]"
+                        />
+                        <label htmlFor="runSaturdays" className="text-sm text-[var(--text-dark)] whitespace-nowrap">
+                          Run Saturdays
+                        </label>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCalculateSplit}
+                      disabled={loadingSplit || !formData.start_date || !formData.due_date || !formData.quantity}
+                      className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      {loadingSplit ? "Calculating..." : "Calculate Split"}
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Split Results Display */}
+              {splitResults.length > 0 && (
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-blue-50">
+                  <h4 className="font-semibold text-[var(--text-dark)] mb-3">
+                    Calculated Quantity Split
+                  </h4>
+                  <div className="space-y-3">
+                    {(() => {
+                      // Group results by CalendarWeek
+                      const groupedByWeek = splitResults.reduce((acc, item) => {
+                        if (!acc[item.CalendarWeek]) {
+                          acc[item.CalendarWeek] = [];
+                        }
+                        acc[item.CalendarWeek].push(item);
+                        return acc;
+                      }, {} as Record<number, typeof splitResults>);
+
+                      // Sort weeks and days within each week
+                      const sortedWeeks = Object.keys(groupedByWeek)
+                        .map(Number)
+                        .sort((a, b) => a - b);
+
+                      const dayNames = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+                      return sortedWeeks.map((week) => {
+                        const weekData = groupedByWeek[week].sort(
+                          (a, b) => a.CalendarDayInWeek - b.CalendarDayInWeek
+                        );
+                        const weekTotal = weekData.reduce((sum, item) => sum + item.Quantity, 0);
+                        const startDate = weekData[0]?.Date || "";
+                        const endDate = weekData[weekData.length - 1]?.Date || "";
+
+                        return (
+                          <div
+                            key={week}
+                            className="bg-white border border-[var(--border)] rounded-lg p-3"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-semibold text-[var(--text-dark)]">
+                                  Week {week}
+                                </span>
+                                <span className="text-sm text-[var(--text-light)] ml-2">
+                                  ({startDate} to {endDate})
+                                </span>
+                              </div>
+                              <span className="font-semibold text-[var(--primary-blue)]">
+                                Total: {weekTotal.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                              {weekData.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded"
+                                >
+                                  <span className="text-[var(--text-light)]">
+                                    {dayNames[item.CalendarDayInWeek]}:
+                                  </span>
+                                  <span className="font-medium text-[var(--text-dark)]">
+                                    {item.Quantity.toLocaleString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* Weekly Split Section */}
               {formData.weekly_split.length > 0 && (
@@ -2086,14 +2181,29 @@ export default function AddJobModal({
                   <h4 className="font-semibold text-[var(--text-dark)] mb-3">
                     Schedule Type
                   </h4>
-                  <ScheduleToggle
-                    isConfirmed={isConfirmed}
-                    onScheduleChange={setIsConfirmed}
-                  />
+                  <select
+                    value={scheduleType}
+                    onChange={(e) => setScheduleType(e.target.value)}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] bg-white"
+                  >
+                    <option value="soft schedule">Soft Schedule</option>
+                    <option value="Hard Schedule">Hard Schedule</option>
+                    <option value="projected">Projected</option>
+                    <option value="completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
                   <p className="text-sm text-[var(--text-light)] mt-3">
-                    {isConfirmed
+                    {scheduleType === "Hard Schedule"
                       ? "✓ This job will be confirmed and scheduled immediately."
-                      : "ℹ This job will be added as a soft schedule and can be confirmed later."}
+                      : scheduleType === "soft schedule"
+                        ? "ℹ This job will be added as a soft schedule and can be confirmed later."
+                        : scheduleType === "projected"
+                          ? "📊 This job is projected for future planning."
+                          : scheduleType === "completed"
+                            ? "✅ This job has been completed."
+                            : scheduleType === "Cancelled"
+                              ? "❌ This job has been cancelled."
+                              : ""}
                   </p>
                 </div>
               )}
