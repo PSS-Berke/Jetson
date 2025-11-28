@@ -178,7 +178,7 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
     error: error?.message ?? null,
     pagination,
     refetch: async () => {
-      await mutate();
+      //await mutate();
     },
   };
 };
