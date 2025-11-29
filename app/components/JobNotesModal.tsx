@@ -97,62 +97,72 @@ export default function JobNotesModal({
     if (targetGranularity === "daily" && timeSplit.daily && timeSplit.daily.length > 0) {
       // Use daily data directly
       console.log(`[convertTimeSplitToPeriods] Using daily data, ${timeSplit.daily.length} days`);
-      return timeSplit.daily.map((day) => {
-        const date = new Date(day.date);
-        return {
-          startDate: date,
-          endDate: date,
-          label: `${date.getMonth() + 1}/${date.getDate()}`,
-          quantity: day.quantity,
-          isLocked: false,
-        };
-      });
+      return timeSplit.daily
+        .map((day) => {
+          const date = new Date(day.date);
+          const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+          return {
+            startDate: date,
+            endDate: date,
+            label: `${weekday} ${date.getMonth() + 1}/${date.getDate()}`,
+            quantity: day.quantity,
+            isLocked: false,
+          };
+        })
+        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
     } else if (targetGranularity === "weekly" && timeSplit.weekly && timeSplit.weekly.length > 0) {
       // Use weekly data directly
       console.log(`[convertTimeSplitToPeriods] Using weekly data, ${timeSplit.weekly.length} weeks`);
-      return timeSplit.weekly.map((week) => {
-        const weekStart = new Date(week.week_start);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        return {
-          startDate: weekStart,
-          endDate: weekEnd,
-          label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
-          quantity: week.quantity,
-          isLocked: false,
-        };
-      });
+      return timeSplit.weekly
+        .map((week) => {
+          const weekStart = new Date(week.week_start);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+          const weekday = weekStart.toLocaleDateString("en-US", { weekday: "short" });
+          return {
+            startDate: weekStart,
+            endDate: weekEnd,
+            label: `${weekday} ${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+            quantity: week.quantity,
+            isLocked: false,
+          };
+        })
+        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
     } else if (targetGranularity === "monthly" && timeSplit.monthly && timeSplit.monthly.length > 0) {
       // Use monthly data directly
       console.log(`[convertTimeSplitToPeriods] Using monthly data, ${timeSplit.monthly.length} months`);
-      return timeSplit.monthly.map((month) => {
-        const monthStart = new Date(month.month_start);
-        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-        return {
-          startDate: monthStart,
-          endDate: monthEnd,
-          label: monthStart.toLocaleDateString("en-US", {
-            month: "short",
-            year: "2-digit",
-          }),
-          quantity: month.quantity,
-          isLocked: false,
-        };
-      });
+      return timeSplit.monthly
+        .map((month) => {
+          const monthStart = new Date(month.month_start);
+          const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+          return {
+            startDate: monthStart,
+            endDate: monthEnd,
+            label: monthStart.toLocaleDateString("en-US", {
+              month: "short",
+              year: "2-digit",
+            }),
+            quantity: month.quantity,
+            isLocked: false,
+          };
+        })
+        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
     } else if (targetGranularity === "quarterly" && timeSplit.quarterly && timeSplit.quarterly.length > 0) {
       // Use quarterly data directly
       console.log(`[convertTimeSplitToPeriods] Using quarterly data, ${timeSplit.quarterly.length} quarters`);
-      return timeSplit.quarterly.map((quarter) => {
-        const quarterStart = new Date(quarter.year, (quarter.quarter - 1) * 3, 1);
-        const quarterEnd = new Date(quarter.year, quarter.quarter * 3, 0);
-        return {
-          startDate: quarterStart,
-          endDate: quarterEnd,
-          label: `Q${quarter.quarter} ${quarter.year.toString().slice(-2)}`,
-          quantity: quarter.quantity,
-          isLocked: false,
-        };
-      });
+      return timeSplit.quarterly
+        .map((quarter) => {
+          const quarterStart = new Date(quarter.year, (quarter.quarter - 1) * 3, 1);
+          const quarterEnd = new Date(quarter.year, quarter.quarter * 3, 0);
+          return {
+            startDate: quarterStart,
+            endDate: quarterEnd,
+            label: `Q${quarter.quarter} ${quarter.year.toString().slice(-2)}`,
+            quantity: quarter.quantity,
+            isLocked: false,
+          };
+        })
+        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
     }
 
     // Fallback: if specific granularity not available, use daily and convert
@@ -771,7 +781,14 @@ export default function JobNotesModal({
                           <div className="flex items-center justify-between">
                             <div className="text-xs text-[var(--text-light)]">
                               {note.created_at &&
-                                new Date(note.created_at).toLocaleString()}
+                                new Date(note.created_at).toLocaleDateString("en-US", {
+                                  weekday: "short",
+                                  month: "numeric",
+                                  day: "numeric",
+                                  year: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
                               {note.name && ` • ${note.name}`}
                               {note.email && ` (${note.email})`}
                             </div>
@@ -836,7 +853,14 @@ export default function JobNotesModal({
                           </div>
                           <div className="mt-2 text-xs text-[var(--text-light)]">
                             {note.created_at &&
-                              new Date(note.created_at).toLocaleString()}
+                              new Date(note.created_at).toLocaleDateString("en-US", {
+                                weekday: "short",
+                                month: "numeric",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
                             {note.name && ` • ${note.name}`}
                             {note.email && ` (${note.email})`}
                           </div>

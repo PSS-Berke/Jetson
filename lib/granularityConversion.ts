@@ -30,10 +30,11 @@ export function calculatePeriods(
   if (granularity === "daily") {
     let currentDate = new Date(startDateObj);
     while (currentDate <= dueDateObj) {
+      const weekday = currentDate.toLocaleDateString("en-US", { weekday: "short" });
       periods.push({
         startDate: new Date(currentDate),
         endDate: new Date(currentDate),
-        label: `${currentDate.getMonth() + 1}/${currentDate.getDate()}`,
+        label: `${weekday} ${currentDate.getMonth() + 1}/${currentDate.getDate()}`,
       });
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -43,11 +44,12 @@ export function calculatePeriods(
       const weekEnd = new Date(currentWeekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
       const effectiveEnd = weekEnd > dueDateObj ? dueDateObj : weekEnd;
+      const weekday = currentWeekStart.toLocaleDateString("en-US", { weekday: "short" });
 
       periods.push({
         startDate: new Date(currentWeekStart),
         endDate: effectiveEnd,
-        label: `${currentWeekStart.getMonth() + 1}/${currentWeekStart.getDate()}`,
+        label: `${weekday} ${currentWeekStart.getMonth() + 1}/${currentWeekStart.getDate()}`,
       });
 
       currentWeekStart.setDate(currentWeekStart.getDate() + 7);

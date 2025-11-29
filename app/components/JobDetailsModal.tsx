@@ -907,7 +907,12 @@ export default function JobDetailsModal({
                 </label>
                 <p className="text-base text-[var(--text-dark)]">
                   {job.start_date
-                    ? new Date(job.start_date).toLocaleDateString()
+                    ? new Date(job.start_date).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "numeric",
+                        day: "numeric",
+                        year: "numeric",
+                      })
                     : "N/A"}
                 </p>
               </div>
@@ -917,7 +922,12 @@ export default function JobDetailsModal({
                 </label>
                 <p className="text-base text-[var(--text-dark)]">
                   {job.due_date
-                    ? new Date(job.due_date).toLocaleDateString()
+                    ? new Date(job.due_date).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "numeric",
+                        day: "numeric",
+                        year: "numeric",
+                      })
                     : "N/A"}
                 </p>
               </div>
