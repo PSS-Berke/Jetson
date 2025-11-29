@@ -445,7 +445,7 @@ const parseCapabilities = (capabilities: any): Record<string, any> => {
  */
 const mapMachineTypeToAPI = (type?: string): string | undefined => {
   if (!type) return undefined;
-  
+
   const typeMap: Record<string, string> = {
     inserters: "inserts",
     folders: "folders",
@@ -456,7 +456,7 @@ const mapMachineTypeToAPI = (type?: string): string | undefined => {
     inserts: "inserts",
     "hp press": "hp press",
   };
-  
+
   return typeMap[type.toLowerCase()] || undefined;
 };
 
@@ -464,11 +464,9 @@ const mapMachineTypeToAPI = (type?: string): string | undefined => {
 export const getMachines = async (
   status?: string,
   facilitiesId?: number,
-  type?: string,
+  type?: "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer",
 ): Promise<Machine[]> => {
   // Build query parameters - API expects GET with query params
-  // NOTE: We removed type filtering from the API call because Xano has inconsistent
-  // capitalization (e.g., "Insert" vs "insert"). We'll filter client-side instead.
   const params = new URLSearchParams();
 
   // Only append status parameter if it has a valid value
@@ -479,6 +477,11 @@ export const getMachines = async (
   // Only append facilities_id parameter if it has a valid value
   if (facilitiesId !== undefined && facilitiesId !== null && facilitiesId > 0 && !isNaN(facilitiesId)) {
     params.append("facilities_id", facilitiesId.toString());
+  }
+
+  // Only append type parameter if it has a valid value
+  if (type && type.trim() !== "" && type !== "undefined" && type !== "null") {
+    params.append("type", type.trim());
   }
 
   const queryString = params.toString();
@@ -645,21 +648,21 @@ export const createMachine = async (
   console.log("[createMachine] Capabilities object:", machineData.capabilities);
 
   // Extract paper_size and pockets from capabilities if they exist
-  const capabilities: Record<string, MachineCapabilityValue> = 
+  const capabilities: Record<string, MachineCapabilityValue> =
     (machineData.capabilities && typeof machineData.capabilities === 'object' && !Array.isArray(machineData.capabilities))
       ? machineData.capabilities as Record<string, MachineCapabilityValue>
       : {};
-  const paper_size = capabilities.paper_size 
-    ? String(capabilities.paper_size) 
-    : capabilities.supported_paper_sizes 
-      ? (Array.isArray(capabilities.supported_paper_sizes) 
-          ? capabilities.supported_paper_sizes[0] 
-          : String(capabilities.supported_paper_sizes))
+  const paper_size = capabilities.paper_size
+    ? String(capabilities.paper_size)
+    : capabilities.supported_paper_sizes
+      ? (Array.isArray(capabilities.supported_paper_sizes)
+        ? capabilities.supported_paper_sizes[0]
+        : String(capabilities.supported_paper_sizes))
       : "";
-  const pockets = capabilities.pockets 
-    ? Number(capabilities.pockets) 
-    : capabilities.max_pockets 
-      ? Number(capabilities.max_pockets) 
+  const pockets = capabilities.pockets
+    ? Number(capabilities.pockets)
+    : capabilities.max_pockets
+      ? Number(capabilities.max_pockets)
       : 0;
 
   // Get designation - prefer explicit designation, otherwise try to extract from name
@@ -807,21 +810,21 @@ export const createMachinesBulk = async (bulkData: {
   console.log("[createMachinesBulk] Creating machines in bulk:", bulkData);
 
   // Extract paper_size and pockets from capabilities if they exist
-  const capabilities: Record<string, MachineCapabilityValue> = 
+  const capabilities: Record<string, MachineCapabilityValue> =
     (bulkData.capabilities && typeof bulkData.capabilities === 'object' && !Array.isArray(bulkData.capabilities))
       ? bulkData.capabilities as Record<string, MachineCapabilityValue>
       : {};
-  const paper_size = capabilities.paper_size 
-    ? String(capabilities.paper_size) 
-    : capabilities.supported_paper_sizes 
-      ? (Array.isArray(capabilities.supported_paper_sizes) 
-          ? capabilities.supported_paper_sizes[0] 
-          : String(capabilities.supported_paper_sizes))
+  const paper_size = capabilities.paper_size
+    ? String(capabilities.paper_size)
+    : capabilities.supported_paper_sizes
+      ? (Array.isArray(capabilities.supported_paper_sizes)
+        ? capabilities.supported_paper_sizes[0]
+        : String(capabilities.supported_paper_sizes))
       : "";
-  const pockets = capabilities.pockets 
-    ? Number(capabilities.pockets) 
-    : capabilities.max_pockets 
-      ? Number(capabilities.max_pockets) 
+  const pockets = capabilities.pockets
+    ? Number(capabilities.pockets)
+    : capabilities.max_pockets
+      ? Number(capabilities.max_pockets)
       : 0;
 
   // Determine type field - derive from process_type_key
@@ -935,7 +938,7 @@ export const updateMachine = async (
     process_type_key: machineData.process_type_key || "",
     designation: machineData.designation || "",
   };
-  
+
   // Include speed_hr and shiftCapacity if provided
   if (machineData.speed_hr !== undefined) {
     apiData.speed_hr = machineData.speed_hr;
@@ -999,6 +1002,119 @@ export const getJobs = async (facilitiesId?: number): Promise<Job[]> => {
   console.log("[getJobs] Endpoint:", endpoint);
 
   return apiFetch<Job[]>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+};
+
+// ============================================================================
+// Jobs V2 API (Paginated with time_split)
+// ============================================================================
+
+/**
+ * Time split data structure for jobs v2 API
+ */
+export interface TimeSplit {
+  id: number;
+  daily: Array<{
+    date: string; // Format: "YYYY-MM-DD"
+    quantity: number;
+    year: number;
+  }>;
+  weekly: Array<{
+    week_start: string; // Format: "YYYY-MM-DD"
+    year: number;
+    quantity: number;
+  }>;
+  monthly: Array<{
+    month_start: string; // Format: "YYYY-MM-DD"
+    year: number;
+    quantity: number;
+  }>;
+  quarterly: Array<{
+    quarter: number; // 1-4
+    year: number;
+    quantity: number;
+  }>;
+}
+
+/**
+ * Job with time_split data from v2 API
+ */
+export interface JobV2 extends Omit<Job, "machines_id" | "client"> {
+  machines_id: number[]; // Array instead of string
+  time_split: TimeSplit | null;
+  sub_client_id?: number;
+  schedule_type?: string;
+  sub_client?: string;
+  facility?: string;
+  client?: string; // Optional in v2 API
+}
+
+/**
+ * Paginated response from jobs v2 API
+ */
+export interface JobsV2Response {
+  itemsReceived: number;
+  curPage: number;
+  nextPage: number | null;
+  prevPage: number | null;
+  offset: number;
+  perPage: number;
+  items: JobV2[];
+}
+
+/**
+ * Parameters for jobs v2 API request
+ */
+export interface GetJobsV2Params {
+  facilities_id?: number; // 0, 1, or 2 (0 = all facilities)
+  page?: number;
+  per_page?: number;
+  search?: string;
+}
+
+/**
+ * Get jobs with pagination and time_split data (v2 API)
+ * @param params - Query parameters for filtering and pagination
+ * @returns Paginated response with jobs and time_split data
+ */
+export const getJobsV2 = async (
+  params: GetJobsV2Params = {},
+): Promise<JobsV2Response> => {
+  const {
+    facilities_id = 0,
+    page = 1,
+    per_page = 1000,
+    search = "",
+  } = params;
+
+  console.log("[getJobsV2] Fetching jobs with params:", {
+    facilities_id,
+    page,
+    per_page,
+    search,
+  });
+
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  queryParams.append("facilities_id", facilities_id.toString());
+  queryParams.append("page", page.toString());
+  queryParams.append("per_page", per_page.toString());
+  if (search) {
+    queryParams.append("search", search);
+  }
+
+  const endpoint = `/jobs/v2?${queryParams.toString()}`;
+  const fullUrl = `${JOBS_BASE_URL}${endpoint}`;
+
+  console.log("[getJobsV2] Full URL:", fullUrl);
+  console.log("[getJobsV2] Endpoint:", endpoint);
+
+  return apiFetch<JobsV2Response>(
     endpoint,
     {
       method: "GET",
@@ -2053,12 +2169,12 @@ export const getJobEditLogs = async (jobsId?: number): Promise<any[]> => {
   if (jobsId !== undefined && jobsId !== null) {
     params.append("jobs_id", jobsId.toString());
   }
-  
+
   const queryString = params.toString();
   const endpoint = queryString
     ? `/job_edit_logs?${queryString}`
     : "/job_edit_logs";
-  
+
   console.log("[getJobEditLogs] Fetching job edit logs", jobsId ? `for job ${jobsId}` : "for all jobs");
   const result = await apiFetch<any[]>(endpoint, {
     method: "GET",
@@ -2080,7 +2196,7 @@ export const getJobTemplates = async (clientsId?: number): Promise<any[]> => {
   console.log("[getJobTemplates] Fetching job templates", clientsId ? `for client ${clientsId}` : "for all clients");
   const token = getToken();
   const url = new URL("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates");
-  
+
   if (clientsId) {
     url.searchParams.append("clients_id", clientsId.toString());
   }
@@ -2115,7 +2231,7 @@ export const createJobTemplate = async (templateData: {
 }): Promise<any> => {
   console.log("[createJobTemplate] Creating job template:", templateData);
   const token = getToken();
-  
+
   const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
     method: "POST",
     headers: {
@@ -2147,7 +2263,7 @@ export const updateJobTemplate = async (templateData: {
 }): Promise<any> => {
   console.log("[updateJobTemplate] Updating job template:", templateData);
   const token = getToken();
-  
+
   const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
     method: "PUT",
     headers: {
@@ -2175,7 +2291,7 @@ export const updateJobTemplate = async (templateData: {
 export const deleteJobTemplate = async (jobTemplatesId: number): Promise<void> => {
   console.log("[deleteJobTemplate] Deleting job template:", jobTemplatesId);
   const token = getToken();
-  
+
   const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
     method: "DELETE",
     headers: {

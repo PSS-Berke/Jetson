@@ -36,7 +36,7 @@ interface UseJobsReturn {
 }
 
 // Job parsing logic extracted for reuse
-const parseJob = (job: Job): ParsedJob => {
+export const parseJob = (job: Job): ParsedJob => {
   try {
     // Parse requirements - handle multiple formats
     let parsedRequirements: ParsedRequirement[] = [];
@@ -178,14 +178,14 @@ const parseJob = (job: Job): ParsedJob => {
         parsedClient = job.client as { id: number; name: string };
       }
     } catch (clientError) {
-      console.error(
+     /* console.error(
         `[parseJob] Failed to parse client for job ${job.job_number}:`,
         {
           error: clientError,
           client_value: job.client,
           clients_id: job.clients_id,
         },
-      );
+      );*/
       parsedClient = { id: job.clients_id || 0, name: "Unknown" };
     }
 
@@ -294,7 +294,7 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
     isLoading,
     error: error?.message ?? null,
     refetch: async () => {
-      await mutate();
+     // await mutate();
     },
   };
 };
