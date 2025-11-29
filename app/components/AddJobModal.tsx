@@ -181,6 +181,64 @@ export default function AddJobModal({
     }
   }, [formData.quantity]);
 
+  // Automatically calculate split when quantity, start_date, or due_date changes (step 1 only)
+  useEffect(() => {
+    // Only run on step 1 for new job or template creation mode
+    if (
+      currentStep === 1 &&
+      (creationMode === "new" || (creationMode === "template" && isCreatingTemplate)) &&
+      formData.start_date &&
+      formData.due_date &&
+      formData.quantity
+    ) {
+      const calculateSplit = async () => {
+        setLoadingSplit(true);
+        try {
+          const token = getToken();
+          const quantity = parseInt(formData.quantity) || 0;
+          
+          // Use ISO date strings (YYYY-MM-DD format)
+          const startDate = formData.start_date;
+          const endDate = formData.due_date;
+
+          const params = new URLSearchParams({
+            start: startDate,
+            end: endDate,
+            quantity: quantity.toString(),
+            saturday: runSaturdays.toString(),
+          });
+
+          const response = await fetch(
+            `https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/quantity_split?${params.toString()}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            },
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Failed to calculate split: ${JSON.stringify(errorData)}`);
+          }
+
+          const data = await response.json();
+          setSplitResults(data);
+        } catch (error) {
+          console.error("Error calculating split:", error);
+          // Don't show alert on automatic calls, just log the error
+          setSplitResults([]);
+        } finally {
+          setLoadingSplit(false);
+        }
+      };
+
+      calculateSplit();
+    }
+  }, [formData.quantity, formData.start_date, formData.due_date, runSaturdays, currentStep, creationMode, isCreatingTemplate]);
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -1572,14 +1630,15 @@ export default function AddJobModal({
                         </label>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleCalculateSplit}
-                      disabled={loadingSplit || !formData.start_date || !formData.due_date || !formData.quantity}
-                      className="px-4 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                      {loadingSplit ? "Calculating..." : "Calculate Split"}
-                    </button>
+                    {loadingSplit && (
+                      <div className="flex items-center gap-2 text-sm text-[var(--text-light)]">
+                        <svg className="animate-spin h-4 w-4 text-[var(--primary-blue)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Calculating split...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
