@@ -29,6 +29,7 @@ import FinancialsPDFHeader from "../components/FinancialsPDFHeader";
 import FinancialsPDFSummary from "../components/FinancialsPDFSummary";
 import FinancialsPDFTables from "../components/FinancialsPDFTables";
 import CFODashboard from "../components/CFODashboard";
+import ProjectionsLoading from "../components/ProjectionsLoading";
 
 // Dynamically import calendar and modals - only loaded when needed
 const EmbeddedCalendar = dynamic(
@@ -408,11 +409,7 @@ export default function ProjectionsPage() {
               </div>
             </div>
           ) : isLoading ? (
-            <div className="text-center py-12">
-              <div className="text-[var(--text-light)]">
-                Loading projections...
-              </div>
-            </div>
+            <ProjectionsLoading />
           ) : (
             <>
               {/* Table View */}
