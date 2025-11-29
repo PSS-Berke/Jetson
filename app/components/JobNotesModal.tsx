@@ -209,7 +209,7 @@ export default function JobNotesModal({
     const newDisplayPeriods = new Map<number, Period[]>();
     jobs.forEach((job) => {
       // Check if this is a v2 job with time_split
-      const jobWithTimeSplit = job as ParsedJob & { time_split?: TimeSplit };
+      const jobWithTimeSplit = job as unknown as { time_split?: TimeSplit };
       
       console.log(`[JobNotesModal] Processing job ${job.id}:`, {
         hasTimeSplit: !!jobWithTimeSplit.time_split,
@@ -546,7 +546,7 @@ export default function JobNotesModal({
     const newDisplayPeriods = new Map<number, Period[]>();
     jobs.forEach((job) => {
       // Check if this is a v2 job with time_split
-      const jobWithTimeSplit = job as ParsedJob & { time_split?: TimeSplit };
+      const jobWithTimeSplit = job as unknown as { time_split?: TimeSplit };
       if (jobWithTimeSplit.time_split) {
         // Use time_split data directly for the selected granularity
         const periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, newGranularity);
@@ -879,7 +879,7 @@ export default function JobNotesModal({
                     {jobs.map((job) => {
                       const periods = displayPeriods.get(job.id) || [];
                       const projectedTotal = periods.reduce((sum, p) => sum + p.quantity, 0);
-                      const jobWithTimeSplit = job as ParsedJob & { time_split?: TimeSplit };
+                      const jobWithTimeSplit = job as unknown as { time_split?: TimeSplit };
                       const usingTimeSplit = !!jobWithTimeSplit.time_split;
                       
                       // For time_split data, use the projected total as the source of truth
