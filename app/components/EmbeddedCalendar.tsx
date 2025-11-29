@@ -49,7 +49,7 @@ export default function EmbeddedCalendar({
       setCurrentDate(startDate);
     }
   }, [startDate]);
-
+  console.log("selectedClients", selectedClients);
   // Get date range based on view type
   const dateRange = useMemo(() => {
     switch (viewType) {

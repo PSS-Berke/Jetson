@@ -312,6 +312,7 @@ export function formatQuantity(quantity: number): string {
 
 /**
  * Generic function to calculate job distribution across any time periods (weeks, months, quarters)
+ * Uses time_split data from v2 API when available, otherwise falls back to date-based calculation
  */
 export function calculateJobDistribution(
   job: ParsedJob,
@@ -324,6 +325,82 @@ export function calculateJobDistribution(
     quantities.set(range.label, 0);
   });
 
+  // Check if job has time_split data (from v2 API)
+  const timeSplit = (job as any).time_split;
+  if (timeSplit) {
+    // Determine granularity from timeRanges
+    const firstRange = timeRanges[0];
+    const isWeekly = 'weekNumber' in firstRange;
+    const isMonthly = 'monthNumber' in firstRange;
+    const isQuarterly = 'quarter' in firstRange;
+
+    if (isWeekly && timeSplit.weekly) {
+      // Map weekly time_split to timeRanges
+      timeRanges.forEach((range) => {
+        const rangeStart = new Date(range.startDate);
+        rangeStart.setHours(0, 0, 0, 0);
+        const rangeStartStr = rangeStart.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Find matching week in time_split
+        const matchingWeek = timeSplit.weekly.find((week: any) => {
+          const weekStart = new Date(week.week_start);
+          weekStart.setHours(0, 0, 0, 0);
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          
+          // Exact match on week start date
+          return weekStartStr === rangeStartStr;
+        });
+
+        if (matchingWeek) {
+          quantities.set(range.label, matchingWeek.quantity || 0);
+        }
+      });
+    } else if (isMonthly && timeSplit.monthly) {
+      // Map monthly time_split to timeRanges
+      timeRanges.forEach((range) => {
+        const rangeStart = range.startDate;
+        const rangeYear = rangeStart.getFullYear();
+        const rangeMonth = rangeStart.getMonth() + 1; // 1-12
+
+        // Find matching month in time_split
+        const matchingMonth = timeSplit.monthly.find((month: any) => {
+          const monthStart = new Date(month.month_start);
+          return (
+            monthStart.getFullYear() === rangeYear &&
+            monthStart.getMonth() + 1 === rangeMonth
+          );
+        });
+
+        if (matchingMonth) {
+          quantities.set(range.label, matchingMonth.quantity || 0);
+        }
+      });
+    } else if (isQuarterly && timeSplit.quarterly) {
+      // Map quarterly time_split to timeRanges
+      timeRanges.forEach((range) => {
+        const rangeStart = range.startDate;
+        const rangeYear = rangeStart.getFullYear();
+        const rangeQuarter = Math.floor(rangeStart.getMonth() / 3) + 1; // 1-4
+
+        // Find matching quarter in time_split
+        const matchingQuarter = timeSplit.quarterly.find((quarter: any) => {
+          return quarter.year === rangeYear && quarter.quarter === rangeQuarter;
+        });
+
+        if (matchingQuarter) {
+          quantities.set(range.label, matchingQuarter.quantity || 0);
+        }
+      });
+    }
+
+    // If we found any quantities from time_split, return them
+    const hasQuantities = Array.from(quantities.values()).some(qty => qty > 0);
+    if (hasQuantities) {
+      return quantities;
+    }
+  }
+
+  // Fallback to date-based calculation if no time_split or no matches found
   // If job has no dates or quantity, return zeros
   if (!job.start_date || !job.due_date || !job.quantity) {
     return quantities;
