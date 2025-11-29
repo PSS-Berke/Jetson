@@ -43,7 +43,7 @@ export default function JobNotesModal({
 }: JobNotesModalProps) {
   const { user } = useUser();
   const [notes, setNotes] = useState<JobNote[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<(Job | ParsedJob)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
@@ -256,7 +256,7 @@ export default function JobNotesModal({
   const loadData = async () => {
     setIsLoading(true);
     try {
-      let selectedJobs: Job[] = [];
+      let selectedJobs: (Job | ParsedJob)[] = [];
       let v2DataUsed = false;
 
       // For single job, fetch from v2 API to get time_split data
@@ -286,7 +286,7 @@ export default function JobNotesModal({
             const parsedJob = parseJob(baseJob as any);
             (parsedJob as any).time_split = v2Job.time_split;
             
-            selectedJobs = [parsedJob as Job];
+            selectedJobs = [parsedJob];
             v2DataUsed = true;
             setUsingV2Data(true);
             
@@ -312,7 +312,7 @@ export default function JobNotesModal({
             if (providedJobs && providedJobs.length > 0) {
               selectedJobs = providedJobs.filter((job) =>
                 selectedJobIds.includes(job.id)
-              ) as Job[];
+              );
               console.log(`[JobNotesModal] Using providedJobs fallback, found ${selectedJobs.length} jobs`);
             } else {
               const allJobs = await getJobs();
