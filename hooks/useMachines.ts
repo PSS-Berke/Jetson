@@ -5,22 +5,24 @@ import useSWR from "swr";
 import { getMachines } from "@/lib/api";
 import type { Machine } from "@/types";
 
+type MachineType = "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer";
+
 interface UseMachinesReturn {
   machines: Machine[];
   isLoading: boolean;
   error: string | null;
-  refetch: (status?: string, facilitiesId?: number, type?: string) => Promise<void>;
+  refetch: (status?: string, facilitiesId?: number, type?: MachineType) => Promise<void>;
 }
 
 // SWR fetcher for machines
-const machinesFetcher = async (status?: string, facilitiesId?: number, type?: string) => {
+const machinesFetcher = async (status?: string, facilitiesId?: number, type?: MachineType) => {
   return await getMachines(status, facilitiesId, type);
 };
 
 export const useMachines = (
   initialStatus?: string,
   initialFacilityId?: number,
-  initialType?: string,
+  initialType?: MachineType,
 ): UseMachinesReturn => {
   // Create unique SWR key
   const key = useMemo(
@@ -53,7 +55,7 @@ export const useMachines = (
     machines,
     isLoading,
     error: error?.message ?? null,
-    refetch: async (status?: string, facilitiesId?: number, type?: string) => {
+    refetch: async (status?: string, facilitiesId?: number, type?: MachineType) => {
       // If parameters are provided, use them; otherwise use initial values
       const newStatus = status !== undefined ? status : initialStatus;
       const newFacilityId =
