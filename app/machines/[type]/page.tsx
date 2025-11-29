@@ -234,13 +234,13 @@ export default function MachineTypePage() {
 
   const handleMachineModalClose = async () => {
     setSelectedMachine(null);
-    refetch(filterStatus, filterFacility || undefined, machineType);
+    refetch(filterStatus, filterFacility || undefined, apiMachineType);
     await fetchRawMachinesResponse();
   };
 
   const handleAddMachineSuccess = () => {
     setIsAddMachineModalOpen(false);
-    refetch(filterStatus, filterFacility || undefined, machineType);
+    refetch(filterStatus, filterFacility || undefined, apiMachineType);
   };
 
   // Helper to render capability values
@@ -403,7 +403,7 @@ export default function MachineTypePage() {
       setShowNewMachineRow(false);
       setNewMachineFormData(null);
       setErrors({});
-      refetch(filterStatus, filterFacility || undefined, machineType);
+      refetch(filterStatus, filterFacility || undefined, apiMachineType);
     } catch (error) {
       console.error("Error creating machine:", error);
       setErrors((prev) => ({
@@ -525,7 +525,7 @@ export default function MachineTypePage() {
 
     try {
       await updateMachine(editingMachineId, editedMachine as Machine);
-      refetch(filterStatus, filterFacility || undefined, machineType);
+      refetch(filterStatus, filterFacility || undefined, apiMachineType);
       await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);
@@ -560,7 +560,7 @@ export default function MachineTypePage() {
 
     try {
       await deleteMachine(machineToDelete.id);
-      refetch(filterStatus, filterFacility || undefined, machineType);
+      refetch(filterStatus, filterFacility || undefined, apiMachineType);
       await fetchRawMachinesResponse();
       setEditingMachineId(null);
       setEditedMachineFormData(null);
