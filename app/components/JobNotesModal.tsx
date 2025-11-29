@@ -329,7 +329,7 @@ export default function JobNotesModal({
           if (providedJobs && providedJobs.length > 0) {
             selectedJobs = providedJobs.filter((job) =>
               selectedJobIds.includes(job.id)
-            ) as Job[];
+            );
           } else {
             const allJobs = await getJobs();
             selectedJobs = allJobs.filter((job) =>
@@ -343,7 +343,7 @@ export default function JobNotesModal({
         if (providedJobs && providedJobs.length > 0) {
           selectedJobs = providedJobs.filter((job) =>
             selectedJobIds.includes(job.id)
-          ) as Job[];
+          );
         } else {
           const allJobs = await getJobs();
           selectedJobs = allJobs.filter((job) =>
