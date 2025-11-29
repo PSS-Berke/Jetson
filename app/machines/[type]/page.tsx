@@ -136,9 +136,24 @@ const machineTypeConfig: Record<
   },
 };
 
+// Helper function to map route param to API machine type
+const mapRouteParamToApiType = (
+  routeParam: string
+): "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer" | undefined => {
+  const mapping: Record<string, "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer"> = {
+    inserters: "inserter",
+    folders: "folder",
+    "hp-press": "hp-press",
+    inkjetters: "inkjetter",
+    affixers: "affixer",
+  };
+  return mapping[routeParam] || undefined;
+};
+
 export default function MachineTypePage() {
   const params = useParams();
   const machineType = params.type as string;
+  const apiMachineType = mapRouteParamToApiType(machineType);
 
   const [viewMode, setViewMode] = useState<"machines" | "processes" | "groups">("machines");
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
@@ -166,7 +181,7 @@ export default function MachineTypePage() {
     isLoading: machinesLoading,
     error: machinesError,
     refetch,
-  } = useMachines(filterStatus, filterFacility || undefined, machineType);
+  } = useMachines(filterStatus, filterFacility || undefined, apiMachineType);
   const { logout } = useAuth();
 
   // Get configuration for this machine type (only for label, no filtering)
@@ -178,7 +193,7 @@ export default function MachineTypePage() {
     setRawResponseLoading(true);
     try {
       // Use getMachines instead of api.get to ensure capabilities are properly parsed
-      const rawData = await getMachines(filterStatus, filterFacility || undefined, machineType);
+      const rawData = await getMachines(filterStatus, filterFacility || undefined, apiMachineType);
       setRawMachinesResponse(rawData);
     } catch (error) {
       console.error("[MachineTypePage] Error fetching raw machines:", error);
