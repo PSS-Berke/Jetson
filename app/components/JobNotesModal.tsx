@@ -8,8 +8,10 @@ import {
   updateJobNote,
   type JobNote,
   getJobs,
+  getJobsV2,
   updateJob,
   type Job,
+  type TimeSplit,
 } from "@/lib/api";
 import { useUser } from "@/hooks/useUser";
 import {
@@ -19,13 +21,18 @@ import {
   convertGranularityToWeekly,
   redistributeQuantity,
   resetToEvenDistribution,
+  calculatePeriods,
 } from "@/lib/granularityConversion";
+import type { ParsedJob } from "@/hooks/useJobs";
+import { parseJob } from "@/hooks/useJobs";
+import type { TimeSplit } from "@/lib/api";
 
 interface JobNotesModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedJobIds: number[];
   onSuccess?: () => void;
+  jobs?: ParsedJob[]; // Optional: pass jobs directly to avoid refetching
 }
 
 export default function JobNotesModal({
@@ -33,6 +40,7 @@ export default function JobNotesModal({
   onClose,
   selectedJobIds,
   onSuccess,
+  jobs: providedJobs,
 }: JobNotesModalProps) {
   const { user } = useUser();
   const [notes, setNotes] = useState<JobNote[]>([]);
@@ -56,6 +64,9 @@ export default function JobNotesModal({
   // Granularity state
   const [selectedGranularity, setSelectedGranularity] = useState<CellGranularity>("weekly");
   const [displayPeriods, setDisplayPeriods] = useState<Map<number, Period[]>>(new Map());
+  
+  // Track if we're using v2 API data (for single job)
+  const [usingV2Data, setUsingV2Data] = useState(false);
 
   // Get user's notes color or default
   const notesColor = user?.notes_color || "#000000";
@@ -65,34 +76,180 @@ export default function JobNotesModal({
     if (isOpen && selectedJobIds.length > 0) {
       loadData();
     }
-  }, [isOpen, selectedJobIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedJobIds, providedJobs]);
+
+  // Helper function to convert time_split data to Period[] based on granularity
+  const convertTimeSplitToPeriods = (
+    timeSplit: TimeSplit,
+    targetGranularity: CellGranularity
+  ): Period[] => {
+    console.log(`[convertTimeSplitToPeriods] Converting for granularity: ${targetGranularity}`, {
+      hasDaily: !!timeSplit.daily,
+      hasWeekly: !!timeSplit.weekly,
+      hasMonthly: !!timeSplit.monthly,
+      hasQuarterly: !!timeSplit.quarterly,
+      dailyLength: timeSplit.daily?.length,
+      weeklyLength: timeSplit.weekly?.length,
+      monthlyLength: timeSplit.monthly?.length,
+      quarterlyLength: timeSplit.quarterly?.length,
+    });
+
+    if (targetGranularity === "daily" && timeSplit.daily && timeSplit.daily.length > 0) {
+      // Use daily data directly
+      console.log(`[convertTimeSplitToPeriods] Using daily data, ${timeSplit.daily.length} days`);
+      return timeSplit.daily.map((day) => {
+        const date = new Date(day.date);
+        return {
+          startDate: date,
+          endDate: date,
+          label: `${date.getMonth() + 1}/${date.getDate()}`,
+          quantity: day.quantity,
+          isLocked: false,
+        };
+      });
+    } else if (targetGranularity === "weekly" && timeSplit.weekly && timeSplit.weekly.length > 0) {
+      // Use weekly data directly
+      console.log(`[convertTimeSplitToPeriods] Using weekly data, ${timeSplit.weekly.length} weeks`);
+      return timeSplit.weekly.map((week) => {
+        const weekStart = new Date(week.week_start);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return {
+          startDate: weekStart,
+          endDate: weekEnd,
+          label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+          quantity: week.quantity,
+          isLocked: false,
+        };
+      });
+    } else if (targetGranularity === "monthly" && timeSplit.monthly && timeSplit.monthly.length > 0) {
+      // Use monthly data directly
+      console.log(`[convertTimeSplitToPeriods] Using monthly data, ${timeSplit.monthly.length} months`);
+      return timeSplit.monthly.map((month) => {
+        const monthStart = new Date(month.month_start);
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+        return {
+          startDate: monthStart,
+          endDate: monthEnd,
+          label: monthStart.toLocaleDateString("en-US", {
+            month: "short",
+            year: "2-digit",
+          }),
+          quantity: month.quantity,
+          isLocked: false,
+        };
+      });
+    } else if (targetGranularity === "quarterly" && timeSplit.quarterly && timeSplit.quarterly.length > 0) {
+      // Use quarterly data directly
+      console.log(`[convertTimeSplitToPeriods] Using quarterly data, ${timeSplit.quarterly.length} quarters`);
+      return timeSplit.quarterly.map((quarter) => {
+        const quarterStart = new Date(quarter.year, (quarter.quarter - 1) * 3, 1);
+        const quarterEnd = new Date(quarter.year, quarter.quarter * 3, 0);
+        return {
+          startDate: quarterStart,
+          endDate: quarterEnd,
+          label: `Q${quarter.quarter} ${quarter.year.toString().slice(-2)}`,
+          quantity: quarter.quantity,
+          isLocked: false,
+        };
+      });
+    }
+
+    // Fallback: if specific granularity not available, use daily and convert
+    console.log(`[convertTimeSplitToPeriods] No direct data for ${targetGranularity}, trying fallback with daily data`);
+    if (timeSplit.daily && timeSplit.daily.length > 0) {
+      console.log(`[convertTimeSplitToPeriods] Using daily data as fallback, ${timeSplit.daily.length} days`);
+      const sortedDaily = [...timeSplit.daily].sort((a, b) => {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      });
+      const dates = sortedDaily.map((d) => new Date(d.date));
+      const startDate = dates[0].getTime();
+      const endDate = dates[dates.length - 1].getTime();
+
+      // Convert daily to target granularity
+      const weekPeriods = calculatePeriods(startDate, endDate, "weekly");
+      const dailyQuantities = new Map<string, number>();
+      sortedDaily.forEach((day) => {
+        dailyQuantities.set(day.date, day.quantity);
+      });
+
+      const weeklySplit: number[] = [];
+      weekPeriods.forEach((week) => {
+        let weekQuantity = 0;
+        let currentDay = new Date(week.startDate);
+        const endDay = new Date(week.endDate);
+        while (currentDay <= endDay) {
+          const dateKey = `${currentDay.getFullYear()}-${String(currentDay.getMonth() + 1).padStart(2, '0')}-${String(currentDay.getDate()).padStart(2, '0')}`;
+          weekQuantity += dailyQuantities.get(dateKey) || 0;
+          currentDay.setDate(currentDay.getDate() + 1);
+        }
+        weeklySplit.push(weekQuantity);
+      });
+
+      const result = convertWeeklyToGranularity(
+        weeklySplit,
+        Array(weeklySplit.length).fill(false),
+        startDate,
+        endDate,
+        targetGranularity
+      );
+      console.log(`[convertTimeSplitToPeriods] Fallback conversion resulted in ${result.length} periods`);
+      return result;
+    }
+
+    console.warn(`[convertTimeSplitToPeriods] No data available for granularity ${targetGranularity} and no daily data for fallback`);
+    return [];
+  };
 
   // Initialize display periods when jobs load or granularity changes
   useEffect(() => {
     if (jobs.length === 0) return;
 
+    console.log(`[JobNotesModal] Initializing display periods for ${jobs.length} jobs, granularity: ${selectedGranularity}`);
     const newDisplayPeriods = new Map<number, Period[]>();
     jobs.forEach((job) => {
-      const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
-      const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
-
-      if (weeklySplit.length > 0) {
-        // Use current date as fallback for missing dates
-        const now = Date.now();
-        const startDate = job.start_date || now;
-        const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
-
-        const periods = convertWeeklyToGranularity(
-          weeklySplit,
-          lockedWeeks,
-          startDate,
-          dueDate,
-          selectedGranularity
-        );
+      // Check if this is a v2 job with time_split
+      const jobWithTimeSplit = job as ParsedJob & { time_split?: TimeSplit };
+      
+      console.log(`[JobNotesModal] Processing job ${job.id}:`, {
+        hasTimeSplit: !!jobWithTimeSplit.time_split,
+        timeSplitKeys: jobWithTimeSplit.time_split ? Object.keys(jobWithTimeSplit.time_split) : [],
+        selectedGranularity,
+      });
+      
+      if (jobWithTimeSplit.time_split) {
+        // Use time_split data directly for the selected granularity
+        console.log(`[JobNotesModal] Converting time_split for job ${job.id}, granularity: ${selectedGranularity}`);
+        const periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, selectedGranularity);
+        console.log(`[JobNotesModal] Converted to ${periods.length} periods for job ${job.id}:`, periods.slice(0, 3));
         newDisplayPeriods.set(job.id, periods);
+      } else {
+        // Use weekly_split (existing logic)
+        const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
+        const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
+
+        if (weeklySplit.length > 0) {
+          // Use current date as fallback for missing dates
+          const now = Date.now();
+          const startDate = job.start_date || now;
+          const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
+
+          const periods = convertWeeklyToGranularity(
+            weeklySplit,
+            lockedWeeks,
+            startDate,
+            dueDate,
+            selectedGranularity
+          );
+          newDisplayPeriods.set(job.id, periods);
+        } else {
+          console.warn(`[JobNotesModal] Job ${job.id} has no time_split.daily and no weekly_split`);
+        }
       }
     });
 
+    console.log(`[JobNotesModal] Setting displayPeriods with ${newDisplayPeriods.size} jobs`);
     setDisplayPeriods(newDisplayPeriods);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobs, selectedGranularity, editedWeeklySplits, editedLockedWeeks]); // Trigger when edited splits change
@@ -100,11 +257,105 @@ export default function JobNotesModal({
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load notes and jobs in parallel
-      const [allNotes, allJobs] = await Promise.all([
-        getJobNotes(),
-        getJobs(),
-      ]);
+      let selectedJobs: Job[] = [];
+      let v2DataUsed = false;
+
+      // For single job, fetch from v2 API to get time_split data
+      if (selectedJobIds.length === 1) {
+        try {
+          // Fetch from v2 API to get time_split data
+          const jobId = selectedJobIds[0];
+          console.log(`[JobNotesModal] Fetching job ${jobId} from v2 API`);
+          const v2Response = await getJobsV2({ per_page: 1000 });
+          console.log(`[JobNotesModal] V2 API returned ${v2Response.items.length} jobs`);
+          
+          const v2Job = v2Response.items.find((job) => job.id === jobId);
+          console.log(`[JobNotesModal] Found job in v2 response:`, {
+            found: !!v2Job,
+            jobId: v2Job?.id,
+            hasTimeSplit: !!v2Job?.time_split,
+            timeSplitKeys: v2Job?.time_split ? Object.keys(v2Job.time_split) : [],
+          });
+          
+          if (v2Job && v2Job.time_split) {
+            // Convert v2 job to ParsedJob format and attach time_split
+            const baseJob = {
+              ...v2Job,
+              machines_id: JSON.stringify((v2Job.machines_id || []).map((id) => ({ id, line: "" }))),
+              machines: JSON.stringify((v2Job.machines_id || []).map((id) => ({ id, line: "" }))),
+            };
+            const parsedJob = parseJob(baseJob as any);
+            (parsedJob as any).time_split = v2Job.time_split;
+            
+            selectedJobs = [parsedJob as Job];
+            v2DataUsed = true;
+            setUsingV2Data(true);
+            
+            console.log(`[JobNotesModal] Loaded job ${v2Job.id} from v2 API with time_split:`, {
+              hasDaily: !!v2Job.time_split.daily,
+              hasWeekly: !!v2Job.time_split.weekly,
+              hasMonthly: !!v2Job.time_split.monthly,
+              hasQuarterly: !!v2Job.time_split.quarterly,
+              dailyLength: v2Job.time_split.daily?.length,
+              weeklyLength: v2Job.time_split.weekly?.length,
+              monthlyLength: v2Job.time_split.monthly?.length,
+              quarterlyLength: v2Job.time_split.quarterly?.length,
+              timeSplit: v2Job.time_split,
+            });
+            console.log(`[JobNotesModal] Parsed job after attaching time_split:`, {
+              id: parsedJob.id,
+              hasTimeSplit: !!(parsedJob as any).time_split,
+              timeSplitKeys: (parsedJob as any).time_split ? Object.keys((parsedJob as any).time_split) : [],
+            });
+          } else {
+            console.warn(`[JobNotesModal] Job ${jobId} not found in v2 response or has no time_split, using fallback`);
+            // Fallback to provided jobs or v1 API
+            if (providedJobs && providedJobs.length > 0) {
+              selectedJobs = providedJobs.filter((job) =>
+                selectedJobIds.includes(job.id)
+              ) as Job[];
+              console.log(`[JobNotesModal] Using providedJobs fallback, found ${selectedJobs.length} jobs`);
+            } else {
+              const allJobs = await getJobs();
+              selectedJobs = allJobs.filter((job) =>
+                selectedJobIds.includes(job.id)
+              );
+              console.log(`[JobNotesModal] Using v1 API fallback, found ${selectedJobs.length} jobs`);
+            }
+            setUsingV2Data(false);
+          }
+        } catch (v2Error) {
+          console.warn("Failed to load from v2 API, falling back:", v2Error);
+          // Fallback to provided jobs or v1 API
+          if (providedJobs && providedJobs.length > 0) {
+            selectedJobs = providedJobs.filter((job) =>
+              selectedJobIds.includes(job.id)
+            ) as Job[];
+          } else {
+            const allJobs = await getJobs();
+            selectedJobs = allJobs.filter((job) =>
+              selectedJobIds.includes(job.id)
+            );
+          }
+          setUsingV2Data(false);
+        }
+      } else {
+        // Multiple jobs - use provided jobs or fetch from v1 API
+        if (providedJobs && providedJobs.length > 0) {
+          selectedJobs = providedJobs.filter((job) =>
+            selectedJobIds.includes(job.id)
+          ) as Job[];
+        } else {
+          const allJobs = await getJobs();
+          selectedJobs = allJobs.filter((job) =>
+            selectedJobIds.includes(job.id)
+          );
+        }
+        setUsingV2Data(false);
+      }
+
+      // Load notes
+      const allNotes = await getJobNotes();
 
       // Filter notes that include any of the selected job IDs
       const relevantNotes = allNotes.filter((note) =>
@@ -112,43 +363,42 @@ export default function JobNotesModal({
       );
       setNotes(relevantNotes);
 
-      // Filter jobs that match selected IDs
-      const selectedJobs = allJobs.filter((job) =>
-        selectedJobIds.includes(job.id)
-      );
       setJobs(selectedJobs);
 
       // Initialize weekly split state from jobs (useEffect will handle displayPeriods)
-      const newWeeklySplits = new Map<number, number[]>();
-      const newLockedWeeks = new Map<number, boolean[]>();
+      // Only initialize if not using v2 data (v2 data uses daily_split directly)
+      if (!v2DataUsed) {
+        const newWeeklySplits = new Map<number, number[]>();
+        const newLockedWeeks = new Map<number, boolean[]>();
 
-      selectedJobs.forEach((job) => {
-        if (job.weekly_split && job.weekly_split.length > 0) {
-          newWeeklySplits.set(job.id, [...job.weekly_split]);
-          newLockedWeeks.set(job.id, job.locked_weeks ? [...job.locked_weeks] : []);
-        } else if (job.start_date && job.due_date) {
-          // Initialize with even distribution if no weekly_split exists
-          const weeks = Math.ceil(
-            (job.due_date - job.start_date) / (7 * 24 * 60 * 60 * 1000)
-          );
-          const numWeeks = Math.max(1, weeks);
-          const { quantities, locks } = resetToEvenDistribution(numWeeks, job.quantity);
-          newWeeklySplits.set(job.id, quantities);
-          newLockedWeeks.set(job.id, locks);
-        } else {
-          // Job missing start_date or due_date - log warning but still initialize with 1 week
-          console.warn(
-            `[JobNotesModal] Job #${job.job_number} (ID: ${job.id}) is missing start_date or due_date. Initializing with 1 week default.`,
-            { start_date: job.start_date, due_date: job.due_date }
-          );
-          const { quantities, locks } = resetToEvenDistribution(1, job.quantity);
-          newWeeklySplits.set(job.id, quantities);
-          newLockedWeeks.set(job.id, locks);
-        }
-      });
+        selectedJobs.forEach((job) => {
+          if (job.weekly_split && job.weekly_split.length > 0) {
+            newWeeklySplits.set(job.id, [...job.weekly_split]);
+            newLockedWeeks.set(job.id, job.locked_weeks ? [...job.locked_weeks] : []);
+          } else if (job.start_date && job.due_date) {
+            // Initialize with even distribution if no weekly_split exists
+            const weeks = Math.ceil(
+              (job.due_date - job.start_date) / (7 * 24 * 60 * 60 * 1000)
+            );
+            const numWeeks = Math.max(1, weeks);
+            const { quantities, locks } = resetToEvenDistribution(numWeeks, job.quantity);
+            newWeeklySplits.set(job.id, quantities);
+            newLockedWeeks.set(job.id, locks);
+          } else {
+            // Job missing start_date or due_date - log warning but still initialize with 1 week
+            console.warn(
+              `[JobNotesModal] Job #${job.job_number} (ID: ${job.id}) is missing start_date or due_date. Initializing with 1 week default.`,
+              { start_date: job.start_date, due_date: job.due_date }
+            );
+            const { quantities, locks } = resetToEvenDistribution(1, job.quantity);
+            newWeeklySplits.set(job.id, quantities);
+            newLockedWeeks.set(job.id, locks);
+          }
+        });
 
-      setEditedWeeklySplits(newWeeklySplits);
-      setEditedLockedWeeks(newLockedWeeks);
+        setEditedWeeklySplits(newWeeklySplits);
+        setEditedLockedWeeks(newLockedWeeks);
+      }
     } catch (error) {
       console.error("Failed to load data:", error);
       alert("Failed to load data. Please try again.");
@@ -296,23 +546,32 @@ export default function JobNotesModal({
     // Convert all jobs to new granularity
     const newDisplayPeriods = new Map<number, Period[]>();
     jobs.forEach((job) => {
-      const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
-      const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
-
-      if (weeklySplit.length > 0) {
-        // Use current date as fallback for missing dates
-        const now = Date.now();
-        const startDate = job.start_date || now;
-        const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
-
-        const periods = convertWeeklyToGranularity(
-          weeklySplit,
-          lockedWeeks,
-          startDate,
-          dueDate,
-          newGranularity
-        );
+      // Check if this is a v2 job with time_split
+      const jobWithTimeSplit = job as ParsedJob & { time_split?: TimeSplit };
+      if (jobWithTimeSplit.time_split) {
+        // Use time_split data directly for the selected granularity
+        const periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, newGranularity);
         newDisplayPeriods.set(job.id, periods);
+      } else {
+        // Use weekly_split (existing logic)
+        const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
+        const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
+
+        if (weeklySplit.length > 0) {
+          // Use current date as fallback for missing dates
+          const now = Date.now();
+          const startDate = job.start_date || now;
+          const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
+
+          const periods = convertWeeklyToGranularity(
+            weeklySplit,
+            lockedWeeks,
+            startDate,
+            dueDate,
+            newGranularity
+          );
+          newDisplayPeriods.set(job.id, periods);
+        }
       }
     });
     setDisplayPeriods(newDisplayPeriods);
@@ -620,12 +879,33 @@ export default function JobNotesModal({
                   <div className="space-y-6">
                     {jobs.map((job) => {
                       const periods = displayPeriods.get(job.id) || [];
-                      const currentTotal = periods.reduce((sum, p) => sum + p.quantity, 0);
-                      const totalMismatch = currentTotal !== job.quantity;
+                      const projectedTotal = periods.reduce((sum, p) => sum + p.quantity, 0);
+                      const jobWithTimeSplit = job as ParsedJob & { time_split?: TimeSplit };
+                      const usingTimeSplit = !!jobWithTimeSplit.time_split;
+                      
+                      // For time_split data, use the projected total as the source of truth
+                      // For regular jobs, compare to job.quantity
+                      const expectedTotal = usingTimeSplit ? projectedTotal : job.quantity;
+                      const totalMismatch = !usingTimeSplit && projectedTotal !== job.quantity;
+                      const percentage = job.quantity > 0 ? ((projectedTotal / job.quantity) * 100).toFixed(1) : "0";
 
-                      // Don't render if periods haven't loaded yet
+                      console.log(`[JobNotesModal] Rendering job ${job.id}:`, {
+                        periodsLength: periods.length,
+                        periods: periods,
+                        displayPeriodsSize: displayPeriods.size,
+                        jobHasTimeSplit: usingTimeSplit,
+                        projectedTotal,
+                        jobQuantity: job.quantity,
+                        usingTimeSplit,
+                      });
+
+                      // Show loading state if periods haven't loaded yet
                       if (periods.length === 0) {
-                        return null;
+                        return (
+                          <div key={job.id} className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
+                            <p className="text-sm text-gray-500">Loading projections for Job #{job.job_number}...</p>
+                          </div>
+                        );
                       }
 
                       return (
@@ -636,19 +916,38 @@ export default function JobNotesModal({
                               <h3 className="text-sm font-medium text-[var(--text-dark)]">
                                 Job #{job.job_number} - {job.job_name}
                               </h3>
-                              <p className="text-xs text-[var(--text-light)] mt-1">
-                                Total: {job.quantity.toLocaleString()} | Current: {currentTotal.toLocaleString()}
-                                {selectedGranularity === "weekly" && (
-                                  <span className="ml-2">
-                                    • {periods.length} {periods.length === 1 ? "week" : "weeks"}
+                              <div className="text-xs text-[var(--text-light)] mt-1 space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-[var(--text-dark)]">
+                                    Projected Total: {projectedTotal.toLocaleString()}
                                   </span>
-                                )}
-                                {totalMismatch && (
-                                  <span className="text-red-600 ml-2 font-medium">
-                                    (Difference: {(currentTotal - job.quantity).toLocaleString()})
-                                  </span>
-                                )}
-                              </p>
+                                  {usingTimeSplit && (
+                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
+                                      From Timeline
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 text-[var(--text-light)]">
+                                  <span>Job Quantity: {job.quantity.toLocaleString()}</span>
+                                  {selectedGranularity === "weekly" && (
+                                    <span>• {periods.length} {periods.length === 1 ? "week" : "weeks"}</span>
+                                  )}
+                                  {selectedGranularity === "monthly" && (
+                                    <span>• {periods.length} {periods.length === 1 ? "month" : "months"}</span>
+                                  )}
+                                  {selectedGranularity === "quarterly" && (
+                                    <span>• {periods.length} {periods.length === 1 ? "quarter" : "quarters"}</span>
+                                  )}
+                                  {selectedGranularity === "daily" && (
+                                    <span>• {periods.length} {periods.length === 1 ? "day" : "days"}</span>
+                                  )}
+                                  {!usingTimeSplit && totalMismatch && (
+                                    <span className="text-amber-600 font-medium">
+                                      ({percentage}% of job quantity)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                             <button
                               onClick={() => handleResetToEvenDistribution(job.id)}

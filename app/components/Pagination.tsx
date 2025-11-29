@@ -1,6 +1,7 @@
 interface PaginationProps {
   currentPage: number;
   totalItems: number;
+  totalItemsFromAPI?: number; // Total items from API before filtering
   itemsPerPage: number;
   onPageChange: (page: number) => void;
   onItemsPerPageChange: (itemsPerPage: number) => void;
@@ -9,6 +10,7 @@ interface PaginationProps {
 export default function Pagination({
   currentPage,
   totalItems,
+  totalItemsFromAPI,
   itemsPerPage,
   onPageChange,
   onItemsPerPageChange,
@@ -77,6 +79,11 @@ export default function Pagination({
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-600">
             Showing <span className="font-semibold">all {totalItems}</span> jobs
+            {totalItemsFromAPI !== undefined && totalItemsFromAPI !== totalItems && (
+              <span className="text-gray-500 ml-1">
+                (of {totalItemsFromAPI} total from API)
+              </span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             <label htmlFor="items-per-page" className="text-sm text-gray-600">
@@ -108,6 +115,11 @@ export default function Pagination({
           Showing <span className="font-semibold">{startItem}</span> to{" "}
           <span className="font-semibold">{endItem}</span> of{" "}
           <span className="font-semibold">{totalItems}</span> jobs
+          {totalItemsFromAPI !== undefined && totalItemsFromAPI !== totalItems && (
+            <span className="text-gray-500 ml-1">
+              (of {totalItemsFromAPI} total from API)
+            </span>
+          )}
         </p>
         <div className="flex items-center gap-2">
           <label htmlFor="items-per-page" className="text-sm text-gray-600">

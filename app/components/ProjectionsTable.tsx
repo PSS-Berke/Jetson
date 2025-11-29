@@ -2277,6 +2277,7 @@ export default function ProjectionsTable({
         onClose={handleNotesModalClose}
         selectedJobIds={Array.from(selectedJobIds)}
         onSuccess={handleNotesSuccess}
+        jobs={jobProjections.map(p => p.job)}
       />
 
       {/* Delete Confirmation Modal */}

@@ -119,6 +119,7 @@ export default function ProjectionsPage() {
     processTypeCounts,
     totalRevenue,
     totalJobsInTimeframe,
+    totalJobsFromAPI,
     isLoading,
     error,
     refetch,
@@ -136,10 +137,10 @@ export default function ProjectionsPage() {
   );
   console.log("[DEBUG] ProjectionsPage - totalRevenue:", totalRevenue);
 
-  // Calculate paginated job projections
+  // Calculate paginated job projections - use all jobs from API, not filtered
   const paginatedJobProjections = itemsPerPage === -1
-    ? filteredJobProjections  // Show all items
-    : filteredJobProjections.slice(
+    ? jobProjections  // Show all items from API
+    : jobProjections.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
       );
@@ -430,14 +431,15 @@ export default function ProjectionsPage() {
                     showNotes={showNotes}
                     onShowNotesChange={setShowNotes}
                     granularity={granularity}
-                    fullFilteredProjections={filteredJobProjections}
+                    fullFilteredProjections={jobProjections}
                   />
 
                   {/* Pagination */}
                   <div className="no-print">
                     <Pagination
                       currentPage={currentPage}
-                      totalItems={filteredJobProjections.length}
+                      totalItems={jobProjections.length}
+                      totalItemsFromAPI={totalJobsFromAPI}
                       itemsPerPage={itemsPerPage}
                       onPageChange={setCurrentPage}
                       onItemsPerPageChange={setItemsPerPage}
@@ -545,7 +547,8 @@ export default function ProjectionsPage() {
                       <div className="no-print mt-4">
                         <Pagination
                           currentPage={currentPage}
-                          totalItems={filteredJobProjections.length}
+                          totalItems={jobProjections.length}
+                          totalItemsFromAPI={totalJobsFromAPI}
                           itemsPerPage={itemsPerPage}
                           onPageChange={setCurrentPage}
                           onItemsPerPageChange={setItemsPerPage}

@@ -78,6 +78,7 @@ export interface ProjectionsData {
   processTypeCounts: ProcessTypeCounts;
   totalRevenue: number;
   totalJobsInTimeframe: number;
+  totalJobsFromAPI: number; // Total jobs received from API before filtering
 }
 
 export interface ProjectionFilters {
@@ -203,6 +204,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     isLoading,
     error,
     refetch: refetchJobs,
+    pagination,
   } = useJobsV2({
     facilities_id: filters.facility || 0,
     fetchAll: true, // Fetch all jobs for projections
@@ -551,6 +553,8 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
 
   // 8. Combine everything - this is cheap now, just object creation
   const projectionsData = useMemo<ProjectionsData>(() => {
+    const totalJobsFromAPI = pagination?.itemsReceived ?? jobs?.length ?? 0;
+    
     if (!jobs || jobs.length === 0) {
       return {
         timeRanges,
@@ -575,6 +579,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         },
         totalRevenue: 0,
         totalJobsInTimeframe: 0,
+        totalJobsFromAPI,
       };
     }
 
@@ -589,6 +594,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       processTypeCounts,
       totalRevenue,
       totalJobsInTimeframe,
+      totalJobsFromAPI,
     };
   }, [
     jobs,
@@ -601,6 +607,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     processTypeCounts,
     totalRevenue,
     totalJobsInTimeframe,
+    pagination,
   ]);
 
   // Refetch function that refetches both jobs and production in parallel
