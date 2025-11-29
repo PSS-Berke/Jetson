@@ -25,7 +25,6 @@ import {
 } from "@/lib/granularityConversion";
 import type { ParsedJob } from "@/hooks/useJobs";
 import { parseJob } from "@/hooks/useJobs";
-import type { TimeSplit } from "@/lib/api";
 
 interface JobNotesModalProps {
   isOpen: boolean;
