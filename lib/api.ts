@@ -480,8 +480,8 @@ export const getMachines = async (
   }
 
   // Only append type parameter if it has a valid value
-  if (type && type.trim() !== "" && type !== "undefined" && type !== "null") {
-    params.append("type", type.trim());
+  if (type) {
+    params.append("type", type);
   }
 
   const queryString = params.toString();
