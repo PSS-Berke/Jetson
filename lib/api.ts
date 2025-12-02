@@ -1123,6 +1123,59 @@ export const getJobsV2 = async (
   );
 };
 
+// Service Type Load API response type
+export interface ServiceTypeLoadItem {
+  service_type: string;
+  key: string;
+  value: string;
+  job_count: number;
+  weekly: string; // JSON string
+  monthly: string; // JSON string
+  quarterly: string; // JSON string
+  key_total: number;
+  service_total: number;
+}
+
+// Get service type load data
+export const getServiceTypeLoad = async (
+  facilitiesId: number = 0,
+): Promise<ServiceTypeLoadItem[]> => {
+  return api.post<ServiceTypeLoadItem[]>(
+    "/service_type_load",
+    { facilities_id: facilitiesId },
+    "jobs",
+  );
+};
+
+// Data Health API response type
+export interface DataHealth {
+  missing_due_dates: number;
+  missing_start_date: number;
+  start_is_after_due: number;
+  total_issues: number;
+  total_records: number;
+  healthy_percentage: string;
+}
+
+// Get data health
+export const getDataHealth = async (
+  facilitiesId: number = 0,
+): Promise<DataHealth> => {
+  const params = new URLSearchParams();
+  params.append("facilities_id", facilitiesId.toString());
+
+  const endpoint = `/data_health?${params.toString()}`;
+  const result = await apiFetch<DataHealth[]>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
+  // API returns an array with one item
+  return result[0];
+};
+
 // Update a job
 export const updateJob = async (
   jobId: number,

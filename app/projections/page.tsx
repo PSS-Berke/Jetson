@@ -30,6 +30,8 @@ import FinancialsPDFSummary from "../components/FinancialsPDFSummary";
 import FinancialsPDFTables from "../components/FinancialsPDFTables";
 import CFODashboard from "../components/CFODashboard";
 import ProjectionsLoading from "../components/ProjectionsLoading";
+import ServiceTypeLoadTable from "../components/ServiceTypeLoadTable";
+import DataHealthCard from "../components/DataHealthCard";
 
 // Dynamically import calendar and modals - only loaded when needed
 const EmbeddedCalendar = dynamic(
@@ -55,7 +57,7 @@ const BulkJobUploadModal = dynamic(
   },
 );
 
-type ViewMode = "table" | "calendar" | "financials" | "revenue-table";
+type ViewMode = "table" | "calendar" | "financials" | "revenue-table" | "service-load";
 
 export default function ProjectionsPage() {
   const [granularity, setGranularity] = useState<Granularity>("weekly");
@@ -313,6 +315,9 @@ export default function ProjectionsPage() {
           </div>
         </div>
 
+        {/* Data Health Card */}
+        <DataHealthCard facilitiesId={selectedFacility} />
+
         {/* View Mode Tabs */}
         <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] no-print">
           <div className="flex gap-2 overflow-x-auto">
@@ -345,6 +350,16 @@ export default function ProjectionsPage() {
               }`}
             >
               Financials
+            </button>
+            <button
+              onClick={() => setViewMode("service-load")}
+              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+                viewMode === "service-load"
+                  ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                  : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
+              }`}
+            >
+              Service Load
             </button>
           </div>
         </div>
@@ -557,6 +572,14 @@ export default function ProjectionsPage() {
                     </>
                   )}
                 </>
+              )}
+
+              {/* Service Load View */}
+              {viewMode === "service-load" && (
+                <ServiceTypeLoadTable
+                  facilitiesId={selectedFacility}
+                  granularity={granularity}
+                />
               )}
             </>
           )}
