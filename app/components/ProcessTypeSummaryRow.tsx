@@ -13,6 +13,8 @@ interface ProcessTypeSummaryRowProps {
   isFacilitySummary?: boolean;
   facilityName?: string;
   expandCollapseAllButton?: React.ReactNode;
+  onCategoryClick?: (processType: string, timeRangeLabel?: string) => void;
+  isCategoryFilterActive?: boolean;
 }
 
 export function ProcessTypeSummaryRow({
@@ -25,6 +27,8 @@ export function ProcessTypeSummaryRow({
   isFacilitySummary = false,
   facilityName,
   expandCollapseAllButton,
+  onCategoryClick,
+  isCategoryFilterActive = false,
 }: ProcessTypeSummaryRowProps) {
   const displayValue = summary.grandTotal;
   const formattedTotal = formatQuantity(Math.round(displayValue));
@@ -35,7 +39,18 @@ export function ProcessTypeSummaryRow({
     : summary.processType;
 
   return (
-    <tr className="bg-blue-50 font-semibold text-sm border-b border-blue-200">
+    <tr 
+      className={`font-semibold text-sm border-b border-blue-200 ${
+        isCategoryFilterActive ? "bg-blue-200" : "bg-blue-50"
+      } ${onCategoryClick ? "cursor-pointer hover:bg-blue-100" : ""}`}
+      onClick={(e) => {
+        // Don't trigger category click when clicking expand/collapse button
+        if ((e.target as HTMLElement).closest('button')) {
+          return;
+        }
+        onCategoryClick?.(summary.processType);
+      }}
+    >
       {/* Checkbox column - with expand/collapse all button on first row */}
       <th className="px-2 py-2 w-12">
         {expandCollapseAllButton && (
@@ -88,7 +103,11 @@ export function ProcessTypeSummaryRow({
             key={range.label}
             className={`px-2 py-2 text-center text-xs font-semibold ${
               index % 2 === 0 ? "bg-blue-100" : "bg-blue-50"
-            }`}
+            } ${onCategoryClick ? "cursor-pointer hover:bg-blue-200" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCategoryClick?.(summary.processType, range.label);
+            }}
           >
             {formattedValue}
           </th>

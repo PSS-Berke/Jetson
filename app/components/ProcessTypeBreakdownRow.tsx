@@ -8,6 +8,8 @@ interface ProcessTypeBreakdownRowProps {
   fieldDisplayLabel: string;
   timeRanges: TimeRange[];
   showNotes: boolean;
+  onCategoryClick?: (processType: string, fieldName: string, fieldValue: any, timeRangeLabel?: string) => void;
+  isCategoryFilterActive?: boolean;
 }
 
 export function ProcessTypeBreakdownRow({
@@ -15,11 +17,20 @@ export function ProcessTypeBreakdownRow({
   fieldDisplayLabel,
   timeRanges,
   showNotes,
+  onCategoryClick,
+  isCategoryFilterActive = false,
 }: ProcessTypeBreakdownRowProps) {
   const formattedTotal = formatQuantity(Math.round(breakdown.totalQuantity));
 
   return (
-    <tr className="bg-blue-25 text-sm border-b border-blue-100">
+    <tr 
+      className={`text-sm border-b border-blue-100 ${
+        isCategoryFilterActive ? "bg-blue-200" : "bg-blue-50/30"
+      } ${onCategoryClick ? "cursor-pointer hover:bg-blue-50" : ""}`}
+      onClick={() => {
+        onCategoryClick?.(breakdown.processType, breakdown.fieldName, breakdown.fieldValue);
+      }}
+    >
       {/* Empty checkbox column */}
       <td className="px-2 py-2 w-12"></td>
       {/* Job # column */}
@@ -53,7 +64,11 @@ export function ProcessTypeBreakdownRow({
             key={range.label}
             className={`px-2 py-2 text-center text-xs ${
               index % 2 === 0 ? "bg-blue-50" : "bg-white"
-            }`}
+            } ${onCategoryClick ? "cursor-pointer hover:bg-blue-100" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCategoryClick?.(breakdown.processType, breakdown.fieldName, breakdown.fieldValue, range.label);
+            }}
           >
             {formattedValue}
           </td>

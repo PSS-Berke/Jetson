@@ -1136,6 +1136,14 @@ export default function ProjectionsTable({
   const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
   const [machineVariables, setMachineVariables] = useState<any[]>([]);
 
+  // Category filter state - tracks which category/breakdown is selected
+  const [categoryFilter, setCategoryFilter] = useState<{
+    processType: string;
+    fieldName?: string;
+    fieldValue?: any;
+    timeRangeLabel?: string;
+  } | null>(null);
+
   // Load machine variables for field definitions
   useEffect(() => {
     getAllMachineVariables()
@@ -1177,13 +1185,155 @@ export default function ProjectionsTable({
     setExpandedSummaries(new Set());
   };
 
-  // Transform data for process view
-  const displayProjections = useMemo(() => {
-    if (showExpandedProcesses) {
-      return expandJobProjectionsToProcesses(jobProjections);
+  // Category filter handlers
+  const handleCategoryClick = (
+    processType: string,
+    fieldName?: string,
+    fieldValue?: any,
+    timeRangeLabel?: string
+  ) => {
+    // If clicking the same filter, clear it
+    if (
+      categoryFilter &&
+      categoryFilter.processType === processType &&
+      categoryFilter.fieldName === fieldName &&
+      categoryFilter.fieldValue === fieldValue &&
+      categoryFilter.timeRangeLabel === timeRangeLabel
+    ) {
+      setCategoryFilter(null);
+      return;
     }
-    return jobProjections;
-  }, [showExpandedProcesses, jobProjections]);
+
+    // Set new filter
+    setCategoryFilter({
+      processType,
+      fieldName,
+      fieldValue,
+      timeRangeLabel,
+    });
+  };
+
+  const handleClearCategoryFilter = () => {
+    setCategoryFilter(null);
+  };
+
+  // Helper function to compare field values flexibly
+  const fieldValuesMatch = (filterValue: any, requirementValue: any): boolean => {
+    // Handle undefined/null
+    if (filterValue === undefined || filterValue === null) {
+      return requirementValue === undefined || requirementValue === null || requirementValue === "";
+    }
+    if (requirementValue === undefined || requirementValue === null) {
+      return filterValue === undefined || filterValue === null || filterValue === "";
+    }
+
+    // Handle boolean comparisons
+    if (typeof filterValue === "boolean") {
+      if (filterValue === true) {
+        return requirementValue === true || 
+               requirementValue === 1 || 
+               String(requirementValue).toLowerCase() === "true" || 
+               String(requirementValue) === "1";
+      } else {
+        return requirementValue === false || 
+               requirementValue === 0 || 
+               String(requirementValue).toLowerCase() === "false" || 
+               String(requirementValue) === "0" || 
+               requirementValue === null || 
+               requirementValue === undefined || 
+               requirementValue === "";
+      }
+    }
+
+    // Handle number comparisons
+    if (typeof filterValue === "number" && typeof requirementValue === "number") {
+      return filterValue === requirementValue;
+    }
+
+    // String comparison (case-insensitive, trimmed)
+    const filterStr = String(filterValue).toLowerCase().trim();
+    const valueStr = String(requirementValue).toLowerCase().trim();
+    return filterStr === valueStr;
+  };
+
+  // Transform data for process view and apply category filter
+  const displayProjections = useMemo(() => {
+    let projections = jobProjections;
+
+    // Apply category filter if active
+    if (categoryFilter) {
+      const originalCount = projections.length;
+      projections = projections.filter((projection) => {
+        const job = projection.job;
+        const requirements = job.requirements || [];
+
+        // Check if job has a requirement matching the process type
+        const matchingRequirements = requirements.filter((req) => {
+          const reqProcessType = normalizeProcessType(req.process_type || "").toLowerCase();
+          const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
+          
+          if (reqProcessType !== filterProcessType) {
+            return false;
+          }
+
+          // If filtering by breakdown field, check field value
+          if (categoryFilter.fieldName && categoryFilter.fieldValue !== undefined) {
+            const fieldValue = req[categoryFilter.fieldName];
+            
+            if (!fieldValuesMatch(categoryFilter.fieldValue, fieldValue)) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+
+        if (matchingRequirements.length === 0) {
+          return false;
+        }
+
+        // If filtering by time range, check if job has quantity in that period
+        if (categoryFilter.timeRangeLabel) {
+          const periodQuantity = projection.weeklyQuantities.get(categoryFilter.timeRangeLabel) || 0;
+          if (periodQuantity <= 0) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+      
+      console.log(`[Category Filter] Filtered from ${originalCount} to ${projections.length} jobs with filter:`, categoryFilter);
+      if (projections.length === 0 && originalCount > 0) {
+        console.warn(`[Category Filter] No jobs matched! Filter:`, categoryFilter);
+        // Sample a few jobs to see what their requirements look like
+        const sampleJobs = jobProjections.slice(0, 3);
+        sampleJobs.forEach((proj, idx) => {
+          const matchingReqs = proj.job.requirements?.filter(req => {
+            const reqProcessType = normalizeProcessType(req.process_type || "").toLowerCase();
+            const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
+            return reqProcessType === filterProcessType;
+          }) || [];
+          console.warn(`[Category Filter] Sample job ${idx + 1} (${proj.job.job_number}):`, {
+            processType: categoryFilter.processType,
+            fieldName: categoryFilter.fieldName,
+            filterValue: categoryFilter.fieldValue,
+            filterValueType: typeof categoryFilter.fieldValue,
+            matchingRequirements: matchingReqs.map(req => ({
+              process_type: req.process_type,
+              [categoryFilter.fieldName || '']: req[categoryFilter.fieldName || ''],
+              fieldValueType: typeof req[categoryFilter.fieldName || ''],
+            })),
+          });
+        });
+      }
+    }
+
+    if (showExpandedProcesses) {
+      return expandJobProjectionsToProcesses(projections);
+    }
+    return projections;
+  }, [showExpandedProcesses, jobProjections, categoryFilter]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
 
@@ -1648,6 +1798,35 @@ export default function ProjectionsTable({
 
   return (
     <>
+      {/* Category Filter Banner */}
+      {categoryFilter && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-semibold text-yellow-900">
+              Filtered by:{" "}
+              <span className="font-normal">
+                {categoryFilter.processType}
+                {categoryFilter.fieldName && categoryFilter.fieldValue !== undefined && (
+                  <> - {categoryFilter.fieldName}: {String(categoryFilter.fieldValue)}</>
+                )}
+                {categoryFilter.timeRangeLabel && (
+                  <> - {categoryFilter.timeRangeLabel}</>
+                )}
+              </span>
+            </span>
+            <span className="text-sm text-yellow-700">
+              ({sortedJobProjections.length} {sortedJobProjections.length === 1 ? "job" : "jobs"} shown)
+            </span>
+          </div>
+          <button
+            onClick={handleClearCategoryFilter}
+            className="text-sm text-yellow-700 hover:text-yellow-900 underline font-medium"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       {/* Bulk Actions Toolbar */}
       {selectedJobIds.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -1869,6 +2048,11 @@ export default function ProjectionsTable({
                     }
                   }
 
+                  // Check if this summary row matches the active filter
+                  const isSummaryFilterActive = categoryFilter && 
+                    categoryFilter.processType === summary.processType &&
+                    !categoryFilter.fieldName;
+
                   return (
                     <React.Fragment key={summaryKey}>
                       <ProcessTypeSummaryRow
@@ -1881,19 +2065,46 @@ export default function ProjectionsTable({
                         isFacilitySummary={isFacilitySummary(summary)}
                         facilityName={isFacilitySummary(summary) ? summary.facilityName : undefined}
                         expandCollapseAllButton={expandCollapseAllButton}
+                        onCategoryClick={handleCategoryClick}
+                        isCategoryFilterActive={!!isSummaryFilterActive}
                       />
                       {/* Render breakdown rows for all fields if expanded */}
                       {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
                         <React.Fragment key={`${summaryKey}-field-${field.name}`}>
-                          {breakdowns.map((breakdown) => (
-                            <ProcessTypeBreakdownRow
-                              key={`${summaryKey}-${field.name}-${breakdown.fieldValue}`}
-                              breakdown={breakdown}
-                              fieldDisplayLabel={field.label}
-                              timeRanges={timeRanges}
-                              showNotes={showNotes}
-                            />
-                          ))}
+                          {breakdowns.map((breakdown) => {
+                            // Check if this breakdown row matches the active filter
+                            let isBreakdownFilterActive = false;
+                            if (categoryFilter) {
+                              const processTypeMatch = categoryFilter.processType === breakdown.processType;
+                              const fieldNameMatch = categoryFilter.fieldName === breakdown.fieldName;
+                              
+                              // Compare field values with proper type handling
+                              let fieldValueMatch = false;
+                              if (categoryFilter.fieldValue !== undefined) {
+                                if (typeof categoryFilter.fieldValue === "boolean" && typeof breakdown.fieldValue === "boolean") {
+                                  fieldValueMatch = categoryFilter.fieldValue === breakdown.fieldValue;
+                                } else {
+                                  fieldValueMatch = String(categoryFilter.fieldValue) === String(breakdown.fieldValue);
+                                }
+                              } else {
+                                fieldValueMatch = true; // No field value filter means match
+                              }
+                              
+                              isBreakdownFilterActive = processTypeMatch && fieldNameMatch && fieldValueMatch;
+                            }
+
+                            return (
+                              <ProcessTypeBreakdownRow
+                                key={`${summaryKey}-${field.name}-${breakdown.fieldValue}`}
+                                breakdown={breakdown}
+                                fieldDisplayLabel={field.label}
+                                timeRanges={timeRanges}
+                                showNotes={showNotes}
+                                onCategoryClick={handleCategoryClick}
+                                isCategoryFilterActive={isBreakdownFilterActive}
+                              />
+                            );
+                          })}
                         </React.Fragment>
                       ))}
                     </React.Fragment>
