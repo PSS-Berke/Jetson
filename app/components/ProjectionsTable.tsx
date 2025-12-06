@@ -20,6 +20,7 @@ import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNot
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
 import type { CellIdentifier } from "@/types";
 import { useCellNotes } from "@/hooks/useCellNotes";
+import { useColumnSettings, ColumnSettingsPopover } from "./ProjectionsTable/index";
 
 type SortField =
   | "job_number"
@@ -32,6 +33,12 @@ type SortField =
   | "due_date"
   | "total";
 type SortDirection = "asc" | "desc";
+
+// Helper to truncate job numbers for table display
+const formatJobNumber = (jobNumber: string, maxLength = 7) => {
+  if (jobNumber.length <= maxLength) return jobNumber;
+  return `${jobNumber.slice(0, maxLength)}…`;
+};
 
 interface ProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
@@ -81,6 +88,8 @@ const ProjectionTableRow = memo(
     onOpenNotesModal,
     granularity,
     cellNotesMap,
+    isColumnVisible,
+    orderedColumnKeys,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -100,9 +109,101 @@ const ProjectionTableRow = memo(
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
     granularity?: "weekly" | "monthly" | "quarterly";
     cellNotesMap?: Map<string, JobNote[]>;
+    isColumnVisible: (key: string) => boolean;
+    orderedColumnKeys: string[];
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
+
+    // Render a single cell based on column key
+    const renderCell = (columnKey: string) => {
+      switch (columnKey) {
+        case "job_number":
+          return (
+            <td
+              key="job_number"
+              className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
+              title={job.job_number}
+            >
+              {formatJobNumber(job.job_number)}
+            </td>
+          );
+        case "facility":
+          return (
+            <td key="facility" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+              {job.facility?.name || "Unknown"}
+            </td>
+          );
+        case "sub_client":
+          return (
+            <td key="sub_client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
+              {job.sub_client || "-"}
+            </td>
+          );
+        case "processes":
+          return (
+            <td key="processes" className="px-2 py-2 text-xs text-[var(--text-dark)]">
+              <div className="flex flex-wrap gap-1">
+                {job.requirements && job.requirements.length > 0 ? (
+                  [...new Set(job.requirements.map((req) => req.process_type).filter(Boolean))].map(
+                    (processType, idx) => (
+                      <ProcessTypeBadge key={idx} processType={processType as string} />
+                    )
+                  )
+                ) : (
+                  <span className="text-gray-400 text-xs">No processes</span>
+                )}
+              </div>
+            </td>
+          );
+        case "description":
+          return (
+            <td key="description" className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
+              {job.description || "N/A"}
+            </td>
+          );
+        case "quantity":
+          return (
+            <td key="quantity" className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
+              {job.quantity.toLocaleString()}
+            </td>
+          );
+        case "start_date":
+          return (
+            <td
+              key="start_date"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {job.start_date
+                ? new Date(job.start_date).toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "2-digit",
+                  })
+                : "N/A"}
+            </td>
+          );
+        case "due_date":
+          return (
+            <td
+              key="due_date"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {job.due_date
+                ? new Date(job.due_date).toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "2-digit",
+                  })
+                : "N/A"}
+            </td>
+          );
+        default:
+          return null;
+      }
+    };
 
     // Helper to get cell key
     const getCellKeyForRange = (range: TimeRange): string => {
@@ -149,66 +250,12 @@ const ProjectionTableRow = memo(
             className="w-4 h-4 cursor-pointer"
           />
         </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
-          {job.job_number}
-        </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-          {job.facility?.name || "Unknown"}
-        </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-          {job.sub_client || "-"}
-        </td>
-        <td className="px-2 py-2 text-xs text-[var(--text-dark)]">
-          <div className="flex flex-wrap gap-1">
-            {job.requirements && job.requirements.length > 0 ? (
-              // Get unique process types from requirements
-              [
-                ...new Set(
-                  job.requirements
-                    .map((req) => req.process_type)
-                    .filter(Boolean),
-                ),
-              ].map((processType, idx) => (
-                <ProcessTypeBadge
-                  key={idx}
-                  processType={processType as string}
-                />
-              ))
-            ) : (
-              <span className="text-gray-400 text-xs">No processes</span>
-            )}
-          </div>
-        </td>
-        <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
-          {job.description || "N/A"}
-        </td>
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
-          {job.quantity.toLocaleString()}
-        </td>
-        <td
-          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {job.start_date
-            ? new Date(job.start_date).toLocaleDateString("en-US", {
-                month: "numeric",
-                day: "numeric",
-                year: "2-digit",
-              })
-            : "N/A"}
-        </td>
-        <td
-          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {job.due_date
-            ? new Date(job.due_date).toLocaleDateString("en-US", {
-                month: "numeric",
-                day: "numeric",
-                year: "2-digit",
-              })
-            : "N/A"}
-        </td>
+        {/* Render cells in configured order */}
+        {orderedColumnKeys.map((columnKey) => {
+          // Skip "total" - it's rendered after time ranges
+          if (columnKey === "total") return null;
+          return renderCell(columnKey);
+        })}
         {timeRanges.map((range, index) => {
           const quantity = projection.weeklyQuantities.get(range.label) || 0;
           const displayValue = formatQuantity(quantity);
@@ -238,9 +285,11 @@ const ProjectionTableRow = memo(
             </td>
           );
         })}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-          {formatQuantity(projection.totalQuantity)}
-        </td>
+        {isColumnVisible("total") && (
+          <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
+            {formatQuantity(projection.totalQuantity)}
+          </td>
+        )}
         {showNotes && (
           <td
             className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
@@ -427,6 +476,8 @@ const ProcessProjectionTableRow = memo(
     onOpenNotesModal,
     granularity,
     cellNotesMap,
+    isColumnVisible,
+    orderedColumnKeys,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -447,9 +498,97 @@ const ProcessProjectionTableRow = memo(
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
     granularity?: "weekly" | "monthly" | "quarterly";
     cellNotesMap?: Map<string, JobNote[]>;
+    isColumnVisible: (key: string) => boolean;
+    orderedColumnKeys: string[];
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
+
+    // Render a single cell based on column key
+    const renderCell = (columnKey: string) => {
+      switch (columnKey) {
+        case "job_number":
+          return isFirstInGroup ? (
+            <td
+              key="job_number"
+              className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
+              title={job.job_number}
+            >
+              {formatJobNumber(job.job_number)}
+            </td>
+          ) : (
+            <td key="job_number" className="px-2 py-2"></td>
+          );
+        case "facility":
+          return isFirstInGroup ? (
+            <td key="facility" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+              {job.facility?.name || "Unknown"}
+            </td>
+          ) : (
+            <td key="facility" className="px-2 py-2"></td>
+          );
+        case "sub_client":
+          return isFirstInGroup ? (
+            <td key="sub_client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
+              {job.sub_client || "-"}
+            </td>
+          ) : (
+            <td key="sub_client" className="px-2 py-2"></td>
+          );
+        case "processes":
+          return (
+            <td key="processes" className="px-2 py-2 text-xs text-[var(--text-dark)] pl-6">
+              <ProcessTypeBadge processType={processProjection.processType} />
+            </td>
+          );
+        case "description":
+          return (
+            <td key="description" className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
+              {isFirstInGroup ? job.description || "N/A" : ""}
+            </td>
+          );
+        case "quantity":
+          return (
+            <td key="quantity" className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
+              {processProjection.totalQuantity.toLocaleString()}
+            </td>
+          );
+        case "start_date":
+          return (
+            <td
+              key="start_date"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {isFirstInGroup && job.start_date
+                ? new Date(job.start_date).toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "2-digit",
+                  })
+                : ""}
+            </td>
+          );
+        case "due_date":
+          return (
+            <td
+              key="due_date"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {isFirstInGroup && job.due_date
+                ? new Date(job.due_date).toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "2-digit",
+                  })
+                : ""}
+            </td>
+          );
+        default:
+          return null;
+      }
+    };
 
     // Helper to get cell key
     const getCellKeyForRange = (range: TimeRange): string => {
@@ -496,67 +635,12 @@ const ProcessProjectionTableRow = memo(
           )}
         </td>
 
-        {/* Job details - only show on first row */}
-        {isFirstInGroup ? (
-          <>
-            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]">
-              {job.job_number}
-            </td>
-            <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-              {job.facility?.name || "Unknown"}
-            </td>
-            <td className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-              {job.sub_client || "-"}
-            </td>
-          </>
-        ) : (
-          <>
-            <td className="px-2 py-2"></td>
-            <td className="px-2 py-2"></td>
-            <td className="px-2 py-2"></td>
-          </>
-        )}
-
-        {/* Process Type - single badge */}
-        <td className="px-2 py-2 text-xs text-[var(--text-dark)] pl-6">
-          <ProcessTypeBadge processType={processProjection.processType} />
-        </td>
-
-        {/* Description - only on first row */}
-        <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
-          {isFirstInGroup ? job.description || "N/A" : ""}
-        </td>
-
-        {/* Quantity - per process */}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
-          {processProjection.totalQuantity.toLocaleString()}
-        </td>
-
-        {/* Dates - only on first row */}
-        <td
-          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {isFirstInGroup && job.start_date
-            ? new Date(job.start_date).toLocaleDateString("en-US", {
-                month: "numeric",
-                day: "numeric",
-                year: "2-digit",
-              })
-            : ""}
-        </td>
-        <td
-          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {isFirstInGroup && job.due_date
-            ? new Date(job.due_date).toLocaleDateString("en-US", {
-                month: "numeric",
-                day: "numeric",
-                year: "2-digit",
-              })
-            : ""}
-        </td>
+        {/* Render cells in configured order */}
+        {orderedColumnKeys.map((columnKey) => {
+          // Skip "total" - it's rendered after time ranges
+          if (columnKey === "total") return null;
+          return renderCell(columnKey);
+        })}
 
         {/* Time period columns - per process */}
         {timeRanges.map((range, index) => {
@@ -591,9 +675,11 @@ const ProcessProjectionTableRow = memo(
         })}
 
         {/* Total - per process */}
-        <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-          {formatQuantity(processProjection.totalQuantity)}
-        </td>
+        {isColumnVisible("total") && (
+          <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
+            {formatQuantity(processProjection.totalQuantity)}
+          </td>
+        )}
         {showNotes && (
           <td 
             className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
@@ -1017,13 +1103,11 @@ ProjectionMobileCard.displayName = "ProjectionMobileCard";
 const MobileTableRow = memo(
   ({
     projection,
-    visibleTimeRanges,
     onJobClick,
     isSelected,
     onToggleSelect,
   }: {
     projection: JobProjection;
-    visibleTimeRanges: TimeRange[];
     onJobClick: (job: ParsedJob) => void;
     isSelected: boolean;
     onToggleSelect: () => void;
@@ -1046,27 +1130,18 @@ const MobileTableRow = memo(
             className="w-4 h-4 cursor-pointer"
           />
         </td>
-        <td className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]">
-          {job.job_number}
+        <td
+          className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]"
+          title={job.job_number}
+        >
+          {formatJobNumber(job.job_number)}
         </td>
         <td className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[80px] truncate">
           {job.facility?.name || "Unknown"}
         </td>
-        {visibleTimeRanges.map((range, index) => {
-          const quantity = projection.weeklyQuantities.get(range.label) || 0;
-          const displayValue = formatQuantity(quantity);
-
-          return (
-            <td
-              key={range.label}
-              className={`px-2 py-2 text-xs text-center font-medium text-[var(--text-dark)] ${
-                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-              }`}
-            >
-              {displayValue}
-            </td>
-          );
-        })}
+        <td className="px-2 py-2 text-xs text-center font-medium text-[var(--text-dark)]">
+          {job.quantity.toLocaleString()}
+        </td>
         <td className="px-2 py-2 text-xs text-center font-bold text-[var(--text-dark)] sticky right-0 bg-white">
           {formatQuantity(projection.totalQuantity)}
         </td>
@@ -1126,6 +1201,23 @@ export default function ProjectionsTable({
 
   // Cell-level notes hook for incremental updates
   const { cellNotesMap, loadNotes: loadCellNotes, cellHasNotes } = useCellNotes();
+
+  // Column settings hook
+  const {
+    columnSettings,
+    visibleColumns,
+    isColumnVisible,
+    toggleColumnVisibility,
+    resetToDefaults: resetColumnSettings,
+    setColumnOrder,
+  } = useColumnSettings();
+
+  // Get ordered visible column keys (excluding checkbox and notes which are handled separately)
+  const orderedColumnKeys = useMemo(() => {
+    return columnSettings.order.filter(
+      (key) => isColumnVisible(key) && key !== "checkbox" && key !== "notes"
+    );
+  }, [columnSettings.order, isColumnVisible]);
 
   // Inline note editing state
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
@@ -1787,6 +1879,130 @@ export default function ProjectionsTable({
     return <span>{sortDirection === "asc" ? "↑" : "↓"}</span>;
   };
 
+  // Render column header based on key
+  const renderColumnHeader = (columnKey: string) => {
+    switch (columnKey) {
+      case "job_number":
+        return (
+          <th
+            key="job_number"
+            onClick={() => handleSort("job_number")}
+            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center gap-1">
+              Job # <SortIcon field="job_number" />
+            </div>
+          </th>
+        );
+      case "facility":
+        return (
+          <th
+            key="facility"
+            onClick={() => handleSort("facility")}
+            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center gap-1">
+              Facility <SortIcon field="facility" />
+            </div>
+          </th>
+        );
+      case "sub_client":
+        return (
+          <th
+            key="sub_client"
+            onClick={() => handleSort("sub_client")}
+            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center gap-1">
+              Sub Client <SortIcon field="sub_client" />
+            </div>
+          </th>
+        );
+      case "processes":
+        return (
+          <th
+            key="processes"
+            onClick={() =>
+              showExpandedProcesses ? handleSort("process_type") : undefined
+            }
+            className={`px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
+              showExpandedProcesses ? "cursor-pointer hover:bg-gray-100" : ""
+            }`}
+          >
+            {showExpandedProcesses ? (
+              <div className="flex items-center gap-1">
+                Process <SortIcon field="process_type" />
+              </div>
+            ) : (
+              "Processes"
+            )}
+          </th>
+        );
+      case "description":
+        return (
+          <th
+            key="description"
+            onClick={() => handleSort("description")}
+            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center gap-1">
+              Description <SortIcon field="description" />
+            </div>
+          </th>
+        );
+      case "quantity":
+        return (
+          <th
+            key="quantity"
+            onClick={() => handleSort("quantity")}
+            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center justify-center gap-1">
+              Qty <SortIcon field="quantity" />
+            </div>
+          </th>
+        );
+      case "start_date":
+        return (
+          <th
+            key="start_date"
+            onClick={() => handleSort("start_date")}
+            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center justify-center gap-1">
+              Start <SortIcon field="start_date" />
+            </div>
+          </th>
+        );
+      case "due_date":
+        return (
+          <th
+            key="due_date"
+            onClick={() => handleSort("due_date")}
+            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center justify-center gap-1">
+              End <SortIcon field="due_date" />
+            </div>
+          </th>
+        );
+      case "total":
+        return (
+          <th
+            key="total"
+            onClick={() => handleSort("total")}
+            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+          >
+            <div className="flex items-center justify-center gap-1">
+              Total <SortIcon field="total" />
+            </div>
+          </th>
+        );
+      default:
+        return null;
+    }
+  };
+
   // Calculate selection state
   const allSelected =
     sortedJobProjections.length > 0 &&
@@ -1945,6 +2161,17 @@ export default function ProjectionsTable({
           </div>
         </div>
       )}
+
+      {/* Table Controls */}
+      <div className="hidden md:flex justify-end mb-3">
+        <ColumnSettingsPopover
+          columnOrder={columnSettings.order}
+          hiddenColumns={columnSettings.hidden}
+          onToggleColumn={toggleColumnVisibility}
+          onReorderColumns={setColumnOrder}
+          onResetToDefaults={resetColumnSettings}
+        />
+      </div>
 
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
@@ -2113,8 +2340,9 @@ export default function ProjectionsTable({
               </>
             )}
 
-            {/* Column Headers */}
+            {/* Column Headers - rendered dynamically based on column order */}
             <tr className="bg-gray-50 border-y border-gray-200">
+              {/* Checkbox column is always first */}
               <th className="px-2 py-2 text-left w-12">
                 <input
                   type="checkbox"
@@ -2128,82 +2356,13 @@ export default function ProjectionsTable({
                   className="w-4 h-4 cursor-pointer"
                 />
               </th>
-              <th
-                onClick={() => handleSort("job_number")}
-                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center gap-1">
-                  Job # <SortIcon field="job_number" />
-                </div>
-              </th>
-              <th
-                onClick={() => handleSort("facility")}
-                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center gap-1">
-                  Facility <SortIcon field="facility" />
-                </div>
-              </th>
-              <th
-                onClick={() => handleSort("sub_client")}
-                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center gap-1">
-                  Sub Client <SortIcon field="sub_client" />
-                </div>
-              </th>
-              <th
-                onClick={() =>
-                  showExpandedProcesses
-                    ? handleSort("process_type")
-                    : undefined
-                }
-                className={`px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-                  showExpandedProcesses
-                    ? "cursor-pointer hover:bg-gray-100"
-                    : ""
-                }`}
-              >
-                {showExpandedProcesses ? (
-                  <div className="flex items-center gap-1">
-                    Process <SortIcon field="process_type" />
-                  </div>
-                ) : (
-                  "Processes"
-                )}
-              </th>
-              <th
-                onClick={() => handleSort("description")}
-                className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center gap-1">
-                  Description <SortIcon field="description" />
-                </div>
-              </th>
-              <th
-                onClick={() => handleSort("quantity")}
-                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center justify-center gap-1">
-                  Qty <SortIcon field="quantity" />
-                </div>
-              </th>
-              <th
-                onClick={() => handleSort("start_date")}
-                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center justify-center gap-1">
-                  Start <SortIcon field="start_date" />
-                </div>
-              </th>
-              <th
-                onClick={() => handleSort("due_date")}
-                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center justify-center gap-1">
-                  End <SortIcon field="due_date" />
-                </div>
-              </th>
+              {/* Render columns in the configured order */}
+              {orderedColumnKeys.map((columnKey) => {
+                // Skip "total" - it's rendered after time ranges
+                if (columnKey === "total") return null;
+                return renderColumnHeader(columnKey);
+              })}
+              {/* Time range columns are always after the configurable columns */}
               {timeRanges.map((range, index) => (
                 <th
                   key={range.label}
@@ -2214,14 +2373,9 @@ export default function ProjectionsTable({
                   {range.label}
                 </th>
               ))}
-              <th
-                onClick={() => handleSort("total")}
-                className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center justify-center gap-1">
-                  Total <SortIcon field="total" />
-                </div>
-              </th>
+              {/* Total column is always after time ranges */}
+              {isColumnVisible("total") && renderColumnHeader("total")}
+              {/* Notes column is always last */}
               {showNotes && (
                 <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider min-w-[200px]">
                   Notes
@@ -2278,6 +2432,8 @@ export default function ProjectionsTable({
                       onOpenNotesModal={handleOpenNotesModal}
                       granularity={granularity}
                       cellNotesMap={cellNotesMap}
+                      isColumnVisible={isColumnVisible}
+                      orderedColumnKeys={orderedColumnKeys}
                     />
                   );
                 },
@@ -2310,6 +2466,8 @@ export default function ProjectionsTable({
                     onOpenNotesModal={handleOpenNotesModal}
                     granularity={granularity}
                     cellNotesMap={cellNotesMap}
+                    isColumnVisible={isColumnVisible}
+                    orderedColumnKeys={orderedColumnKeys}
                   />
                 );
               })
@@ -2408,16 +2566,9 @@ export default function ProjectionsTable({
                   <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
                     Facility
                   </th>
-                  {mobileTableVisibleRanges.map((range, index) => (
-                    <th
-                      key={range.label}
-                      className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase ${
-                        index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-                      }`}
-                    >
-                      {range.label}
-                    </th>
-                  ))}
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase">
+                    Qty
+                  </th>
                   <th className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase sticky right-0 bg-gray-50">
                     Total
                   </th>
@@ -2427,7 +2578,7 @@ export default function ProjectionsTable({
                 {sortedJobProjections.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6 + VISIBLE_PERIODS}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-[var(--text-light)]"
                     >
                       No jobs found for the selected criteria
@@ -2438,7 +2589,6 @@ export default function ProjectionsTable({
                     <MobileTableRow
                       key={`mobile-${projection.job.id}-${index}`}
                       projection={projection}
-                      visibleTimeRanges={mobileTableVisibleRanges}
                       onJobClick={handleJobClick}
                       isSelected={selectedJobIds.has(projection.job.id)}
                       onToggleSelect={() =>

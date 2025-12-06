@@ -1,7 +1,7 @@
 interface PaginationProps {
   currentPage: number;
   totalItems: number;
-  totalItemsFromAPI?: number; // Total items from API before filtering
+  totalUnfilteredItems?: number; // Total items before client-side filtering
   itemsPerPage: number;
   onPageChange: (page: number) => void;
   onItemsPerPageChange: (itemsPerPage: number) => void;
@@ -10,11 +10,12 @@ interface PaginationProps {
 export default function Pagination({
   currentPage,
   totalItems,
-  totalItemsFromAPI,
+  totalUnfilteredItems,
   itemsPerPage,
   onPageChange,
   onItemsPerPageChange,
 }: PaginationProps) {
+  const hasActiveFilters = totalUnfilteredItems !== undefined && totalUnfilteredItems !== totalItems;
   const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
   const startItem = totalItems === 0 ? 0 : itemsPerPage === -1 ? 1 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = itemsPerPage === -1 ? totalItems : Math.min(currentPage * itemsPerPage, totalItems);
@@ -79,9 +80,10 @@ export default function Pagination({
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-600">
             Showing <span className="font-semibold">all {totalItems}</span> jobs
-            {totalItemsFromAPI !== undefined && totalItemsFromAPI !== totalItems && (
+            {hasActiveFilters ? " matching filters" : ""}
+            {hasActiveFilters && (
               <span className="text-gray-500 ml-1">
-                (of {totalItemsFromAPI} total from API)
+                ({totalUnfilteredItems} total)
               </span>
             )}
           </p>
@@ -115,9 +117,10 @@ export default function Pagination({
           Showing <span className="font-semibold">{startItem}</span> to{" "}
           <span className="font-semibold">{endItem}</span> of{" "}
           <span className="font-semibold">{totalItems}</span> jobs
-          {totalItemsFromAPI !== undefined && totalItemsFromAPI !== totalItems && (
+          {hasActiveFilters ? " matching filters" : ""}
+          {hasActiveFilters && (
             <span className="text-gray-500 ml-1">
-              (of {totalItemsFromAPI} total from API)
+              ({totalUnfilteredItems} total)
             </span>
           )}
         </p>

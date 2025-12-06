@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@/hooks/useUser";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,7 +31,6 @@ import FinancialsPDFTables from "../components/FinancialsPDFTables";
 import CFODashboard from "../components/CFODashboard";
 import ProjectionsLoading from "../components/ProjectionsLoading";
 import ServiceTypeLoadTable from "../components/ServiceTypeLoadTable";
-import DataHealthCard from "../components/DataHealthCard";
 
 // Dynamically import calendar and modals - only loaded when needed
 const EmbeddedCalendar = dynamic(
@@ -139,13 +138,26 @@ export default function ProjectionsPage() {
   );
   console.log("[DEBUG] ProjectionsPage - totalRevenue:", totalRevenue);
 
-  // Calculate paginated job projections - use all jobs from API, not filtered
+  // Calculate paginated job projections from filtered results
   const paginatedJobProjections = itemsPerPage === -1
-    ? jobProjections  // Show all items from API
-    : jobProjections.slice(
+    ? filteredJobProjections  // Show all filtered items
+    : filteredJobProjections.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
       );
+
+  // Reset to page 1 when filters change to avoid showing empty/invalid pages
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    selectedServiceTypes,
+    searchQuery,
+    selectedFacility,
+    filterMode,
+    scheduleFilter,
+    dynamicFieldFilters,
+    dynamicFieldFilterLogic,
+  ]);
 
   // Handle granularity change and adjust start date accordingly
   const handleGranularityChange = (newGranularity: Granularity) => {
@@ -315,9 +327,6 @@ export default function ProjectionsPage() {
           </div>
         </div>
 
-        {/* Data Health Card */}
-        <DataHealthCard facilitiesId={selectedFacility} />
-
         {/* View Mode Tabs */}
         <div className="flex justify-between items-center mb-6 border-b border-[var(--border)] no-print">
           <div className="flex gap-2 overflow-x-auto">
@@ -399,6 +408,7 @@ export default function ProjectionsPage() {
             onDynamicFieldFiltersChange={setDynamicFieldFilters}
             dynamicFieldFilterLogic={dynamicFieldFilterLogic}
             onDynamicFieldFilterLogicChange={setDynamicFieldFilterLogic}
+            facilitiesId={selectedFacility}
           />
         </div>
 
@@ -453,8 +463,8 @@ export default function ProjectionsPage() {
                   <div className="no-print">
                     <Pagination
                       currentPage={currentPage}
-                      totalItems={jobProjections.length}
-                      totalItemsFromAPI={totalJobsFromAPI}
+                      totalItems={filteredJobProjections.length}
+                      totalUnfilteredItems={jobProjections.length}
                       itemsPerPage={itemsPerPage}
                       onPageChange={setCurrentPage}
                       onItemsPerPageChange={setItemsPerPage}
@@ -562,8 +572,8 @@ export default function ProjectionsPage() {
                       <div className="no-print mt-4">
                         <Pagination
                           currentPage={currentPage}
-                          totalItems={jobProjections.length}
-                          totalItemsFromAPI={totalJobsFromAPI}
+                          totalItems={filteredJobProjections.length}
+                          totalUnfilteredItems={jobProjections.length}
                           itemsPerPage={itemsPerPage}
                           onPageChange={setCurrentPage}
                           onItemsPerPageChange={setItemsPerPage}

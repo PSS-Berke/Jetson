@@ -1176,6 +1176,80 @@ export const getDataHealth = async (
   return result[0];
 };
 
+// Data Health Issue Types
+export type DataHealthIssueType =
+  | "missing_due_dates"
+  | "missing_start_date"
+  | "start_is_after_due";
+
+// Get jobs filtered by data health issue type
+export const getJobsByHealthIssue = async (
+  issueType: DataHealthIssueType,
+  facilitiesId?: number | null,
+): Promise<Job[]> => {
+  // Use the V2 API which is more reliable
+  const response = await getJobsV2({
+    facilities_id: facilitiesId || 0,
+    per_page: 10000, // Get all jobs
+  });
+
+  // Convert JobV2 to Job format (they're compatible for our needs)
+  const jobs = response.items as unknown as Job[];
+
+  // Filter based on issue type
+  switch (issueType) {
+    case "missing_due_dates":
+      return jobs.filter((job) => !job.due_date);
+    case "missing_start_date":
+      return jobs.filter((job) => !job.start_date);
+    case "start_is_after_due":
+      return jobs.filter((job) => {
+        if (!job.start_date || !job.due_date) return false;
+        return job.start_date > job.due_date;
+      });
+    default:
+      return [];
+  }
+};
+
+// Bulk update multiple existing jobs with individual updates per job
+// Supports progress tracking and chunked processing
+export const bulkUpdateJobsWithProgress = async (
+  updates: Array<{ id: number; data: Partial<Job> }>,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<{
+  success: Job[];
+  failures: { jobId: number; error: string }[];
+}> => {
+  const CHUNK_SIZE = 25;
+  const success: Job[] = [];
+  const failures: { jobId: number; error: string }[] = [];
+
+  for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+    const chunk = updates.slice(i, i + CHUNK_SIZE);
+
+    const results = await Promise.allSettled(
+      chunk.map(({ id, data }) => updateJob(id, data)),
+    );
+
+    results.forEach((result, idx) => {
+      const jobId = chunk[idx].id;
+      if (result.status === "fulfilled") {
+        success.push(result.value);
+      } else {
+        failures.push({
+          jobId,
+          error: result.reason?.message || "Unknown error",
+        });
+      }
+    });
+
+    onProgress?.(Math.min(i + CHUNK_SIZE, updates.length), updates.length);
+  }
+
+  return { success, failures };
+};
+
 // Update a job
 export const updateJob = async (
   jobId: number,

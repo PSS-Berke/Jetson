@@ -18,6 +18,7 @@ import {
 import ProcessViewToggle from "./ProcessViewToggle";
 import DynamicFieldFilter from "./DynamicFieldFilter";
 import { getProcessTypeOptions } from "@/lib/processTypeConfig";
+import DataHealthPopup from "./DataHealthPopup";
 
 interface ProjectionFiltersProps {
   jobs: ParsedJob[];
@@ -50,6 +51,7 @@ interface ProjectionFiltersProps {
   onDynamicFieldFiltersChange?: (filters: import("@/types").DynamicFieldFilter[]) => void;
   dynamicFieldFilterLogic?: "and" | "or";
   onDynamicFieldFilterLogicChange?: (logic: "and" | "or") => void;
+  facilitiesId?: number | null;
 }
 
 export default function ProjectionFilters({
@@ -83,6 +85,7 @@ export default function ProjectionFilters({
   onDynamicFieldFiltersChange,
   dynamicFieldFilterLogic = "and",
   onDynamicFieldFilterLogicChange,
+  facilitiesId,
 }: ProjectionFiltersProps) {
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
@@ -620,8 +623,8 @@ export default function ProjectionFilters({
           </div>
         )}
 
-        {/* Fourth Row - View Notes, Bulk Upload & Export PDF (Advanced Mode Only) */}
-        {filterViewMode === "advanced" && (onShowNotesChange || onBulkUpload || onExportPDF) && (
+        {/* Fourth Row - View Notes, Bulk Upload, Data Health & Export PDF (Advanced Mode Only) */}
+        {filterViewMode === "advanced" && (
           <div className="flex gap-3 justify-start">
             {onShowNotesChange && (
               <button
@@ -654,6 +657,7 @@ export default function ProjectionFilters({
                 Add Bulk Jobs
               </button>
             )}
+            <DataHealthPopup facilitiesId={facilitiesId ?? null} />
             {onExportPDF && (
               <button
                 onClick={onExportPDF}
