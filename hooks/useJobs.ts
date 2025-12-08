@@ -295,9 +295,11 @@ const fetcher = async (facilityId?: number | null) => {
     allJobs.push(...convertedJobs);
     
     // Check if there are more pages
-    hasMore = response.nextPage !== null;
-    if (hasMore) {
+    if (response.nextPage !== null) {
+      hasMore = true;
       currentPage = response.nextPage;
+    } else {
+      hasMore = false;
     }
   }
   

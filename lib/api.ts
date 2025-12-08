@@ -167,7 +167,36 @@ const apiFetch = async <T = unknown>(
     throw new Error(errorMessage);
   }
 
-  const responseData = await response.json();
+  let responseData: T;
+  try {
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      responseData = await response.json();
+    } else {
+      // If response is not JSON, return empty object or throw
+      const text = await response.text();
+      console.warn("[apiFetch] Non-JSON response received:", {
+        endpoint,
+        contentType,
+        text: text.substring(0, 200),
+      });
+      // Try to parse as JSON anyway (some APIs don't set content-type correctly)
+      try {
+        responseData = JSON.parse(text) as T;
+      } catch {
+        throw new Error(`Expected JSON response but received ${contentType || "unknown content type"}`);
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Expected JSON")) {
+      throw error;
+    }
+    console.error("[apiFetch] Failed to parse JSON response:", {
+      endpoint,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   // Debug logging for jobs endpoint
   if (endpoint.includes("/jobs")) {
@@ -2337,12 +2366,23 @@ export const getJobTemplates = async (clientsId?: number): Promise<any[]> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    let errorData: any;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+    }
     console.error("[getJobTemplates] Error:", errorData);
     throw new Error(`Failed to fetch job templates: ${JSON.stringify(errorData)}`);
   }
 
-  const result = await response.json();
+  let result: any;
+  try {
+    result = await response.json();
+  } catch (error) {
+    console.error("[getJobTemplates] Failed to parse JSON response:", error);
+    throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : String(error)}`);
+  }
   console.log("[getJobTemplates] Received", Array.isArray(result) ? result.length : 1, "template(s)");
   return Array.isArray(result) ? result : [result];
 };
@@ -2369,12 +2409,23 @@ export const createJobTemplate = async (templateData: {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    let errorData: any;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+    }
     console.error("[createJobTemplate] Error:", errorData);
     throw new Error(`Failed to create job template: ${JSON.stringify(errorData)}`);
   }
 
-  const result = await response.json();
+  let result: any;
+  try {
+    result = await response.json();
+  } catch (error) {
+    console.error("[createJobTemplate] Failed to parse JSON response:", error);
+    throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : String(error)}`);
+  }
   console.log("[createJobTemplate] Template created:", result);
   return result;
 };
@@ -2401,12 +2452,23 @@ export const updateJobTemplate = async (templateData: {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    let errorData: any;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+    }
     console.error("[updateJobTemplate] Error:", errorData);
     throw new Error(`Failed to update job template: ${JSON.stringify(errorData)}`);
   }
 
-  const result = await response.json();
+  let result: any;
+  try {
+    result = await response.json();
+  } catch (error) {
+    console.error("[updateJobTemplate] Failed to parse JSON response:", error);
+    throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : String(error)}`);
+  }
   console.log("[updateJobTemplate] Template updated:", result);
   return result;
 };
@@ -2429,7 +2491,12 @@ export const deleteJobTemplate = async (jobTemplatesId: number): Promise<void> =
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    let errorData: any;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+    }
     console.error("[deleteJobTemplate] Error:", errorData);
     throw new Error(`Failed to delete job template: ${JSON.stringify(errorData)}`);
   }
