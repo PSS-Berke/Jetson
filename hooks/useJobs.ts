@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import useSWR from "swr";
-import { getJobs } from "@/lib/api";
+import { getJobsV2 } from "@/lib/api";
 
 // Re-export Job from api for consistency
 import type { Job } from "@/lib/api";
@@ -257,10 +257,52 @@ export const parseJob = (job: Job): ParsedJob => {
 
 // SWR fetcher function
 const fetcher = async (facilityId?: number | null) => {
-  const facilityParam =
-    facilityId !== undefined && facilityId !== null ? facilityId : undefined;
-  const data = await getJobs(facilityParam);
-  return data.map(parseJob);
+  const facilities_id = facilityId !== undefined && facilityId !== null ? facilityId : 0;
+  
+  // Fetch all pages of jobs
+  const allJobs: Job[] = [];
+  let currentPage = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    // Use v2 API to fetch jobs page by page
+    const response = await getJobsV2({
+      facilities_id,
+      page: currentPage,
+      per_page: 1000, // Fetch 1000 jobs per page
+    });
+    
+    // Convert JobV2 items to Job format for parseJob compatibility
+    // JobV2 has machines_id as array, but parseJob expects machines as JSON string
+    const convertedJobs = response.items.map((jobV2) => {
+      // Convert machines_id array to machines JSON string format
+      // Filter out 0 values (which might indicate "no machine assigned")
+      const machines = (jobV2.machines_id || [])
+        .filter((id: number) => id !== 0)
+        .map((id: number) => ({
+          id,
+          line: "", // Line info not available in v2 API
+        }));
+      
+      // Create a job object compatible with Job type
+      return {
+        ...jobV2,
+        machines: JSON.stringify(machines),
+        machines_id: JSON.stringify(machines), // Also set machines_id for compatibility
+      } as Job;
+    });
+    
+    allJobs.push(...convertedJobs);
+    
+    // Check if there are more pages
+    hasMore = response.nextPage !== null;
+    if (hasMore) {
+      currentPage = response.nextPage;
+    }
+  }
+  
+  // Parse jobs using existing parseJob function
+  return allJobs.map(parseJob);
 };
 
 export const useJobs = (facilityId?: number | null): UseJobsReturn => {
