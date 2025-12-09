@@ -440,6 +440,18 @@ export function getProcessTypeOptions(): Array<{
 }
 
 /**
+ * Get a map from process type labels to their normalized keys
+ * This ensures consistency when filtering by service types
+ */
+export function getLabelToKeyMap(): Record<string, string> {
+  const map: Record<string, string> = {};
+  PROCESS_TYPE_CONFIGS.forEach((config) => {
+    map[config.label] = config.key;
+  });
+  return map;
+}
+
+/**
  * Get color for a process type
  */
 export function getProcessTypeColor(processTypeKey: string): string {

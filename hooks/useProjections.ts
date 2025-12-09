@@ -23,7 +23,7 @@ import { getProductionEntries } from "@/lib/api";
 import { aggregateProductionByJob } from "@/lib/productionUtils";
 import type { Granularity } from "@/app/components/GranularityToggle";
 import type { ProductionEntry } from "@/types";
-import { normalizeProcessType } from "@/lib/processTypeConfig";
+import { normalizeProcessType, getLabelToKeyMap } from "@/lib/processTypeConfig";
 import { applyDynamicFieldFilters } from "@/lib/dynamicFieldFilters";
 
 /**
@@ -331,12 +331,24 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   // 4. Filtered projections - only recalculates when filters or adjustedJobProjections change
   const filteredProjections = useMemo<JobProjection[]>(() => {
     if (adjustedJobProjections.length === 0) {
+      console.log(`[useProjections] No adjusted job projections available`);
       return [];
     }
+
+    console.log(`[useProjections] Starting filter with ${adjustedJobProjections.length} total projections`);
+    console.log(`[useProjections] Active filters:`, {
+      serviceTypes: filters.serviceTypes,
+      searchQuery: filters.searchQuery,
+      scheduleFilter: filters.scheduleFilter,
+      showOnlyInDateRange: filters.showOnlyInDateRange,
+      filterMode: filters.filterMode || "and",
+      dynamicFieldFilters: filters.dynamicFieldFilters?.length || 0,
+    });
 
     // Apply date range filter first if enabled
     let projectionsToFilter = adjustedJobProjections;
     if (filters.showOnlyInDateRange) {
+      const beforeDateFilter = projectionsToFilter.length;
       projectionsToFilter = adjustedJobProjections.filter((projection) => {
         // Check if any of the visible columns have production quantity > 0
         const hasProductionInVisibleColumns = Array.from(projection.weeklyQuantities.values())
@@ -345,7 +357,14 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       });
 
       console.log(
-        `[useProjections] Date range filter: ON, Projections before: ${adjustedJobProjections.length}, Projections after: ${projectionsToFilter.length}`,
+        `[useProjections] Date range filter: ON, Projections before: ${beforeDateFilter}, Projections after: ${projectionsToFilter.length}`,
+      );
+      if (projectionsToFilter.length === 0 && beforeDateFilter > 0) {
+        console.warn(`[useProjections] ⚠️ Date range filter removed ALL jobs! This might be why no jobs are showing.`);
+      }
+    } else {
+      console.log(
+        `[useProjections] Date range filter: OFF, Projections to filter: ${projectionsToFilter.length}`,
       );
     }
 
@@ -357,6 +376,14 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     const hasDynamicFieldFilter =
       filters.dynamicFieldFilters && filters.dynamicFieldFilters.length > 0;
     const filterMode = filters.filterMode || "and";
+
+    // Get label-to-key map once for service type filtering
+    const labelToKeyMap = hasServiceTypeFilter ? getLabelToKeyMap() : {};
+    if (hasServiceTypeFilter) {
+      console.log(`[ServiceTypeFilter] Label to key map:`, labelToKeyMap);
+      console.log(`[ServiceTypeFilter] Selected service types:`, filters.serviceTypes);
+      console.log(`[ServiceTypeFilter] Expected keys for selected types:`, filters.serviceTypes.map(label => ({ label, key: labelToKeyMap[label] || label.toLowerCase() })));
+    }
 
     if (filterMode === "or") {
       return projectionsToFilter.filter((p) => {
@@ -376,19 +403,11 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
             if (!req.process_type) return false;
             // Normalize the process type and check against selected labels
             const normalized = normalizeProcessType(req.process_type);
-            // Map selected labels to their keys for comparison
-            const labelToKeyMap: Record<string, string> = {
-              "Data": "data",
-              "HP": "hp",
-              "Laser": "laser",
-              "Fold": "fold",
-              "Affix with Glue": "affix",
-              "Insert": "insert",
-              "Ink Jet": "inkjet",
-              "Labeling": "labeling",
-            };
             return filters.serviceTypes.some(
-              (label) => (labelToKeyMap[label] || label.toLowerCase()) === normalized
+              (label) => {
+                const expectedKey = labelToKeyMap[label] || label.toLowerCase();
+                return expectedKey === normalized;
+              }
             );
           });
         const matchesSearch =
@@ -430,30 +449,43 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       let result = projectionsToFilter;
 
       if (hasServiceTypeFilter) {
+        const beforeCount = result.length;
+        
+        // Sample a few jobs to see what process types they have
+        if (result.length > 0 && result.length <= 10) {
+          // Only log samples if we have a small number of jobs to avoid spam
+          const sampleJobs = result.slice(0, 3);
+          sampleJobs.forEach((p) => {
+            console.log(`[ServiceTypeFilter] Sample job ${p.job.job_number}:`, {
+              requirements: p.job.requirements?.map(req => ({
+                process_type: req.process_type,
+                normalized: req.process_type ? normalizeProcessType(req.process_type) : null
+              }))
+            });
+          });
+        }
+        
         result = result.filter((p) => {
           if (p.job.requirements && p.job.requirements.length > 0) {
             return p.job.requirements.some((req) => {
               if (!req.process_type) return false;
               // Normalize the process type and check against selected labels
               const normalized = normalizeProcessType(req.process_type);
-              // Map selected labels to their keys for comparison
-              const labelToKeyMap: Record<string, string> = {
-                "Data": "data",
-                "HP": "hp",
-                "Laser": "laser",
-                "Fold": "fold",
-                "Affix with Glue": "affix",
-                "Insert": "insert",
-                "Ink Jet": "inkjet",
-                "Labeling": "labeling",
-              };
               return filters.serviceTypes.some(
-                (label) => (labelToKeyMap[label] || label.toLowerCase()) === normalized
+                (label) => {
+                  const expectedKey = labelToKeyMap[label] || label.toLowerCase();
+                  const isMatch = expectedKey === normalized;
+                  if (isMatch) {
+                    console.log(`[ServiceTypeFilter] ✓ Match: job ${p.job.job_number}, "${label}" (${expectedKey}) = "${normalized}" from "${req.process_type}"`);
+                  }
+                  return isMatch;
+                }
               );
             });
           }
           return false;
         });
+        console.log(`[ServiceTypeFilter] Filtered from ${beforeCount} to ${result.length} jobs with service types:`, filters.serviceTypes);
       }
 
       if (hasSearchFilter) {

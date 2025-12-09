@@ -159,6 +159,13 @@ export default function ProjectionsPage() {
     dynamicFieldFilterLogic,
   ]);
 
+  // Automatically show all items when filtering by service type or dynamic field filters
+  useEffect(() => {
+    if (selectedServiceTypes.length > 0 || (dynamicFieldFilters && dynamicFieldFilters.length > 0)) {
+      setItemsPerPage(-1); // Show all when service type or dynamic field filters are active
+    }
+  }, [selectedServiceTypes, dynamicFieldFilters]);
+
   // Handle granularity change and adjust start date accordingly
   const handleGranularityChange = (newGranularity: Granularity) => {
     setGranularity(newGranularity);
