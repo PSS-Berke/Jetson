@@ -92,7 +92,18 @@ export default function SmartClientSelect({
           created_at: 0,
         });
       }
-    } else if (!value) {
+    } else if (initialClientName && initialClientName.trim() !== "") {
+      // If we have an initialClientName but no valid value, still set it to display the name
+      // This handles cases where we have a client name but the ID might be null/0
+      if (!selectedClient || selectedClient.name !== initialClientName) {
+        console.log("Setting initial client name without ID:", initialClientName);
+        setSelectedClient({
+          id: value || 0, // Use 0 if value is null/undefined
+          name: initialClientName,
+          created_at: 0,
+        });
+      }
+    } else if (!value && !initialClientName) {
       setSelectedClient(null);
     }
   }, [value, initialClientName, selectedClient]);
