@@ -225,16 +225,22 @@ export default function JobNotesModal({
         hasTimeSplit: !!jobWithTimeSplit.time_split,
         timeSplitKeys: jobWithTimeSplit.time_split ? Object.keys(jobWithTimeSplit.time_split) : [],
         selectedGranularity,
+        hasWeeklySplit: !!(job.weekly_split && job.weekly_split.length > 0),
+        hasStartDate: !!job.start_date,
+        hasDueDate: !!job.due_date,
       });
+      
+      let periods: Period[] = [];
       
       if (jobWithTimeSplit.time_split) {
         // Use time_split data directly for the selected granularity
         console.log(`[JobNotesModal] Converting time_split for job ${job.id}, granularity: ${selectedGranularity}`);
-        const periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, selectedGranularity);
+        periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, selectedGranularity);
         console.log(`[JobNotesModal] Converted to ${periods.length} periods for job ${job.id}:`, periods.slice(0, 3));
-        newDisplayPeriods.set(job.id, periods);
-      } else {
-        // Use weekly_split (existing logic)
+      }
+      
+      // If time_split conversion failed or returned empty, try weekly_split
+      if (periods.length === 0) {
         const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
         const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
 
@@ -244,17 +250,57 @@ export default function JobNotesModal({
           const startDate = job.start_date || now;
           const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
 
-          const periods = convertWeeklyToGranularity(
+          periods = convertWeeklyToGranularity(
             weeklySplit,
             lockedWeeks,
             startDate,
             dueDate,
             selectedGranularity
           );
-          newDisplayPeriods.set(job.id, periods);
-        } else {
-          console.warn(`[JobNotesModal] Job ${job.id} has no time_split.daily and no weekly_split`);
+          console.log(`[JobNotesModal] Converted weekly_split to ${periods.length} periods for job ${job.id}`);
         }
+      }
+      
+      // If still no periods, create default periods based on job dates
+      if (periods.length === 0) {
+        const now = Date.now();
+        const startDate = job.start_date || now;
+        const dueDate = job.due_date || (job.start_date ? job.start_date + (7 * 24 * 60 * 60 * 1000) : now + (7 * 24 * 60 * 60 * 1000));
+        
+        // Calculate default periods
+        const periodTemplates = calculatePeriods(startDate, dueDate, selectedGranularity);
+        
+        // If we still have no periods (dates might be invalid), create at least one period
+        if (periodTemplates.length === 0) {
+          const defaultStart = new Date(startDate);
+          const defaultEnd = new Date(dueDate);
+          periods = [{
+            startDate: defaultStart,
+            endDate: defaultEnd,
+            label: defaultStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            quantity: job.quantity || 0,
+            isLocked: false,
+          }];
+          console.warn(`[JobNotesModal] Job ${job.id} had no valid periods, created single default period`);
+        } else {
+          // Distribute job quantity evenly across periods
+          const quantityPerPeriod = job.quantity ? Math.floor(job.quantity / periodTemplates.length) : 0;
+          const remainder = job.quantity ? job.quantity % periodTemplates.length : 0;
+          
+          periods = periodTemplates.map((template, idx) => ({
+            ...template,
+            quantity: quantityPerPeriod + (idx < remainder ? 1 : 0),
+            isLocked: false,
+          }));
+          console.log(`[JobNotesModal] Created ${periods.length} default periods for job ${job.id} with no existing data`);
+        }
+      }
+      
+      // Always set periods, even if empty (shouldn't happen after above logic)
+      if (periods.length > 0) {
+        newDisplayPeriods.set(job.id, periods);
+      } else {
+        console.error(`[JobNotesModal] Failed to create periods for job ${job.id} - this should not happen!`);
       }
     });
 
@@ -557,12 +603,15 @@ export default function JobNotesModal({
     jobs.forEach((job) => {
       // Check if this is a v2 job with time_split
       const jobWithTimeSplit = job as unknown as { time_split?: TimeSplit };
+      let periods: Period[] = [];
+      
       if (jobWithTimeSplit.time_split) {
         // Use time_split data directly for the selected granularity
-        const periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, newGranularity);
-        newDisplayPeriods.set(job.id, periods);
-      } else {
-        // Use weekly_split (existing logic)
+        periods = convertTimeSplitToPeriods(jobWithTimeSplit.time_split, newGranularity);
+      }
+      
+      // If time_split conversion failed or returned empty, try weekly_split
+      if (periods.length === 0) {
         const weeklySplit = editedWeeklySplits.get(job.id) || job.weekly_split || [];
         const lockedWeeks = editedLockedWeeks.get(job.id) || job.locked_weeks || [];
 
@@ -572,15 +621,52 @@ export default function JobNotesModal({
           const startDate = job.start_date || now;
           const dueDate = job.due_date || now + (7 * 24 * 60 * 60 * 1000 * weeklySplit.length);
 
-          const periods = convertWeeklyToGranularity(
+          periods = convertWeeklyToGranularity(
             weeklySplit,
             lockedWeeks,
             startDate,
             dueDate,
             newGranularity
           );
-          newDisplayPeriods.set(job.id, periods);
         }
+      }
+      
+      // If still no periods, create default periods based on job dates
+      if (periods.length === 0) {
+        const now = Date.now();
+        const startDate = job.start_date || now;
+        const dueDate = job.due_date || (job.start_date ? job.start_date + (7 * 24 * 60 * 60 * 1000) : now + (7 * 24 * 60 * 60 * 1000));
+        
+        // Calculate default periods
+        const periodTemplates = calculatePeriods(startDate, dueDate, newGranularity);
+        
+        // If we still have no periods (dates might be invalid), create at least one period
+        if (periodTemplates.length === 0) {
+          const defaultStart = new Date(startDate);
+          const defaultEnd = new Date(dueDate);
+          periods = [{
+            startDate: defaultStart,
+            endDate: defaultEnd,
+            label: defaultStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            quantity: job.quantity || 0,
+            isLocked: false,
+          }];
+        } else {
+          // Distribute job quantity evenly across periods
+          const quantityPerPeriod = job.quantity ? Math.floor(job.quantity / periodTemplates.length) : 0;
+          const remainder = job.quantity ? job.quantity % periodTemplates.length : 0;
+          
+          periods = periodTemplates.map((template, idx) => ({
+            ...template,
+            quantity: quantityPerPeriod + (idx < remainder ? 1 : 0),
+            isLocked: false,
+          }));
+        }
+      }
+      
+      // Always set periods, even if empty (shouldn't happen after above logic)
+      if (periods.length > 0) {
+        newDisplayPeriods.set(job.id, periods);
       }
     });
     setDisplayPeriods(newDisplayPeriods);
@@ -923,10 +1009,14 @@ export default function JobNotesModal({
                       });
 
                       // Show loading state if periods haven't loaded yet
+                      // This should rarely happen now with fallback logic, but keep as safety check
                       if (periods.length === 0) {
                         return (
                           <div key={job.id} className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
                             <p className="text-sm text-gray-500">Loading projections for Job #{job.job_number}...</p>
+                            <p className="text-xs text-amber-600 mt-2">
+                              If this persists, the job may be missing date information. Try refreshing.
+                            </p>
                           </div>
                         );
                       }

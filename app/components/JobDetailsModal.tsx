@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, useRef } from "react";
 import { type ParsedJob } from "@/hooks/useJobs";
 import { deleteJob, updateJob } from "@/lib/api";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
@@ -80,6 +80,7 @@ export default function JobDetailsModal({
     newValue: number;
   } | null>(null);
   const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
     clients_id: null,
@@ -154,6 +155,7 @@ export default function JobDetailsModal({
       };
 
       const clientId = job.client?.id || null;
+      // Preserve client name even if it's "Unknown" - SmartClientSelect can now handle it
       const clientName = job.client?.name || "";
       const subClientId = null; // sub_client is now just a string, not an object with an id
       const subClientName = job.sub_client || "";
@@ -309,6 +311,13 @@ export default function JobDetailsModal({
     }
   }, [isEditMode, formData.quantity]);
 
+  // Adjust description textarea height on mount and when description changes
+  useEffect(() => {
+    if (descriptionTextareaRef.current && isEditMode) {
+      adjustTextareaHeight(descriptionTextareaRef.current);
+    }
+  }, [formData.description, isEditMode, isOpen]);
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -383,6 +392,19 @@ export default function JobDetailsModal({
   };
 
   // Form handlers for edit mode
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = "auto";
+    // Calculate the height needed (minimum 3 rows)
+    // Get computed line height or use a reasonable default
+    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 24;
+    const padding = parseInt(window.getComputedStyle(textarea).paddingTop) + 
+                    parseInt(window.getComputedStyle(textarea).paddingBottom) || 16;
+    const minHeight = (3 * lineHeight) + padding;
+    const newHeight = Math.max(minHeight, textarea.scrollHeight);
+    textarea.style.height = `${newHeight}px`;
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -392,6 +414,11 @@ export default function JobDetailsModal({
       ...formData,
       [e.target.name]: e.target.value,
     });
+    
+    // Auto-resize description textarea
+    if (e.target.name === "description" && e.target instanceof HTMLTextAreaElement) {
+      adjustTextareaHeight(e.target);
+    }
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -407,6 +434,14 @@ export default function JobDetailsModal({
       ...formData,
       clients_id: clientId,
       client_name: clientName,
+    });
+  };
+
+  const handleSubClientChange = (clientId: number, clientName: string) => {
+    setFormData({
+      ...formData,
+      sub_clients_id: clientId,
+      sub_client_name: clientName,
     });
   };
 
@@ -1391,13 +1426,11 @@ export default function JobDetailsModal({
                     <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                       Sub-Client
                     </label>
-                    <input
-                      type="text"
-                      name="sub_client_name"
-                      value={formData.sub_client_name}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                      placeholder="Sub-client name"
+                    <SmartClientSelect
+                      value={formData.sub_clients_id}
+                      onChange={handleSubClientChange}
+                      initialClientName={formData.sub_client_name}
+                      required={false}
                     />
                   </div>
                 </div>
@@ -1642,20 +1675,19 @@ export default function JobDetailsModal({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                      placeholder="Job description"
-                      rows={2}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    ref={descriptionTextareaRef}
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] resize-none overflow-hidden"
+                    placeholder="Job description"
+                    rows={3}
+                  />
                 </div>
               </div>
             )}
