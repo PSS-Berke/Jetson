@@ -1361,17 +1361,29 @@ export default function ProjectionsTable({
 
         // Check if job has a requirement matching the process type
         const matchingRequirements = requirements.filter((req) => {
-          const reqProcessType = normalizeProcessType(req.process_type || "").toLowerCase();
-          const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
-          
-          if (reqProcessType !== filterProcessType) {
+          const rawProcessType = req.process_type || "";
+
+          // If filtering by breakdown field, use normalizeProcessType (breakdowns use normalized keys)
+          // If filtering by summary row only, use exact case-insensitive match (summaries use original names)
+          let processTypeMatches: boolean;
+          if (categoryFilter.fieldName) {
+            // Breakdown filter - use normalized comparison
+            const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
+            const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
+            processTypeMatches = reqProcessType === filterProcessType;
+          } else {
+            // Summary filter - use exact case-insensitive comparison
+            processTypeMatches = rawProcessType.toLowerCase() === categoryFilter.processType.toLowerCase();
+          }
+
+          if (!processTypeMatches) {
             return false;
           }
 
           // If filtering by breakdown field, check field value
           if (categoryFilter.fieldName && categoryFilter.fieldValue !== undefined) {
             const fieldValue = req[categoryFilter.fieldName];
-            
+
             if (!fieldValuesMatch(categoryFilter.fieldValue, fieldValue)) {
               return false;
             }
@@ -1402,9 +1414,15 @@ export default function ProjectionsTable({
         const sampleJobs = jobProjections.slice(0, 3);
         sampleJobs.forEach((proj, idx) => {
           const matchingReqs = proj.job.requirements?.filter(req => {
-            const reqProcessType = normalizeProcessType(req.process_type || "").toLowerCase();
-            const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
-            return reqProcessType === filterProcessType;
+            const rawProcessType = req.process_type || "";
+            // Use same logic as main filter
+            if (categoryFilter.fieldName) {
+              const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
+              const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
+              return reqProcessType === filterProcessType;
+            } else {
+              return rawProcessType.toLowerCase() === categoryFilter.processType.toLowerCase();
+            }
           }) || [];
           console.warn(`[Category Filter] Sample job ${idx + 1} (${proj.job.job_number}):`, {
             processType: categoryFilter.processType,
