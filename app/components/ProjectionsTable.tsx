@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, memo, useMemo, useEffect, useRef } from "react";
+import React, { useState, memo, useMemo, useEffect, useRef, useCallback } from "react";
 import { ParsedJob } from "@/hooks/useJobs";
 import { JobProjection, ServiceTypeSummary, ProcessTypeSummary, ProcessTypeFacilitySummary } from "@/hooks/useProjections";
 import {
@@ -20,25 +20,18 @@ import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNot
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
 import type { CellIdentifier } from "@/types";
 import { useCellNotes } from "@/hooks/useCellNotes";
-import { useColumnSettings, ColumnSettingsPopover } from "./ProjectionsTable/index";
+import {
+  useColumnSettings,
+  ColumnSettingsPopover,
+  renderColumnHeader,
+  renderCell,
+  formatJobNumber,
+  hexToRgba,
+  calculateColumnCount,
+} from "./ProjectionsTable/index";
+import type { HeaderRenderContext, CellRenderContext, SortField } from "./ProjectionsTable/index";
 
-type SortField =
-  | "job_number"
-  | "facility"
-  | "sub_client"
-  | "process_type"
-  | "description"
-  | "quantity"
-  | "start_date"
-  | "due_date"
-  | "total";
 type SortDirection = "asc" | "desc";
-
-// Helper to truncate job numbers for table display
-const formatJobNumber = (jobNumber: string, maxLength = 7) => {
-  if (jobNumber.length <= maxLength) return jobNumber;
-  return `${jobNumber.slice(0, maxLength)}…`;
-};
 
 interface ProjectionsTableProps {
   timeRanges: TimeRange[]; // Can be weeks, months, or quarters
@@ -1210,14 +1203,25 @@ export default function ProjectionsTable({
     toggleColumnVisibility,
     resetToDefaults: resetColumnSettings,
     setColumnOrder,
+    getOrderedColumns,
   } = useColumnSettings();
 
-  // Get ordered visible column keys (excluding checkbox and notes which are handled separately)
+  // External controls for column visibility (e.g., showNotes prop)
+  const externalColumnControls = useMemo(() => ({
+    showNotes: showNotes ?? false,
+  }), [showNotes]);
+
+  // Get ordered columns with visibility info for unified rendering
+  const orderedColumns = useMemo(() => {
+    return getOrderedColumns(externalColumnControls);
+  }, [getOrderedColumns, externalColumnControls]);
+
+  // Legacy: Get ordered visible column keys for backward compatibility with row components
   const orderedColumnKeys = useMemo(() => {
-    return columnSettings.order.filter(
-      (key) => isColumnVisible(key) && key !== "checkbox" && key !== "notes"
-    );
-  }, [columnSettings.order, isColumnVisible]);
+    return orderedColumns
+      .filter((col) => col.isVisible && col.config.type === "static")
+      .map((col) => col.config.key);
+  }, [orderedColumns]);
 
   // Inline note editing state
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
@@ -1891,136 +1895,6 @@ export default function ProjectionsTable({
     });
   }, [displayProjections, sortField, sortDirection, showExpandedProcesses]);
 
-  // Render sort icon
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <span className="text-gray-400">⇅</span>;
-    return <span>{sortDirection === "asc" ? "↑" : "↓"}</span>;
-  };
-
-  // Render column header based on key
-  const renderColumnHeader = (columnKey: string) => {
-    switch (columnKey) {
-      case "job_number":
-        return (
-          <th
-            key="job_number"
-            onClick={() => handleSort("job_number")}
-            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center gap-1">
-              Job # <SortIcon field="job_number" />
-            </div>
-          </th>
-        );
-      case "facility":
-        return (
-          <th
-            key="facility"
-            onClick={() => handleSort("facility")}
-            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center gap-1">
-              Facility <SortIcon field="facility" />
-            </div>
-          </th>
-        );
-      case "sub_client":
-        return (
-          <th
-            key="sub_client"
-            onClick={() => handleSort("sub_client")}
-            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center gap-1">
-              Sub Client <SortIcon field="sub_client" />
-            </div>
-          </th>
-        );
-      case "processes":
-        return (
-          <th
-            key="processes"
-            onClick={() =>
-              showExpandedProcesses ? handleSort("process_type") : undefined
-            }
-            className={`px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-              showExpandedProcesses ? "cursor-pointer hover:bg-gray-100" : ""
-            }`}
-          >
-            {showExpandedProcesses ? (
-              <div className="flex items-center gap-1">
-                Process <SortIcon field="process_type" />
-              </div>
-            ) : (
-              "Processes"
-            )}
-          </th>
-        );
-      case "description":
-        return (
-          <th
-            key="description"
-            onClick={() => handleSort("description")}
-            className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center gap-1">
-              Description <SortIcon field="description" />
-            </div>
-          </th>
-        );
-      case "quantity":
-        return (
-          <th
-            key="quantity"
-            onClick={() => handleSort("quantity")}
-            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center justify-center gap-1">
-              Qty <SortIcon field="quantity" />
-            </div>
-          </th>
-        );
-      case "start_date":
-        return (
-          <th
-            key="start_date"
-            onClick={() => handleSort("start_date")}
-            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center justify-center gap-1">
-              Start <SortIcon field="start_date" />
-            </div>
-          </th>
-        );
-      case "due_date":
-        return (
-          <th
-            key="due_date"
-            onClick={() => handleSort("due_date")}
-            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center justify-center gap-1">
-              End <SortIcon field="due_date" />
-            </div>
-          </th>
-        );
-      case "total":
-        return (
-          <th
-            key="total"
-            onClick={() => handleSort("total")}
-            className="px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-          >
-            <div className="flex items-center justify-center gap-1">
-              Total <SortIcon field="total" />
-            </div>
-          </th>
-        );
-      default:
-        return null;
-    }
-  };
-
   // Calculate selection state
   const allSelected =
     sortedJobProjections.length > 0 &&
@@ -2029,6 +1903,25 @@ export default function ProjectionsTable({
     selectedJobIds.has(p.job.id),
   );
   const selectAllIndeterminate = someSelected && !allSelected;
+
+  // Create header render context for unified column rendering
+  const headerRenderContext: HeaderRenderContext = useMemo(() => ({
+    allSelected,
+    someSelected,
+    selectAllIndeterminate,
+    onSelectAll: handleSelectAll,
+    sortField,
+    sortDirection,
+    onSort: handleSort,
+    timeRanges,
+    showExpandedProcesses: showExpandedProcesses ?? false,
+    showNotes: showNotes ?? false,
+  }), [allSelected, someSelected, selectAllIndeterminate, handleSelectAll, sortField, sortDirection, handleSort, timeRanges, showExpandedProcesses, showNotes]);
+
+  // Calculate total column count for colSpan
+  const totalColumnCount = useMemo(() => {
+    return calculateColumnCount(orderedColumns, timeRanges.length);
+  }, [orderedColumns, timeRanges.length]);
 
   return (
     <>
@@ -2358,47 +2251,12 @@ export default function ProjectionsTable({
               </>
             )}
 
-            {/* Column Headers - rendered dynamically based on column order */}
+            {/* Column Headers - rendered dynamically based on column order using unified system */}
             <tr className="bg-gray-50 border-y border-gray-200">
-              {/* Checkbox column is always first */}
-              <th className="px-2 py-2 text-left w-12">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(input) => {
-                    if (input) {
-                      input.indeterminate = selectAllIndeterminate;
-                    }
-                  }}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer"
-                />
-              </th>
-              {/* Render columns in the configured order */}
-              {orderedColumnKeys.map((columnKey) => {
-                // Skip "total" - it's rendered after time ranges
-                if (columnKey === "total") return null;
-                return renderColumnHeader(columnKey);
+              {orderedColumns.map((col) => {
+                if (!col.isVisible) return null;
+                return renderColumnHeader(col.config, headerRenderContext);
               })}
-              {/* Time range columns are always after the configurable columns */}
-              {timeRanges.map((range, index) => (
-                <th
-                  key={range.label}
-                  className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
-                    index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-                  }`}
-                >
-                  {range.label}
-                </th>
-              ))}
-              {/* Total column is always after time ranges */}
-              {isColumnVisible("total") && renderColumnHeader("total")}
-              {/* Notes column is always last */}
-              {showNotes && (
-                <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider min-w-[200px]">
-                  Notes
-                </th>
-              )}
             </tr>
           </thead>
 
@@ -2406,7 +2264,7 @@ export default function ProjectionsTable({
             {sortedJobProjections.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10 + timeRanges.length + (showNotes ? 1 : 0)}
+                  colSpan={totalColumnCount}
                   className="px-4 py-8 text-center text-[var(--text-light)]"
                 >
                   No jobs found for the selected criteria
