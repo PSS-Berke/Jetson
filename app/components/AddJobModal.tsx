@@ -524,9 +524,33 @@ export default function AddJobModal({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      requirements: prev.requirements.map((req, idx) =>
-        idx === requirementIndex ? { ...req, [field]: value } : req,
-      ),
+      requirements: prev.requirements.map((req, idx) => {
+        if (idx !== requirementIndex) return req;
+        
+        // Check if the value is invalid/unselected
+        const isInvalid = 
+          value === undefined || 
+          value === null || 
+          value === false || 
+          value === "false" || 
+          value === 0 || 
+          (typeof value === "string" && value.trim() === "");
+        
+        // If the value is invalid, remove the field entirely (and its cost field if it exists)
+        if (isInvalid) {
+          const { [field]: removedField, ...rest } = req;
+          // Also remove the associated cost field if it exists
+          const costFieldName = `${String(field)}_cost` as keyof Requirement;
+          if (costFieldName in rest) {
+            const { [costFieldName]: removedCost, ...restWithoutCost } = rest;
+            return restWithoutCost as Requirement;
+          }
+          return rest as Requirement;
+        }
+        
+        // Otherwise, update the field with the new value
+        return { ...req, [field]: value };
+      }),
     }));
   };
 
@@ -922,6 +946,13 @@ export default function AddJobModal({
 
     setSavingTemplate(true);
     try {
+      // Filter to only valid requirements (those with process_type and at least one field)
+      const validRequirements = getValidRequirements(formData.requirements);
+      
+      // Clean each requirement to remove unselected fields (false, empty, null, undefined)
+      // This ensures unselected fields are completely omitted from the template
+      const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
+
       // Prepare template data from form
       const templateData = {
         job_number: formData.job_number,
@@ -941,7 +972,7 @@ export default function AddJobModal({
         pockets: formData.pockets,
         data_type: formData.data_type,
         machines_id: formData.machines_id,
-        requirements: formData.requirements,
+        requirements: cleanedRequirements,
         weekly_split: formData.weekly_split,
         locked_weeks: formData.locked_weeks,
         price_per_m: formData.price_per_m,
@@ -1051,6 +1082,127 @@ export default function AddJobModal({
     return dailyBreakdown;
   };
 
+  // Helper function to check if a field value is valid/selected
+  // Returns true if the field should be considered "selected" and its cost should be included
+  const isFieldValueValid = (value: any): boolean => {
+    if (value === undefined || value === null) return false;
+    
+    // Handle boolean values - only true is valid
+    if (value === true || value === "true" || value === 1) return true;
+    if (value === false || value === "false" || value === 0) return false;
+    
+    // Handle strings - must be non-empty
+    if (typeof value === "string") {
+      return value.trim() !== "";
+    }
+    
+    // Handle numbers - must be non-zero
+    if (typeof value === "number") {
+      return value !== 0;
+    }
+    
+    return true;
+  };
+
+  // Helper function to calculate additional costs, only including costs for fields that are actually selected
+  // A cost field (e.g., "some_field_cost") should only be included if its base field (e.g., "some_field") is valid/selected
+  const calculateAdditionalCosts = (req: Requirement, quantity: number): number => {
+    return Object.keys(req)
+      .filter(key => key.endsWith('_cost'))
+      .reduce((costTotal, costKey) => {
+        // Get the base field name (remove _cost suffix)
+        const baseFieldName = costKey.replace('_cost', '');
+        const baseFieldValue = req[baseFieldName];
+        
+        // Only include cost if the base field is valid/selected
+        if (!isFieldValueValid(baseFieldValue)) {
+          return costTotal;
+        }
+        
+        const costValue = parseFloat(String(req[costKey] || "0")) || 0;
+        // Additional costs are per 1000, so multiply by quantity/1000
+        return costTotal + (quantity / 1000) * costValue;
+      }, 0);
+  };
+
+  // Helper function to clean a requirement by removing unselected/invalid fields
+  // This ensures that unselected fields (false, empty, null, undefined) are completely omitted from the payload
+  const cleanRequirement = (req: Requirement): Requirement => {
+    // process_type is required and should always be present (we only clean validated requirements)
+    const cleaned: Requirement = {
+      process_type: req.process_type,
+    };
+    
+    // Always include price_per_m if it exists (even if 0, as it might be intentional)
+    if (req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "") {
+      cleaned.price_per_m = req.price_per_m;
+    }
+    
+    // Always include id if it exists
+    if (req.id !== undefined && req.id !== null) {
+      cleaned.id = req.id;
+    }
+    
+    // Process all other fields
+    Object.keys(req).forEach((key) => {
+      // Skip fields we've already handled
+      if (key === "process_type" || key === "price_per_m" || key === "id") {
+        return;
+      }
+      
+      // Skip cost fields - we'll handle them separately
+      if (key.endsWith('_cost')) {
+        return;
+      }
+      
+      const value = req[key];
+      
+      // Only include the field if it's valid/selected
+      if (isFieldValueValid(value)) {
+        cleaned[key] = value;
+        
+        // If this field has a corresponding _cost field, include it only if the base field is valid
+        const costKey = `${key}_cost`;
+        if (req[costKey] !== undefined && req[costKey] !== null) {
+          const costValue = req[costKey];
+          // Include cost field if it has a valid value (even 0 might be intentional, but empty string/null should be excluded)
+          if (costValue !== "" && costValue !== null && costValue !== undefined) {
+            cleaned[costKey] = costValue;
+          }
+        }
+      }
+      // If field is not valid, don't include it AND don't include its _cost field
+    });
+    
+    return cleaned;
+  };
+
+  // Helper function to filter out unselected/invalid requirements
+  // A requirement is valid if it has a process_type and at least one other field filled
+  const getValidRequirements = (requirements: Requirement[]): Requirement[] => {
+    return requirements.filter((req) => {
+      // Must have a process_type
+      if (!req.process_type || req.process_type === "") {
+        return false;
+      }
+
+      // Must have at least one other field filled (besides process_type, price_per_m, id, and cost fields)
+      const fieldCount = Object.keys(req).filter(
+        (key) =>
+          key !== "process_type" &&
+          key !== "price_per_m" &&
+          key !== "id" &&
+          !key.endsWith('_cost') && // Exclude cost fields from the count
+          req[key] !== undefined &&
+          req[key] !== null &&
+          req[key] !== "" &&
+          isFieldValueValid(req[key]),
+      ).length;
+
+      return fieldCount > 0;
+    });
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -1065,11 +1217,22 @@ export default function AddJobModal({
     try {
       const token = getToken();
 
-      // Calculate total billing from requirements
+      // Filter to only valid requirements (those with process_type and at least one field)
+      const validRequirements = getValidRequirements(formData.requirements);
+      
+      // Clean each requirement to remove unselected fields (false, empty, null, undefined)
+      // This ensures unselected fields are completely omitted from the POST request
+      const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
+
+      // Calculate total billing from valid requirements only
       const quantity = parseInt(formData.quantity) || 0;
-      const calculatedRevenue = formData.requirements.reduce((total, req) => {
+      const calculatedRevenue = cleanedRequirements.reduce((total, req) => {
         const pricePerM = parseFloat(String(req.price_per_m || "0")) || 0;
-        return total + (quantity / 1000) * pricePerM;
+
+        // Calculate additional field costs (only for selected fields)
+        const additionalCosts = calculateAdditionalCosts(req, quantity);
+
+        return total + (quantity / 1000) * pricePerM + additionalCosts;
       }, 0);
 
       const addOnCharges = parseFloat(String(formData.add_on_charges || "0")) || 0;
@@ -1104,6 +1267,7 @@ export default function AddJobModal({
       // Use the selected schedule type directly
 
       // Prepare the payload according to the new v2 API specification
+      // Only include valid requirements in the request body
       const payload: Record<string, unknown> = {
         job_number: formData.job_number || "",
         service_type: formData.service_type || "",
@@ -1117,7 +1281,7 @@ export default function AddJobModal({
         job_name: formData.job_name || "",
         prgm: formData.prgm || "",
         csr: formData.csr || "",
-        requirements: formData.requirements || {},
+        requirements: cleanedRequirements || [],
         total_billing: calculatedTotalBilling > 0 ? calculatedTotalBilling : null,
         facilities_id: formData.facilities_id,
         daily_split: dailySplit,
@@ -1126,12 +1290,20 @@ export default function AddJobModal({
       };
 
       console.log(
-        "[AddJobModal] Requirements before stringify:",
+        "[AddJobModal] All requirements:",
         formData.requirements,
       );
       console.log(
+        "[AddJobModal] Valid requirements (filtered):",
+        validRequirements,
+      );
+      console.log(
+        "[AddJobModal] Cleaned requirements (unselected fields removed):",
+        cleanedRequirements,
+      );
+      console.log(
         "[AddJobModal] Requirements after stringify:",
-        JSON.stringify(formData.requirements),
+        JSON.stringify(cleanedRequirements),
       );
       console.log(
         "[AddJobModal] facilities_id in formData:",
@@ -1172,12 +1344,12 @@ export default function AddJobModal({
         responseData.facilities_id,
       );
 
-      // Auto-sync job_cost_entry from requirements
+      // Auto-sync job_cost_entry from valid requirements only
       try {
         const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
         await syncJobCostEntryFromRequirements(
           responseData.id,
-          formData.requirements,
+          cleanedRequirements,
           formData.start_date,
           formData.facilities_id || undefined,
         );
@@ -2083,10 +2255,24 @@ export default function AddJobModal({
                     </button>
                   )}
                 </div>
-                {formData.requirements.map((req, index) => {
+                {getValidRequirements(formData.requirements).map((req, index) => {
                   const quantity = parseInt(formData.quantity || "0");
                   const pricePerM = parseFloat(req.price_per_m || "0");
-                  const requirementTotal = (quantity / 1000) * pricePerM;
+
+                  // Debug: Log requirement object
+                  console.log('[AddJobModal Review] Full requirement object:', req);
+                  console.log('[AddJobModal Review] All keys:', Object.keys(req));
+                  console.log('[AddJobModal Review] Cost keys:', Object.keys(req).filter(key => key.endsWith('_cost')));
+
+                  // Calculate additional field costs (only for selected fields)
+                  const additionalCosts = calculateAdditionalCosts(req, quantity);
+
+                  console.log('[AddJobModal Review] Total additional costs:', additionalCosts);
+                  console.log('[AddJobModal Review] Price per M:', pricePerM);
+                  console.log('[AddJobModal Review] Base calculation:', (quantity / 1000) * pricePerM);
+                  console.log('[AddJobModal Review] Final total:', (quantity / 1000) * pricePerM + additionalCosts);
+
+                  const requirementTotal = (quantity / 1000) * pricePerM + additionalCosts;
                   const processConfig = getProcessTypeConfig(req.process_type);
 
                   return (
@@ -2106,16 +2292,13 @@ export default function AddJobModal({
 
                         {/* Display all fields for this requirement */}
                         <div className="grid grid-cols-2 gap-2 mb-2 ml-4">
+                          {/* Display basic fields from processConfig */}
                           {processConfig?.fields.map((fieldConfig) => {
                             const fieldValue =
                               req[fieldConfig.name as keyof typeof req];
 
-                            // Skip if field has no value
-                            if (
-                              fieldValue === undefined ||
-                              fieldValue === null ||
-                              fieldValue === ""
-                            ) {
+                            // Skip if field has no value or is invalid (e.g., boolean false)
+                            if (!isFieldValueValid(fieldValue)) {
                               return null;
                             }
 
@@ -2138,6 +2321,102 @@ export default function AddJobModal({
                               </div>
                             );
                           })}
+
+                          {/* Display dynamic fields not in processConfig (e.g., boolean fields from machine variables) */}
+                          {Object.keys(req)
+                            .filter(key => {
+                              // Exclude fields already shown in processConfig
+                              const isInProcessConfig = processConfig?.fields.some(f => f.name === key);
+                              // Exclude system fields
+                              const isSystemField = key === "process_type" || key === "price_per_m" || key === "id" || key.endsWith('_cost');
+                              // Only show if field has a valid value
+                              return !isInProcessConfig && !isSystemField && isFieldValueValid(req[key]);
+                            })
+                            .map(fieldKey => {
+                              const fieldValue = req[fieldKey];
+                              
+                              // Format the field name for display
+                              const displayLabel = fieldKey
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ');
+
+                              // Format the value
+                              let displayValue: string;
+                              if (typeof fieldValue === "boolean") {
+                                displayValue = fieldValue ? "Yes" : "No";
+                              } else {
+                                displayValue = String(fieldValue);
+                              }
+
+                              return (
+                                <div key={fieldKey} className="text-xs">
+                                  <span className="text-[var(--text-light)]">
+                                    {displayLabel}:{" "}
+                                  </span>
+                                  <span className="text-[var(--text-dark)] font-medium">
+                                    {displayValue}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                          {/* Display additional fields with costs */}
+                          {Object.keys(req)
+                            .filter(key => key.endsWith('_cost'))
+                            .map(costKey => {
+                              const costValue = parseFloat(String(req[costKey] || "0")) || 0;
+                              if (costValue === 0) return null;
+
+                              // Get the base field name (remove _cost suffix)
+                              const baseFieldName = costKey.replace('_cost', '');
+                              const baseFieldValue = req[baseFieldName];
+                              
+                              // Only show cost if the base field is valid/selected
+                              if (!isFieldValueValid(baseFieldValue)) {
+                                return null;
+                              }
+                              
+                              // Calculate the actual cost for this quantity
+                              const calculatedCost = (quantity / 1000) * costValue;
+
+                              // Format the field name for display
+                              const displayLabel = baseFieldName
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ');
+
+                              return (
+                                <div key={costKey} className="text-xs col-span-2 bg-blue-50 p-2 rounded">
+                                  <div className="mb-1">
+                                    <span className="text-[var(--text-light)]">
+                                      {displayLabel}:{" "}
+                                    </span>
+                                    <span className="text-[var(--text-dark)] font-medium">
+                                      {String(baseFieldValue)}
+                                    </span>
+                                  </div>
+                                  <div className="ml-4 space-y-1">
+                                    <div>
+                                      <span className="text-[var(--text-light)]">
+                                        Cost (per 1000):{" "}
+                                      </span>
+                                      <span className="text-[var(--text-dark)] font-medium">
+                                        ${costValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[var(--text-light)]">
+                                        Calculated Cost:{" "}
+                                      </span>
+                                      <span className="text-[var(--text-dark)] font-semibold">
+                                        ${calculatedCost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                         </div>
 
                         <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
@@ -2165,11 +2444,15 @@ export default function AddJobModal({
                     </span>
                     <span className="font-bold text-[var(--primary-blue)] text-xl">
                       $
-                      {formData.requirements
+                      {getValidRequirements(formData.requirements)
                         .reduce((total, req) => {
                           const quantity = parseInt(formData.quantity || "0");
                           const pricePerM = parseFloat(req.price_per_m || "0");
-                          return total + (quantity / 1000) * pricePerM;
+
+                          // Calculate additional field costs (only for selected fields)
+                          const additionalCosts = calculateAdditionalCosts(req, quantity);
+
+                          return total + (quantity / 1000) * pricePerM + additionalCosts;
                         }, 0)
                         .toLocaleString("en-US", {
                           minimumFractionDigits: 2,

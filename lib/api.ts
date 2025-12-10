@@ -968,28 +968,16 @@ export const deleteMachine = async (machineId: number): Promise<void> => {
 
 // Get all jobs
 export const getJobs = async (facilitiesId?: number): Promise<Job[]> => {
-  console.log(
-    "[getJobs] Called with facilitiesId:",
-    facilitiesId,
-    "Type:",
-    typeof facilitiesId,
-  );
 
   const params = new URLSearchParams();
 
   if (facilitiesId !== undefined && facilitiesId !== null) {
     params.append("facilities_id", facilitiesId.toString());
-    console.log("[getJobs] Added facilities_id to params:", facilitiesId);
-  } else {
-    console.log("[getJobs] No facilities_id added (was undefined or null)");
   }
 
   const queryString = params.toString();
   const endpoint = queryString ? `/jobs?${queryString}` : "/jobs";
   const fullUrl = `${JOBS_BASE_URL}${endpoint}`;
-
-  console.log("[getJobs] Full URL:", fullUrl);
-  console.log("[getJobs] Endpoint:", endpoint);
 
   return apiFetch<Job[]>(
     endpoint,
@@ -2023,6 +2011,10 @@ export const syncJobCostEntryFromRequirements = async (
 // Machine Rules API Functions
 // ============================================================================
 
+// Cache for machine rules to prevent repeated API calls
+const machineRulesCache = new Map<string, { data: MachineRule[]; timestamp: number }>();
+const MACHINE_RULES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Get all machine rules with optional filters
  * @param processTypeKey - Filter by process type (e.g., 'insert', 'fold')
@@ -2054,6 +2046,20 @@ export const getMachineRules = async (
     ? `/machine_rules?${queryString}`
     : "/machine_rules";
 
+  // Check cache first
+  const cacheKey = endpoint;
+  const cached = machineRulesCache.get(cacheKey);
+  if (cached) {
+    const cacheAge = Date.now() - cached.timestamp;
+    if (cacheAge < MACHINE_RULES_CACHE_DURATION) {
+      console.log("[getMachineRules] Using cached rules for:", endpoint);
+      return cached.data;
+    } else {
+      // Cache expired
+      machineRulesCache.delete(cacheKey);
+    }
+  }
+
   console.log("[getMachineRules] Fetching rules from:", endpoint);
 
   try {
@@ -2061,11 +2067,26 @@ export const getMachineRules = async (
       method: "GET",
     });
     console.log("[getMachineRules] Received", result.length, "rules");
+
+    // Cache the result
+    machineRulesCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now(),
+    });
+
     return result;
   } catch (error) {
-    // If endpoint is not configured, return empty array
+    // If endpoint is not configured, return empty array and cache it
     console.log("[getMachineRules] Endpoint not available, returning empty array");
-    return [];
+    const emptyResult: MachineRule[] = [];
+
+    // Cache the empty result to prevent repeated 404s
+    machineRulesCache.set(cacheKey, {
+      data: emptyResult,
+      timestamp: Date.now(),
+    });
+
+    return emptyResult;
   }
 };
 

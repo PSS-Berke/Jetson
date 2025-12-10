@@ -28,6 +28,7 @@ import { applyDynamicFieldFilters } from "@/lib/dynamicFieldFilters";
 
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
+ * Includes additional costs from fields ending with _cost
  */
 function getJobRevenue(job: ParsedJob): number {
   // Check if job has parsed requirements with price_per_m
@@ -41,7 +42,19 @@ function getJobRevenue(job: ParsedJob): number {
       const isValidPrice =
         pricePerMStr && pricePerMStr !== "undefined" && pricePerMStr !== "null";
       const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
-      return total + (job.quantity / 1000) * pricePerM;
+      const baseRevenue = (job.quantity / 1000) * pricePerM;
+      
+      // Calculate additional field costs (price per 1000)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const additionalCosts = Object.keys(req as any)
+        .filter(key => key.endsWith('_cost'))
+        .reduce((costTotal, costKey) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const costValue = parseFloat(String((req as any)[costKey] || "0")) || 0;
+          return costTotal + (job.quantity / 1000) * costValue;
+        }, 0);
+      
+      return total + baseRevenue + additionalCosts;
     }, 0);
 
     // Add add-on charges if available

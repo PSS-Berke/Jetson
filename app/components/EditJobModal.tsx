@@ -3,9 +3,9 @@
 import { useState, FormEvent, useEffect, useRef } from "react";
 import SmartClientSelect from "./SmartClientSelect";
 import FacilityToggle from "./FacilityToggle";
-import ScheduleToggle from "./ScheduleToggle";
 import DynamicRequirementFields from "./DynamicRequirementFields";
-import { updateJob, deleteJob } from "@/lib/api";
+import RecommendedMachines from "./RecommendedMachines";
+import { updateJob, deleteJob, getToken } from "@/lib/api";
 import { type ParsedJob } from "@/hooks/useJobs";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
 import Toast from "./Toast";
@@ -60,7 +60,7 @@ export default function EditJobModal({
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false); // true = Schedule, false = Soft Schedule
+  const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "Hard Schedule", "soft schedule", "Cancelled", "projected", "completed"
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
@@ -70,6 +70,7 @@ export default function EditJobModal({
     newValue: number;
   } | null>(null);
   const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
+  const [runSaturdays, setRunSaturdays] = useState<boolean>(false);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
@@ -119,10 +120,14 @@ export default function EditJobModal({
             // Create a copy with all fields, removing legacy shifts_id
             // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { shifts_id, ...rest } = req as any;
-            return {
+            const requirement = {
               process_type: req.process_type || "",
               ...rest,
             };
+            console.log('[EditJobModal Init] Parsed requirement:', requirement);
+            console.log('[EditJobModal Init] All keys in requirement:', Object.keys(requirement));
+            console.log('[EditJobModal Init] Cost keys found:', Object.keys(requirement).filter(key => key.endsWith('_cost')));
+            return requirement;
           });
         } else {
           parsedRequirements = [{ process_type: "", price_per_m: "" }];
@@ -132,6 +137,74 @@ export default function EditJobModal({
         if (!parsedRequirements || parsedRequirements.length === 0) {
           parsedRequirements = [{ process_type: "", price_per_m: "" }];
         }
+        
+        // Clean requirements to remove unselected/invalid fields (false, empty, null, undefined)
+        // This ensures that fields with false values are removed immediately when the modal opens
+        parsedRequirements = parsedRequirements.map((req) => {
+          const cleaned: Requirement = {
+            process_type: req.process_type,
+          };
+          
+          // Always include price_per_m if it exists
+          if (req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "") {
+            cleaned.price_per_m = req.price_per_m;
+          }
+          
+          // Always include id if it exists
+          if (req.id !== undefined && req.id !== null) {
+            cleaned.id = req.id;
+          }
+          
+          // Process all other fields - only include valid/selected ones
+          Object.keys(req).forEach((key) => {
+            // Skip fields we've already handled
+            if (key === "process_type" || key === "price_per_m" || key === "id") {
+              return;
+            }
+            
+            // Skip cost fields - we'll handle them separately
+            if (key.endsWith('_cost')) {
+              return;
+            }
+            
+            const value = req[key];
+            
+            // Helper to check if value is valid - be very strict, same as isFieldValueValid
+            const isValid = (val: any): boolean => {
+              if (val === undefined || val === null) return false;
+              if (val === false || val === "false" || val === "False" || val === 0 || val === "0") return false;
+              if (typeof val === "string") {
+                const trimmed = val.trim();
+                if (trimmed === "" || trimmed.toLowerCase() === "false") return false;
+                return true;
+              }
+              if (typeof val === "number") {
+                return val !== 0;
+              }
+              return true;
+            };
+            
+            // Only include the field if it's valid/selected
+            if (isValid(value)) {
+              cleaned[key] = value;
+              
+              // If this field has a corresponding _cost field, include it only if the base field is valid
+              const costKey = `${key}_cost`;
+              if (req[costKey] !== undefined && req[costKey] !== null) {
+                const costValue = req[costKey];
+                // Include cost field if it has a valid value
+                if (costValue !== "" && costValue !== null && costValue !== undefined) {
+                  cleaned[costKey] = costValue;
+                }
+              }
+            }
+            // If field is not valid, don't include it AND don't include its _cost field
+          });
+          
+          return cleaned;
+        });
+        
+        console.log('[EditJobModal Init] Final parsedRequirements (cleaned):', parsedRequirements);
       } catch (error) {
         console.error("Failed to parse requirements:", error);
         parsedRequirements = [{ process_type: "", price_per_m: "" }];
@@ -233,6 +306,12 @@ export default function EditJobModal({
         ext_price: toStringValue(jobWithFields.ext_price || ""),
         total_billing: toStringValue(jobWithFields.total_billing || ""),
       });
+
+      // Initialize schedule type from job
+      const jobWithSchedule = job as typeof job & {
+        schedule_type?: string;
+      };
+      setScheduleType(jobWithSchedule.schedule_type || "soft schedule");
     }
   }, [isOpen, job]);
 
@@ -414,12 +493,49 @@ export default function EditJobModal({
     field: keyof Requirement,
     value: string | number | boolean,
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      requirements: prev.requirements.map((req, idx) =>
-        idx === requirementIndex ? { ...req, [field]: value } : req,
-      ),
-    }));
+    console.log('[EditJobModal] handleRequirementChange called:', { requirementIndex, field, value, valueType: typeof value });
+    
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        requirements: prev.requirements.map((req, idx) => {
+          if (idx !== requirementIndex) return req;
+          
+          // Check if the value is invalid/unselected - be very strict
+          const isInvalid = 
+            value === undefined || 
+            value === null || 
+            value === false || 
+            value === "false" || 
+            value === "False" ||
+            value === 0 || 
+            value === "0" ||
+            (typeof value === "string" && (value.trim() === "" || value.trim().toLowerCase() === "false"));
+          
+          console.log('[EditJobModal] Field value check:', { field, value, isInvalid });
+          
+          // If the value is invalid, remove the field entirely (and its cost field if it exists)
+          if (isInvalid) {
+            const { [field]: removedField, ...rest } = req;
+            // Also remove the associated cost field if it exists
+            const costFieldName = `${String(field)}_cost` as keyof Requirement;
+            if (costFieldName in rest) {
+              const { [costFieldName]: removedCost, ...restWithoutCost } = rest;
+              console.log('[EditJobModal] Removed field and cost:', { field, costFieldName });
+              return restWithoutCost as Requirement;
+            }
+            console.log('[EditJobModal] Removed field:', { field });
+            return rest as Requirement;
+          }
+          
+          // Otherwise, update the field with the new value
+          return { ...req, [field]: value };
+        }),
+      };
+      
+      console.log('[EditJobModal] Updated requirements:', updated.requirements);
+      return updated;
+    });
   };
 
   const addRequirement = () => {
@@ -444,6 +560,21 @@ export default function EditJobModal({
         ),
       }));
     }
+  };
+
+  // Machine selection handlers
+  const handleSelectMachine = (machineId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      machines_id: [...prev.machines_id, machineId],
+    }));
+  };
+
+  const handleDeselectMachine = (machineId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      machines_id: prev.machines_id.filter((id) => id !== machineId),
+    }));
   };
 
   const handleWeeklySplitChange = (weekIndex: number, value: string) => {
@@ -623,12 +754,141 @@ export default function EditJobModal({
     return getWeeklySplitSum() - quantity;
   };
 
+  // Helper function to check if a field value is valid/selected
+  // Returns true if the field should be considered "selected" and its cost should be included
+  // Returns false for ANY false value - be very strict
+  const isFieldValueValid = (value: any): boolean => {
+    if (value === undefined || value === null) return false;
+    
+    // Handle boolean values - only true is valid, everything else is false
+    if (value === false || value === "false" || value === "False" || value === 0 || value === "0") return false;
+    if (value === true || value === "true" || value === "True" || value === 1 || value === "1") return true;
+    
+    // Handle strings - must be non-empty and not "false"
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed === "" || trimmed.toLowerCase() === "false") return false;
+      return true;
+    }
+    
+    // Handle numbers - must be non-zero
+    if (typeof value === "number") {
+      return value !== 0;
+    }
+    
+    return true;
+  };
+
+  // Helper function to calculate additional costs, only including costs for fields that are actually selected
+  // A cost field (e.g., "some_field_cost") should only be included if its base field (e.g., "some_field") is valid/selected
+  const calculateAdditionalCosts = (req: Requirement, quantity: number): number => {
+    return Object.keys(req)
+      .filter(key => key.endsWith('_cost'))
+      .reduce((costTotal, costKey) => {
+        // Get the base field name (remove _cost suffix)
+        const baseFieldName = costKey.replace('_cost', '');
+        const baseFieldValue = req[baseFieldName];
+        
+        // Only include cost if the base field is valid/selected
+        if (!isFieldValueValid(baseFieldValue)) {
+          return costTotal;
+        }
+        
+        const rawValue = req[costKey as keyof typeof req];
+        let costValue = 0;
+        if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+          const parsed = parseFloat(String(rawValue));
+          costValue = isNaN(parsed) ? 0 : parsed;
+        }
+        // Additional costs are per 1000, so multiply by quantity/1000
+        return costTotal + (quantity / 1000) * costValue;
+      }, 0);
+  };
+
+  // Helper function to clean a requirement by removing unselected/invalid fields
+  // This ensures that unselected fields (false, empty, null, undefined) are completely omitted from the payload
+  const cleanRequirement = (req: Requirement): Requirement => {
+    // process_type is required and should always be present (we only clean validated requirements)
+    const cleaned: Requirement = {
+      process_type: req.process_type,
+    };
+    
+    // Always include price_per_m if it exists (even if 0, as it might be intentional)
+    if (req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "") {
+      cleaned.price_per_m = req.price_per_m;
+    }
+    
+    // Always include id if it exists
+    if (req.id !== undefined && req.id !== null) {
+      cleaned.id = req.id;
+    }
+    
+    // Process all other fields
+    Object.keys(req).forEach((key) => {
+      // Skip fields we've already handled
+      if (key === "process_type" || key === "price_per_m" || key === "id") {
+        return;
+      }
+      
+      // Skip cost fields - we'll handle them separately
+      if (key.endsWith('_cost')) {
+        return;
+      }
+      
+      const value = req[key];
+      
+      // Only include the field if it's valid/selected
+      if (isFieldValueValid(value)) {
+        cleaned[key] = value;
+        
+        // If this field has a corresponding _cost field, include it only if the base field is valid
+        const costKey = `${key}_cost`;
+        if (req[costKey] !== undefined && req[costKey] !== null) {
+          const costValue = req[costKey];
+          // Include cost field if it has a valid value (even 0 might be intentional, but empty string/null should be excluded)
+          if (costValue !== "" && costValue !== null && costValue !== undefined) {
+            cleaned[costKey] = costValue;
+          }
+        }
+      }
+      // If field is not valid, don't include it AND don't include its _cost field
+    });
+    
+    return cleaned;
+  };
+
+  // Helper function to filter out unselected/invalid requirements
+  // A requirement is valid if it has a process_type and at least one other field filled
+  const getValidRequirements = (requirements: Requirement[]): Requirement[] => {
+    return requirements.filter((req) => {
+      // Must have a process_type
+      if (!req.process_type || req.process_type === "") {
+        return false;
+      }
+
+      // Must have at least one other field filled (besides process_type, price_per_m, id, and cost fields)
+      const fieldCount = Object.keys(req).filter(
+        (key) =>
+          key !== "process_type" &&
+          key !== "price_per_m" &&
+          key !== "id" &&
+          !key.endsWith('_cost') && // Exclude cost fields from the count
+          req[key] !== undefined &&
+          req[key] !== null &&
+          req[key] !== "" &&
+          isFieldValueValid(req[key]),
+      ).length;
+
+      return fieldCount > 0;
+    });
+  };
+
   const handleNext = () => {
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
       // Reset schedule type to soft schedule when entering review step
       if (currentStep === 2) {
-        setIsConfirmed(false);
+        setScheduleType("soft schedule");
       }
     }
   };
@@ -660,14 +920,25 @@ export default function EditJobModal({
         : undefined;
 
 
-      // Calculate total billing from requirements
-      const quantity = parseInt(formData.quantity);
-      const calculatedRevenue = formData.requirements.reduce((total, req) => {
-        const pricePerM = parseFloat(req.price_per_m || "0");
-        return total + (quantity / 1000) * pricePerM;
+      // Filter to only valid requirements (those with process_type and at least one field)
+      const validRequirements = getValidRequirements(formData.requirements);
+      
+      // Clean each requirement to remove unselected fields (false, empty, null, undefined)
+      // This ensures unselected fields are completely omitted from the POST request
+      const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
+
+      // Calculate total billing from valid requirements only
+      const quantity = parseInt(formData.quantity) || 0;
+      const calculatedRevenue = cleanedRequirements.reduce((total, req) => {
+        const pricePerM = parseFloat(String(req.price_per_m || "0")) || 0;
+
+        // Calculate additional field costs (only for selected fields)
+        const additionalCosts = calculateAdditionalCosts(req, quantity);
+
+        return total + (quantity / 1000) * pricePerM + additionalCosts;
       }, 0);
 
-      const addOnCharges = parseFloat(formData.add_on_charges || "0");
+      const addOnCharges = parseFloat(String(formData.add_on_charges || "0")) || 0;
       const calculatedTotalBilling = calculatedRevenue + addOnCharges;
 
       const payload: Partial<{
@@ -691,6 +962,7 @@ export default function EditJobModal({
         add_on_charges: string;
         ext_price: string;
         total_billing: string;
+        schedule_type: string;
       }> = {
         jobs_id: job.id,
         job_number: formData.job_number,
@@ -700,7 +972,7 @@ export default function EditJobModal({
         time_estimate: null,
         clients_id: formData.clients_id || 0,
         machines_id: JSON.stringify(formData.machines_id),
-        requirements: JSON.stringify(formData.requirements),
+        requirements: JSON.stringify(cleanedRequirements),
         job_name: formData.job_name,
         prgm: formData.prgm,
         csr: formData.csr,
@@ -708,6 +980,7 @@ export default function EditJobModal({
         add_on_charges: addOnCharges.toString(),
         ext_price: formData.ext_price || "0",
         total_billing: calculatedTotalBilling.toString(),
+        schedule_type: scheduleType || "soft schedule",
         // Include start_date - convert to timestamp or use existing
         start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : job.start_date,
         // Include due_date - convert to timestamp or use existing
@@ -723,7 +996,7 @@ export default function EditJobModal({
 
       await updateJob(job.id, payload);
 
-      // Auto-sync job_cost_entry from updated requirements
+      // Auto-sync job_cost_entry from valid requirements only
       try {
         const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
         // Use start_date from payload (timestamp) or fall back to existing job start_date
@@ -731,7 +1004,7 @@ export default function EditJobModal({
           payload.start_date || new Date(job.start_date).getTime();
         await syncJobCostEntryFromRequirements(
           job.id,
-          payload.requirements as string,
+          JSON.stringify(cleanedRequirements),
           startDateForSync,
           payload.facilities_id,
         );
@@ -823,45 +1096,50 @@ export default function EditJobModal({
 
         {/* Step Indicator */}
         <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
-          {[1, 2, 3].map((step) => (
-            <div
-              key={step}
-              className="flex items-center"
-              style={{ flex: step === 3 ? "0 1 auto" : "1 1 0%" }}
-            >
-              <div className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                    step === currentStep
+          {(() => {
+            const steps = [1, 2, 3]; // Job Details -> Services -> Review
+
+            return steps.map((step, index) => (
+              <div
+                key={step}
+                className="flex items-center"
+                style={{ flex: index === steps.length - 1 ? "0 1 auto" : "1 1 0%" }}
+              >
+                <div className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${step === currentStep
                       ? "bg-[#EF3340] text-white"
                       : step < currentStep
-                        ? "bg-[#EF3340] text-white"
+                        ? "bg-[#2E3192] text-white"
                         : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  {step < currentStep ? "✓" : step}
-                </div>
-                <div className="ml-3">
-                  <div
-                    className={`text-xs font-medium whitespace-nowrap ${
-                      step === currentStep ? "text-[#EF3340]" : "text-gray-500"
-                    }`}
+                      }`}
                   >
-                    {step === 1 && "Job Details"}
-                    {step === 2 && "Requirements"}
-                    {step === 3 && "Review"}
+                    {step < currentStep ? "✓" : step === 0 ? "•" : step}
+                  </div>
+                  <div className="ml-3">
+                    <div
+                      className={`text-xs font-medium whitespace-nowrap ${step === currentStep
+                        ? "text-[#EF3340]"
+                        : step < currentStep
+                          ? "text-[#2E3192]"
+                          : "text-gray-500"
+                        }`}
+                    >
+                      {step === 1 && "Job Details"}
+                      {step === 2 && "Services"}
+                      {step === 3 && "Review"}
+                    </div>
                   </div>
                 </div>
+                {index < steps.length - 1 && (
+                  <div
+                    className={`h-0.5 flex-1 mx-4 ${step < currentStep ? "bg-[#2E3192]" : "bg-gray-200"
+                      }`}
+                  />
+                )}
               </div>
-              {step < 3 && (
-                <div
-                  className={`h-0.5 flex-1 mx-4 ${
-                    step < currentStep ? "bg-[#EF3340]" : "bg-gray-200"
-                  }`}
-                />
-              )}
-            </div>
-          ))}
+            ));
+          })()}
         </div>
 
         {/* Form Content */}
@@ -877,7 +1155,7 @@ export default function EditJobModal({
               e.preventDefault();
             }
           }}
-          className="flex-1 overflow-y-auto p-6"
+          className="flex-1 overflow-y-auto p-4 sm:p-6"
         >
           {/* Step 1: Job Details */}
           {currentStep === 1 && (
@@ -895,7 +1173,7 @@ export default function EditJobModal({
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                    Sub-Client
+                    Sub Client
                   </label>
                   <SmartClientSelect
                     value={formData.sub_clients_id}
@@ -1015,18 +1293,34 @@ export default function EditJobModal({
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Quantity
                   </label>
-                  <input
-                    type="text"
-                    name="quantity"
-                    value={
-                      formData.quantity
-                        ? parseInt(formData.quantity).toLocaleString()
-                        : ""
-                    }
-                    onChange={handleQuantityChange}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder="e.g., 73"
-                  />
+                  <div className="flex gap-4 items-center justify-between">
+                    <div className="flex gap-4 items-center flex-1">
+                      <input
+                        type="text"
+                        name="quantity"
+                        value={
+                          formData.quantity
+                            ? parseInt(formData.quantity).toLocaleString()
+                            : ""
+                        }
+                        onChange={handleQuantityChange}
+                        className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                        placeholder="e.g., 73"
+                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          id="runSaturdays"
+                          checked={runSaturdays}
+                          onChange={(e) => setRunSaturdays(e.target.checked)}
+                          className="w-4 h-4 text-[var(--primary-blue)] border-[var(--border)] rounded focus:ring-[var(--primary-blue)]"
+                        />
+                        <label htmlFor="runSaturdays" className="text-sm text-[var(--text-dark)] whitespace-nowrap">
+                          Run Saturdays
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1166,11 +1460,11 @@ export default function EditJobModal({
             </div>
           )}
 
-          {/* Step 2: Requirements */}
+          {/* Step 2: Services */}
           {currentStep === 2 && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-6">
-                Job Requirements
+                Job Services
               </h3>
 
               {formData.requirements.map((requirement, index) => (
@@ -1178,9 +1472,10 @@ export default function EditJobModal({
                   key={index}
                   className="border border-[var(--border)] rounded-lg p-6 space-y-4"
                 >
+                  {/* Service Header */}
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-semibold text-[var(--text-dark)]">
-                      Requirement {index + 1}
+                      Service {index + 1}
                     </h4>
                     {index > 0 && (
                       <button
@@ -1193,7 +1488,7 @@ export default function EditJobModal({
                     )}
                   </div>
 
-                  {/* Dynamic Requirement Fields */}
+                  {/* Dynamic Service Fields */}
                   <DynamicRequirementFields
                     requirement={requirement}
                     onChange={(field, value) =>
@@ -1204,13 +1499,53 @@ export default function EditJobModal({
                 </div>
               ))}
 
+              {/* Add Service Button */}
               <button
                 type="button"
                 onClick={addRequirement}
                 className="w-full px-6 py-3 border-2 border-dashed border-[var(--border)] rounded-lg font-semibold text-[var(--primary-blue)] hover:bg-blue-50 transition-colors"
               >
-                + Add Another Requirement
+                + Add Another Service
               </button>
+
+              {/* Recommended Machines - Show for each requirement that has a process type */}
+              {formData.requirements.map((requirement, index) => {
+                // Only show recommendations if we have:
+                // 1. A process type selected
+                // 2. Quantity entered
+                // 3. Start and due dates set
+                if (!requirement.process_type || !formData.quantity || !formData.start_date || !formData.due_date) {
+                  return null;
+                }
+
+                // Check if there are any filled capability fields (excluding metadata)
+                const filledCapabilityFields = Object.keys(requirement).filter(
+                  k => k !== 'process_type' && k !== 'price_per_m' && k !== 'id' &&
+                       requirement[k] !== undefined && requirement[k] !== null && requirement[k] !== ''
+                ).length;
+
+                // Show recommendations if we have at least one capability field filled
+                if (filledCapabilityFields === 0) {
+                  return null;
+                }
+
+                console.log('[EditJobModal] Rendering RecommendedMachines for requirement:', requirement);
+
+                return (
+                  <RecommendedMachines
+                    key={`recommended-${index}`}
+                    processType={requirement.process_type}
+                    jobRequirements={requirement}
+                    quantity={parseInt(formData.quantity) || 0}
+                    startDate={formData.start_date}
+                    dueDate={formData.due_date}
+                    facilityId={formData.facilities_id}
+                    selectedMachineIds={formData.machines_id}
+                    onSelectMachine={handleSelectMachine}
+                    onDeselectMachine={handleDeselectMachine}
+                  />
+                );
+              })}
             </div>
           )}
 
@@ -1218,9 +1553,20 @@ export default function EditJobModal({
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="bg-[var(--bg-alert-info)] border-l-4 border-[var(--primary-blue)] p-4 rounded">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-2">
-                  Job Summary
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-[var(--text-dark)]">
+                    Job Summary
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(1);
+                    }}
+                    className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
+                  >
+                    Edit Details
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-[var(--text-light)]">Job #:</span>
@@ -1242,14 +1588,6 @@ export default function EditJobModal({
                     <span className="text-[var(--text-light)]">Client:</span>
                     <span className="ml-2 font-semibold text-[var(--text-dark)]">
                       {formData.client_name}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-light)]">
-                      Sub-Client:
-                    </span>
-                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
-                      {formData.sub_client_name || "N/A"}
                     </span>
                   </div>
                   <div>
@@ -1296,14 +1634,140 @@ export default function EditJobModal({
               </div>
 
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
-                <h3 className="font-semibold text-[var(--text-dark)] mb-3">
-                  Job Requirements & Pricing
-                </h3>
-                {formData.requirements.map((req, index) => {
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-[var(--text-dark)]">
+                    Job Services & Pricing
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(2);
+                    }}
+                    className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
+                  >
+                    Edit Services
+                  </button>
+                </div>
+                {(() => {
+                  console.log('[EditJobModal Review Step] formData.requirements:', formData.requirements);
+                  console.log('[EditJobModal Review Step] Quantity:', formData.quantity);
+                  return null;
+                })()}
+                {getValidRequirements(formData.requirements).map((req, index) => {
+                  // Clean the requirement one more time before displaying - remove any false values
+                  const cleanedReq: Requirement = {
+                    process_type: req.process_type,
+                  };
+                  
+                  if (req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "") {
+                    cleanedReq.price_per_m = req.price_per_m;
+                  }
+                  
+                  if (req.id !== undefined && req.id !== null) {
+                    cleanedReq.id = req.id;
+                  }
+                  
+                  // Only include valid fields - be extremely strict
+                  // First, explicitly remove any fields with false values
+                  Object.keys(req).forEach((key) => {
+                    if (key === "process_type" || key === "price_per_m" || key === "id") {
+                      return;
+                    }
+                    
+                    const value = req[key];
+                    
+                    // Check if this is a cost field
+                    if (key.endsWith('_cost')) {
+                      // For cost fields, check if the base field is valid
+                      const baseFieldName = key.replace('_cost', '');
+                      const baseFieldValue = req[baseFieldName];
+                      
+                      // Only include cost if base field is valid
+                      if (
+                        baseFieldValue !== undefined &&
+                        baseFieldValue !== null &&
+                        baseFieldValue !== false &&
+                        baseFieldValue !== "false" &&
+                        baseFieldValue !== "False" &&
+                        baseFieldValue !== 0 &&
+                        baseFieldValue !== "0" &&
+                        !(typeof baseFieldValue === "string" && (baseFieldValue.trim() === "" || baseFieldValue.trim().toLowerCase() === "false")) &&
+                        isFieldValueValid(baseFieldValue) &&
+                        value !== undefined &&
+                        value !== null &&
+                        value !== ""
+                      ) {
+                        // Base field is valid, include the cost
+                        cleanedReq[key] = value;
+                      }
+                      return; // Skip to next key
+                    }
+                    
+                    // For non-cost fields, explicitly reject any false-like values
+                    if (
+                      value === undefined ||
+                      value === null ||
+                      value === false ||
+                      value === "false" ||
+                      value === "False" ||
+                      value === "FALSE" ||
+                      value === 0 ||
+                      value === "0" ||
+                      (typeof value === "string" && (value.trim() === "" || value.trim().toLowerCase() === "false"))
+                    ) {
+                      // Don't include this field - skip it completely
+                      // Also make sure its cost field is not included
+                      const costKey = `${key}_cost`;
+                      if (costKey in cleanedReq) {
+                        delete cleanedReq[costKey];
+                      }
+                      return;
+                    }
+                    
+                    // Double-check with isFieldValueValid
+                    if (!isFieldValueValid(value)) {
+                      // Also remove its cost field if it exists
+                      const costKey = `${key}_cost`;
+                      if (costKey in cleanedReq) {
+                        delete cleanedReq[costKey];
+                      }
+                      return;
+                    }
+                    
+                    // Field is valid - include it
+                    cleanedReq[key] = value;
+                  });
+                  
+                  // Debug: Log what fields are in cleanedReq
+                  console.log('[EditJobModal] Original req keys:', Object.keys(req));
+                  console.log('[EditJobModal] Cleaned requirement keys:', Object.keys(cleanedReq));
+                  console.log('[EditJobModal] Cleaned requirement:', cleanedReq);
+                  
                   const quantity = parseInt(formData.quantity || "0");
-                  const pricePerM = parseFloat(req.price_per_m || "0");
-                  const requirementTotal = (quantity / 1000) * pricePerM;
-                  const processConfig = getProcessTypeConfig(req.process_type);
+                  const pricePerMStr = cleanedReq.price_per_m;
+                  const isValidPrice =
+                    pricePerMStr &&
+                    pricePerMStr !== "undefined" &&
+                    pricePerMStr !== "null";
+                  const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+
+                  // Debug: Log requirement object
+                  console.log('[EditJobModal Review] Full requirement object:', cleanedReq);
+                  console.log('[EditJobModal Review] All keys:', Object.keys(cleanedReq));
+                  const costKeys = Object.keys(cleanedReq).filter(key => key.endsWith('_cost'));
+                  console.log('[EditJobModal Review] Cost keys:', costKeys);
+
+                  // Calculate additional field costs (only for selected fields)
+                  const additionalCosts = calculateAdditionalCosts(cleanedReq, quantity);
+
+                  const baseRevenue = (quantity / 1000) * pricePerM;
+                  const requirementTotal = baseRevenue + additionalCosts;
+
+                  console.log('[EditJobModal Review] Price per M:', pricePerM);
+                  console.log('[EditJobModal Review] Base revenue:', baseRevenue);
+                  console.log('[EditJobModal Review] Total additional costs:', additionalCosts);
+                  console.log('[EditJobModal Review] Final total:', requirementTotal);
+                  const processConfig = getProcessTypeConfig(cleanedReq.process_type);
 
                   return (
                     <div
@@ -1313,25 +1777,46 @@ export default function EditJobModal({
                       <div className="text-sm">
                         <div className="mb-2">
                           <span className="text-[var(--text-light)]">
-                            Requirement {index + 1}:{" "}
+                            Service {index + 1}:{" "}
                           </span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            {processConfig?.label || req.process_type}
+                            {processConfig?.label || cleanedReq.process_type}
                           </span>
                         </div>
 
                         {/* Display all fields for this requirement */}
                         <div className="grid grid-cols-2 gap-2 mb-2 ml-4">
+                          {/* Display basic fields from processConfig */}
                           {processConfig?.fields.map((fieldConfig) => {
                             const fieldValue =
-                              req[fieldConfig.name as keyof typeof req];
+                              cleanedReq[fieldConfig.name as keyof typeof cleanedReq];
 
-                            // Skip if field has no value
+                            // Skip if field has no value or is invalid (e.g., boolean false)
+                            // Be extra strict - if value is false, "false", undefined, null, 0, or empty, don't display
                             if (
                               fieldValue === undefined ||
                               fieldValue === null ||
-                              fieldValue === ""
+                              fieldValue === false ||
+                              fieldValue === "false" ||
+                              fieldValue === "False" ||
+                              fieldValue === 0 ||
+                              fieldValue === "0" ||
+                              (typeof fieldValue === "string" && (fieldValue.trim() === "" || fieldValue.trim().toLowerCase() === "false")) ||
+                              !isFieldValueValid(fieldValue)
                             ) {
+                              return null;
+                            }
+
+                            // Final safety check - if somehow a false value got through, don't display it
+                            if (
+                              fieldValue === false ||
+                              fieldValue === "false" ||
+                              fieldValue === "False" ||
+                              fieldValue === 0 ||
+                              fieldValue === "0" ||
+                              (typeof fieldValue === "string" && fieldValue.trim().toLowerCase() === "false")
+                            ) {
+                              console.warn('[EditJobModal] Attempted to display false field value:', fieldConfig.name, fieldValue);
                               return null;
                             }
 
@@ -1354,11 +1839,122 @@ export default function EditJobModal({
                               </div>
                             );
                           })}
+
+                          {/* Display additional fields with costs */}
+                          {Object.keys(cleanedReq)
+                            .filter(key => key.endsWith('_cost'))
+                            .map(costKey => {
+                              const rawValue = cleanedReq[costKey as keyof typeof cleanedReq];
+                              let costValue = 0;
+                              if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+                                const parsed = parseFloat(String(rawValue));
+                                costValue = isNaN(parsed) ? 0 : parsed;
+                              }
+                              if (costValue === 0) return null;
+
+                              // Get the base field name (remove _cost suffix)
+                              const baseFieldName = costKey.replace('_cost', '');
+                              const baseFieldValue = cleanedReq[baseFieldName];
+                              
+                              // Only show cost if the base field is valid/selected
+                              if (!isFieldValueValid(baseFieldValue)) {
+                                return null;
+                              }
+                              
+                              // Calculate the actual cost for this quantity
+                              const calculatedCost = (quantity / 1000) * costValue;
+
+                              // Format the field name for display
+                              const displayLabel = baseFieldName
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ');
+
+                              // Double-check: never display if base field is false/invalid
+                              if (!isFieldValueValid(baseFieldValue)) {
+                                return null;
+                              }
+
+                              return (
+                                <div key={costKey} className="text-xs col-span-2 bg-blue-50 p-2 rounded">
+                                  <div className="mb-1">
+                                    <span className="text-[var(--text-light)]">
+                                      {displayLabel}:{" "}
+                                    </span>
+                                    <span className="text-[var(--text-dark)] font-medium">
+                                      {String(baseFieldValue)}
+                                    </span>
+                                  </div>
+                                  <div className="ml-4 space-y-1">
+                                    <div>
+                                      <span className="text-[var(--text-light)]">
+                                        Cost (per 1000):{" "}
+                                      </span>
+                                      <span className="text-[var(--text-dark)] font-medium">
+                                        ${costValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[var(--text-light)]">
+                                        Calculated Cost:{" "}
+                                      </span>
+                                      <span className="text-[var(--text-dark)] font-semibold">
+                                        ${calculatedCost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                          {/* Display dynamic fields not in processConfig (e.g., boolean fields from machine variables) */}
+                          {Object.keys(cleanedReq)
+                            .filter(key => {
+                              // Exclude fields already shown in processConfig
+                              const isInProcessConfig = processConfig?.fields.some(f => f.name === key);
+                              // Exclude system fields
+                              const isSystemField = key === "process_type" || key === "price_per_m" || key === "id" || key.endsWith('_cost');
+                              // Only show if field has a valid value
+                              return !isInProcessConfig && !isSystemField && isFieldValueValid(cleanedReq[key]);
+                            })
+                            .map(fieldKey => {
+                              const fieldValue = cleanedReq[fieldKey];
+                              
+                              // Format the field name for display
+                              const displayLabel = fieldKey
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ');
+
+                              // Double-check: never display false values
+                              if (!isFieldValueValid(fieldValue)) {
+                                return null;
+                              }
+
+                              // Format the value
+                              let displayValue: string;
+                              if (typeof fieldValue === "boolean") {
+                                displayValue = fieldValue ? "Yes" : "No";
+                              } else {
+                                displayValue = String(fieldValue);
+                              }
+
+                              return (
+                                <div key={fieldKey} className="text-xs">
+                                  <span className="text-[var(--text-light)]">
+                                    {displayLabel}:{" "}
+                                  </span>
+                                  <span className="text-[var(--text-dark)] font-medium">
+                                    {displayValue}
+                                  </span>
+                                </div>
+                              );
+                            })}
                         </div>
 
                         <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
                           <span className="text-[var(--text-light)]">
-                            Subtotal for this requirement:
+                            Subtotal for this service:
                           </span>
                           <span className="font-semibold text-[var(--text-dark)]">
                             $
@@ -1381,11 +1977,21 @@ export default function EditJobModal({
                     </span>
                     <span className="font-bold text-[var(--primary-blue)] text-xl">
                       $
-                      {formData.requirements
+                      {getValidRequirements(formData.requirements)
                         .reduce((total, req) => {
                           const quantity = parseInt(formData.quantity || "0");
-                          const pricePerM = parseFloat(req.price_per_m || "0");
-                          return total + (quantity / 1000) * pricePerM;
+                          const pricePerMStr = req.price_per_m;
+                          const isValidPrice =
+                            pricePerMStr &&
+                            pricePerMStr !== "undefined" &&
+                            pricePerMStr !== "null";
+                          const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+                          const baseRevenue = (quantity / 1000) * pricePerM;
+
+                          // Calculate additional field costs (only for selected fields)
+                          const additionalCosts = calculateAdditionalCosts(req, quantity);
+
+                          return total + baseRevenue + additionalCosts;
                         }, 0)
                         .toLocaleString("en-US", {
                           minimumFractionDigits: 2,
@@ -1394,20 +2000,245 @@ export default function EditJobModal({
                     </span>
                   </div>
                 </div>
+
+                {/* Pricing Breakdown Section */}
+                <div className="mt-6 pt-6 border-t border-[var(--border)]">
+                  <h4 className="text-base font-semibold text-[var(--dark-blue)] mb-4">
+                    Pricing Breakdown
+                  </h4>
+                  <div className="space-y-3">
+                    {/* Revenue per Process */}
+                    {getValidRequirements(formData.requirements).map((req, index) => {
+                      const quantity = parseInt(formData.quantity || "0");
+                      const pricePerMStr = req.price_per_m;
+                      const isValidPrice =
+                        pricePerMStr &&
+                        pricePerMStr !== "undefined" &&
+                        pricePerMStr !== "null";
+                      const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+                      const baseRevenue = (quantity / 1000) * pricePerM;
+                      
+                      // Calculate additional field costs (only for selected fields)
+                      const additionalCosts = calculateAdditionalCosts(req, quantity);
+                      
+                      const processRevenue = baseRevenue + additionalCosts;
+
+                      return (
+                        <div
+                          key={index}
+                          className="flex justify-between items-center py-2"
+                        >
+                          <span className="text-sm text-[var(--text-dark)]">
+                            Revenue from {req.process_type}:
+                          </span>
+                          <span className="text-base font-semibold text-[var(--text-dark)]">
+                            $
+                            {processRevenue.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Add-On Charges */}
+                    {formData.add_on_charges && parseFloat(formData.add_on_charges) > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-[var(--text-dark)]">
+                          Add-on Charges:
+                        </span>
+                        <span className="text-base font-semibold text-[var(--text-dark)]">
+                          $
+                          {parseFloat(formData.add_on_charges).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Total Revenue */}
+                    {(() => {
+                      // Calculate total revenue from requirements (including additional costs)
+                      // Only use valid requirements (those with process_type and at least one field)
+                      const calculatedTotalRevenue = getValidRequirements(formData.requirements).reduce((total, req) => {
+                        const quantity = parseInt(formData.quantity || "0");
+                        const pricePerMStr = req.price_per_m;
+                        const isValidPrice =
+                          pricePerMStr &&
+                          pricePerMStr !== "undefined" &&
+                          pricePerMStr !== "null";
+                        const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+                        const baseRevenue = (quantity / 1000) * pricePerM;
+                        
+                        // Calculate additional field costs (only for selected fields)
+                        const additionalCosts = calculateAdditionalCosts(req, quantity);
+                        
+                        return total + baseRevenue + additionalCosts;
+                      }, 0) + parseFloat(formData.add_on_charges || "0");
+
+                      return (
+                        <div className="flex justify-between items-center py-3 border-t-2 border-[var(--primary-blue)] mt-3">
+                          <span className="text-base font-bold text-[var(--text-dark)]">
+                            Total Revenue:
+                          </span>
+                          <span className="text-xl font-bold text-[var(--primary-blue)]">
+                            $
+                            {calculatedTotalRevenue.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Revenue per Unit */}
+                    <div className="flex justify-between items-center py-2 bg-gray-50 rounded-lg px-4">
+                      <span className="text-sm text-[var(--text-dark)]">
+                        Revenue per Unit:
+                      </span>
+                      <span className="text-base font-semibold text-[var(--text-dark)]">
+                        $
+                        {(() => {
+                          const quantity = parseInt(formData.quantity || "0");
+                          if (quantity > 0) {
+                            // Only use valid requirements (those with process_type and at least one field)
+                            const totalRevenue = getValidRequirements(formData.requirements).reduce((total, req) => {
+                              const pricePerMStr = req.price_per_m;
+                              const isValidPrice =
+                                pricePerMStr &&
+                                pricePerMStr !== "undefined" &&
+                                pricePerMStr !== "null";
+                              const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+                              const baseRevenue = (quantity / 1000) * pricePerM;
+                              
+                              // Calculate additional field costs (only for selected fields)
+                              const additionalCosts = calculateAdditionalCosts(req, quantity);
+                              
+                              return total + baseRevenue + additionalCosts;
+                            }, 0) + parseFloat(formData.add_on_charges || "0");
+                            
+                            return (totalRevenue / quantity).toLocaleString("en-US", {
+                              minimumFractionDigits: 4,
+                              maximumFractionDigits: 4,
+                            });
+                          }
+                          return "0.0000";
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Selected Machines Section */}
+              <div className="bg-white border border-[var(--border)] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-[var(--text-dark)]">
+                    Assigned Machines
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(2)}
+                    className="text-sm text-[var(--primary-blue)] hover:underline font-medium"
+                  >
+                    Edit Machines
+                  </button>
+                </div>
+                {formData.machines_id.length === 0 ? (
+                  <div className="text-center py-6 px-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <svg
+                      className="w-10 h-10 text-yellow-500 mx-auto mb-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <p className="text-sm font-medium text-yellow-800">
+                      No machines selected
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Go back to Services step to select machines from recommendations
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.machines_id.map((machineId) => (
+                      <div
+                        key={machineId}
+                        className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <svg
+                            className="w-5 h-5 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+                            />
+                          </svg>
+                          <div>
+                            <p className="font-semibold text-blue-900">
+                              Machine ID: {machineId}
+                            </p>
+                            <p className="text-xs text-blue-700">
+                              Assigned to this job
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeselectMachine(machineId)}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
                 <h4 className="font-semibold text-[var(--text-dark)] mb-3">
                   Schedule Type
                 </h4>
-                <ScheduleToggle
-                  isConfirmed={isConfirmed}
-                  onScheduleChange={setIsConfirmed}
-                />
+                <select
+                  value={scheduleType}
+                  onChange={(e) => setScheduleType(e.target.value)}
+                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] bg-white"
+                >
+                  <option value="soft schedule">Soft Schedule</option>
+                  <option value="Hard Schedule">Hard Schedule</option>
+                  <option value="projected">Projected</option>
+                  <option value="completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
                 <p className="text-sm text-[var(--text-light)] mt-3">
-                  {isConfirmed
+                  {scheduleType === "Hard Schedule"
                     ? "✓ This job will be confirmed and scheduled immediately."
-                    : "ℹ This job will be added as a soft schedule and can be confirmed later."}
+                    : scheduleType === "soft schedule"
+                      ? "ℹ This job will be added as a soft schedule and can be confirmed later."
+                      : scheduleType === "projected"
+                        ? "📊 This job is projected for future planning."
+                        : scheduleType === "completed"
+                          ? "✅ This job has been completed."
+                          : scheduleType === "Cancelled"
+                            ? "❌ This job has been cancelled."
+                            : ""}
                 </p>
               </div>
             </div>

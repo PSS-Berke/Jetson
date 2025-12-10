@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Machine } from "@/types";
 import type { MachineMatch } from "@/lib/machineMatching";
 import { findMatchingMachines } from "@/lib/machineMatching";
-import { getMachines, getJobs } from "@/lib/api";
+import { getMachines, getJobsV2 } from "@/lib/api";
 
 interface RecommendedMachinesProps {
   processType: string;
@@ -33,12 +33,40 @@ export default function RecommendedMachines({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllMachines, setShowAllMachines] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!processType || !startDate || !dueDate || quantity <= 0) {
       setMatches([]);
       return;
     }
+
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Debounce the machine matching to prevent excessive API calls
+    // Wait 500ms after the last change before triggering the search
+    debounceTimerRef.current = setTimeout(() => {
+      console.log("[RecommendedMachines] Debounce timer fired, loading matches");
+      loadMatchesNow();
+    }, 500);
+
+    // Cleanup function
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [processType, jobRequirements, quantity, startDate, dueDate, facilityId]);
+
+  const loadMatchesNow = async () => {
+    if (!processType || !startDate || !dueDate || quantity <= 0) {
+      setMatches([]);
+      return;
+    }
+
     const typeMap = {
       "inserter": ["Insert", "Sort", "Data", "9-12 in+", "13+ in+"],
       "folders": ["Fold"],
@@ -49,16 +77,15 @@ export default function RecommendedMachines({
     const machineType = (Object.keys(typeMap).find(key =>
       typeMap[key as keyof typeof typeMap].includes(processType)
     ) || "inserter") as "inserter" | "folders" | "hp press" | "inkjetters" | "affixers"
-    const loadMatches = async () => {
-      setLoading(true);
-      setError(null);
 
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch all machines - wrap in try-catch to handle API errors
+      let allMachines: Machine[] = [];
       try {
-
-        // Fetch all machines - wrap in try-catch to handle API errors
-        let allMachines: Machine[] = [];
-        try {
-          allMachines = await getMachines(undefined, undefined, machineType);
+        allMachines = await getMachines(undefined, undefined, machineType);
 
           // Filter out machines with invalid process_type_key
           allMachines = allMachines.filter(m => {
@@ -74,10 +101,14 @@ export default function RecommendedMachines({
           throw new Error("Unable to load machines. Please check your machine configuration.");
         }
 
-        // Fetch existing jobs for availability calculation
+        // Fetch existing jobs for availability calculation using v2 API
         let existingJobs: any[] = [];
         try {
-          existingJobs = await getJobs();
+          const jobsResponse = await getJobsV2({
+            facilities_id: facilityId || 0,
+            per_page: 10000, // Get all jobs for availability calculation
+          });
+          existingJobs = jobsResponse.items;
         } catch (jobError) {
           console.warn("[RecommendedMachines] Error fetching jobs, continuing without availability data:", jobError);
           // Continue without jobs - availability will be estimated
@@ -110,18 +141,15 @@ export default function RecommendedMachines({
           }))
         );
 
-        setMatches(matchResults);
-      } catch (err) {
-        console.error("[RecommendedMachines] Error loading matches:", err);
-        setError(err instanceof Error ? err.message : "Failed to load recommendations");
-        setMatches([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMatches();
-  }, [processType, jobRequirements, quantity, startDate, dueDate, facilityId]);
+      setMatches(matchResults);
+    } catch (err) {
+      console.error("[RecommendedMachines] Error loading matches:", err);
+      setError(err instanceof Error ? err.message : "Failed to load recommendations");
+      setMatches([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Show loading state
   if (loading) {
