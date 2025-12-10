@@ -40,23 +40,16 @@ export default function RecommendedMachines({
       return;
     }
 
-    // TEMPORARY: Skip loading if you want to test without fixing data
-    // Uncomment these lines to disable recommendations temporarily:
-    // setMatches([]);
-    // return;
-
     const loadMatches = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        console.log("[RecommendedMachines] Fetching machines and jobs...");
 
         // Fetch all machines - wrap in try-catch to handle API errors
         let allMachines: Machine[] = [];
         try {
           allMachines = await getMachines();
-          console.log(`[RecommendedMachines] Loaded ${allMachines.length} machines`);
 
           // Filter out machines with invalid process_type_key
           allMachines = allMachines.filter(m => {

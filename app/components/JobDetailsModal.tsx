@@ -746,9 +746,7 @@ export default function JobDetailsModal({
         payload.facilities_id = formData.facilities_id;
       }
 
-      console.log("Payload being sent to Xano (Edit):", payload);
       await updateJob(job.id, payload);
-      console.log("Job updated successfully");
 
       try {
         const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
@@ -760,7 +758,6 @@ export default function JobDetailsModal({
           startDateForSync,
           payload.facilities_id,
         );
-        console.log("[JobDetailsModal] Job cost entry synced successfully");
       } catch (costError) {
         console.error(
           "[JobDetailsModal] Failed to sync job cost entry (non-blocking):",

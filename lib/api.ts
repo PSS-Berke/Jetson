@@ -66,16 +66,6 @@ const apiFetch = async <T = unknown>(
         ? JOBS_BASE_URL
         : API_BASE_URL;
 
-  // Debug logging for jobs endpoint
-  if (endpoint.includes("/jobs")) {
-    console.log("[apiFetch] Jobs request:", {
-      url: `${baseUrl}${endpoint}`,
-      method: options.method,
-      body: options.body,
-      headers,
-    });
-  }
-
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
@@ -86,12 +76,7 @@ const apiFetch = async <T = unknown>(
     let errorText: string = "";
     try {
       errorText = await response.text();
-      console.log("[apiFetch] Raw error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorText: errorText,
-        endpoint: endpoint,
-      });
+
       try {
         error = JSON.parse(errorText);
         // If error is an empty object or has no useful info, add status info
@@ -127,30 +112,6 @@ const apiFetch = async <T = unknown>(
     const isMachineVariablesEndpoint = endpoint.includes("/machine_variables");
     const isCapabilityBucketsEndpoint = endpoint.includes("/capability_buckets");
 
-    // Log error details for debugging (unless it's an expected endpoint error)
-    if (
-      !isProductionEndpoint &&
-      !isJobCostEndpoint &&
-      !isMachineRulesEndpoint &&
-      !isMachineGroupsEndpoint &&
-      !isVariableCombinationsEndpoint &&
-      !isMachineVariablesEndpoint &&
-      !isCapabilityBucketsEndpoint
-    ) {
-      console.error("[API Error]", {
-        endpoint,
-        baseType,
-        fullUrl: `${baseType === "auth" ? AUTH_BASE_URL : baseType === "jobs" ? JOBS_BASE_URL : API_BASE_URL}${endpoint}`,
-        status: response.status,
-        statusText: response.statusText,
-        error,
-        errorMessage: error.message || error.error || error.detail || 'No error message',
-        errorString: JSON.stringify(error, null, 2),
-        rawErrorText: errorText,
-        requestBody: options.body || 'No request body',
-        requestMethod: options.method || 'GET',
-      });
-    }
 
     // Handle unauthorized/expired token
     if (response.status === 401 || error.code === "ERROR_CODE_UNAUTHORIZED") {
@@ -2469,7 +2430,6 @@ export const updateJobTemplate = async (templateData: {
     console.error("[updateJobTemplate] Failed to parse JSON response:", error);
     throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : String(error)}`);
   }
-  console.log("[updateJobTemplate] Template updated:", result);
   return result;
 };
 
@@ -2478,7 +2438,6 @@ export const updateJobTemplate = async (templateData: {
  * @param jobTemplatesId - The job template ID to delete
  */
 export const deleteJobTemplate = async (jobTemplatesId: number): Promise<void> => {
-  console.log("[deleteJobTemplate] Deleting job template:", jobTemplatesId);
   const token = getToken();
 
   const response = await fetch("https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/job_templates", {
@@ -2501,7 +2460,6 @@ export const deleteJobTemplate = async (jobTemplatesId: number): Promise<void> =
     throw new Error(`Failed to delete job template: ${JSON.stringify(errorData)}`);
   }
 
-  console.log("[deleteJobTemplate] Template deleted successfully");
 };
 
 // ============================================================================
@@ -2523,11 +2481,9 @@ export interface CapabilityBucket {
  * @returns Array of capability buckets
  */
 export const getCapabilityBuckets = async (): Promise<CapabilityBucket[]> => {
-  console.log("[getCapabilityBuckets] Fetching capability buckets");
   const result = await apiFetch<CapabilityBucket[]>("/capability_buckets", {
     method: "GET",
   });
-  console.log("[getCapabilityBuckets] Received", result.length, "capability buckets");
   return result;
 };
 
@@ -2540,12 +2496,10 @@ export const createCapabilityBucket = async (bucketData: {
   name: string;
   capabilities: Record<string, any>;
 }): Promise<CapabilityBucket> => {
-  console.log("[createCapabilityBucket] Creating capability bucket:", bucketData);
   const result = await apiFetch<CapabilityBucket>("/capability_buckets", {
     method: "POST",
     body: JSON.stringify(bucketData),
   });
-  console.log("[createCapabilityBucket] Capability bucket created:", result);
   return result;
 };
 
@@ -2562,12 +2516,10 @@ export const updateCapabilityBucket = async (
     capabilities: Record<string, any>;
   },
 ): Promise<CapabilityBucket> => {
-  console.log("[updateCapabilityBucket] Updating capability bucket:", bucketId, bucketData);
   const result = await apiFetch<CapabilityBucket>(`/capability_buckets/${bucketId}`, {
     method: "PUT",
     body: JSON.stringify(bucketData),
   });
-  console.log("[updateCapabilityBucket] Capability bucket updated:", result);
   return result;
 };
 
@@ -2576,9 +2528,7 @@ export const updateCapabilityBucket = async (
  * @param bucketId - The capability bucket ID
  */
 export const deleteCapabilityBucket = async (bucketId: number): Promise<void> => {
-  console.log("[deleteCapabilityBucket] Deleting capability bucket:", bucketId);
   await apiFetch<void>(`/capability_buckets/${bucketId}`, {
     method: "DELETE",
   });
-  console.log("[deleteCapabilityBucket] Capability bucket deleted successfully");
 };
