@@ -78,7 +78,6 @@ export default function RecommendedMachines({
         let existingJobs: any[] = [];
         try {
           existingJobs = await getJobs();
-          console.log(`[RecommendedMachines] Loaded ${existingJobs.length} jobs`);
         } catch (jobError) {
           console.warn("[RecommendedMachines] Error fetching jobs, continuing without availability data:", jobError);
           // Continue without jobs - availability will be estimated

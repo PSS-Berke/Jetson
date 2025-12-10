@@ -691,9 +691,6 @@ export default function EditJobModal({
         add_on_charges: string;
         ext_price: string;
         total_billing: string;
-        weekly_split: number[];
-        locked_weeks: boolean[];
-        confirmed: boolean;
       }> = {
         jobs_id: job.id,
         job_number: formData.job_number,
@@ -711,32 +708,20 @@ export default function EditJobModal({
         add_on_charges: addOnCharges.toString(),
         ext_price: formData.ext_price || "0",
         total_billing: calculatedTotalBilling.toString(),
-        weekly_split: formData.weekly_split,
-        locked_weeks: formData.locked_weeks,
-        confirmed: isConfirmed,
+        // Include start_date - convert to timestamp or use existing
+        start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : job.start_date,
+        // Include due_date - convert to timestamp or use existing
+        due_date: dueDateTimestamp && dueDateTimestamp > 0 ? dueDateTimestamp : job.due_date,
+        // Include facilities_id whether it was edited or not
+        facilities_id: formData.facilities_id !== null ? formData.facilities_id : job.facilities_id,
       };
 
-      // Only include sub_clients_id if it's not null
+      // Include sub_clients_id if available (either from form or if it exists in job)
       if (formData.sub_clients_id !== null) {
         payload.sub_clients_id = formData.sub_clients_id;
       }
 
-      // Only include dates if they are valid timestamps (not 0 or undefined)
-      if (startDateTimestamp && startDateTimestamp > 0) {
-        payload.start_date = startDateTimestamp;
-      }
-      if (dueDateTimestamp && dueDateTimestamp > 0) {
-        payload.due_date = dueDateTimestamp;
-      }
-
-      // Only include facilities_id if it's not null
-      if (formData.facilities_id !== null) {
-        payload.facilities_id = formData.facilities_id;
-      }
-
-      console.log("Payload being sent to Xano (Edit):", payload);
       await updateJob(job.id, payload);
-      console.log("Job updated successfully");
 
       // Auto-sync job_cost_entry from updated requirements
       try {
