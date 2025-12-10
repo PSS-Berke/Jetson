@@ -59,7 +59,7 @@ export default function PageHeader({
 
   return (
     <header className="bg-white shadow-sm border-b border-[var(--border)]">
-      <div className="px-4 sm:px-6 py-4">
+      <div className="px-4 sm:px-6 py-4 max-w-[1800px] mx-auto">
         <div className="flex items-center justify-between">
           <Link
             href="/projections"
@@ -68,9 +68,9 @@ export default function PageHeader({
             <Image
               src="/logo.png"
               alt="Jetson Marketing Solutions"
-              width={500}
-              height={250}
-              className="h-auto w-auto max-h-[150px] -my-5"
+              width={250}
+              height={125}
+              className="h-auto w-auto max-h-[100px] -my-5"
               priority
               unoptimized
             />
