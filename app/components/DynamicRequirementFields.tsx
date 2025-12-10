@@ -533,9 +533,9 @@ export default function DynamicRequirementFields({
     // Check if this is a boolean field (stored in originalType)
     const isBoolean = (field as any).originalType === "boolean";
 
-    // Handle boolean values - default to false if not set
+    // Handle boolean values - get the actual value from requirement, don't default to false
     const value = isBoolean
-      ? (requirement[field.name] !== undefined ? requirement[field.name] : false)
+      ? requirement[field.name]
       : (requirement[field.name] || "");
 
     const error = errors[field.name];

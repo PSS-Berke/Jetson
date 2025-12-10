@@ -514,17 +514,28 @@ export default function EditJobModal({
           
           console.log('[EditJobModal] Field value check:', { field, value, isInvalid });
           
-          // If the value is invalid, remove the field entirely (and its cost field if it exists)
+          // If the value is invalid, remove the field entirely (and set its cost field to 0)
           if (isInvalid) {
-            const { [field]: removedField, ...rest } = req;
-            // Also remove the associated cost field if it exists
-            const costFieldName = `${String(field)}_cost` as keyof Requirement;
-            if (costFieldName in rest) {
-              const { [costFieldName]: removedCost, ...restWithoutCost } = rest;
-              console.log('[EditJobModal] Removed field and cost:', { field, costFieldName });
-              return restWithoutCost as Requirement;
-            }
-            console.log('[EditJobModal] Removed field:', { field });
+            // Create a new object without the field
+            const rest: Partial<Requirement> = {};
+            Object.keys(req).forEach((key) => {
+              if (key !== String(field)) {
+                rest[key as keyof Requirement] = req[key as keyof Requirement];
+              }
+            });
+
+            // Always set the associated cost field to 0 when unchecking a boolean/field
+            // This ensures when user re-checks the field, the cost starts at 0
+            const costFieldName = `${String(field)}_cost`;
+            rest[costFieldName as keyof Requirement] = "0" as any;  // Use string "0" to match input format
+            console.log('[EditJobModal] Removed field and set cost to "0":', {
+              field,
+              costFieldName,
+              oldCostValue: req[costFieldName as keyof Requirement],
+              newCostValue: "0",
+              remainingKeys: Object.keys(rest)
+            });
+
             return rest as Requirement;
           }
           
@@ -1654,97 +1665,8 @@ export default function EditJobModal({
                   return null;
                 })()}
                 {getValidRequirements(formData.requirements).map((req, index) => {
-                  // Clean the requirement one more time before displaying - remove any false values
-                  const cleanedReq: Requirement = {
-                    process_type: req.process_type,
-                  };
-                  
-                  if (req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "") {
-                    cleanedReq.price_per_m = req.price_per_m;
-                  }
-                  
-                  if (req.id !== undefined && req.id !== null) {
-                    cleanedReq.id = req.id;
-                  }
-                  
-                  // Only include valid fields - be extremely strict
-                  // First, explicitly remove any fields with false values
-                  Object.keys(req).forEach((key) => {
-                    if (key === "process_type" || key === "price_per_m" || key === "id") {
-                      return;
-                    }
-                    
-                    const value = req[key];
-                    
-                    // Check if this is a cost field
-                    if (key.endsWith('_cost')) {
-                      // For cost fields, check if the base field is valid
-                      const baseFieldName = key.replace('_cost', '');
-                      const baseFieldValue = req[baseFieldName];
-                      
-                      // Only include cost if base field is valid
-                      if (
-                        baseFieldValue !== undefined &&
-                        baseFieldValue !== null &&
-                        baseFieldValue !== false &&
-                        baseFieldValue !== "false" &&
-                        baseFieldValue !== "False" &&
-                        baseFieldValue !== 0 &&
-                        baseFieldValue !== "0" &&
-                        !(typeof baseFieldValue === "string" && (baseFieldValue.trim() === "" || baseFieldValue.trim().toLowerCase() === "false")) &&
-                        isFieldValueValid(baseFieldValue) &&
-                        value !== undefined &&
-                        value !== null &&
-                        value !== ""
-                      ) {
-                        // Base field is valid, include the cost
-                        cleanedReq[key] = value;
-                      }
-                      return; // Skip to next key
-                    }
-                    
-                    // For non-cost fields, explicitly reject any false-like values
-                    if (
-                      value === undefined ||
-                      value === null ||
-                      value === false ||
-                      value === "false" ||
-                      value === "False" ||
-                      value === "FALSE" ||
-                      value === 0 ||
-                      value === "0" ||
-                      (typeof value === "string" && (value.trim() === "" || value.trim().toLowerCase() === "false"))
-                    ) {
-                      // Don't include this field - skip it completely
-                      // Also make sure its cost field is not included
-                      const costKey = `${key}_cost`;
-                      if (costKey in cleanedReq) {
-                        delete cleanedReq[costKey];
-                      }
-                      return;
-                    }
-                    
-                    // Double-check with isFieldValueValid
-                    if (!isFieldValueValid(value)) {
-                      // Also remove its cost field if it exists
-                      const costKey = `${key}_cost`;
-                      if (costKey in cleanedReq) {
-                        delete cleanedReq[costKey];
-                      }
-                      return;
-                    }
-                    
-                    // Field is valid - include it
-                    cleanedReq[key] = value;
-                  });
-                  
-                  // Debug: Log what fields are in cleanedReq
-                  console.log('[EditJobModal] Original req keys:', Object.keys(req));
-                  console.log('[EditJobModal] Cleaned requirement keys:', Object.keys(cleanedReq));
-                  console.log('[EditJobModal] Cleaned requirement:', cleanedReq);
-                  
                   const quantity = parseInt(formData.quantity || "0");
-                  const pricePerMStr = cleanedReq.price_per_m;
+                  const pricePerMStr = req.price_per_m;
                   const isValidPrice =
                     pricePerMStr &&
                     pricePerMStr !== "undefined" &&
@@ -1752,13 +1674,13 @@ export default function EditJobModal({
                   const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
 
                   // Debug: Log requirement object
-                  console.log('[EditJobModal Review] Full requirement object:', cleanedReq);
-                  console.log('[EditJobModal Review] All keys:', Object.keys(cleanedReq));
-                  const costKeys = Object.keys(cleanedReq).filter(key => key.endsWith('_cost'));
+                  console.log('[EditJobModal Review] Full requirement object:', req);
+                  console.log('[EditJobModal Review] All keys:', Object.keys(req));
+                  const costKeys = Object.keys(req).filter(key => key.endsWith('_cost'));
                   console.log('[EditJobModal Review] Cost keys:', costKeys);
 
                   // Calculate additional field costs (only for selected fields)
-                  const additionalCosts = calculateAdditionalCosts(cleanedReq, quantity);
+                  const additionalCosts = calculateAdditionalCosts(req, quantity);
 
                   const baseRevenue = (quantity / 1000) * pricePerM;
                   const requirementTotal = baseRevenue + additionalCosts;
@@ -1767,7 +1689,7 @@ export default function EditJobModal({
                   console.log('[EditJobModal Review] Base revenue:', baseRevenue);
                   console.log('[EditJobModal Review] Total additional costs:', additionalCosts);
                   console.log('[EditJobModal Review] Final total:', requirementTotal);
-                  const processConfig = getProcessTypeConfig(cleanedReq.process_type);
+                  const processConfig = getProcessTypeConfig(req.process_type);
 
                   return (
                     <div
@@ -1780,7 +1702,7 @@ export default function EditJobModal({
                             Service {index + 1}:{" "}
                           </span>
                           <span className="font-semibold text-[var(--text-dark)]">
-                            {processConfig?.label || cleanedReq.process_type}
+                            {processConfig?.label || req.process_type}
                           </span>
                         </div>
 
@@ -1789,7 +1711,7 @@ export default function EditJobModal({
                           {/* Display basic fields from processConfig */}
                           {processConfig?.fields.map((fieldConfig) => {
                             const fieldValue =
-                              cleanedReq[fieldConfig.name as keyof typeof cleanedReq];
+                              req[fieldConfig.name as keyof typeof req];
 
                             // Skip if field has no value or is invalid (e.g., boolean false)
                             // Be extra strict - if value is false, "false", undefined, null, 0, or empty, don't display
@@ -1804,19 +1726,6 @@ export default function EditJobModal({
                               (typeof fieldValue === "string" && (fieldValue.trim() === "" || fieldValue.trim().toLowerCase() === "false")) ||
                               !isFieldValueValid(fieldValue)
                             ) {
-                              return null;
-                            }
-
-                            // Final safety check - if somehow a false value got through, don't display it
-                            if (
-                              fieldValue === false ||
-                              fieldValue === "false" ||
-                              fieldValue === "False" ||
-                              fieldValue === 0 ||
-                              fieldValue === "0" ||
-                              (typeof fieldValue === "string" && fieldValue.trim().toLowerCase() === "false")
-                            ) {
-                              console.warn('[EditJobModal] Attempted to display false field value:', fieldConfig.name, fieldValue);
                               return null;
                             }
 
@@ -1841,10 +1750,10 @@ export default function EditJobModal({
                           })}
 
                           {/* Display additional fields with costs */}
-                          {Object.keys(cleanedReq)
+                          {Object.keys(req)
                             .filter(key => key.endsWith('_cost'))
                             .map(costKey => {
-                              const rawValue = cleanedReq[costKey as keyof typeof cleanedReq];
+                              const rawValue = req[costKey as keyof typeof req];
                               let costValue = 0;
                               if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
                                 const parsed = parseFloat(String(rawValue));
@@ -1854,7 +1763,7 @@ export default function EditJobModal({
 
                               // Get the base field name (remove _cost suffix)
                               const baseFieldName = costKey.replace('_cost', '');
-                              const baseFieldValue = cleanedReq[baseFieldName];
+                              const baseFieldValue = req[baseFieldName];
                               
                               // Only show cost if the base field is valid/selected
                               if (!isFieldValueValid(baseFieldValue)) {
@@ -1908,17 +1817,17 @@ export default function EditJobModal({
                             })}
 
                           {/* Display dynamic fields not in processConfig (e.g., boolean fields from machine variables) */}
-                          {Object.keys(cleanedReq)
+                          {Object.keys(req)
                             .filter(key => {
                               // Exclude fields already shown in processConfig
                               const isInProcessConfig = processConfig?.fields.some(f => f.name === key);
                               // Exclude system fields
                               const isSystemField = key === "process_type" || key === "price_per_m" || key === "id" || key.endsWith('_cost');
                               // Only show if field has a valid value
-                              return !isInProcessConfig && !isSystemField && isFieldValueValid(cleanedReq[key]);
+                              return !isInProcessConfig && !isSystemField && isFieldValueValid(req[key]);
                             })
                             .map(fieldKey => {
-                              const fieldValue = cleanedReq[fieldKey];
+                              const fieldValue = req[fieldKey];
                               
                               // Format the field name for display
                               const displayLabel = fieldKey
