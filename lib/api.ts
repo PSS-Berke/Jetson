@@ -454,7 +454,7 @@ const mapMachineTypeToAPI = (type?: string): string | undefined => {
 export const getMachines = async (
   status?: string,
   facilitiesId?: number,
-  type?: "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer",
+  type?: "inserter" | "folders" | "hp press" | "inkjetters" | "affixers",
 ): Promise<Machine[]> => {
   // Build query parameters - API expects GET with query params
   const params = new URLSearchParams();

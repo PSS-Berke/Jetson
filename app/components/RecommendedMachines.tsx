@@ -39,7 +39,17 @@ export default function RecommendedMachines({
       setMatches([]);
       return;
     }
-
+    const typeMap = {
+      "inserter": ["Insert", "Sort", "Data", "9-12 in+", "13+ in+"],
+      "folders": ["Fold"],
+      "hp_press": ["HP"],
+      "inkjetters": ["Laser", "Ink jet"],
+      "affixers": ["Label/Apply", "Affix with Glue", "Affix label+", "Labeling"]
+    }
+    const machineType = Object.keys(typeMap).find(key => 
+      typeMap[key as keyof typeof typeMap].includes(processType)
+      || "test"
+    )
     const loadMatches = async () => {
       setLoading(true);
       setError(null);
@@ -49,7 +59,7 @@ export default function RecommendedMachines({
         // Fetch all machines - wrap in try-catch to handle API errors
         let allMachines: Machine[] = [];
         try {
-          allMachines = await getMachines();
+          allMachines = await getMachines(undefined, undefined, machineType);
 
           // Filter out machines with invalid process_type_key
           allMachines = allMachines.filter(m => {
