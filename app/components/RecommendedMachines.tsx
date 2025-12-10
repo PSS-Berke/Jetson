@@ -42,14 +42,13 @@ export default function RecommendedMachines({
     const typeMap = {
       "inserter": ["Insert", "Sort", "Data", "9-12 in+", "13+ in+"],
       "folders": ["Fold"],
-      "hp_press": ["HP"],
+      "hp press": ["HP"],
       "inkjetters": ["Laser", "Ink jet"],
       "affixers": ["Label/Apply", "Affix with Glue", "Affix label+", "Labeling"]
     }
-    const machineType = Object.keys(typeMap).find(key => 
+    const machineType = (Object.keys(typeMap).find(key =>
       typeMap[key as keyof typeof typeMap].includes(processType)
-      || "test"
-    )
+    ) || "inserter") as "inserter" | "folders" | "hp press" | "inkjetters" | "affixers"
     const loadMatches = async () => {
       setLoading(true);
       setError(null);
