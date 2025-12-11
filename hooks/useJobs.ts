@@ -173,7 +173,25 @@ export const parseJob = (job: Job): ParsedJob => {
         );
         parsedClient = { id: job.clients_id || 0, name: "Unknown" };
       } else if (typeof job.client === "string") {
-        parsedClient = JSON.parse(job.client);
+        const clientString = job.client.trim();
+
+        // If the string looks like JSON, try parsing; otherwise treat it as the name
+        if (clientString.startsWith("{") || clientString.startsWith("[")) {
+          const parsed = JSON.parse(clientString);
+          if (parsed && typeof parsed === "object" && "name" in parsed) {
+            parsedClient = {
+              id: (parsed as any).id ?? job.clients_id ?? 0,
+              name: (parsed as any).name ?? "Unknown",
+            };
+          } else if (typeof parsed === "string") {
+            parsedClient = { id: job.clients_id || 0, name: parsed };
+          } else {
+            parsedClient = { id: job.clients_id || 0, name: "Unknown" };
+          }
+        } else {
+          // Plain string from API (e.g., "DISCOVER")
+          parsedClient = { id: job.clients_id || 0, name: clientString };
+        }
       } else {
         parsedClient = job.client as { id: number; name: string };
       }

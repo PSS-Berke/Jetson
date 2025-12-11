@@ -106,10 +106,8 @@ export default function EditJobModal({
   // Initialize form with job data when modal opens
   useEffect(() => {
     if (isOpen && job) {
-      console.log("EditJobModal - Initializing with job:", job);
-      console.log("EditJobModal - Client data:", job.client);
 
-      // Parse requirements if it's a JSON string or already an array
+
       let parsedRequirements: Requirement[];
       try {
         if (typeof job.requirements === "string") {
@@ -124,9 +122,6 @@ export default function EditJobModal({
               process_type: req.process_type || "",
               ...rest,
             };
-            console.log('[EditJobModal Init] Parsed requirement:', requirement);
-            console.log('[EditJobModal Init] All keys in requirement:', Object.keys(requirement));
-            console.log('[EditJobModal Init] Cost keys found:', Object.keys(requirement).filter(key => key.endsWith('_cost')));
             return requirement;
           });
         } else {
@@ -204,7 +199,6 @@ export default function EditJobModal({
           return cleaned;
         });
         
-        console.log('[EditJobModal Init] Final parsedRequirements (cleaned):', parsedRequirements);
       } catch (error) {
         console.error("Failed to parse requirements:", error);
         parsedRequirements = [{ process_type: "", price_per_m: "" }];
@@ -281,6 +275,57 @@ export default function EditJobModal({
         facilitiesId,
       );
 
+      // Normalize machine ids so we never try to render raw machine objects
+      const normalizeMachineIds = (
+        machinesList: unknown,
+        machinesIdField: unknown,
+      ): number[] => {
+        const machineIds = new Set<number>();
+
+        const processEntries = (input: unknown) => {
+          if (Array.isArray(input)) {
+            input.forEach((item) => {
+              if (typeof item === "number") {
+                machineIds.add(item);
+                return;
+              }
+
+              if (
+                item &&
+                typeof item === "object" &&
+                "id" in item &&
+                typeof (item as { id?: unknown }).id === "number"
+              ) {
+                machineIds.add((item as { id: number }).id);
+              }
+            });
+          }
+        };
+
+        processEntries(machinesList);
+
+        if (typeof machinesIdField === "string") {
+          try {
+            const parsed = JSON.parse(machinesIdField);
+            processEntries(parsed);
+          } catch (error) {
+            console.warn(
+              "EditJobModal - unable to parse machines_id string",
+              error,
+            );
+          }
+        } else {
+          processEntries(machinesIdField);
+        }
+
+        return Array.from(machineIds);
+      };
+
+      const normalizedMachineIds = normalizeMachineIds(
+        job.machines,
+        (job as typeof job & { machines_id?: unknown }).machines_id,
+      );
+
       setFormData({
         job_number: toStringValue(job.job_number),
         clients_id: clientId,
@@ -297,7 +342,7 @@ export default function EditJobModal({
         due_date: formatDate(job.due_date),
         service_type: job.service_type || "insert",
         pockets: "2", // Default value - pockets are defined in requirements
-        machines_id: job.machines?.map((m) => m.id) || [],
+        machines_id: normalizedMachineIds,
         requirements: parsedRequirements,
         weekly_split: weeklySplit,
         locked_weeks: lockedWeeks,
