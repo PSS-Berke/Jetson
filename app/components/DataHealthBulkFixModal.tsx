@@ -4,7 +4,6 @@ import React, { useEffect, useState, useMemo } from "react";
 import {
   getJobsByHealthIssue,
   bulkUpdateJobsWithProgress,
-  batchCreateJobCostEntries,
   type Job,
   type DataHealthIssueType,
 } from "@/lib/api";
@@ -486,11 +485,7 @@ export default function DataHealthBulkFixModal({
     setSavingJobIds((prev) => new Set(prev).add(jobId));
 
     try {
-      await updateJob(jobId, {
-        requirements: JSON.stringify(requirements),
-      });
-
-      // Calculate the total cost from the saved requirements
+      // Calculate the total cost from the requirements
       const totalCost = requirements.reduce((sum, req) => {
         const baseCost = parseFloat(String(req.price_per_m || "0")) || 0;
         let serviceTotalCost = baseCost;
@@ -502,16 +497,32 @@ export default function DataHealthBulkFixModal({
         return sum + serviceTotalCost;
       }, 0);
 
-      // Update the local jobs array with new requirements
+      // Update job with both requirements and actual_cost_per_m
+      const updateData: Partial<Job> = {
+        requirements: JSON.stringify(requirements),
+      };
+      
+      // Include actual_cost_per_m if we have a valid cost
+      if (totalCost > 0) {
+        updateData.actual_cost_per_m = totalCost;
+      }
+
+      await updateJob(jobId, updateData);
+
+      // Update the local jobs array with new requirements and actual_cost_per_m
       setJobs((prev) =>
         prev.map((job) =>
           job.id === jobId
-            ? { ...job, requirements: JSON.stringify(requirements) }
+            ? { 
+                ...job, 
+                requirements: JSON.stringify(requirements),
+                actual_cost_per_m: totalCost > 0 ? totalCost : job.actual_cost_per_m,
+              }
             : job
         )
       );
 
-      // Update the Cost/M field with the calculated total
+      // Update the Cost/M field in editedJobs with the calculated total
       if (totalCost > 0) {
         setEditedJobs((prev) => {
           const newMap = new Map(prev);
@@ -605,11 +616,12 @@ export default function DataHealthBulkFixModal({
     setError(null);
 
     try {
-      // Handle cost entries differently - create job_cost_entry records
+      // Handle cost entries - update actual_cost_per_m field on jobs
       if (isCostIssue) {
-        // 1. First, update job requirements if service prices were edited
-        const jobRequirementUpdates: Array<{ id: number; data: Partial<Job> }> = [];
+        // Build a map of all job updates (combining requirements and actual_cost_per_m)
+        const jobUpdatesMap = new Map<number, Partial<Job>>();
 
+        // 1. Add requirement updates if service prices were edited
         for (const [jobId, serviceEdits] of editedServices.entries()) {
           if (serviceEdits.size > 0) {
             const job = jobs.find((j) => j.id === jobId);
@@ -625,42 +637,54 @@ export default function DataHealthBulkFixModal({
               }
 
               if (hasChanges) {
-                jobRequirementUpdates.push({
-                  id: jobId,
-                  data: { requirements: JSON.stringify(requirements) } as Partial<Job>,
+                jobUpdatesMap.set(jobId, {
+                  requirements: JSON.stringify(requirements),
                 });
               }
             }
           }
         }
 
-        // Update jobs with edited requirements
-        if (jobRequirementUpdates.length > 0) {
-          await bulkUpdateJobsWithProgress(jobRequirementUpdates, (current, total) => {
-            setSaveProgress({ current, total: total + validEdits.length });
-          });
+        // 2. Add actual_cost_per_m updates for jobs with valid cost values
+        for (const [jobId, edits] of validEdits) {
+          if (edits.actual_cost_per_m !== null && edits.actual_cost_per_m !== undefined) {
+            const existing = jobUpdatesMap.get(jobId) || {};
+            jobUpdatesMap.set(jobId, {
+              ...existing,
+              actual_cost_per_m: edits.actual_cost_per_m,
+            });
+          }
         }
 
-        // 2. Create cost entries for jobs with valid cost values
-        const costEntries = validEdits.map(([jobId, edits]) => ({
-          job: jobId,
-          date: Date.now(),
-          actual_cost_per_m: edits.actual_cost_per_m!,
-          facilities_id: facilitiesId || undefined,
+        // Convert map to array format for bulkUpdateJobsWithProgress
+        const updates = Array.from(jobUpdatesMap.entries()).map(([id, data]) => ({
+          id,
+          data,
         }));
 
-        const createdEntries = await batchCreateJobCostEntries(costEntries);
+        if (updates.length === 0) {
+          setError("No valid changes to save");
+          setIsSaving(false);
+          return;
+        }
 
-        setSaveResult({
-          success: createdEntries.length + jobRequirementUpdates.length,
-          failures: [],
+        // Update all jobs with both requirements and actual_cost_per_m
+        const result = await bulkUpdateJobsWithProgress(updates, (current, total) => {
+          setSaveProgress({ current, total });
         });
 
-        // All successful - refresh and close after a short delay
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 1500);
+        setSaveResult({
+          success: result.success.length,
+          failures: result.failures,
+        });
+
+        if (result.failures.length === 0) {
+          // All successful - refresh and close after a short delay
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 1500);
+        }
       } else {
         // Handle date updates - update job records
         const updates = validEdits.map(([jobId, edits]) => ({

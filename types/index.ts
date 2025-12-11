@@ -222,6 +222,7 @@ export interface Job {
   daily_split?: number[][]; // 2D array: weeks x days (Mon-Sun)
   weekly_split?: number[]; // Array of quantities per week (used in frontend forms)
   locked_weeks?: boolean[]; // Array of booleans indicating which weeks are locked
+  actual_cost_per_m?: number | null; // Actual cost per thousand (replaces job_cost_entry table)
 }
 
 /**

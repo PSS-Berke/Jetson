@@ -1130,6 +1130,7 @@ export interface DataHealth {
   missing_due_dates: number;
   missing_start_date: number;
   start_is_after_due: number;
+  missing_price_per_m: number;
   total_issues: number;
   total_records: number;
   healthy_percentage: string;
@@ -1165,22 +1166,25 @@ export type DataHealthIssueType =
 export const getJobsMissingCostEntries = async (
   facilitiesId?: number | null,
 ): Promise<Job[]> => {
-  // Fetch all jobs and all cost entries in parallel
-  const [jobsResponse, costEntries] = await Promise.all([
-    getJobsV2({
-      facilities_id: facilitiesId || 0,
-      per_page: 10000,
-    }),
-    getJobCostEntries(facilitiesId || undefined),
-  ]);
+  const params = new URLSearchParams();
+  params.append("facilities_id", (facilitiesId ?? 0).toString());
 
-  const jobs = jobsResponse.items as unknown as Job[];
+  const endpoint = `/data_health/missing_price_per_m?${params.toString()}`;
 
-  // Create a set of job IDs that have cost entries
-  const jobsWithCostEntries = new Set(costEntries.map((entry) => entry.job));
+  const jobs = await apiFetch<Job[]>(
+    endpoint,
+    {
+      method: "GET",
+    },
+    "jobs",
+  );
 
-  // Return jobs that don't have any cost entries
-  return jobs.filter((job) => !jobsWithCostEntries.has(job.id));
+  // Return sorted by job number (numeric) for stable display
+  return jobs.sort((a, b) => {
+    const aNum = Number(a.job_number) || 0;
+    const bNum = Number(b.job_number) || 0;
+    return aNum - bNum;
+  });
 };
 
 // Get jobs filtered by data health issue type
@@ -1489,6 +1493,10 @@ export const batchCreateProductionEntries = async (
 // ============================================================================
 // Job Cost Entry API Functions
 // ============================================================================
+
+// These APIs should not be used anymore, there is a new field in the jobs table called "actual_cost_per_m" that is used to store the cost per thousand.
+// Use updateJob to update the actual_cost_per_m field.
+// Use response from jobs v2 API to get the actual_cost_per_m field
 
 // Get job cost entries with optional filters
 export const getJobCostEntries = async (

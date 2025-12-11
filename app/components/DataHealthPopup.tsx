@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { getDataHealth, getJobCostEntries, getJobsV2, type DataHealth, type DataHealthIssueType } from "@/lib/api";
+import { getDataHealth, type DataHealth, type DataHealthIssueType } from "@/lib/api";
 import {
   AlertCircle,
   CheckCircle2,
@@ -21,7 +21,6 @@ export default function DataHealthPopup({
   facilitiesId,
 }: DataHealthPopupProps) {
   const [dataHealth, setDataHealth] = useState<DataHealth | null>(null);
-  const [missingCostCount, setMissingCostCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -54,24 +53,8 @@ export default function DataHealthPopup({
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch data health and calculate missing cost count in parallel
-      const [health, jobsResponse, costEntries] = await Promise.all([
-        getDataHealth(facilitiesId || 0),
-        getJobsV2({
-          facilities_id: facilitiesId || 0,
-          per_page: 10000,
-        }),
-        getJobCostEntries(facilitiesId || undefined),
-      ]);
-
+      const health = await getDataHealth(facilitiesId || 0);
       setDataHealth(health);
-
-      // Calculate jobs missing cost entries
-      const jobsWithCostEntries = new Set(costEntries.map((entry) => entry.job));
-      const missingCount = jobsResponse.items.filter(
-        (job) => !jobsWithCostEntries.has(job.id)
-      ).length;
-      setMissingCostCount(missingCount);
     } catch (err) {
       console.error("[DataHealthPopup] Error fetching data health:", err);
       setError(
@@ -259,10 +242,10 @@ export default function DataHealthPopup({
 
                     {/* Missing Cost Per Thousand */}
                     <button
-                      onClick={() => handleTileClick("missing_cost_per_m", missingCostCount)}
-                      disabled={missingCostCount === 0}
+                      onClick={() => handleTileClick("missing_cost_per_m", dataHealth.missing_price_per_m)}
+                      disabled={dataHealth.missing_price_per_m === 0}
                       className={`bg-gray-50 rounded-lg p-3 text-left transition-all ${
-                        missingCostCount > 0
+                        dataHealth.missing_price_per_m > 0
                           ? "hover:bg-gray-100 hover:shadow-md cursor-pointer"
                           : "opacity-60 cursor-not-allowed"
                       }`}
@@ -274,7 +257,7 @@ export default function DataHealthPopup({
                         </span>
                       </div>
                       <div className="text-xl font-bold text-[var(--text-dark)]">
-                        {missingCostCount}
+                        {dataHealth.missing_price_per_m}
                       </div>
                     </button>
 
@@ -289,7 +272,7 @@ export default function DataHealthPopup({
                         {dataHealth.total_records}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {dataHealth.total_issues + missingCostCount} issues
+                        {dataHealth.total_issues} issues
                       </div>
                     </div>
                   </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getDataHealth, type DataHealth } from "@/lib/api";
-import { AlertCircle, CheckCircle2, XCircle, Calendar, CalendarX } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, Calendar, CalendarX, DollarSign } from "lucide-react";
 
 interface DataHealthCardProps {
   facilitiesId: number | null;
@@ -51,7 +51,8 @@ export default function DataHealthCard({ facilitiesId }: DataHealthCardProps) {
     return null;
   }
 
-  const healthyPercentage = parseFloat(dataHealth.healthy_percentage);
+  const parsedHealthy = parseFloat(dataHealth.healthy_percentage);
+  const healthyPercentage = Number.isFinite(parsedHealthy) ? parsedHealthy : 0;
   const isHealthy = healthyPercentage >= 80;
   const isWarning = healthyPercentage >= 60 && healthyPercentage < 80;
   const isCritical = healthyPercentage < 60;
@@ -64,25 +65,25 @@ export default function DataHealthCard({ facilitiesId }: DataHealthCardProps) {
           {isHealthy && (
             <div className="flex items-center gap-2 text-green-600">
               <CheckCircle2 className="w-5 h-5" />
-              <span className="font-medium">{dataHealth.healthy_percentage}%</span>
+              <span className="font-medium">{healthyPercentage.toFixed(2)}%</span>
             </div>
           )}
           {isWarning && (
             <div className="flex items-center gap-2 text-yellow-600">
               <AlertCircle className="w-5 h-5" />
-              <span className="font-medium">{dataHealth.healthy_percentage}%</span>
+              <span className="font-medium">{healthyPercentage.toFixed(2)}%</span>
             </div>
           )}
           {isCritical && (
             <div className="flex items-center gap-2 text-red-600">
               <XCircle className="w-5 h-5" />
-              <span className="font-medium">{dataHealth.healthy_percentage}%</span>
+              <span className="font-medium">{healthyPercentage.toFixed(2)}%</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <CalendarX className="w-4 h-4 text-gray-600" />
@@ -105,6 +106,16 @@ export default function DataHealthCard({ facilitiesId }: DataHealthCardProps) {
 
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
+            <DollarSign className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Missing Price per M</span>
+          </div>
+          <div className="text-2xl font-bold text-[var(--text-dark)]">
+            {dataHealth.missing_price_per_m}
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4 text-orange-600" />
             <span className="text-sm font-medium text-gray-700">Start After Due</span>
           </div>
@@ -122,6 +133,15 @@ export default function DataHealthCard({ facilitiesId }: DataHealthCardProps) {
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {dataHealth.total_issues} total issues
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-medium text-gray-700">Total Issues</span>
+          </div>
+          <div className="text-2xl font-bold text-[var(--text-dark)]">
+            {dataHealth.total_issues}
           </div>
         </div>
       </div>
