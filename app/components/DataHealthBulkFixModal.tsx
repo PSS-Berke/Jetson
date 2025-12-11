@@ -873,6 +873,7 @@ export default function DataHealthBulkFixModal({
                         placeholder="0.00"
                         value={bulkCost}
                         onChange={(e) => setBulkCost(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="px-3 py-1.5 border border-blue-300 rounded-lg text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <button
@@ -995,6 +996,7 @@ export default function DataHealthBulkFixModal({
                                     onChange={(e) =>
                                       handleCostChange(job.id, e.target.value)
                                     }
+                                    onWheel={(e) => e.currentTarget.blur()}
                                     className={`px-2 py-1 border rounded text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                       !isValid
                                         ? "border-red-300 bg-red-50"
