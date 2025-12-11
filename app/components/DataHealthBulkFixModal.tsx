@@ -618,6 +618,10 @@ export default function DataHealthBulkFixModal({
       const sanitizedRequirements = sanitizeRequirements(requirements);
       const totalCost = calculateTotalCostFromRequirements(sanitizedRequirements);
 
+      // Get the job to access quantity and add_on_charges for total_billing calculation
+      const job = jobs.find((j) => j.id === jobId);
+      if (!job) return;
+
       // Update job with both requirements and actual_cost_per_m
       const updateData: Partial<Job> = {
         requirements: JSON.stringify(sanitizedRequirements),
@@ -626,21 +630,38 @@ export default function DataHealthBulkFixModal({
       // Include actual_cost_per_m if we have a valid cost
       if (totalCost > 0) {
         updateData.actual_cost_per_m = totalCost;
+        
+        // Calculate total_billing from quantity and actual_cost_per_m
+        const quantity = job.quantity || 0;
+        const addOnCharges = parseFloat(job.add_on_charges || "0") || 0;
+        const calculatedTotalBilling = (quantity / 1000) * totalCost + addOnCharges;
+        updateData.total_billing = calculatedTotalBilling.toFixed(2);
       }
 
       await updateJob(jobId, updateData);
 
-      // Update the local jobs array with new requirements and actual_cost_per_m
+      // Update the local jobs array with new requirements, actual_cost_per_m, and total_billing
       setJobs((prev) =>
-        prev.map((job) =>
-          job.id === jobId
-            ? { 
-                ...job, 
-                requirements: JSON.stringify(sanitizedRequirements),
-                actual_cost_per_m: totalCost > 0 ? totalCost : job.actual_cost_per_m,
-              }
-            : job
-        )
+        prev.map((job) => {
+          if (job.id === jobId) {
+            const updatedJob = { 
+              ...job, 
+              requirements: JSON.stringify(sanitizedRequirements),
+              actual_cost_per_m: totalCost > 0 ? totalCost : job.actual_cost_per_m,
+            };
+            
+            // Update total_billing if we have a valid cost
+            if (totalCost > 0) {
+              const quantity = job.quantity || 0;
+              const addOnCharges = parseFloat(job.add_on_charges || "0") || 0;
+              const calculatedTotalBilling = (quantity / 1000) * totalCost + addOnCharges;
+              updatedJob.total_billing = calculatedTotalBilling.toFixed(2);
+            }
+            
+            return updatedJob;
+          }
+          return job;
+        })
       );
 
       // Update the Cost/M field in editedJobs with the calculated total
@@ -782,12 +803,25 @@ export default function DataHealthBulkFixModal({
         }
 
         // 3. Add actual_cost_per_m updates for jobs with valid cost values
+        // Also calculate and include total_billing
         for (const [jobId, edits] of validEdits) {
           if (edits.actual_cost_per_m !== null && edits.actual_cost_per_m !== undefined) {
             const existing = jobUpdatesMap.get(jobId) || {};
+            const job = jobs.find((j) => j.id === jobId);
+            
+            // Calculate total_billing from quantity and actual_cost_per_m
+            let totalBilling: string | undefined;
+            if (job) {
+              const quantity = job.quantity || 0;
+              const addOnCharges = parseFloat(job.add_on_charges || "0") || 0;
+              const calculatedTotalBilling = (quantity / 1000) * edits.actual_cost_per_m + addOnCharges;
+              totalBilling = calculatedTotalBilling.toFixed(2);
+            }
+            
             jobUpdatesMap.set(jobId, {
               ...existing,
               actual_cost_per_m: edits.actual_cost_per_m,
+              ...(totalBilling !== undefined && { total_billing: totalBilling }),
             });
           }
         }
