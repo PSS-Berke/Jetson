@@ -2,7 +2,7 @@
 
 import { useRef, useLayoutEffect, useState } from "react";
 
-export type Granularity = "weekly" | "monthly" | "quarterly";
+export type Granularity = "week" | "month" | "quarter";
 
 interface GranularityToggleProps {
   currentGranularity: Granularity;
@@ -10,9 +10,9 @@ interface GranularityToggleProps {
 }
 
 const granularities: { value: Granularity; label: string }[] = [
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Month" },
-  { value: "quarterly", label: "Quarterly" },
+  { value: "week", label: "Weekly" },
+  { value: "month", label: "Monthly" },
+  { value: "quarter", label: "Quarterly" },
 ];
 
 export default function GranularityToggle({

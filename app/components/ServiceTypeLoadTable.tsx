@@ -4,9 +4,18 @@ import React, { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useServiceTypeLoad, type ServiceTypeGroup } from "@/hooks/useServiceTypeLoad";
 
+// Map toggle granularity to property name
+const granularityToProperty = (granularity: "week" | "month" | "quarter"): "weekly" | "monthly" | "quarterly" => {
+  switch (granularity) {
+    case "week": return "weekly";
+    case "month": return "monthly";
+    case "quarter": return "quarterly";
+  }
+};
+
 interface ServiceTypeLoadTableProps {
   facilitiesId: number | null;
-  granularity: "weekly" | "monthly" | "quarterly";
+  granularity: "week" | "month" | "quarter";
 }
 
 function formatNumber(num: number): string {
@@ -99,7 +108,7 @@ export default function ServiceTypeLoadTable({
         <tbody>
           {groupedData.map((group) => {
             const isExpanded = expandedServiceTypes.has(group.serviceType);
-            const timeDataKey = granularity;
+            const timeDataKey = granularityToProperty(granularity);
 
             return (
               <React.Fragment key={group.serviceType}>

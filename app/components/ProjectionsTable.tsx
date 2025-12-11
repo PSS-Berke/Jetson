@@ -18,8 +18,18 @@ import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
-import type { CellIdentifier } from "@/types";
+import type { CellIdentifier, CellGranularity } from "@/types";
 import { useCellNotes } from "@/hooks/useCellNotes";
+
+// Convert toggle granularity to cell granularity
+const toCellGranularity = (granularity: "week" | "month" | "quarter" | undefined): CellGranularity => {
+  switch (granularity) {
+    case "week": return "weekly";
+    case "month": return "monthly";
+    case "quarter": return "quarterly";
+    default: return "weekly";
+  }
+};
 import {
   useColumnSettings,
   ColumnSettingsPopover,
@@ -49,7 +59,7 @@ interface ProjectionsTableProps {
   showExpandedProcesses?: boolean;
   showNotes?: boolean;
   onShowNotesChange?: (show: boolean) => void;
-  granularity?: "weekly" | "monthly" | "quarterly"; // NEW: for cell-level notes
+  granularity?: "week" | "month" | "quarter"; // NEW: for cell-level notes
   fullFilteredProjections?: JobProjection[]; // NEW: Full filtered data for breakdown calculations
 }
 
@@ -100,7 +110,7 @@ const ProjectionTableRow = memo(
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
-    granularity?: "weekly" | "monthly" | "quarterly";
+    granularity?: "week" | "month" | "quarter";
     cellNotesMap?: Map<string, JobNote[]>;
     isColumnVisible: (key: string) => boolean;
     orderedColumnKeys: string[];
@@ -267,7 +277,7 @@ const ProjectionTableRow = memo(
                   periodLabel: range.label,
                   periodStart: range.startDate.getTime(),
                   periodEnd: range.endDate.getTime(),
-                  granularity: granularity || "weekly",
+                  granularity: toCellGranularity(granularity),
                 });
               }}
             >
@@ -489,7 +499,7 @@ const ProcessProjectionTableRow = memo(
     onTextChange?: (text: string) => void;
     isSavingNote?: boolean;
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
-    granularity?: "weekly" | "monthly" | "quarterly";
+    granularity?: "week" | "month" | "quarter";
     cellNotesMap?: Map<string, JobNote[]>;
     isColumnVisible: (key: string) => boolean;
     orderedColumnKeys: string[];
@@ -655,7 +665,7 @@ const ProcessProjectionTableRow = memo(
                   periodLabel: range.label,
                   periodStart: range.startDate.getTime(),
                   periodEnd: range.endDate.getTime(),
-                  granularity: granularity || "weekly",
+                  granularity: toCellGranularity(granularity),
                 });
               }}
             >
@@ -1156,7 +1166,7 @@ export default function ProjectionsTable({
   showExpandedProcesses = true,
   showNotes: showNotesProp = false,
   onShowNotesChange,
-  granularity = "weekly",
+  granularity = "week",
   fullFilteredProjections,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
@@ -2205,6 +2215,8 @@ export default function ProjectionsTable({
                         expandCollapseAllButton={expandCollapseAllButton}
                         onCategoryClick={handleCategoryClick}
                         isCategoryFilterActive={!!isSummaryFilterActive}
+                        orderedColumnKeys={orderedColumnKeys}
+                        isColumnVisible={isColumnVisible}
                       />
                       {/* Render breakdown rows for all fields if expanded */}
                       {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
@@ -2240,6 +2252,8 @@ export default function ProjectionsTable({
                                 showNotes={showNotes}
                                 onCategoryClick={handleCategoryClick}
                                 isCategoryFilterActive={isBreakdownFilterActive}
+                                orderedColumnKeys={orderedColumnKeys}
+                                isColumnVisible={isColumnVisible}
                               />
                             );
                           })}

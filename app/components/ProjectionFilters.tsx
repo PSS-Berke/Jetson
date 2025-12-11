@@ -24,6 +24,8 @@ interface ProjectionFiltersProps {
   jobs: ParsedJob[];
   startDate: Date;
   onStartDateChange: (date: Date) => void;
+  selectedClients: number[];
+  onClientsChange: (clients: number[]) => void;
   selectedServiceTypes: string[];
   onServiceTypesChange: (types: string[]) => void;
   searchQuery: string;
@@ -58,6 +60,8 @@ export default function ProjectionFilters({
   jobs,
   startDate,
   onStartDateChange,
+  selectedClients,
+  onClientsChange,
   selectedServiceTypes,
   onServiceTypesChange,
   searchQuery,
@@ -87,12 +91,20 @@ export default function ProjectionFilters({
   onDynamicFieldFilterLogicChange,
   facilitiesId,
 }: ProjectionFiltersProps) {
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (
+        clientDropdownRef.current &&
+        !clientDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsClientDropdownOpen(false);
+      }
       if (
         serviceDropdownRef.current &&
         !serviceDropdownRef.current.contains(event.target as Node)
@@ -106,6 +118,29 @@ export default function ProjectionFilters({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Extract unique clients from jobs
+  const clients = useMemo(() => {
+    const clientMap = new Map<number, { id: number; name: string }>();
+    jobs.forEach((job) => {
+      if (job.client) {
+        clientMap.set(job.client.id, job.client);
+      }
+    });
+    return Array.from(clientMap.values()).sort((a, b) => {
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      return nameA.localeCompare(nameB);
+    });
+  }, [jobs]);
+
+  const handleClientToggle = (clientId: number) => {
+    if (selectedClients.includes(clientId)) {
+      onClientsChange(selectedClients.filter((id) => id !== clientId));
+    } else {
+      onClientsChange([...selectedClients, clientId]);
+    }
+  };
 
   // Get process types from configuration (same as Dynamic Field filter)
   const serviceTypes = useMemo(() => {
@@ -142,13 +177,13 @@ export default function ProjectionFilters({
   const handlePrevious = () => {
     const newDate = new Date(startDate);
     switch (granularity) {
-      case "monthly":
+      case "month":
         newDate.setMonth(newDate.getMonth() - 1);
         break;
-      case "quarterly":
+      case "quarter":
         newDate.setMonth(newDate.getMonth() - 3);
         break;
-      case "weekly":
+      case "week":
       default:
         newDate.setDate(newDate.getDate() - 7);
         break;
@@ -159,13 +194,13 @@ export default function ProjectionFilters({
   const handleNext = () => {
     const newDate = new Date(startDate);
     switch (granularity) {
-      case "monthly":
+      case "month":
         newDate.setMonth(newDate.getMonth() + 1);
         break;
-      case "quarterly":
+      case "quarter":
         newDate.setMonth(newDate.getMonth() + 3);
         break;
-      case "weekly":
+      case "week":
       default:
         newDate.setDate(newDate.getDate() + 7);
         break;
@@ -175,13 +210,13 @@ export default function ProjectionFilters({
 
   const handleToday = () => {
     switch (granularity) {
-      case "monthly":
+      case "month":
         onStartDateChange(startOfMonth(new Date()));
         break;
-      case "quarterly":
+      case "quarter":
         onStartDateChange(startOfQuarter(new Date()));
         break;
-      case "weekly":
+      case "week":
       default:
         onStartDateChange(getStartOfWeek());
         break;
@@ -193,13 +228,13 @@ export default function ProjectionFilters({
     const endDate = new Date(startDate);
     let days = 0;
     switch (granularity) {
-      case "monthly":
+      case "month":
         days = 90; // ~3 months
         break;
-      case "quarterly":
+      case "quarter":
         days = 365; // ~4 quarters
         break;
-      case "weekly":
+      case "week":
       default:
         days = 34; // 5 weeks
         break;
@@ -215,11 +250,11 @@ export default function ProjectionFilters({
 
   const getPeriodLabel = () => {
     switch (granularity) {
-      case "monthly":
+      case "month":
         return "Month Range";
-      case "quarterly":
+      case "quarter":
         return "Quarter Range";
-      case "weekly":
+      case "week":
       default:
         return "Week Range";
     }
@@ -227,11 +262,11 @@ export default function ProjectionFilters({
 
   const getTodayButtonLabel = () => {
     switch (granularity) {
-      case "monthly":
+      case "month":
         return "This Month";
-      case "quarterly":
+      case "quarter":
         return "This Quarter";
-      case "weekly":
+      case "week":
       default:
         return "This Week";
     }
@@ -307,70 +342,136 @@ export default function ProjectionFilters({
             />
           </div>
 
+          {/* Clients Filter - Advanced mode only on first row */}
+          {filterViewMode === "advanced" && (
+            <div className="relative" ref={clientDropdownRef}>
+              <button
+                onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                className="px-4 py-2 bg-white border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--text-dark)] hover:bg-gray-50 transition-colors flex items-center gap-2"
+              >
+                Clients
+                {selectedClients.length > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                    {selectedClients.length}
+                  </span>
+                )}
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {isClientDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 z-50 max-h-64 overflow-y-auto">
+                  {clients.length === 0 ? (
+                    <div className="px-4 py-2 text-sm text-[var(--text-light)]">
+                      No clients found
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => onClientsChange([])}
+                        className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                      <div className="border-t border-[var(--border)] my-1"></div>
+                      {clients.map((client) => (
+                        <label
+                          key={client.id}
+                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedClients.includes(client.id)}
+                            onChange={() => handleClientToggle(client.id)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-[var(--text-dark)]">
+                            {client.name}
+                          </span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Process Type Filter - Advanced mode only on first row */}
           {filterViewMode === "advanced" && (
             <div className="relative" ref={serviceDropdownRef}>
-            <button
-              onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
-              className="px-4 py-2 bg-white border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--text-dark)] hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              Process Types
-              {selectedServiceTypes.length > 0 && (
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                  {selectedServiceTypes.length}
-                </span>
-              )}
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <button
+                onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
+                className="px-4 py-2 bg-white border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--text-dark)] hover:bg-gray-50 transition-colors flex items-center gap-2"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {isServiceDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 z-50 max-h-64 overflow-y-auto">
-                {serviceTypes.length === 0 ? (
-                  <div className="px-4 py-2 text-sm text-[var(--text-light)]">
-                    No process types found
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => onServiceTypesChange([])}
-                      className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors"
-                    >
-                      Clear All
-                    </button>
-                    <div className="border-t border-[var(--border)] my-1"></div>
-                    {serviceTypes.map((serviceType) => (
-                      <label
-                        key={serviceType}
-                        className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedServiceTypes.includes(serviceType)}
-                          onChange={() => handleServiceTypeToggle(serviceType)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-[var(--text-dark)]">
-                          {serviceType}
-                        </span>
-                      </label>
-                    ))}
-                  </>
+                Process Types
+                {selectedServiceTypes.length > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                    {selectedServiceTypes.length}
+                  </span>
                 )}
-              </div>
-            )}
-          </div>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {isServiceDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 z-50 max-h-64 overflow-y-auto">
+                  {serviceTypes.length === 0 ? (
+                    <div className="px-4 py-2 text-sm text-[var(--text-light)]">
+                      No process types found
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => onServiceTypesChange([])}
+                        className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                      <div className="border-t border-[var(--border)] my-1"></div>
+                      {serviceTypes.map((serviceType) => (
+                        <label
+                          key={serviceType}
+                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedServiceTypes.includes(serviceType)}
+                            onChange={() => handleServiceTypeToggle(serviceType)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-[var(--text-dark)]">
+                            {serviceType}
+                          </span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Date Range Selector - Only on first row in simple mode */}
@@ -385,7 +486,7 @@ export default function ProjectionFilters({
               <button
                 onClick={handlePrevious}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Previous ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+                aria-label={`Previous ${granularity === "week" ? "week" : granularity === "month" ? "month" : "quarter"}`}
               >
                 <svg
                   className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
@@ -408,7 +509,7 @@ export default function ProjectionFilters({
               <button
                 onClick={handleNext}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Next ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+                aria-label={`Next ${granularity === "week" ? "week" : granularity === "month" ? "month" : "quarter"}`}
               >
                 <svg
                   className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
@@ -442,7 +543,7 @@ export default function ProjectionFilters({
               <button
                 onClick={handlePrevious}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Previous ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+                aria-label={`Previous ${granularity === "week" ? "week" : granularity === "month" ? "month" : "quarter"}`}
               >
                 <svg
                   className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"
@@ -465,7 +566,7 @@ export default function ProjectionFilters({
               <button
                 onClick={handleNext}
                 className="p-1.5 sm:px-2 sm:py-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label={`Next ${granularity === "weekly" ? "week" : granularity === "monthly" ? "month" : "quarter"}`}
+                aria-label={`Next ${granularity === "week" ? "week" : granularity === "month" ? "month" : "quarter"}`}
               >
                 <svg
                   className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-dark)]"

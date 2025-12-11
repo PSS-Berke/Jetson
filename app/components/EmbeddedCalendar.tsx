@@ -25,7 +25,7 @@ interface EmbeddedCalendarProps {
   scheduleFilter?: "all" | "confirmed" | "soft";
   filterMode?: "and" | "or";
   height?: number;
-  viewType?: CalendarViewType | "quarterly";
+  viewType?: CalendarViewType | "quarter";
 }
 
 export default function EmbeddedCalendar({
@@ -57,7 +57,7 @@ export default function EmbeddedCalendar({
         return getMonthRange(currentDate); // Show full calendar month
       case "week":
         return getWeeklyViewRange(currentDate); // Fetch 5 weeks of data
-      case "quarterly":
+      case "quarter":
         return getQuarterlyViewRange(currentDate); // Fetch 4 quarters of data
       default:
         return getMonthRange(currentDate);
@@ -160,7 +160,7 @@ export default function EmbeddedCalendar({
           >
             <div className="text-[var(--text-light)]">Loading calendar...</div>
           </div>
-        ) : viewType === "quarterly" ? (
+        ) : viewType === "quarter" ? (
           <QuarterlyCalendarView
             jobs={filteredJobs}
             year={currentDate.getFullYear()}
