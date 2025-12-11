@@ -148,43 +148,77 @@ export default function DataHealthBulkFixModal({
     if (!isCostIssue) return;
 
     for (const [jobId, requirements] of editingRequirements.entries()) {
-      const sanitizedRequirements = sanitizeRequirements(requirements);
-      // Calculate total cost as SUM of all service costs (base price + additional costs)
+      // Calculate directly from requirements without sanitizing first
+      // This ensures we include all requirements even if they're partially filled
+      // We'll sanitize only for the final calculation
       let totalCost = 0;
 
-      console.log(`[DataHealthBulkFixModal] Calculating cost for job ${jobId}, ${sanitizedRequirements.length} services:`);
+      console.log(`[DataHealthBulkFixModal] Calculating cost for job ${jobId}, ${requirements.length} services:`);
 
-      for (let i = 0; i < sanitizedRequirements.length; i++) {
-        const req = sanitizedRequirements[i];
-        const baseCost = parseFloat(String(req.price_per_m || "0")) || 0;
+      for (let i = 0; i < requirements.length; i++) {
+        const req = requirements[i];
+        // Log the full requirement object to debug
+        console.log(`  Service ${i + 1} full requirement object:`, JSON.stringify(req, null, 2));
+        
+        // Extract price_per_m directly from the requirement (before sanitization)
+        // Handle both string and number types, and also handle the string "undefined"
+        // Use hasOwnProperty to check if the property exists, default to empty string if missing
+        // Also support legacy/mistyped field `price_perm`
+        const pricePerMRaw = req.hasOwnProperty("price_per_m") ? req.price_per_m : "";
+        const pricePerMFromLegacy = (req as any).price_perm;
+        const pricePerM =
+          pricePerMRaw !== undefined && pricePerMRaw !== null && pricePerMRaw !== ""
+            ? pricePerMRaw
+            : pricePerMFromLegacy !== undefined && pricePerMFromLegacy !== null
+            ? pricePerMFromLegacy
+            : "";
+        console.log(
+          `  Service ${i + 1} price_per_m raw value:`,
+          pricePerM,
+          `(type: ${typeof pricePerM}, has price_per_m: ${req.hasOwnProperty("price_per_m")}, has price_perm: ${req.hasOwnProperty("price_perm")})`
+        );
+        
+        // Check if pricePerM is valid (not undefined, null, empty string, or the string "undefined")
+        const isValidPrice = pricePerM !== undefined && 
+                            pricePerM !== null && 
+                            pricePerM !== "" && 
+                            String(pricePerM) !== "undefined" &&
+                            String(pricePerM).trim() !== "";
+        const baseCost = isValidPrice
+          ? parseFloat(String(pricePerM)) || 0
+          : 0;
         let serviceTotalCost = baseCost;
 
         // Add all _cost fields
         for (const [key, value] of Object.entries(req)) {
           if (key.endsWith("_cost") && key !== "price_per_m") {
-            const additionalCost = parseFloat(String(value || "0")) || 0;
+            const additionalCost = value !== undefined && value !== null && value !== ""
+              ? parseFloat(String(value)) || 0
+              : 0;
             serviceTotalCost += additionalCost;
             if (additionalCost > 0) {
-              console.log(`  Service ${i + 1} (${req.process_type}): ${key} = $${additionalCost}`);
+              console.log(`  Service ${i + 1} (${req.process_type || "unnamed"}): ${key} = $${additionalCost}`);
             }
           }
         }
 
-        console.log(`  Service ${i + 1} (${req.process_type}): price_per_m="${req.price_per_m}" → baseCost=$${baseCost}, serviceTotalCost=$${serviceTotalCost}`);
+        console.log(`  Service ${i + 1} (${req.process_type || "unnamed"}): price_per_m="${pricePerM}" → baseCost=$${baseCost}, serviceTotalCost=$${serviceTotalCost}`);
         totalCost += serviceTotalCost;
       }
 
       console.log(`  TOTAL COST for job ${jobId}: $${totalCost}`);
 
-      // Update if we have any cost (even 0 is valid if user clears it)
-      if (totalCost > 0) {
-        setEditedJobs((prev) => {
-          const newMap = new Map(prev);
-          const existing = newMap.get(jobId) || {};
-          newMap.set(jobId, { ...existing, actual_cost_per_m: totalCost });
-          return newMap;
-        });
-      }
+      // Always update the Cost/M field with the calculated total when editing inline requirements
+      // This ensures the input field displays the calculated value
+      setEditedJobs((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(jobId) || {};
+        // Update with calculated total (use 0 if totalCost is 0, but still update to show the calculation)
+        const newValue = totalCost;
+        console.log(`[DataHealthBulkFixModal] Updating editedJobs for job ${jobId}: actual_cost_per_m = ${newValue}`);
+        newMap.set(jobId, { ...existing, actual_cost_per_m: newValue });
+        return newMap;
+      });
     }
   }, [editingRequirements, isCostIssue]);
 
@@ -327,7 +361,22 @@ export default function DataHealthBulkFixModal({
         ? JSON.parse(job.requirements)
         : job.requirements;
       const requirements = Array.isArray(parsed) ? parsed : [];
-      return sanitizeRequirements(requirements);
+      // Ensure all requirements have price_per_m initialized (even if empty string)
+      // Also normalize legacy/mistyped field `price_perm` to `price_per_m`
+      const normalizedRequirements = requirements.map((req) => {
+        const hasPricePerM = req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "";
+        const fallbackPricePerM = (req as any).price_perm;
+        const price_per_m = hasPricePerM
+          ? req.price_per_m
+          : fallbackPricePerM !== undefined && fallbackPricePerM !== null
+          ? fallbackPricePerM
+          : "";
+        return {
+          ...req,
+          price_per_m,
+        };
+      });
+      return sanitizeRequirements(normalizedRequirements);
     } catch {
       return [];
     }
@@ -479,16 +528,56 @@ export default function DataHealthBulkFixModal({
     field: string,
     value: string | number | boolean
   ) => {
-    console.log(`[DataHealthBulkFixModal] handleInlineRequirementChange: job=${jobId}, serviceIndex=${requirementIndex}, field="${field}", value="${value}"`);
+    // Normalize the value - ensure undefined/null/string "undefined" becomes empty string for string fields
+    // This prevents "undefined" from being stored as a string
+    let normalizedValue: string | number | boolean = value;
+    
+    // Special handling for price_per_m - always ensure it's a string
+    if (field === "price_per_m") {
+      if (value === undefined || value === null || (typeof value === "string" && value === "undefined")) {
+        normalizedValue = "";
+      } else {
+        // Convert to string to ensure consistency
+        normalizedValue = String(value);
+      }
+    } else if (value === undefined || value === null || (typeof value === "string" && value === "undefined")) {
+      // For other string fields, use empty string
+      // For number fields, use 0
+      // For boolean fields, use false
+      if (typeof value === "string" && value === "undefined") {
+        normalizedValue = "";
+      } else if (typeof value === "number") {
+        normalizedValue = 0;
+      } else {
+        normalizedValue = false;
+      }
+    }
+    
+    console.log(`[DataHealthBulkFixModal] handleInlineRequirementChange: job=${jobId}, serviceIndex=${requirementIndex}, field="${field}", value="${value}" (type: ${typeof value}) → normalized="${normalizedValue}" (type: ${typeof normalizedValue})`);
     setEditingRequirements((prev) => {
       const newMap = new Map(prev);
       const requirements = [...(newMap.get(jobId) || [])];
       if (requirements[requirementIndex]) {
-        requirements[requirementIndex] = { ...requirements[requirementIndex], [field]: value };
+        // Create updated requirement - ensure process_type and price_per_m are always strings
+        const currentReq = requirements[requirementIndex];
+        const updatedRequirement = { 
+          ...currentReq,
+          process_type: currentReq.process_type || "",
+          // Always ensure price_per_m exists and is a string
+          price_per_m: field === "price_per_m" 
+            ? String(normalizedValue) 
+            : (currentReq.price_per_m !== undefined ? String(currentReq.price_per_m) : ""),
+          // Set the field that was changed
+          [field]: normalizedValue 
+        };
+        requirements[requirementIndex] = updatedRequirement;
+        console.log(`[DataHealthBulkFixModal] Updated requirement ${requirementIndex} for job ${jobId}:`, JSON.stringify(updatedRequirement, null, 2));
+        console.log(`[DataHealthBulkFixModal] price_per_m in updated requirement:`, updatedRequirement.price_per_m, `(type: ${typeof updatedRequirement.price_per_m})`);
       }
-      const sanitizedRequirements = sanitizeRequirements(requirements);
-      console.log(`[DataHealthBulkFixModal] Updated requirements for job ${jobId}:`, JSON.stringify(sanitizedRequirements, null, 2));
-      newMap.set(jobId, sanitizedRequirements);
+      // Don't sanitize during editing - preserve all requirements and fields
+      // Sanitization will happen when saving
+      console.log(`[DataHealthBulkFixModal] All requirements for job ${jobId}:`, JSON.stringify(requirements, null, 2));
+      newMap.set(jobId, requirements);
       return newMap;
     });
   };
