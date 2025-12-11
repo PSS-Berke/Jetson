@@ -1237,6 +1237,8 @@ export default function AddJobModal({
 
       const addOnCharges = parseFloat(String(formData.add_on_charges || "0")) || 0;
       const calculatedTotalBilling = calculatedRevenue + addOnCharges;
+      const actualPricePerM =
+        quantity > 0 ? calculatedTotalBilling / (quantity / 1000) : null;
 
       // Convert date strings to timestamps
       const startDateTimestamp: number | undefined = formData.start_date
@@ -1283,6 +1285,10 @@ export default function AddJobModal({
         csr: formData.csr || "",
         requirements: cleanedRequirements || [],
         total_billing: calculatedTotalBilling > 0 ? calculatedTotalBilling : null,
+        actual_cost_per_m:
+          actualPricePerM !== null && !Number.isNaN(actualPricePerM)
+            ? actualPricePerM
+            : null,
         facilities_id: formData.facilities_id,
         daily_split: dailySplit,
         sub_client_id: formData.sub_clients_id || 0,

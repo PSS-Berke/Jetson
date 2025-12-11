@@ -1325,13 +1325,7 @@ export const batchCreateJobs = async (
             },
             "jobs",
           );
-          console.log(`[batchCreateJobs] Created job response:`, {
-            id: createdJob.id,
-            job_number: createdJob.job_number,
-            clients_id: createdJob.clients_id,
-            client: createdJob.client,
-            sub_client: createdJob.sub_client,
-          });
+
           return createdJob;
         } catch (error) {
           console.error(`[batchCreateJobs] Failed to create job:`, {

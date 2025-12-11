@@ -148,13 +148,14 @@ export default function DataHealthBulkFixModal({
     if (!isCostIssue) return;
 
     for (const [jobId, requirements] of editingRequirements.entries()) {
+      const sanitizedRequirements = sanitizeRequirements(requirements);
       // Calculate total cost as SUM of all service costs (base price + additional costs)
       let totalCost = 0;
 
-      console.log(`[DataHealthBulkFixModal] Calculating cost for job ${jobId}, ${requirements.length} services:`);
+      console.log(`[DataHealthBulkFixModal] Calculating cost for job ${jobId}, ${sanitizedRequirements.length} services:`);
 
-      for (let i = 0; i < requirements.length; i++) {
-        const req = requirements[i];
+      for (let i = 0; i < sanitizedRequirements.length; i++) {
+        const req = sanitizedRequirements[i];
         const baseCost = parseFloat(String(req.price_per_m || "0")) || 0;
         let serviceTotalCost = baseCost;
 
@@ -196,7 +197,8 @@ export default function DataHealthBulkFixModal({
       if (!job.requirements) return [];
       try {
         const parsed = JSON.parse(job.requirements);
-        return Array.isArray(parsed) ? parsed : [];
+        const requirements = Array.isArray(parsed) ? parsed : [];
+        return sanitizeRequirements(requirements);
       } catch {
         return [];
       }
@@ -204,17 +206,7 @@ export default function DataHealthBulkFixModal({
 
     // Helper to calculate total cost inline
     const calcTotal = (requirements: JobRequirement[]): number => {
-      if (!requirements || requirements.length === 0) return 0;
-      return requirements.reduce((sum, req) => {
-        const baseCost = parseFloat(String(req.price_per_m || "0")) || 0;
-        let serviceTotalCost = baseCost;
-        for (const [key, value] of Object.entries(req)) {
-          if (key.endsWith("_cost") && key !== "price_per_m") {
-            serviceTotalCost += parseFloat(String(value || "0")) || 0;
-          }
-        }
-        return sum + serviceTotalCost;
-      }, 0);
+      return calculateTotalCostFromRequirements(requirements);
     };
 
     for (const jobId of expandedJobs) {
@@ -334,7 +326,8 @@ export default function DataHealthBulkFixModal({
       const parsed = typeof job.requirements === "string"
         ? JSON.parse(job.requirements)
         : job.requirements;
-      return Array.isArray(parsed) ? parsed : [];
+      const requirements = Array.isArray(parsed) ? parsed : [];
+      return sanitizeRequirements(requirements);
     } catch {
       return [];
     }
@@ -373,17 +366,62 @@ export default function DataHealthBulkFixModal({
     return requirement.price_per_m || "";
   };
 
+  // Determine if a requirement field has been deselected/cleared by the user
+  const isUnselectedValue = (value: unknown): boolean => {
+    if (value === undefined || value === null) return true;
+    if (typeof value === "boolean") return value === false;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed === "" || trimmed === "false";
+    }
+    return false;
+  };
+
+  // Strip unselected fields and orphaned _cost fields so we don't send them
+  const sanitizeRequirements = (requirements: JobRequirement[]): JobRequirement[] => {
+    return requirements.map((req) => {
+      const cleaned: JobRequirement = { process_type: req.process_type };
+      const retainedFields = new Set<string>();
+
+      if (!isUnselectedValue(req.price_per_m)) {
+        cleaned.price_per_m = req.price_per_m;
+      }
+
+      Object.entries(req).forEach(([key, value]) => {
+        if (key === "process_type" || key === "price_per_m" || key.endsWith("_cost")) return;
+        if (!isUnselectedValue(value)) {
+          cleaned[key] = value;
+          retainedFields.add(key);
+        }
+      });
+
+      Object.entries(req).forEach(([key, value]) => {
+        if (!key.endsWith("_cost")) return;
+        const baseField = key.replace(/_cost$/, "");
+        if (!retainedFields.has(baseField)) return;
+        if (!isUnselectedValue(value)) {
+          cleaned[key] = value;
+        }
+      });
+
+      return cleaned;
+    });
+  };
+
   // Extract all costs from a requirement (price_per_m + all _cost fields)
   const getRequirementCosts = (requirement: JobRequirement): {
     baseCost: number;
     additionalCosts: Array<{ name: string; cost: number }>;
     total: number;
   } => {
-    const baseCost = parseFloat(String(requirement.price_per_m || "0")) || 0;
+    const [sanitizedRequirement] = sanitizeRequirements([requirement]);
+    const req = sanitizedRequirement || { process_type: requirement.process_type };
+
+    const baseCost = parseFloat(String(req.price_per_m || "0")) || 0;
     const additionalCosts: Array<{ name: string; cost: number }> = [];
 
     // Find all _cost fields
-    for (const [key, value] of Object.entries(requirement)) {
+    for (const [key, value] of Object.entries(req)) {
       if (key.endsWith("_cost") && key !== "price_per_m") {
         const cost = parseFloat(String(value || "0")) || 0;
         if (cost > 0) {
@@ -402,10 +440,11 @@ export default function DataHealthBulkFixModal({
   // Calculate total cost from all requirements (for job-level Cost/M)
   // This is the SUM of all service costs (base price + additional costs for each service)
   const calculateTotalCostFromRequirements = (requirements: JobRequirement[]): number => {
-    if (!requirements || requirements.length === 0) return 0;
+    const sanitizedRequirements = sanitizeRequirements(requirements);
+    if (!sanitizedRequirements || sanitizedRequirements.length === 0) return 0;
 
     // Sum all service totals (each service total = base price + its additional costs)
-    return requirements.reduce((sum, req) => sum + getRequirementCosts(req).total, 0);
+    return sanitizedRequirements.reduce((sum, req) => sum + getRequirementCosts(req).total, 0);
   };
 
   // Start editing services inline for a job
@@ -447,8 +486,9 @@ export default function DataHealthBulkFixModal({
       if (requirements[requirementIndex]) {
         requirements[requirementIndex] = { ...requirements[requirementIndex], [field]: value };
       }
-      console.log(`[DataHealthBulkFixModal] Updated requirements for job ${jobId}:`, JSON.stringify(requirements, null, 2));
-      newMap.set(jobId, requirements);
+      const sanitizedRequirements = sanitizeRequirements(requirements);
+      console.log(`[DataHealthBulkFixModal] Updated requirements for job ${jobId}:`, JSON.stringify(sanitizedRequirements, null, 2));
+      newMap.set(jobId, sanitizedRequirements);
       return newMap;
     });
   };
@@ -486,20 +526,12 @@ export default function DataHealthBulkFixModal({
 
     try {
       // Calculate the total cost from the requirements
-      const totalCost = requirements.reduce((sum, req) => {
-        const baseCost = parseFloat(String(req.price_per_m || "0")) || 0;
-        let serviceTotalCost = baseCost;
-        for (const [key, value] of Object.entries(req)) {
-          if (key.endsWith("_cost") && key !== "price_per_m") {
-            serviceTotalCost += parseFloat(String(value || "0")) || 0;
-          }
-        }
-        return sum + serviceTotalCost;
-      }, 0);
+      const sanitizedRequirements = sanitizeRequirements(requirements);
+      const totalCost = calculateTotalCostFromRequirements(sanitizedRequirements);
 
       // Update job with both requirements and actual_cost_per_m
       const updateData: Partial<Job> = {
-        requirements: JSON.stringify(requirements),
+        requirements: JSON.stringify(sanitizedRequirements),
       };
       
       // Include actual_cost_per_m if we have a valid cost
@@ -515,7 +547,7 @@ export default function DataHealthBulkFixModal({
           job.id === jobId
             ? { 
                 ...job, 
-                requirements: JSON.stringify(requirements),
+                requirements: JSON.stringify(sanitizedRequirements),
                 actual_cost_per_m: totalCost > 0 ? totalCost : job.actual_cost_per_m,
               }
             : job
@@ -637,15 +669,30 @@ export default function DataHealthBulkFixModal({
               }
 
               if (hasChanges) {
+                const sanitizedRequirements = sanitizeRequirements(requirements);
                 jobUpdatesMap.set(jobId, {
-                  requirements: JSON.stringify(requirements),
+                  requirements: JSON.stringify(sanitizedRequirements),
                 });
               }
             }
           }
         }
 
-        // 2. Add actual_cost_per_m updates for jobs with valid cost values
+        // 2. Add requirement updates when inline requirement fields were edited directly
+        for (const [jobId, requirements] of editingRequirements.entries()) {
+          if (!requirements || requirements.length === 0) continue;
+          const sanitizedRequirements = sanitizeRequirements(requirements);
+          const hasMeaningfulFields = sanitizedRequirements.some((req) => Object.keys(req).length > 1);
+          if (!hasMeaningfulFields) continue;
+
+          const existing = jobUpdatesMap.get(jobId) || {};
+          jobUpdatesMap.set(jobId, {
+            ...existing,
+            requirements: JSON.stringify(sanitizedRequirements),
+          });
+        }
+
+        // 3. Add actual_cost_per_m updates for jobs with valid cost values
         for (const [jobId, edits] of validEdits) {
           if (edits.actual_cost_per_m !== null && edits.actual_cost_per_m !== undefined) {
             const existing = jobUpdatesMap.get(jobId) || {};

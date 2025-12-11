@@ -996,6 +996,8 @@ export default function EditJobModal({
 
       const addOnCharges = parseFloat(String(formData.add_on_charges || "0")) || 0;
       const calculatedTotalBilling = calculatedRevenue + addOnCharges;
+      const actualPricePerM =
+        quantity > 0 ? calculatedTotalBilling / (quantity / 1000) : null;
 
       const payload: Partial<{
         jobs_id: number;
@@ -1019,6 +1021,7 @@ export default function EditJobModal({
         ext_price: string;
         total_billing: string;
         schedule_type: string;
+        actual_cost_per_m: number | null;
       }> = {
         jobs_id: job.id,
         job_number: formData.job_number,
@@ -1037,6 +1040,10 @@ export default function EditJobModal({
         ext_price: formData.ext_price || "0",
         total_billing: calculatedTotalBilling.toString(),
         schedule_type: scheduleType || "soft schedule",
+        actual_cost_per_m:
+          actualPricePerM !== null && !Number.isNaN(actualPricePerM)
+            ? actualPricePerM
+            : null,
         // Include start_date - convert to timestamp or use existing
         start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : job.start_date,
         // Include due_date - convert to timestamp or use existing
