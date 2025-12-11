@@ -1647,7 +1647,7 @@ export default function EditJobModal({
               <div className="bg-white border border-[var(--border)] rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-[var(--text-dark)]">
-                    Job Services & Pricing
+                    Job Services & Pricing1111
                   </h3>
                   <button
                     type="button"
@@ -2121,7 +2121,8 @@ export default function EditJobModal({
                 )}
               </div>
 
-              <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50">
+              {/* Schedule Type Section */}
+              <div className="border-2 border-[var(--border)] rounded-lg p-4 bg-gray-50 mt-6">
                 <h4 className="font-semibold text-[var(--text-dark)] mb-3">
                   Schedule Type
                 </h4>

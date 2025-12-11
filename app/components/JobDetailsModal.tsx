@@ -10,6 +10,7 @@ import SmartClientSelect from "./SmartClientSelect";
 import FacilityToggle from "./FacilityToggle";
 import ScheduleToggle from "./ScheduleToggle";
 import DynamicRequirementFields from "./DynamicRequirementFields";
+import EditJobModal from "./EditJobModal";
 
 interface JobDetailsModalProps {
   isOpen: boolean;
@@ -60,6 +61,7 @@ export default function JobDetailsModal({
   // Mode management
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // State for view mode
   const [isRevisionHistoryOpen, setIsRevisionHistoryOpen] = useState(false);
@@ -331,10 +333,39 @@ export default function JobDetailsModal({
     };
   }, [isOpen]);
 
+  // Close edit modal when the details modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setIsEditMode(false);
+      setIsEditModalOpen(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !job) return null;
+
+  if (isEditMode || isEditModalOpen) {
+    return (
+      <EditJobModal
+        isOpen={isEditMode || isEditModalOpen}
+        job={job}
+        onClose={() => {
+          setIsEditMode(false);
+          setIsEditModalOpen(false);
+        }}
+        onSuccess={() => {
+          setIsEditMode(false);
+          setIsEditModalOpen(false);
+          if (onRefresh) {
+            onRefresh();
+          }
+        }}
+      />
+    );
+  }
 
   const handleEdit = () => {
     setIsEditMode(true);
+    setIsEditModalOpen(true);
     setCurrentStep(1);
   };
 
