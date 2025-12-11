@@ -2,7 +2,7 @@ import { format } from "date-fns";
 
 interface FinancialsPDFHeaderProps {
   dateRange: { start: Date; end: Date };
-  granularity: "weekly" | "monthly" | "quarterly";
+  granularity: "week" | "month" | "quarter";
   facility: number | null;
   selectedServiceTypes: string[];
   searchQuery: string;
@@ -29,9 +29,9 @@ export default function FinancialsPDFHeader({
   };
 
   const getGranularityLabel = () => {
-    if (granularity === "weekly") return "Weekly";
-    if (granularity === "monthly") return "Monthly";
-    if (granularity === "quarterly") return "Quarterly";
+    if (granularity === "week") return "Weekly";
+    if (granularity === "month") return "Monthly";
+    if (granularity === "quarter") return "Quarterly";
     return "Monthly";
   };
 

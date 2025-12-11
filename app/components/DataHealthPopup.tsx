@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { getDataHealth, type DataHealth, type DataHealthIssueType } from "@/lib/api";
+import { getDataHealth, getJobCostEntries, getJobsV2, type DataHealth, type DataHealthIssueType } from "@/lib/api";
 import {
   AlertCircle,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   Calendar,
   CalendarX,
   Activity,
+  DollarSign,
 } from "lucide-react";
 import DataHealthBulkFixModal from "./DataHealthBulkFixModal";
 
@@ -20,6 +21,7 @@ export default function DataHealthPopup({
   facilitiesId,
 }: DataHealthPopupProps) {
   const [dataHealth, setDataHealth] = useState<DataHealth | null>(null);
+  const [missingCostCount, setMissingCostCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -52,8 +54,24 @@ export default function DataHealthPopup({
     setIsLoading(true);
     setError(null);
     try {
-      const health = await getDataHealth(facilitiesId || 0);
+      // Fetch data health and calculate missing cost count in parallel
+      const [health, jobsResponse, costEntries] = await Promise.all([
+        getDataHealth(facilitiesId || 0),
+        getJobsV2({
+          facilities_id: facilitiesId || 0,
+          per_page: 10000,
+        }),
+        getJobCostEntries(facilitiesId || undefined),
+      ]);
+
       setDataHealth(health);
+
+      // Calculate jobs missing cost entries
+      const jobsWithCostEntries = new Set(costEntries.map((entry) => entry.job));
+      const missingCount = jobsResponse.items.filter(
+        (job) => !jobsWithCostEntries.has(job.id)
+      ).length;
+      setMissingCostCount(missingCount);
     } catch (err) {
       console.error("[DataHealthPopup] Error fetching data health:", err);
       setError(
@@ -239,6 +257,27 @@ export default function DataHealthPopup({
                       </div>
                     </button>
 
+                    {/* Missing Cost Per Thousand */}
+                    <button
+                      onClick={() => handleTileClick("missing_cost_per_m", missingCostCount)}
+                      disabled={missingCostCount === 0}
+                      className={`bg-gray-50 rounded-lg p-3 text-left transition-all ${
+                        missingCostCount > 0
+                          ? "hover:bg-gray-100 hover:shadow-md cursor-pointer"
+                          : "opacity-60 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <DollarSign className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-600">
+                          Missing Cost/M
+                        </span>
+                      </div>
+                      <div className="text-xl font-bold text-[var(--text-dark)]">
+                        {missingCostCount}
+                      </div>
+                    </button>
+
                     {/* Total Records - not clickable */}
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center gap-1.5 mb-1">
@@ -250,7 +289,7 @@ export default function DataHealthPopup({
                         {dataHealth.total_records}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {dataHealth.total_issues} issues
+                        {dataHealth.total_issues + missingCostCount} issues
                       </div>
                     </div>
                   </div>

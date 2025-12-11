@@ -1209,13 +1209,41 @@ export const getDataHealth = async (
 export type DataHealthIssueType =
   | "missing_due_dates"
   | "missing_start_date"
-  | "start_is_after_due";
+  | "start_is_after_due"
+  | "missing_cost_per_m";
+
+// Get jobs that are missing cost entries (no job_cost_entry records)
+export const getJobsMissingCostEntries = async (
+  facilitiesId?: number | null,
+): Promise<Job[]> => {
+  // Fetch all jobs and all cost entries in parallel
+  const [jobsResponse, costEntries] = await Promise.all([
+    getJobsV2({
+      facilities_id: facilitiesId || 0,
+      per_page: 10000,
+    }),
+    getJobCostEntries(facilitiesId || undefined),
+  ]);
+
+  const jobs = jobsResponse.items as unknown as Job[];
+
+  // Create a set of job IDs that have cost entries
+  const jobsWithCostEntries = new Set(costEntries.map((entry) => entry.job));
+
+  // Return jobs that don't have any cost entries
+  return jobs.filter((job) => !jobsWithCostEntries.has(job.id));
+};
 
 // Get jobs filtered by data health issue type
 export const getJobsByHealthIssue = async (
   issueType: DataHealthIssueType,
   facilitiesId?: number | null,
 ): Promise<Job[]> => {
+  // Handle missing_cost_per_m separately since it requires cost entries lookup
+  if (issueType === "missing_cost_per_m") {
+    return getJobsMissingCostEntries(facilitiesId);
+  }
+
   // Use the V2 API which is more reliable
   const response = await getJobsV2({
     facilities_id: facilitiesId || 0,

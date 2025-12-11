@@ -47,6 +47,8 @@ interface ProductionFiltersProps {
   onDynamicFieldFiltersChange?: (filters: import("@/types").DynamicFieldFilter[]) => void;
   dynamicFieldFilterLogic?: "and" | "or";
   onDynamicFieldFilterLogicChange?: (logic: "and" | "or") => void;
+  showOnlyInDateRange?: boolean;
+  onDateRangeToggleChange?: (value: boolean) => void;
 }
 
 export default function ProductionFilters({
@@ -80,6 +82,8 @@ export default function ProductionFilters({
   onDynamicFieldFiltersChange,
   dynamicFieldFilterLogic = "and",
   onDynamicFieldFilterLogicChange,
+  showOnlyInDateRange = true,
+  onDateRangeToggleChange,
 }: ProductionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -488,6 +492,32 @@ export default function ProductionFilters({
                 </svg>
               </button>
             </div>
+
+            {/* Date Range Filter Toggle - Advanced Mode */}
+            {onDateRangeToggleChange && (
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+                <button
+                  onClick={() => onDateRangeToggleChange(true)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    showOnlyInDateRange
+                      ? "bg-white text-[var(--primary-blue)] shadow-sm"
+                      : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                  }`}
+                >
+                  Date Range Only
+                </button>
+                <button
+                  onClick={() => onDateRangeToggleChange(false)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    !showOnlyInDateRange
+                      ? "bg-white text-[var(--dark-blue)] shadow-sm"
+                      : "text-[var(--text-light)] hover:text-[var(--text-dark)]"
+                  }`}
+                >
+                  All Jobs
+                </button>
+              </div>
+            )}
           </div>
         )}
 

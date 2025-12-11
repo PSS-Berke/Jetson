@@ -14,7 +14,7 @@ interface ProjectionsPDFSummaryProps {
   totalQuantity: number;
   serviceTypeCount: number;
   averagePerPeriod: number;
-  granularity: "weekly" | "monthly" | "quarterly";
+  granularity: "week" | "month" | "quarter";
   processTypeCounts: ProcessTypeCounts;
   serviceSummaries: Array<{
     serviceType: string;
@@ -46,8 +46,8 @@ export default function ProjectionsPDFSummary({
   };
 
   const getPeriodLabel = () => {
-    if (granularity === "weekly") return "Week";
-    if (granularity === "monthly") return "Month";
+    if (granularity === "week") return "Week";
+    if (granularity === "month") return "Month";
     return "Quarter";
   };
 

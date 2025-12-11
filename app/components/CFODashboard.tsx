@@ -43,7 +43,7 @@ interface CFODashboardProps {
   facilitiesId?: number;
 
   // PDF export props
-  granularity?: "weekly" | "monthly" | "quarterly";
+  granularity?: "week" | "month" | "quarter";
   selectedClients?: string[];
   selectedServiceTypes?: string[];
   searchQuery?: string;

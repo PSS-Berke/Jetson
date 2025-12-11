@@ -83,6 +83,7 @@ export interface ProjectionsData {
 
 export interface ProjectionFilters {
   facility: number | null;
+  clients: number[];
   serviceTypes: string[];
   searchQuery: string;
   granularity?: Granularity;
@@ -209,7 +210,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     facilities_id: filters.facility || 0,
     fetchAll: true, // Fetch all jobs for projections
   });
-  const granularity = filters.granularity || "weekly";
+  const granularity = filters.granularity || "week";
 
   // Fetch production entries to adjust projections (in parallel with jobs)
   const [productionEntries, setProductionEntries] = useState<ProductionEntry[]>(
@@ -243,11 +244,11 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   // 1. Time ranges - only recalculates when granularity or startDate changes
   const timeRanges = useMemo<TimeRange[]>(() => {
     switch (granularity) {
-      case "monthly":
+      case "month":
         return generateMonthRanges(startDate, 6);
-      case "quarterly":
+      case "quarter":
         return generateQuarterRanges(startDate, 6);
-      case "weekly":
+      case "week":
       default:
         return generateWeekRanges(startDate);
     }
@@ -369,6 +370,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     }
 
     // Determine which filters are active
+    const hasClientFilter = filters.clients && filters.clients.length > 0;
     const hasServiceTypeFilter = filters.serviceTypes.length > 0;
     const hasSearchFilter = filters.searchQuery.trim().length > 0;
     const hasScheduleFilter =
@@ -388,6 +390,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     if (filterMode === "or") {
       return projectionsToFilter.filter((p) => {
         if (
+          !hasClientFilter &&
           !hasServiceTypeFilter &&
           !hasSearchFilter &&
           !hasScheduleFilter &&
@@ -395,6 +398,10 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         ) {
           return true;
         }
+        const matchesClient =
+          hasClientFilter &&
+          p.job.client &&
+          filters.clients.includes(p.job.client.id);
         const matchesServiceType =
           hasServiceTypeFilter &&
           p.job.requirements &&
@@ -439,6 +446,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           );
 
         return (
+          matchesClient ||
           matchesServiceType ||
           matchesSearch ||
           matchesSchedule ||
@@ -447,6 +455,12 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       });
     } else {
       let result = projectionsToFilter;
+
+      if (hasClientFilter) {
+        result = result.filter((p) => {
+          return p.job.client && filters.clients.includes(p.job.client.id);
+        });
+      }
 
       if (hasServiceTypeFilter) {
         const beforeCount = result.length;

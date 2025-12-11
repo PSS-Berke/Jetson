@@ -59,9 +59,10 @@ const BulkJobUploadModal = dynamic(
 type ViewMode = "table" | "calendar" | "financials" | "revenue-table" | "service-load";
 
 export default function ProjectionsPage() {
-  const [granularity, setGranularity] = useState<Granularity>("weekly");
+  const [granularity, setGranularity] = useState<Granularity>("week");
   const [startDate, setStartDate] = useState<Date>(getStartOfWeek());
   const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
+  const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>(
     [],
   );
@@ -99,6 +100,7 @@ export default function ProjectionsPage() {
 
   const filters: ProjectionFilters = {
     facility: selectedFacility,
+    clients: selectedClients,
     serviceTypes: selectedServiceTypes,
     searchQuery,
     granularity,
@@ -150,6 +152,7 @@ export default function ProjectionsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [
+    selectedClients,
     selectedServiceTypes,
     searchQuery,
     selectedFacility,
@@ -173,13 +176,13 @@ export default function ProjectionsPage() {
 
     // Adjust start date to align with the new granularity
     switch (newGranularity) {
-      case "monthly":
+      case "month":
         setStartDate(startOfMonth(new Date()));
         break;
-      case "quarterly":
+      case "quarter":
         setStartDate(startOfQuarter(new Date()));
         break;
-      case "weekly":
+      case "week":
       default:
         setStartDate(getStartOfWeek());
         break;
@@ -189,14 +192,14 @@ export default function ProjectionsPage() {
   // Map granularity to calendar view type
   const mapGranularityToViewType = (
     gran: Granularity,
-  ): "month" | "week" | "day" | "quarterly" => {
+  ): "month" | "week" | "day" | "quarter" => {
     switch (gran) {
-      case "weekly":
+      case "week":
         return "week";
-      case "monthly":
+      case "month":
         return "month";
-      case "quarterly":
-        return "quarterly"; // Show custom quarterly view
+      case "quarter":
+        return "quarter"; // Show custom quarter view
       default:
         return "month";
     }
@@ -310,9 +313,9 @@ export default function ProjectionsPage() {
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Page Title */}
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)] mb-4 no-print">
-          {granularity === "weekly"
+          {granularity === "week"
             ? "5-Week"
-            : granularity === "monthly"
+            : granularity === "month"
               ? "3-Month"
               : "4-Quarter"}{" "}
           Projections
@@ -386,6 +389,8 @@ export default function ProjectionsPage() {
             jobs={jobProjections.map((p) => p.job)}
             startDate={startDate}
             onStartDateChange={setStartDate}
+            selectedClients={selectedClients}
+            onClientsChange={setSelectedClients}
             selectedServiceTypes={selectedServiceTypes}
             onServiceTypesChange={setSelectedServiceTypes}
             searchQuery={searchQuery}
@@ -529,8 +534,8 @@ export default function ProjectionsPage() {
                       jobs={filteredJobProjections.map((p) => p.job)}
                       timeRanges={timeRanges}
                       totalRevenue={totalRevenue}
-                      periodLabel={`Current ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
-                      previousPeriodLabel={`Previous ${granularity === "weekly" ? "6 Weeks" : granularity === "monthly" ? "6 Months" : "6 Quarters"}`}
+                      periodLabel={`Current ${granularity === "week" ? "6 Weeks" : granularity === "month" ? "6 Months" : "6 Quarters"}`}
+                      previousPeriodLabel={`Previous ${granularity === "week" ? "6 Weeks" : granularity === "month" ? "6 Months" : "6 Quarters"}`}
                       startDate={startDate.getTime()}
                       endDate={
                         timeRanges.length > 0

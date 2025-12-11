@@ -969,7 +969,7 @@ export default function JobNotesModal({
                     </div>
                     {/* Granularity Selector */}
                     <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                      {(["daily", "weekly", "monthly", "quarterly"] as CellGranularity[]).map((gran) => (
+                      {(["daily", "weekly", "monthly", "quarter"] as CellGranularity[]).map((gran) => (
                         <button
                           key={gran}
                           onClick={() => handleGranularityChange(gran)}

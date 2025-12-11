@@ -15,7 +15,19 @@ interface ProcessTypeSummaryRowProps {
   expandCollapseAllButton?: React.ReactNode;
   onCategoryClick?: (processType: string, timeRangeLabel?: string) => void;
   isCategoryFilterActive?: boolean;
+  orderedColumnKeys?: string[];
+  isColumnVisible?: (key: string) => boolean;
 }
+
+// Default column keys if not provided (for backward compatibility)
+const DEFAULT_STATIC_COLUMNS = [
+  "job_number",
+  "facility",
+  "sub_client",
+  "processes",
+  "description",
+  "quantity",
+];
 
 export function ProcessTypeSummaryRow({
   summary,
@@ -29,9 +41,24 @@ export function ProcessTypeSummaryRow({
   expandCollapseAllButton,
   onCategoryClick,
   isCategoryFilterActive = false,
+  orderedColumnKeys,
+  isColumnVisible,
 }: ProcessTypeSummaryRowProps) {
   const displayValue = summary.grandTotal;
   const formattedTotal = formatQuantity(Math.round(displayValue));
+
+  // Determine which static columns are visible (excluding checkbox, start_date, due_date)
+  const staticColumnsToRender = orderedColumnKeys && isColumnVisible
+    ? orderedColumnKeys.filter(key =>
+        isColumnVisible(key) &&
+        !["checkbox", "start_date", "due_date"].includes(key)
+      )
+    : DEFAULT_STATIC_COLUMNS;
+
+  // Calculate colSpan for start/end date columns
+  const startDateVisible = isColumnVisible ? isColumnVisible("start_date") : true;
+  const dueDateVisible = isColumnVisible ? isColumnVisible("due_date") : true;
+  const dateColSpan = (startDateVisible ? 1 : 0) + (dueDateVisible ? 1 : 0);
 
   // Create display label
   const displayLabel = isFacilitySummary && facilityName
@@ -59,20 +86,13 @@ export function ProcessTypeSummaryRow({
           </div>
         )}
       </th>
-      {/* Job # column */}
-      <th className="px-2 py-2"></th>
-      {/* Client column */}
-      <th className="px-2 py-2"></th>
-      {/* Sub-client column */}
-      <th className="px-2 py-2"></th>
-      {/* Process column */}
-      <th className="px-2 py-2"></th>
-      {/* Description column */}
-      <th className="px-2 py-2"></th>
-      {/* Qty column */}
-      <th className="px-2 py-2"></th>
+      {/* Dynamic empty cells for visible static columns */}
+      {staticColumnsToRender.map((colKey) => (
+        <th key={colKey} className="px-2 py-2"></th>
+      ))}
       {/* Start & End columns - Process type name with controls */}
-      <th colSpan={2} className="px-2 py-2 text-left">
+      {dateColSpan > 0 && (
+      <th colSpan={dateColSpan} className="px-2 py-2 text-left">
         <div className="flex items-center gap-2">
           {/* Expand/collapse button */}
           {hasBreakdowns && (
@@ -93,6 +113,7 @@ export function ProcessTypeSummaryRow({
           <span className="text-gray-800 font-semibold">{displayLabel}</span>
         </div>
       </th>
+      )}
       {/* Time period totals */}
       {timeRanges.map((range, index) => {
         const periodValue = summary.weeklyTotals.get(range.label) || 0;

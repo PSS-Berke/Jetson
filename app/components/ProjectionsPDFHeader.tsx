@@ -2,7 +2,7 @@ import { format } from "date-fns";
 
 interface ProjectionsPDFHeaderProps {
   startDate: Date;
-  granularity: "weekly" | "monthly" | "quarterly";
+  granularity: "week" | "month" | "quarter";
   facility: number | null;
   selectedServiceTypes: string[];
   searchQuery: string;
@@ -24,8 +24,8 @@ export default function ProjectionsPDFHeader({
   };
 
   const getGranularityLabel = () => {
-    if (granularity === "weekly") return "5-Week Projections";
-    if (granularity === "monthly") return "3-Month Projections";
+    if (granularity === "week") return "5-Week Projections";
+    if (granularity === "month") return "3-Month Projections";
     return "4-Quarter Projections";
   };
 
@@ -107,9 +107,9 @@ export default function ProjectionsPDFHeader({
                 View Type
               </div>
               <div className="text-sm font-semibold text-gray-900">
-                {granularity === "weekly"
+                {granularity === "week"
                   ? "Weekly"
-                  : granularity === "monthly"
+                  : granularity === "month"
                     ? "Monthly"
                     : "Quarterly"}
               </div>

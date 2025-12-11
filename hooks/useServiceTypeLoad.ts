@@ -7,13 +7,22 @@ export interface ParsedServiceTypeLoadItem extends Omit<ServiceTypeLoadItem, "we
   quarterly: Record<string, number>;
 }
 
+// Map toggle granularity to property name
+const granularityToProperty = (granularity: "week" | "month" | "quarter"): "weekly" | "monthly" | "quarterly" => {
+  switch (granularity) {
+    case "week": return "weekly";
+    case "month": return "monthly";
+    case "quarter": return "quarterly";
+  }
+};
+
 export interface ServiceTypeGroup {
   serviceType: string;
   serviceTotal: number;
   items: ParsedServiceTypeLoadItem[];
 }
 
-export function useServiceTypeLoad(facilitiesId: number | null, granularity: "weekly" | "monthly" | "quarterly") {
+export function useServiceTypeLoad(facilitiesId: number | null, granularity: "week" | "month" | "quarter") {
   const [data, setData] = useState<ParsedServiceTypeLoadItem[]>([]);
   const [groupedData, setGroupedData] = useState<ServiceTypeGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,14 +79,15 @@ export function useServiceTypeLoad(facilitiesId: number | null, granularity: "we
     if (data.length === 0) return [];
 
     const allDates = new Set<string>();
+    const propertyKey = granularityToProperty(granularity);
     data.forEach((item) => {
-      const timeData = item[granularity];
+      const timeData = item[propertyKey];
       Object.keys(timeData).forEach((date) => allDates.add(date));
     });
 
     return Array.from(allDates).sort((a, b) => {
       // Sort dates appropriately based on format
-      if (granularity === "weekly") {
+      if (granularity === "week") {
         // Format: "MM/DD" - need to handle year transitions
         const [monthA, dayA] = a.split("/").map(Number);
         const [monthB, dayB] = b.split("/").map(Number);
@@ -91,7 +101,7 @@ export function useServiceTypeLoad(facilitiesId: number | null, granularity: "we
         
         if (monthDiff !== 0) return monthDiff;
         return dayA - dayB;
-      } else if (granularity === "monthly") {
+      } else if (granularity === "month") {
         // Format: "YYYY-MM"
         return a.localeCompare(b);
       } else {

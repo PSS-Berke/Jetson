@@ -87,6 +87,7 @@ export default function ProductionPage() {
   );
   const [dynamicFieldFilters, setDynamicFieldFilters] = useState<import("@/types").DynamicFieldFilter[]>([]);
   const [dynamicFieldFilterLogic, setDynamicFieldFilterLogic] = useState<"and" | "or">("and");
+  const [showOnlyInDateRange, setShowOnlyInDateRange] = useState(true);
 
   // PDF export ref
   const printRef = useRef<HTMLDivElement>(null);
@@ -161,6 +162,12 @@ export default function ProductionPage() {
   const filteredComparisons = useMemo(() => {
     return comparisons.filter((comparison) => {
       const job = comparison.job;
+
+      // Date range filter - when showOnlyInDateRange is true, only show jobs with activity
+      if (showOnlyInDateRange) {
+        const hasActivity = comparison.projected_quantity > 0 || comparison.actual_quantity > 0;
+        if (!hasActivity) return false;
+      }
 
       // Search query filter
       if (searchQuery) {
@@ -252,6 +259,7 @@ export default function ProductionPage() {
     scheduleFilter,
     dynamicFieldFilters,
     dynamicFieldFilterLogic,
+    showOnlyInDateRange,
   ]);
 
   // Handle successful batch entry
@@ -463,6 +471,8 @@ export default function ProductionPage() {
           onDynamicFieldFiltersChange={setDynamicFieldFilters}
           dynamicFieldFilterLogic={dynamicFieldFilterLogic}
           onDynamicFieldFilterLogicChange={setDynamicFieldFilterLogic}
+          showOnlyInDateRange={showOnlyInDateRange}
+          onDateRangeToggleChange={setShowOnlyInDateRange}
         />
 
         {/* Loading State */}

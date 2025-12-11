@@ -132,7 +132,14 @@ export default function DynamicRequirementFields({
           sourceTypes.includes(group.type)
         );
 
-        console.log(`[DynamicRequirementFields] Found ${response.length} matching records from source types: [${sourceTypes.join(', ')}]`);
+        console.log(`[DynamicRequirementFields] Found ${response.length} matching records from source types: [${sourceTypes.join(', ')}] for process_type="${requirement.process_type}"`);
+
+        // Debug: Check if price_per_m is in any of the records
+        response.forEach((record: any, idx: number) => {
+          const hasPricePerM = record.variables && record.variables.price_per_m;
+          const pricePerMConfig = hasPricePerM ? record.variables.price_per_m : null;
+          console.log(`  Record ${idx} (type="${record.type}"): has price_per_m=${!!hasPricePerM}, addToJobInput=${pricePerMConfig?.addToJobInput}`);
+        });
 
         // Extract fields from the API response
         // Response structure: [{ id, type, variables: { varName: { type, label, value, required, addToJobInput } } }]
