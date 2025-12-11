@@ -1804,7 +1804,9 @@ export default function EditJobModal({
 
                             // Format the value based on field type
                             let displayValue: string;
-                            if (fieldConfig.type === "currency") {
+                            if (typeof fieldValue === "boolean") {
+                              displayValue = fieldValue ? "Yes" : "No";
+                            } else if (fieldConfig.type === "currency") {
                               displayValue = formatCurrency(fieldValue);
                             } else {
                               displayValue = String(fieldValue);
