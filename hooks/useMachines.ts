@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { getMachines } from "@/lib/api";
 import type { Machine } from "@/types";
 
-type MachineType = "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer";
+type MachineType = "inserter" | "folders" | "hp press" | "inkjetters" | "affixers";
 
 interface UseMachinesReturn {
   machines: Machine[];

@@ -390,12 +390,13 @@ export default function FinancialsPDFTables({
                   <td className="border border-gray-300 px-2 py-2 text-right text-gray-900 font-semibold">
                     {(() => {
                       // Calculate revenue from requirements.price_per_m if available
+                      // Includes additional costs from fields ending with _cost
                       if (
                         Array.isArray(job.requirements) &&
                         job.requirements.length > 0
                       ) {
                         const revenue = job.requirements.reduce(
-                          (total: number, req: { price_per_m?: string }) => {
+                          (total: number, req: { price_per_m?: string; [key: string]: any }) => {
                             const pricePerMStr = req.price_per_m;
                             const isValidPrice =
                               pricePerMStr &&
@@ -404,7 +405,17 @@ export default function FinancialsPDFTables({
                             const pricePerM = isValidPrice
                               ? parseFloat(pricePerMStr)
                               : 0;
-                            return total + (job.quantity / 1000) * pricePerM;
+                            const baseRevenue = (job.quantity / 1000) * pricePerM;
+                            
+                            // Calculate additional field costs (price per 1000)
+                            const additionalCosts = Object.keys(req)
+                              .filter(key => key.endsWith('_cost'))
+                              .reduce((costTotal, costKey) => {
+                                const costValue = parseFloat(String(req[costKey] || "0")) || 0;
+                                return costTotal + (job.quantity / 1000) * costValue;
+                              }, 0);
+                            
+                            return total + baseRevenue + additionalCosts;
                           },
                           0,
                         );

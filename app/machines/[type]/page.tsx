@@ -139,13 +139,13 @@ const machineTypeConfig: Record<
 // Helper function to map route param to API machine type
 const mapRouteParamToApiType = (
   routeParam: string
-): "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer" | undefined => {
-  const mapping: Record<string, "inserter" | "folder" | "hp-press" | "inkjetter" | "affixer"> = {
+): "inserter" | "folders" | "hp press" | "inkjetters" | "affixers" | undefined => {
+  const mapping: Record<string, "inserter" | "folders" | "hp press" | "inkjetters" | "affixers"> = {
     inserters: "inserter",
-    folders: "folder",
-    "hp-press": "hp-press",
-    inkjetters: "inkjetter",
-    affixers: "affixer",
+    folders: "folders",
+    "hp-press": "hp press",
+    inkjetters: "inkjetters",
+    affixers: "affixers",
   };
   return mapping[routeParam] || undefined;
 };

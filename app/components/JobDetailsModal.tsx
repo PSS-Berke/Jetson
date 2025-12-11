@@ -746,9 +746,7 @@ export default function JobDetailsModal({
         payload.facilities_id = formData.facilities_id;
       }
 
-      console.log("Payload being sent to Xano (Edit):", payload);
       await updateJob(job.id, payload);
-      console.log("Job updated successfully");
 
       try {
         const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
@@ -760,7 +758,6 @@ export default function JobDetailsModal({
           startDateForSync,
           payload.facilities_id,
         );
-        console.log("[JobDetailsModal] Job cost entry synced successfully");
       } catch (costError) {
         console.error(
           "[JobDetailsModal] Failed to sync job cost entry (non-blocking):",
@@ -1066,22 +1063,37 @@ export default function JobDetailsModal({
                     requirements: job.requirements,
                   });
 
+                  // Helper function to calculate revenue from a requirement
+                  const calculateRequirementRevenue = (req: any) => {
+                    // Handle "undefined" string, null, undefined, and empty string
+                    const pricePerMStr = req.price_per_m;
+                    const isValidPrice =
+                      pricePerMStr &&
+                      pricePerMStr !== "undefined" &&
+                      pricePerMStr !== "null";
+                    const pricePerM = isValidPrice
+                      ? parseFloat(pricePerMStr)
+                      : 0;
+                    const baseRevenue = (job.quantity / 1000) * pricePerM;
+                    
+                    // Calculate additional field costs (price per 1000)
+                    const additionalCosts = Object.keys(req)
+                      .filter(key => key.endsWith('_cost'))
+                      .reduce((costTotal, costKey) => {
+                        const costValue = parseFloat(String(req[costKey] || "0")) || 0;
+                        return costTotal + (job.quantity / 1000) * costValue;
+                      }, 0);
+                    
+                    return baseRevenue + additionalCosts;
+                  };
+
                   // Calculate total revenue from requirements
                   const requirementsTotal = job.requirements.reduce(
                     (total, req) => {
-                      // Handle "undefined" string, null, undefined, and empty string
-                      const pricePerMStr = req.price_per_m;
-                      const isValidPrice =
-                        pricePerMStr &&
-                        pricePerMStr !== "undefined" &&
-                        pricePerMStr !== "null";
-                      const pricePerM = isValidPrice
-                        ? parseFloat(pricePerMStr)
-                        : 0;
                       console.log(
-                        `[JobDetailsModal] Requirement ${req.process_type}: price_per_m="${req.price_per_m}", parsed=${pricePerM}`,
+                        `[JobDetailsModal] Requirement ${req.process_type}: price_per_m="${req.price_per_m}"`,
                       );
-                      return total + (job.quantity / 1000) * pricePerM;
+                      return total + calculateRequirementRevenue(req);
                     },
                     0,
                   );
@@ -1103,16 +1115,7 @@ export default function JobDetailsModal({
                     revenueWithoutAddOns > 0 && requirementsTotal === 0;
 
                   return job.requirements.map((req, index) => {
-                    // Handle "undefined" string, null, undefined, and empty string
-                    const pricePerMStr = req.price_per_m;
-                    const isValidPrice =
-                      pricePerMStr &&
-                      pricePerMStr !== "undefined" &&
-                      pricePerMStr !== "null";
-                    const pricePerM = isValidPrice
-                      ? parseFloat(pricePerMStr)
-                      : 0;
-                    let processRevenue = (job.quantity / 1000) * pricePerM;
+                    let processRevenue = calculateRequirementRevenue(req);
 
                     // Distribute revenue if price_per_m is missing
                     if (shouldDistribute) {
@@ -1163,30 +1166,45 @@ export default function JobDetailsModal({
                 )}
 
                 {/* Total Revenue */}
-                <div className="flex justify-between items-center py-3 border-t-2 border-[var(--primary-blue)] mt-3">
-                  <span className="text-base font-bold text-[var(--text-dark)]">
-                    Total Revenue:
-                  </span>
-                  <span className="text-xl font-bold text-[var(--primary-blue)]">
-                    $
-                    {job.total_billing
-                      ? parseFloat(job.total_billing).toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })
-                      : (
-                          job.requirements.reduce((total, req) => {
-                            const pricePerM = parseFloat(
-                              req.price_per_m || "0",
-                            );
-                            return total + (job.quantity / 1000) * pricePerM;
-                          }, 0) + parseFloat(job.add_on_charges || "0")
-                        ).toLocaleString("en-US", {
+                {(() => {
+                  // Calculate total revenue from requirements (including additional costs)
+                  const calculatedTotalRevenue = job.requirements.reduce((total, req) => {
+                    const pricePerMStr = req.price_per_m;
+                    const isValidPrice =
+                      pricePerMStr &&
+                      pricePerMStr !== "undefined" &&
+                      pricePerMStr !== "null";
+                    const pricePerM = isValidPrice ? parseFloat(pricePerMStr) : 0;
+                    const baseRevenue = (job.quantity / 1000) * pricePerM;
+                    
+                    // Calculate additional field costs (price per 1000)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const additionalCosts = Object.keys(req as any)
+                      .filter(key => key.endsWith('_cost'))
+                      .reduce((costTotal, costKey) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const costValue = parseFloat(String((req as any)[costKey] || "0")) || 0;
+                        return costTotal + (job.quantity / 1000) * costValue;
+                      }, 0);
+                    
+                    return total + baseRevenue + additionalCosts;
+                  }, 0) + parseFloat(job.add_on_charges || "0");
+
+                  return (
+                    <div className="flex justify-between items-center py-3 border-t-2 border-[var(--primary-blue)] mt-3">
+                      <span className="text-base font-bold text-[var(--text-dark)]">
+                        Total Revenue:
+                      </span>
+                      <span className="text-xl font-bold text-[var(--primary-blue)]">
+                        $
+                        {calculatedTotalRevenue.toLocaleString("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
-                  </span>
-                </div>
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Revenue per Unit */}
                 <div className="flex justify-between items-center py-2 bg-gray-50 rounded-lg px-4">
@@ -1826,8 +1844,27 @@ export default function JobDetailsModal({
                   </h3>
                   {formData.requirements.map((req, index) => {
                     const quantity = parseInt(formData.quantity || "0");
-                    const pricePerM = parseFloat(req.price_per_m || "0");
-                    const requirementTotal = (quantity / 1000) * pricePerM;
+                    const pricePerMStr = req.price_per_m;
+                    const isValidPrice =
+                      pricePerMStr &&
+                      pricePerMStr !== "undefined" &&
+                      pricePerMStr !== "null";
+                    const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+                    const baseRevenue = (quantity / 1000) * pricePerM;
+                    
+                    // Calculate additional field costs (price per 1000)
+                    const costKeys = Object.keys(req).filter(key => key.endsWith('_cost'));
+                    const additionalCosts = costKeys.reduce((costTotal, costKey) => {
+                      const rawValue = req[costKey as keyof typeof req];
+                      let costValue = 0;
+                      if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+                        const parsed = parseFloat(String(rawValue));
+                        costValue = isNaN(parsed) ? 0 : parsed;
+                      }
+                      return costTotal + (quantity / 1000) * costValue;
+                    }, 0);
+                    
+                    const requirementTotal = baseRevenue + additionalCosts;
                     const processConfig = getProcessTypeConfig(req.process_type);
 
                     return (
@@ -1876,6 +1913,38 @@ export default function JobDetailsModal({
                                 </div>
                               );
                             })}
+                            
+                            {/* Display additional fields that aren't in processConfig, including cost fields */}
+                            {Object.keys(req)
+                              .filter(key => {
+                                // Exclude process_type and fields already shown in processConfig
+                                if (key === "process_type" || key === "price_per_m") return false;
+                                const configFieldNames = new Set(processConfig?.fields.map(f => f.name) || []);
+                                if (configFieldNames.has(key)) return false;
+                                
+                                // Include all other fields (including cost fields)
+                                const fieldValue = req[key];
+                                return fieldValue !== undefined && fieldValue !== null && fieldValue !== "";
+                              })
+                              .map(fieldName => {
+                                const fieldValue = req[fieldName];
+                                
+                                // Format field name for display
+                                const displayLabel = fieldName
+                                  .replace(/_/g, " ")
+                                  .replace(/\b\w/g, (l) => l.toUpperCase());
+
+                                return (
+                                  <div key={fieldName} className="text-xs">
+                                    <span className="text-[var(--text-light)]">
+                                      {displayLabel}:{" "}
+                                    </span>
+                                    <span className="text-[var(--text-dark)] font-medium">
+                                      {String(fieldValue)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                           </div>
 
                           <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
@@ -1905,8 +1974,27 @@ export default function JobDetailsModal({
                         {formData.requirements
                           .reduce((total, req) => {
                             const quantity = parseInt(formData.quantity || "0");
-                            const pricePerM = parseFloat(req.price_per_m || "0");
-                            return total + (quantity / 1000) * pricePerM;
+                            const pricePerMStr = req.price_per_m;
+                            const isValidPrice =
+                              pricePerMStr &&
+                              pricePerMStr !== "undefined" &&
+                              pricePerMStr !== "null";
+                            const pricePerM = isValidPrice ? parseFloat(String(pricePerMStr)) : 0;
+                            const baseRevenue = (quantity / 1000) * pricePerM;
+                            
+                            // Calculate additional field costs (price per 1000)
+                            const costKeys = Object.keys(req).filter(key => key.endsWith('_cost'));
+                            const additionalCosts = costKeys.reduce((costTotal, costKey) => {
+                              const rawValue = req[costKey as keyof typeof req];
+                              let costValue = 0;
+                              if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+                                const parsed = parseFloat(String(rawValue));
+                                costValue = isNaN(parsed) ? 0 : parsed;
+                              }
+                              return costTotal + (quantity / 1000) * costValue;
+                            }, 0);
+                            
+                            return total + baseRevenue + additionalCosts;
                           }, 0)
                           .toLocaleString("en-US", {
                             minimumFractionDigits: 2,

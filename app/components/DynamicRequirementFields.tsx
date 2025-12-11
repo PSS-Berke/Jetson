@@ -9,6 +9,11 @@ import {
 } from "@/lib/processTypeConfig";
 import { getAllMachineVariables, getCapabilityBuckets, type CapabilityBucket } from "@/lib/api";
 
+// Module-level cache to persist fetched fields across component remounts
+// Key: processType, Value: { fields: FieldConfig[], additionalFields: FieldConfig[], timestamp: number }
+const fieldsCache = new Map<string, { basicFields: FieldConfig[]; additionalFields: FieldConfig[]; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 interface DynamicRequirementFieldsProps {
   requirement: {
     process_type: string;
@@ -33,6 +38,9 @@ export default function DynamicRequirementFields({
   const [isLoadingBuckets, setIsLoadingBuckets] = useState(false);
   const populatedProcessTypeRef = useRef<string | null>(null);
   const populatedBucketRef = useRef<number | null>(null);
+  const fetchedProcessTypeRef = useRef<string | null>(null);
+  const isFetchingRef = useRef<boolean>(false);
+  const previousProcessTypeRef = useRef<string | null>(null);
   const processTypeOptions = getProcessTypeOptions();
 
   // Fetch capability buckets when process_type is "Capability Bucket"
@@ -48,7 +56,6 @@ export default function DynamicRequirementFields({
         const buckets = await getCapabilityBuckets();
         setCapabilityBuckets(buckets);
       } catch (error) {
-        console.error("[DynamicRequirementFields] Error fetching capability buckets:", error);
         setCapabilityBuckets([]);
       } finally {
         setIsLoadingBuckets(false);
@@ -78,7 +85,6 @@ export default function DynamicRequirementFields({
 
         // Only populate if capabilities are missing
         if (!hasCapabilities) {
-          console.log("[DynamicRequirementFields] Auto-populating bucket capabilities on mount");
           Object.entries(selectedBucket.capabilities).forEach(([key, value]) => {
             let actualValue = value;
             if (typeof value === "object" && value !== null && !Array.isArray(value) && "value" in value) {
@@ -96,50 +102,103 @@ export default function DynamicRequirementFields({
 
   // Fetch dynamic fields when process_type changes
   useEffect(() => {
-    if (!requirement.process_type) {
+    const currentProcessType = requirement.process_type;
+
+    // CRITICAL: Only proceed if process_type actually changed
+    // This prevents the effect from running when other fields change
+    if (previousProcessTypeRef.current === currentProcessType) {
+      // Process type hasn't changed - this effect shouldn't run
+      // This can happen if React re-runs the effect for other reasons
+      return;
+    }
+
+
+    // Update the previous process type ref
+    previousProcessTypeRef.current = currentProcessType;
+
+    if (!currentProcessType) {
       setDynamicFields([]);
+      setAdditionalFields([]);
       populatedProcessTypeRef.current = null;
+      fetchedProcessTypeRef.current = null;
       return;
     }
 
     // Don't fetch machine_variables if process_type is "Capability Bucket"
-    if (requirement.process_type === "Capability Bucket") {
+    if (currentProcessType === "Capability Bucket") {
       setDynamicFields([]);
+      setAdditionalFields([]);
+      fetchedProcessTypeRef.current = null;
+      return;
+    }
+
+    // CRITICAL: Check module-level cache FIRST (before any other checks)
+    // This prevents API calls when component remounts due to field value changes
+    const cachedData = fieldsCache.get(currentProcessType);
+    if (cachedData) {
+      const cacheAge = Date.now() - cachedData.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        // Cache is still valid - use it and skip API call
+        // This handles the case where component remounts but we have cached data
+        setDynamicFields(cachedData.basicFields);
+        setAdditionalFields(cachedData.additionalFields);
+        fetchedProcessTypeRef.current = currentProcessType;
+        return; // CRITICAL: Return early to prevent API call
+      } else {
+        // Cache expired, remove it
+        fieldsCache.delete(currentProcessType);
+      }
+    }
+
+    // If we've already fetched for this process type AND have fields, skip
+    // This prevents re-fetching when field values change (component doesn't remount)
+    if (fetchedProcessTypeRef.current === currentProcessType) {
+      if (dynamicFields.length > 0 || additionalFields.length > 0) {
+        return;
+      }
+      // If we don't have fields in state but requirement has field values, skip
+      const hasFieldValues = Object.keys(requirement).some(
+        key => key !== 'process_type' && key !== 'price_per_m' && key !== 'id' &&
+               !key.endsWith('_cost') && // Exclude cost fields from this check
+               requirement[key] !== undefined && requirement[key] !== null && requirement[key] !== ''
+      );
+      if (hasFieldValues) {
+        return;
+      }
+    }
+
+    // Prevent duplicate fetches: if we're already fetching for this process type, skip
+    if (isFetchingRef.current) {
       return;
     }
 
     const fetchFields = async () => {
+      // Capture the process type at the start to avoid stale closures
+      const processTypeToFetch = currentProcessType;
+
+      // Double-check: if another fetch started, bail out
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      // Mark as fetching (but don't mark as fetched until we successfully get the data)
+      isFetchingRef.current = true;
       setIsLoadingFields(true);
+
       try {
         // Normalize the process type to match database keys (e.g., "Insert" -> "insert")
-        const normalizedType = normalizeProcessType(requirement.process_type);
+        const normalizedType = normalizeProcessType(processTypeToFetch);
 
         // Get source types that should be included for this normalized type
         const sourceTypes = getSourceTypesForProcessType(normalizedType);
 
-        console.log(
-          "[DynamicRequirementFields] Fetching fields for:",
-          requirement.process_type,
-          "normalized to:",
-          normalizedType,
-          "source types:",
-          sourceTypes,
-        );
-
+  
         // Fetch all machine variables and filter by source types
         const allVariables = await getAllMachineVariables();
         const response = allVariables.filter((group: any) =>
           sourceTypes.includes(group.type)
         );
 
-        console.log(`[DynamicRequirementFields] Found ${response.length} matching records from source types: [${sourceTypes.join(', ')}] for process_type="${requirement.process_type}"`);
-
-        // Debug: Check if price_per_m is in any of the records
-        response.forEach((record: any, idx: number) => {
-          const hasPricePerM = record.variables && record.variables.price_per_m;
-          const pricePerMConfig = hasPricePerM ? record.variables.price_per_m : null;
-          console.log(`  Record ${idx} (type="${record.type}"): has price_per_m=${!!hasPricePerM}, addToJobInput=${pricePerMConfig?.addToJobInput}`);
-        });
 
         // Extract fields from the API response
         // Response structure: [{ id, type, variables: { varName: { type, label, value, required, addToJobInput } } }]
@@ -164,7 +223,6 @@ export default function DynamicRequirementFields({
             }
           });
 
-          console.log("[DynamicRequirementFields] Total merged variables:", Object.keys(mergedVariables).length);
 
           // Check if we have any variables after merging
           if (Object.keys(mergedVariables).length > 0) {
@@ -175,7 +233,6 @@ export default function DynamicRequirementFields({
             // Sort by order property first, then filter
 
             // Debug: Log all variables and their addToJobInput status
-            console.log("[DynamicRequirementFields] All variables for", normalizedType, ":");
             Object.entries(variables).forEach(([varName, varConfig]: [string, any]) => {
               console.log(`  - ${varName}:`, {
                 addToJobInput: varConfig.addToJobInput,
@@ -202,7 +259,6 @@ export default function DynamicRequirementFields({
               })
               .map(({ varName, varConfig }) => [varName, varConfig] as [string, any]);
 
-            console.log("[DynamicRequirementFields] Filtered job input fields count:", allJobInputFields.length);
 
             const basicFields: FieldConfig[] = [];
             const additionalFieldsList: FieldConfig[] = [];
@@ -252,7 +308,8 @@ export default function DynamicRequirementFields({
 
             // Pre-populate field values from API response
             // Only populate once per process type change
-            if (populatedProcessTypeRef.current !== requirement.process_type) {
+            // Use the captured process type to avoid stale closure issues
+            if (populatedProcessTypeRef.current !== processTypeToFetch) {
               Object.entries(variables).forEach(([varName, varConfig]: [string, any]) => {
                 if (varConfig.addToJobInput === true) {
                   // Handle boolean values - they can be false, which is a valid value
@@ -262,56 +319,89 @@ export default function DynamicRequirementFields({
                     : varConfig.value !== undefined &&
                       varConfig.value !== null &&
                       varConfig.value !== "";
-                  const notAlreadySet = requirement[varName] === undefined ||
-                    requirement[varName] === null ||
-                    (isBoolean ? false : requirement[varName] === "");
+                  
+                  // Check if value is already set and matches the API value
+                  const currentValue = requirement[varName];
+                  const apiValue = varConfig.value;
+                  const valuesMatch = isBoolean
+                    ? (currentValue === apiValue || (currentValue === "true" && apiValue === true) || (currentValue === "false" && apiValue === false))
+                    : (currentValue === apiValue || String(currentValue) === String(apiValue));
+                  
+                  const notAlreadySet = currentValue === undefined ||
+                    currentValue === null ||
+                    (isBoolean ? false : currentValue === "");
 
-                  if (hasValue && notAlreadySet) {
-                    onChange(varName, varConfig.value);
+                  // Only call onChange if value is not set or if it's different from API value
+                  if (hasValue && (notAlreadySet || !valuesMatch)) {
+                    onChange(varName, apiValue);
                   }
                 }
               });
-              populatedProcessTypeRef.current = requirement.process_type;
+              populatedProcessTypeRef.current = processTypeToFetch;
             }
 
-            console.log(
-              "[DynamicRequirementFields] Basic fields:",
-              basicFields,
-            );
-            console.log(
-              "[DynamicRequirementFields] Additional fields:",
-              additionalFieldsList,
-            );
+           
+           
             setDynamicFields(basicFields);
             setAdditionalFields(additionalFieldsList);
+            // Cache the fields for this process type (survives component remounts)
+            fieldsCache.set(processTypeToFetch, {
+              basicFields,
+              additionalFields: additionalFieldsList,
+              timestamp: Date.now(),
+            });
+            // Mark this process type as fetched (use captured value to avoid stale closure)
+            fetchedProcessTypeRef.current = processTypeToFetch;
           } else {
             // No variables after merging all records
-            console.log(
-              "[DynamicRequirementFields] No variables found after merging",
-            );
+           
             setDynamicFields([]);
             setAdditionalFields([]);
+            // Cache empty result to prevent repeated fetches
+            fieldsCache.set(processTypeToFetch, {
+              basicFields: [],
+              additionalFields: [],
+              timestamp: Date.now(),
+            });
+            fetchedProcessTypeRef.current = processTypeToFetch;
           }
         } else {
           // Fallback to static config if API returns no fields
-          console.log(
-            "[DynamicRequirementFields] No dynamic fields, using static config",
-          );
+        
           setDynamicFields([]);
+          // Cache empty result to prevent repeated fetches
+          fieldsCache.set(processTypeToFetch, {
+            basicFields: [],
+            additionalFields: [],
+            timestamp: Date.now(),
+          });
+          fetchedProcessTypeRef.current = processTypeToFetch;
         }
       } catch (error) {
-        console.error(
-          "[DynamicRequirementFields] Error fetching fields:",
-          error,
-        );
+     
         // Fallback to static config on error
         setDynamicFields([]);
+        // Don't mark as fetched on error - allow retry if user navigates away and back
+        // Reset the fetched ref so it can try again (use captured value)
+        if (fetchedProcessTypeRef.current === processTypeToFetch) {
+          fetchedProcessTypeRef.current = null;
+        }
       } finally {
         setIsLoadingFields(false);
+        isFetchingRef.current = false;
       }
     };
 
     fetchFields();
+
+    // Cleanup function to reset fetching flag if component unmounts or process_type changes
+    return () => {
+      // Only reset if we were fetching for the current process type
+      // This prevents resetting if the process type changed while fetching
+      if (fetchedProcessTypeRef.current === currentProcessType || !fetchedProcessTypeRef.current) {
+        isFetchingRef.current = false;
+      }
+    };
   }, [requirement.process_type]);
 
   // Only use dynamic fields from API - no fallback to static config
@@ -428,6 +518,7 @@ export default function DynamicRequirementFields({
             id={`${costFieldName}-input`}
             value={displayValue}
             onChange={(e) => onChange(costFieldName, e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()}
             step="0.01"
             min="0"
             placeholder="0.00"
@@ -442,9 +533,9 @@ export default function DynamicRequirementFields({
     // Check if this is a boolean field (stored in originalType)
     const isBoolean = (field as any).originalType === "boolean";
 
-    // Handle boolean values - default to false if not set
+    // Handle boolean values - get the actual value from requirement, don't default to false
     const value = isBoolean
-      ? (requirement[field.name] !== undefined ? requirement[field.name] : false)
+      ? requirement[field.name]
       : (requirement[field.name] || "");
 
     const error = errors[field.name];
@@ -546,6 +637,7 @@ export default function DynamicRequirementFields({
                     : (inputValue === "" ? 0 : parseFloat(inputValue) || 0);
                   onChange(field.name, parsedValue);
                 }}
+                onWheel={(e) => e.currentTarget.blur()}
                 min={field.validation?.min}
                 max={field.validation?.max}
                 step={field.validation?.step || (isInteger ? 1 : undefined)}
@@ -581,6 +673,7 @@ export default function DynamicRequirementFields({
                   id={fieldId}
                   value={value as string}
                   onChange={(e) => onChange(field.name, e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min={field.validation?.min || 0}
                   step={field.validation?.step || 0.01}
                   placeholder={field.placeholder || "0.00"}
