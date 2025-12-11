@@ -43,6 +43,27 @@ export default function JobDetailsModal({
 
   if (!isOpen || !job) return null;
 
+  // Helper function to format currency values
+  const formatCurrency = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined || value === "") return "N/A";
+    const numValue = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(numValue)) return String(value);
+    return `$${numValue.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  // Helper function to check if a field is a cost field
+  const isCostField = (fieldName: string): boolean => {
+    return (
+      fieldName === "price_per_m" ||
+      fieldName.endsWith("_cost") ||
+      fieldName.toLowerCase().includes("price") ||
+      fieldName.toLowerCase().includes("cost")
+    );
+  };
+
   const handleDeleteClick = () => {
     setShowDeleteConfirm(true);
   };
@@ -594,7 +615,7 @@ export default function JobDetailsModal({
                               // Format the value based on field type
                               let displayValue: string;
                               if (fieldConfig.type === "currency") {
-                                displayValue = `$${parseFloat(String(fieldValue)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                displayValue = formatCurrency(fieldValue);
                               } else {
                                 displayValue = String(fieldValue);
                               }
@@ -622,6 +643,11 @@ export default function JobDetailsModal({
                                 return null;
                               }
 
+                              // Format as currency if it's a cost field
+                              const displayValue = isCostField(fieldName)
+                                ? formatCurrency(fieldValue)
+                                : String(fieldValue);
+
                               return (
                                 <div key={fieldName}>
                                   <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
@@ -630,7 +656,7 @@ export default function JobDetailsModal({
                                       .replace(/\b\w/g, (l) => l.toUpperCase())}
                                   </label>
                                   <p className="text-base text-[var(--text-dark)]">
-                                    {String(fieldValue)}
+                                    {displayValue}
                                   </p>
                                 </div>
                               );

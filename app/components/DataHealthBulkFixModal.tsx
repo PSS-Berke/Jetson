@@ -163,9 +163,9 @@ export default function DataHealthBulkFixModal({
         // Extract price_per_m directly from the requirement (before sanitization)
         // Handle both string and number types, and also handle the string "undefined"
         // Use hasOwnProperty to check if the property exists, default to empty string if missing
-        // Also support legacy/mistyped field `price_perm`
+        // Also support legacy/mistyped field `price_per_m`
         const pricePerMRaw = req.hasOwnProperty("price_per_m") ? req.price_per_m : "";
-        const pricePerMFromLegacy = (req as any).price_perm;
+        const pricePerMFromLegacy = (req as any).price_pe_m;
         const pricePerM =
           pricePerMRaw !== undefined && pricePerMRaw !== null && pricePerMRaw !== ""
             ? pricePerMRaw
@@ -175,7 +175,7 @@ export default function DataHealthBulkFixModal({
         console.log(
           `  Service ${i + 1} price_per_m raw value:`,
           pricePerM,
-          `(type: ${typeof pricePerM}, has price_per_m: ${req.hasOwnProperty("price_per_m")}, has price_perm: ${req.hasOwnProperty("price_perm")})`
+          `(type: ${typeof pricePerM}, has price_per_m: ${req.hasOwnProperty("price_per_m")}, has price_per_m: ${req.hasOwnProperty("price_per_m")})`
         );
         
         // Check if pricePerM is valid (not undefined, null, empty string, or the string "undefined")
@@ -362,10 +362,10 @@ export default function DataHealthBulkFixModal({
         : job.requirements;
       const requirements = Array.isArray(parsed) ? parsed : [];
       // Ensure all requirements have price_per_m initialized (even if empty string)
-      // Also normalize legacy/mistyped field `price_perm` to `price_per_m`
+      // Also normalize legacy/mistyped field `price_per_m` to `price_per_m`
       const normalizedRequirements = requirements.map((req) => {
         const hasPricePerM = req.price_per_m !== undefined && req.price_per_m !== null && req.price_per_m !== "";
-        const fallbackPricePerM = (req as any).price_perm;
+        const fallbackPricePerM = (req as any).price_per_m;
         const price_per_m = hasPricePerM
           ? req.price_per_m
           : fallbackPricePerM !== undefined && fallbackPricePerM !== null

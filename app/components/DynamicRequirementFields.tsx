@@ -5,6 +5,7 @@ import {
   getProcessTypeOptions,
   normalizeProcessType,
   getSourceTypesForProcessType,
+  getProcessTypeConfig,
   type FieldConfig,
 } from "@/lib/processTypeConfig";
 import { getAllMachineVariables, getCapabilityBuckets, type CapabilityBucket } from "@/lib/api";
@@ -140,8 +141,50 @@ export default function DynamicRequirementFields({
       if (cacheAge < CACHE_DURATION) {
         // Cache is still valid - use it and skip API call
         // This handles the case where component remounts but we have cached data
-        setDynamicFields(cachedData.basicFields);
-        setAdditionalFields(cachedData.additionalFields);
+        // Remove any price_per_m fields from cache (case-insensitive) - we'll use static config version instead
+        // Convert any other price/cost fields to currency type
+        const isPricePerMField = (fieldName: string): boolean => {
+          const normalized = fieldName.toLowerCase().trim();
+          return normalized === "price_per_m" || 
+                 normalized === "priceper_m" ||
+                 !!normalized.match(/^price[_\s]?per[_\s]?m$/i);
+        };
+        
+        let basicFields = cachedData.basicFields
+          .filter(field => !isPricePerMField(field.name)) // Remove price_per_m variants from API/cache
+          .map(field => {
+            const isCostField = field.name.endsWith("_cost") ||
+              (field.name.toLowerCase().includes("price") && !isPricePerMField(field.name)) ||
+              (field.name.toLowerCase().includes("cost") && !isPricePerMField(field.name));
+            if (isCostField && field.type !== "currency") {
+              return { ...field, type: "currency" as FieldConfig["type"] };
+            }
+            return field;
+          });
+        
+        let additionalFields = cachedData.additionalFields
+          .filter(field => !isPricePerMField(field.name)) // Remove price_per_m variants from API/cache
+          .map(field => {
+            const isCostField = field.name.endsWith("_cost") ||
+              (field.name.toLowerCase().includes("price") && !isPricePerMField(field.name)) ||
+              (field.name.toLowerCase().includes("cost") && !isPricePerMField(field.name));
+            if (isCostField && field.type !== "currency") {
+              return { ...field, type: "currency" as FieldConfig["type"] };
+            }
+            return field;
+          });
+        
+        // Always use price_per_m from static config (properly configured as currency)
+        // Remove any existing price_per_m first to ensure no duplicates
+        const staticConfig = getProcessTypeConfig(currentProcessType);
+        const pricePerMField = staticConfig?.fields.find(f => f.name === "price_per_m");
+        if (pricePerMField) {
+          // Double-check: remove any price_per_m that might have slipped through
+          basicFields = basicFields.filter(f => !isPricePerMField(f.name));
+          basicFields.unshift(pricePerMField);
+        }
+        setDynamicFields(basicFields);
+        setAdditionalFields(additionalFields);
         fetchedProcessTypeRef.current = currentProcessType;
         return; // CRITICAL: Return early to prevent API call
       } else {
@@ -249,7 +292,15 @@ export default function DynamicRequirementFields({
                 order: varConfig.order ?? 999, // Fields without order go to the end
               }))
               .sort((a, b) => a.order - b.order)
-              .filter(({ varConfig }) => {
+              .filter(({ varName, varConfig }) => {
+                // Exclude price_per_m from API (case-insensitive) - we'll use the one from static config instead
+                const normalizedName = varName.toLowerCase().trim();
+                if (normalizedName === "price_per_m" || 
+                    normalizedName === "priceper_m" ||
+                    normalizedName.match(/^price[_\s]?per[_\s]?m$/i)) {
+                  console.log(`  [FILTERED OUT] ${varName}: Using static config version instead`);
+                  return false;
+                }
                 // Only include variables where addToJobInput is true
                 const shouldInclude = varConfig.addToJobInput === true;
                 if (!shouldInclude) {
@@ -266,14 +317,22 @@ export default function DynamicRequirementFields({
             allJobInputFields.forEach(([varName, varConfig]: [string, any]) => {
                 // Map variable type to FieldConfig type
                 let fieldType: FieldConfig["type"] = "text";
+                
+                // Check if field name suggests it's a cost/price field
+                const isCostField = varName === "price_per_m" ||
+                  varName.endsWith("_cost") ||
+                  varName.toLowerCase().includes("price") ||
+                  varName.toLowerCase().includes("cost");
+                
                 if (varConfig.type === "select" || varConfig.type === "dropdown") {
                   fieldType = "dropdown";
-                } else if (varConfig.type === "number" || varConfig.type === "integer") {
-                  fieldType = "number";
                 } else if (varConfig.type === "boolean") {
                   fieldType = "text"; // We'll handle boolean separately in renderField
-                } else if (varConfig.type === "currency") {
+                } else if (varConfig.type === "currency" || isCostField) {
+                  // Force currency type for price/cost fields
                   fieldType = "currency";
+                } else if (varConfig.type === "number" || varConfig.type === "integer") {
+                  fieldType = "number";
                 } else {
                   fieldType = (varConfig.type || "text") as FieldConfig["type"];
                 }
@@ -341,6 +400,58 @@ export default function DynamicRequirementFields({
             }
 
            
+            // Helper function to check if a field is a price_per_m variant
+            const isPricePerMField = (fieldName: string): boolean => {
+              const normalized = fieldName.toLowerCase().trim();
+              return normalized === "price_per_m" || 
+                     normalized === "priceper_m" ||
+                     !!normalized.match(/^price[_\s]?per[_\s]?m$/i);
+            };
+            
+            // Remove ALL price_per_m fields from API (case-insensitive check)
+            // We'll use only the static config version to avoid duplicates
+            // Convert any other price/cost fields to currency type (in case API returned them as number)
+            const filteredBasicFields = basicFields.filter(field => !isPricePerMField(field.name));
+            filteredBasicFields.forEach(field => {
+              const isCostField = field.name.endsWith("_cost") ||
+                (field.name.toLowerCase().includes("price") && !isPricePerMField(field.name)) ||
+                (field.name.toLowerCase().includes("cost") && !isPricePerMField(field.name));
+              if (isCostField && field.type !== "currency") {
+                field.type = "currency";
+              }
+            });
+            
+            const filteredAdditionalFields = additionalFieldsList.filter(field => !isPricePerMField(field.name));
+            filteredAdditionalFields.forEach(field => {
+              const isCostField = field.name.endsWith("_cost") ||
+                (field.name.toLowerCase().includes("price") && !isPricePerMField(field.name)) ||
+                (field.name.toLowerCase().includes("cost") && !isPricePerMField(field.name));
+              if (isCostField && field.type !== "currency") {
+                field.type = "currency";
+              }
+            });
+            
+            // Always use price_per_m from static config (properly configured as currency)
+            // Remove any existing price_per_m first to ensure no duplicates
+            const staticConfig = getProcessTypeConfig(processTypeToFetch);
+            const pricePerMField = staticConfig?.fields.find(f => f.name === "price_per_m");
+            if (pricePerMField) {
+              // Double-check: remove any price_per_m that might have slipped through
+              const finalBasicFields = filteredBasicFields.filter(f => !isPricePerMField(f.name));
+              finalBasicFields.unshift(pricePerMField);
+              
+              // Update the arrays
+              basicFields.length = 0;
+              basicFields.push(...finalBasicFields);
+              additionalFieldsList.length = 0;
+              additionalFieldsList.push(...filteredAdditionalFields);
+            } else {
+              // No static config price_per_m, just use filtered fields
+              basicFields.length = 0;
+              basicFields.push(...filteredBasicFields);
+              additionalFieldsList.length = 0;
+              additionalFieldsList.push(...filteredAdditionalFields);
+            }
            
             setDynamicFields(basicFields);
             setAdditionalFields(additionalFieldsList);
@@ -354,12 +465,15 @@ export default function DynamicRequirementFields({
             fetchedProcessTypeRef.current = processTypeToFetch;
           } else {
             // No variables after merging all records
+            const staticConfig = getProcessTypeConfig(processTypeToFetch);
+            const pricePerMField = staticConfig?.fields.find(f => f.name === "price_per_m");
+            const basicFields = pricePerMField ? [pricePerMField] : [];
            
-            setDynamicFields([]);
+            setDynamicFields(basicFields);
             setAdditionalFields([]);
             // Cache empty result to prevent repeated fetches
             fieldsCache.set(processTypeToFetch, {
-              basicFields: [],
+              basicFields,
               additionalFields: [],
               timestamp: Date.now(),
             });
@@ -367,11 +481,14 @@ export default function DynamicRequirementFields({
           }
         } else {
           // Fallback to static config if API returns no fields
+          const staticConfig = getProcessTypeConfig(processTypeToFetch);
+          const pricePerMField = staticConfig?.fields.find(f => f.name === "price_per_m");
+          const basicFields = pricePerMField ? [pricePerMField] : [];
         
-          setDynamicFields([]);
+          setDynamicFields(basicFields);
           // Cache empty result to prevent repeated fetches
           fieldsCache.set(processTypeToFetch, {
-            basicFields: [],
+            basicFields,
             additionalFields: [],
             timestamp: Date.now(),
           });
@@ -379,8 +496,11 @@ export default function DynamicRequirementFields({
         }
       } catch (error) {
      
-        // Fallback to static config on error
-        setDynamicFields([]);
+        // Fallback to static config on error - at least show price_per_m
+        const staticConfig = getProcessTypeConfig(processTypeToFetch);
+        const pricePerMField = staticConfig?.fields.find(f => f.name === "price_per_m");
+        const basicFields = pricePerMField ? [pricePerMField] : [];
+        setDynamicFields(basicFields);
         // Don't mark as fetched on error - allow retry if user navigates away and back
         // Reset the fetched ref so it can try again (use captured value)
         if (fetchedProcessTypeRef.current === processTypeToFetch) {

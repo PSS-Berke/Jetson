@@ -470,6 +470,27 @@ export default function EditJobModal({
     textarea.style.height = `${newHeight}px`;
   };
 
+  // Helper function to format currency values
+  const formatCurrency = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined || value === "") return "N/A";
+    const numValue = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(numValue)) return String(value);
+    return `$${numValue.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  // Helper function to check if a field is a cost field
+  const isCostField = (fieldName: string): boolean => {
+    return (
+      fieldName === "price_per_m" ||
+      fieldName.endsWith("_cost") ||
+      fieldName.toLowerCase().includes("price") ||
+      fieldName.toLowerCase().includes("cost")
+    );
+  };
+
   // Adjust description textarea height on mount and when description changes
   useEffect(() => {
     if (descriptionTextareaRef.current) {
@@ -1784,7 +1805,7 @@ export default function EditJobModal({
                             // Format the value based on field type
                             let displayValue: string;
                             if (fieldConfig.type === "currency") {
-                              displayValue = `$${parseFloat(String(fieldValue)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                              displayValue = formatCurrency(fieldValue);
                             } else {
                               displayValue = String(fieldValue);
                             }
@@ -1873,8 +1894,8 @@ export default function EditJobModal({
                             .filter(key => {
                               // Exclude fields already shown in processConfig
                               const isInProcessConfig = processConfig?.fields.some(f => f.name === key);
-                              // Exclude system fields
-                              const isSystemField = key === "process_type" || key === "price_per_m" || key === "id" || key.endsWith('_cost');
+                              // Exclude system fields (but allow price_per_m and _cost fields to be shown if not in processConfig)
+                              const isSystemField = key === "process_type" || key === "id";
                               // Only show if field has a valid value
                               return !isInProcessConfig && !isSystemField && isFieldValueValid(req[key]);
                             })
@@ -1896,6 +1917,9 @@ export default function EditJobModal({
                               let displayValue: string;
                               if (typeof fieldValue === "boolean") {
                                 displayValue = fieldValue ? "Yes" : "No";
+                              } else if (isCostField(fieldKey)) {
+                                // Format cost fields as currency
+                                displayValue = formatCurrency(fieldValue);
                               } else {
                                 displayValue = String(fieldValue);
                               }
