@@ -1693,7 +1693,7 @@ export const bulkUpdateJobs = async (
   });
 
   console.log(
-    `[bulkUpdateJobs] Updated ${success.length} of ${jobIds.length} jobs`,
+    `[bulkUpdateJobs] Uppdated ${success.length} of ${jobIds.length} jobs`,
   );
   return { success, failures };
 };
