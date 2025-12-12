@@ -126,8 +126,8 @@ export default function StepCapabilities({
     return baseName;
   };
 
-  // Helper function to properly handle field values, preserving boolean false
-  const getFieldValue = (value: any, fieldType: string): string | number | boolean => {
+  // Helper function to properly handle field values, preserving boolean false and arrays
+  const getFieldValue = (value: any, fieldType: string): string | number | boolean | string[] => {
     // For boolean fields, preserve false as boolean, not empty string
     if (fieldType === "boolean") {
       if (value === false || value === "false" || value === 0) {
@@ -138,6 +138,10 @@ export default function StepCapabilities({
       }
       // Default to false if value is undefined/null/empty
       return false;
+    }
+    // For select fields, preserve arrays if they exist
+    if (fieldType === "select" && Array.isArray(value)) {
+      return value;
     }
     // For other types, use the value or default to empty string
     return value !== undefined && value !== null ? value : "";
@@ -780,7 +784,7 @@ export default function StepCapabilities({
 
   const handleFieldValueChange = (
     id: string,
-    value: string | number | boolean,
+    value: string | number | boolean | string[],
   ) => {
     onUpdateFormBuilderField(id, { fieldValue: value });
     // Auto-save will be triggered by useEffect when formBuilderFields updates
@@ -1403,7 +1407,7 @@ export default function StepCapabilities({
             {/* Right: Assign Values */}
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
               <h4 className="text-lg font-semibold text-gray-900 mb-4">
-                Assign Values
+                Assign Machine Capabilities
               </h4>
 
               {formBuilderFields.length === 0 ? (
@@ -1477,20 +1481,44 @@ export default function StepCapabilities({
                       </div>
 
                       {field.fieldType === "select" && field.options ? (
-                        <select
-                          value={String(field.fieldValue || "")}
-                          onChange={(e) =>
-                            handleFieldValueChange(field.id, e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
-                        >
-                          <option value="">Select an option...</option>
-                          {field.options.map((option, idx) => (
-                            <option key={idx} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
+                          {field.options.map((option, idx) => {
+                            // Handle both array and single value for backward compatibility
+                            const selectedValues = Array.isArray(field.fieldValue)
+                              ? field.fieldValue
+                              : field.fieldValue
+                                ? [String(field.fieldValue)]
+                                : [];
+                            const isSelected = selectedValues.includes(option);
+                            
+                            return (
+                              <label
+                                key={idx}
+                                className="flex items-center space-x-2.5 py-2 hover:bg-gray-50 px-2 rounded cursor-pointer transition-colors"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const currentValues = Array.isArray(field.fieldValue)
+                                      ? field.fieldValue
+                                      : field.fieldValue
+                                        ? [String(field.fieldValue)]
+                                        : [];
+                                    
+                                    const newValues = e.target.checked
+                                      ? [...currentValues, option]
+                                      : currentValues.filter((item) => item !== option);
+                                    
+                                    handleFieldValueChange(field.id, newValues);
+                                  }}
+                                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-2 focus:ring-green-200"
+                                />
+                                <span className="text-sm text-gray-700">{option}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       ) : field.fieldType === "boolean" ? (
                         <div className="flex items-center">
                           <input

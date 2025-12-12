@@ -118,7 +118,7 @@ export interface FormBuilderField {
   fieldName: string;
   fieldLabel: string;
   fieldType: "text" | "number" | "select" | "boolean" | "currency";
-  fieldValue: string | number | boolean;
+  fieldValue: string | number | boolean | string[]; // Allow arrays for multi-select
   options?: string[];
   required?: boolean;
   addToJobInput?: boolean;

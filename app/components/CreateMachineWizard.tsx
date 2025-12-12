@@ -122,11 +122,16 @@ export default function CreateMachineWizard({
           // Include the field if:
           // 1. It's not undefined or null
           // 2. It's not an empty string (for text fields)
-          // 3. For boolean fields, explicitly include false values
+          // 3. It's not an empty array (for select fields with multi-select)
+          // 4. For boolean fields, explicitly include false values
+          const isArray = Array.isArray(field.fieldValue);
+          const isEmptyArray = isArray && field.fieldValue.length === 0;
+          const isEmptyString = !isArray && field.fieldValue === "";
+          
           const shouldInclude = 
             field.fieldValue !== undefined && 
             field.fieldValue !== null && 
-            (field.fieldType === "boolean" || field.fieldValue !== "");
+            (field.fieldType === "boolean" || (!isEmptyString && !isEmptyArray));
           
           if (shouldInclude) {
             // Normalize boolean values: if it's a boolean field, ensure false is boolean, not empty string
@@ -143,6 +148,7 @@ export default function CreateMachineWizard({
                 value = false;
               }
             }
+            // For select fields, arrays are already in the correct format
             combinedCapabilities[field.fieldName] = value;
           }
         });
