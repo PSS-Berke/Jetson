@@ -649,7 +649,7 @@ export default function EditMachineModal({
                 }}
                 errors={errors}
                 isEditMode={true}
-                disableAutoSave={true}
+                disableAutoSave={true} // This is very important to prevent the auto-save from overwriting the changes made by the user, never enable this.
               />
             )}
 
