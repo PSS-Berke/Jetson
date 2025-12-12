@@ -649,6 +649,7 @@ export default function EditMachineModal({
                 }}
                 errors={errors}
                 isEditMode={true}
+                disableAutoSave={true}
               />
             )}
 
