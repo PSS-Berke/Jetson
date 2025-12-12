@@ -393,28 +393,9 @@ export default function EditMachineModal({
         stepErrors.process_type_key = "Process type is required";
       }
 
-      // Validate that machine type matches process_type_key
-      if (machineType && process_type_key) {
-        const typeToProcessMap: { [key: string]: string[] } = {
-          insert: ["insert", "inserter"],
-          fold: ["fold", "folder"],
-          laser: ["laser", "hp", "press"],
-          hpPress: ["laser", "hp", "press"],
-          inkjet: ["inkjet"],
-          affix: ["affix"],
-          sort: ["sort"],
-        };
-
-        const expectedKeywords = typeToProcessMap[process_type_key] || [];
-        const typeLower = machineType.toLowerCase();
-        const matchesExpected = expectedKeywords.some((keyword) =>
-          typeLower.includes(keyword)
-        );
-
-        if (!matchesExpected) {
-          stepErrors.machineType = `Machine type "${machineType}" doesn't match the selected process type. Expected type containing: ${expectedKeywords.join(" or ")}`;
-        }
-      }
+      // Note: Machine type validation is now a warning, not a blocker
+      // The machine type will be auto-updated when process type is selected
+      // This allows users to proceed even if types don't match initially
     }
 
     return stepErrors;
