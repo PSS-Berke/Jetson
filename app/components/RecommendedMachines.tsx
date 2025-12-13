@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { Machine } from "@/types";
 import type { MachineMatch } from "@/lib/machineMatching";
-import { findMatchingMachines } from "@/lib/machineMatching";
-import { getMachines, getJobsV2 } from "@/lib/api";
+import { findCapableMachines, type CapableMachineResponse } from "@/lib/api";
 
 interface RecommendedMachinesProps {
   processType: string;
@@ -17,6 +16,63 @@ interface RecommendedMachinesProps {
   onSelectMachine: (machineId: number) => void;
   onDeselectMachine: (machineId: number) => void;
 }
+
+// Type guard to check if response is a CapableMachineResponse
+const isCapableMachineResponse = (
+  response: CapableMachineResponse | Machine | any
+): response is CapableMachineResponse => {
+  return response && typeof response === 'object' && 'machine' in response;
+};
+
+// Convert API response to MachineMatch format
+// Handles both CapableMachineResponse (with machine property) and direct Machine objects
+const convertToMachineMatch = (response: CapableMachineResponse | Machine | any): MachineMatch => {
+  // Check if response is a direct Machine object (has id, type, line) or wrapped in CapableMachineResponse
+  let machine: Machine;
+  let matchScore: number = 0;
+  let canHandle: boolean = true;
+  let matchReasons: string[] = [];
+  let estimatedHours: number = 0;
+  let currentUtilization: number = 0;
+  let speedWithModifiers: number = 0;
+  let staffingRequired: number = 1;
+
+  if (isCapableMachineResponse(response)) {
+    // It's a CapableMachineResponse
+    machine = response.machine;
+    matchScore = response.matchScore ?? 0;
+    canHandle = response.canHandle ?? true;
+    matchReasons = response.matchReasons ?? [];
+    estimatedHours = response.estimatedHours ?? 0;
+    currentUtilization = response.currentUtilization ?? 0;
+    speedWithModifiers = response.speedWithModifiers ?? 0;
+    staffingRequired = response.staffingRequired ?? 1;
+  } else {
+    // It's a direct Machine object (or something else)
+    // Check if it has the required machine properties
+    if (response && typeof response === 'object' && 'id' in response && 'type' in response) {
+      machine = response as Machine;
+    } else {
+      throw new Error('Invalid machine data in API response: missing required fields');
+    }
+  }
+
+  // Ensure machine is valid
+  if (!machine || !machine.id) {
+    throw new Error('Invalid machine data in API response: machine.id is missing');
+  }
+
+  return {
+    machine,
+    matchScore,
+    canHandle,
+    matchReasons,
+    estimatedHours,
+    currentUtilization,
+    speedWithModifiers,
+    staffingRequired,
+  };
+};
 
 export default function RecommendedMachines({
   processType,
@@ -35,8 +91,40 @@ export default function RecommendedMachines({
   const [showAllMachines, setShowAllMachines] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Serialize jobRequirements to detect changes in object contents
+  const jobRequirementsKey = useMemo(() => {
+    return JSON.stringify(jobRequirements);
+  }, [jobRequirements]);
+
   useEffect(() => {
-    if (!processType || !startDate || !dueDate || quantity <= 0) {
+    console.log('[RecommendedMachines] useEffect triggered', {
+      processType,
+      hasJobRequirements: Object.keys(jobRequirements).length > 0,
+      jobRequirements,
+      quantity,
+      startDate,
+      dueDate,
+      facilityId
+    });
+
+    // Check if we have minimum required data
+    // Allow API call even if quantity is 0, as long as we have processType and dates
+    if (!processType || !startDate || !dueDate) {
+      console.log('[RecommendedMachines] Missing required fields, skipping API call');
+      setMatches([]);
+      return;
+    }
+
+    // Check if we have any job requirements filled
+    const hasRequirements = Object.keys(jobRequirements).some(
+      key => !["process_type", "id", "job_id", "created_at", "price_per_m"].includes(key) &&
+             jobRequirements[key] !== null && 
+             jobRequirements[key] !== undefined && 
+             jobRequirements[key] !== ""
+    );
+
+    if (!hasRequirements) {
+      console.log('[RecommendedMachines] No job requirements filled, skipping API call');
       setMatches([]);
       return;
     }
@@ -46,11 +134,104 @@ export default function RecommendedMachines({
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Debounce the machine matching to prevent excessive API calls
-    // Wait 500ms after the last change before triggering the search
-    debounceTimerRef.current = setTimeout(() => {
-      console.log("[RecommendedMachines] Debounce timer fired, loading matches");
-      loadMatchesNow();
+    // Debounce the API call to prevent excessive requests
+    debounceTimerRef.current = setTimeout(async () => {
+      console.log('[RecommendedMachines] Making API call...');
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Convert ISO date strings to Unix timestamps
+        const fromTimestamp = new Date(startDate).getTime();
+        const toTimestamp = new Date(dueDate).getTime();
+
+        // Helper function to convert string values to proper types
+        const convertValue = (value: any): any => {
+          // If it's already not a string, return as-is
+          if (typeof value !== "string") {
+            return value;
+          }
+
+          // Convert boolean strings
+          if (value === "true") {
+            return true;
+          }
+          if (value === "false") {
+            return false;
+          }
+
+          // Convert numeric strings (but not empty strings or strings with non-numeric content)
+          // Check if it's a valid number (including decimals and negative numbers)
+          const numValue = Number(value);
+          if (value.trim() !== "" && !isNaN(numValue) && isFinite(numValue)) {
+            // Only convert if the string representation matches the number (to avoid converting "9x12" to 9)
+            // This handles cases like "100" -> 100, but not "9x12" -> NaN
+            if (String(numValue) === value.trim()) {
+              return numValue;
+            }
+          }
+
+          // Return as string for everything else
+          return value;
+        };
+
+        // Filter out metadata fields from requirements and convert types
+        const requirements = Object.entries(jobRequirements).reduce(
+          (acc, [key, value]) => {
+            // Skip metadata fields
+            if (["process_type", "id", "job_id", "created_at", "price_per_m"].includes(key)) {
+              return acc;
+            }
+            // Skip empty values
+            if (value === null || value === undefined || value === "") {
+              return acc;
+            }
+            acc[key] = convertValue(value);
+            return acc;
+          },
+          {} as Record<string, any>
+        );
+
+        console.log('[RecommendedMachines] API call params:', {
+          from: fromTimestamp,
+          to: toTimestamp,
+          requirements,
+          facilities_id: facilityId
+        });
+
+        // Call backend API
+        const response = await findCapableMachines({
+          from: fromTimestamp,
+          to: toTimestamp,
+          requirements,
+          facilities_id: facilityId ?? undefined,
+        });
+
+        console.log('[RecommendedMachines] API response received:', response);
+
+        // Convert API response to MachineMatch format and filter out invalid matches
+        const machineMatches = response
+          .map((item) => {
+            try {
+              return convertToMachineMatch(item);
+            } catch (err) {
+              console.warn("[RecommendedMachines] Failed to convert machine match:", err, item);
+              return null;
+            }
+          })
+          .filter((match): match is MachineMatch => match !== null && match.machine?.id !== undefined);
+        setMatches(machineMatches);
+      } catch (err) {
+        console.error("[RecommendedMachines] Error fetching recommended machines:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load machine recommendations. Please try again."
+        );
+        setMatches([]);
+      } finally {
+        setLoading(false);
+      }
     }, 500);
 
     // Cleanup function
@@ -59,97 +240,7 @@ export default function RecommendedMachines({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [processType, jobRequirements, quantity, startDate, dueDate, facilityId]);
-
-  const loadMatchesNow = async () => {
-    if (!processType || !startDate || !dueDate || quantity <= 0) {
-      setMatches([]);
-      return;
-    }
-
-    const typeMap = {
-      "inserter": ["Insert", "Sort", "Data", "9-12 in+", "13+ in+"],
-      "folders": ["Fold"],
-      "hp press": ["HP"],
-      "inkjetters": ["Laser", "Ink jet"],
-      "affixers": ["Label/Apply", "Affix with Glue", "Affix label+", "Labeling"]
-    }
-    const machineType = (Object.keys(typeMap).find(key =>
-      typeMap[key as keyof typeof typeMap].includes(processType)
-    ) || "inserter") as "inserter" | "folders" | "hp press" | "inkjetters" | "affixers"
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Fetch all machines - wrap in try-catch to handle API errors
-      let allMachines: Machine[] = [];
-      try {
-        allMachines = await getMachines(undefined, undefined, machineType);
-
-          // Filter out machines with invalid process_type_key
-          allMachines = allMachines.filter(m => {
-            if (!m.process_type_key || m.process_type_key.trim() === '') {
-              console.warn(`[RecommendedMachines] Skipping machine ${m.id} (Line ${m.line}) - no process_type_key`);
-              return false;
-            }
-            return true;
-          });
-          console.log(`[RecommendedMachines] ${allMachines.length} machines have valid process_type_key`);
-        } catch (apiError) {
-          console.error("[RecommendedMachines] Error fetching machines:", apiError);
-          throw new Error("Unable to load machines. Please check your machine configuration.");
-        }
-
-        // Fetch existing jobs for availability calculation using v2 API
-        let existingJobs: any[] = [];
-        try {
-          const jobsResponse = await getJobsV2({
-            facilities_id: facilityId || 0,
-            per_page: 10000, // Get all jobs for availability calculation
-          });
-          existingJobs = jobsResponse.items;
-        } catch (jobError) {
-          console.warn("[RecommendedMachines] Error fetching jobs, continuing without availability data:", jobError);
-          // Continue without jobs - availability will be estimated
-        }
-
-        // Convert dates to timestamps
-        const startTimestamp = new Date(startDate).getTime();
-        const dueTimestamp = new Date(dueDate).getTime();
-
-        // Find matching machines
-        const matchResults = await findMatchingMachines(
-          {
-            processType,
-            jobRequirements,
-            quantity,
-            startDate: startTimestamp,
-            dueDate: dueTimestamp,
-            facilityId: facilityId || undefined,
-          },
-          allMachines,
-          existingJobs.map((job: any) => ({
-            machines_id: Array.isArray(job.machines_id)
-              ? job.machines_id
-              : typeof job.machines_id === "string"
-              ? JSON.parse(job.machines_id)
-              : [],
-            start_date: job.start_date,
-            due_date: job.due_date,
-            quantity: job.quantity,
-          }))
-        );
-
-      setMatches(matchResults);
-    } catch (err) {
-      console.error("[RecommendedMachines] Error loading matches:", err);
-      setError(err instanceof Error ? err.message : "Failed to load recommendations");
-      setMatches([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [processType, jobRequirementsKey, quantity, startDate, dueDate, facilityId]);
 
   // Show loading state
   if (loading) {
@@ -260,9 +351,11 @@ export default function RecommendedMachines({
         </div>
       ) : (
         <div className="space-y-3">
-          {displayMatches.map((match, index) => {
-            const isSelected = selectedMachineIds.includes(match.machine.id);
-            const isTopRecommendation = index === 0;
+          {displayMatches
+            .filter((match) => match?.machine?.id !== undefined)
+            .map((match, index) => {
+              const isSelected = selectedMachineIds.includes(match.machine.id);
+              const isTopRecommendation = index === 0;
 
             return (
               <div

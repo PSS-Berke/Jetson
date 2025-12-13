@@ -2583,3 +2583,56 @@ export const deleteCapabilityBucket = async (bucketId: number): Promise<void> =>
     method: "DELETE",
   });
 };
+
+// ============================================================================
+// Find Capable Machines API Functions
+// ============================================================================
+
+/**
+ * Find capable machines for a job based on requirements and date range
+ * @param params - Parameters for finding capable machines
+ * @returns Array of recommended machines with match information
+ */
+export interface FindCapableMachinesParams {
+  from: number; // Unix timestamp
+  to: number; // Unix timestamp
+  requirements: Record<string, any>;
+  facilities_id?: number;
+}
+
+export interface CapableMachineResponse {
+  machine: Machine;
+  matchScore?: number;
+  canHandle?: boolean;
+  matchReasons?: string[];
+  estimatedHours?: number;
+  currentUtilization?: number;
+  speedWithModifiers?: number;
+  staffingRequired?: number;
+}
+
+export const findCapableMachines = async (
+  params: FindCapableMachinesParams
+): Promise<CapableMachineResponse[]> => {
+  
+  const queryParams = new URLSearchParams();
+  queryParams.append("from", params.from.toString());
+  queryParams.append("to", params.to.toString());
+  queryParams.append("requirements", JSON.stringify(params.requirements));
+  
+  if (params.facilities_id !== undefined && params.facilities_id !== null) {
+    queryParams.append("facilities_id", params.facilities_id.toString());
+  }
+  
+  const queryString = queryParams.toString();
+  const endpoint = `/find_capable_machines?${queryString}`;
+  
+  const result = await apiFetch<CapableMachineResponse[]>(
+    endpoint,
+    {
+      method: "GET",
+    }
+  );
+  
+  return result;
+};
