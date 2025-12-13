@@ -770,6 +770,32 @@ export default function AddJobModal({
     return getWeeklySplitSum() - quantity;
   };
 
+  // Handler to update splitResults quantity
+  const handleSplitResultQuantityChange = (
+    date: string,
+    calendarDayInWeek: number,
+    calendarWeek: number,
+    newQuantity: string
+  ) => {
+    const cleanedValue = newQuantity.replace(/,/g, "");
+    const quantity = parseInt(cleanedValue) || 0;
+
+    setSplitResults((prev) =>
+      prev.map((item) =>
+        item.Date === date &&
+        item.CalendarDayInWeek === calendarDayInWeek &&
+        item.CalendarWeek === calendarWeek
+          ? { ...item, Quantity: quantity }
+          : item
+      )
+    );
+  };
+
+  // Calculate total from splitResults
+  const getSplitResultsTotal = () => {
+    return splitResults.reduce((sum, item) => sum + item.Quantity, 0);
+  };
+
   const handleModeSelection = (mode: "new" | "template") => {
     setCreationMode(mode);
     if (mode === "new") {
@@ -808,7 +834,7 @@ export default function AddJobModal({
       return;
     }
 
-    // Step 1 (for new job or template creation): Validate weekly split if present
+    // Step 1 (for new job or template creation): Validate weekly split and splitResults if present
     if (currentStep === 1 && (creationMode === "new" || (creationMode === "template" && isCreatingTemplate))) {
       // Validate weekly split if present
       if (
@@ -817,6 +843,15 @@ export default function AddJobModal({
       ) {
         alert("Weekly split total must equal the total quantity");
         return;
+      }
+      // Validate splitResults if present
+      if (splitResults.length > 0) {
+        const splitTotal = getSplitResultsTotal();
+        const quantity = parseInt(formData.quantity || "0");
+        if (splitTotal !== quantity) {
+          alert("Calculated quantity split total must equal the total quantity");
+          return;
+        }
       }
       setCurrentStep(2);
       return;
@@ -1850,9 +1885,27 @@ export default function AddJobModal({
               {/* Split Results Display */}
               {splitResults.length > 0 && (
                 <div className="border border-[var(--border)] rounded-lg p-4 bg-blue-50">
-                  <h4 className="font-semibold text-[var(--text-dark)] mb-3">
-                    Calculated Quantity Split
-                  </h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-[var(--text-dark)]">
+                      Calculated Quantity Split
+                    </h4>
+                    <div
+                      className={`text-sm font-semibold ${getSplitResultsTotal() === parseInt(formData.quantity || "0")
+                        ? "text-green-600"
+                        : "text-red-600"
+                        }`}
+                    >
+                      Total: {getSplitResultsTotal().toLocaleString()} /{" "}
+                      {parseInt(formData.quantity || "0").toLocaleString()}
+                      {getSplitResultsTotal() !== parseInt(formData.quantity || "0") && (
+                        <span className="ml-1">
+                          ({getSplitResultsTotal() - parseInt(formData.quantity || "0") > 0 ? "+" : ""}
+                          {(getSplitResultsTotal() - parseInt(formData.quantity || "0")).toLocaleString()})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
                   <div className="space-y-3">
                     {(() => {
                       // Group results by CalendarWeek
@@ -1901,14 +1954,24 @@ export default function AddJobModal({
                               {weekData.map((item, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded"
+                                  className="flex flex-col gap-1"
                                 >
-                                  <span className="text-[var(--text-light)]">
+                                  <label className="text-xs text-[var(--text-light)]">
                                     {dayNames[item.CalendarDayInWeek]}:
-                                  </span>
-                                  <span className="font-medium text-[var(--text-dark)]">
-                                    {item.Quantity.toLocaleString()}
-                                  </span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.Quantity.toLocaleString()}
+                                    onChange={(e) =>
+                                      handleSplitResultQuantityChange(
+                                        item.Date,
+                                        item.CalendarDayInWeek,
+                                        item.CalendarWeek,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-[var(--border)] rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm bg-white"
+                                  />
                                 </div>
                               ))}
                             </div>
