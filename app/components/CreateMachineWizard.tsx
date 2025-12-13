@@ -124,9 +124,8 @@ export default function CreateMachineWizard({
           // 2. It's not an empty string (for text fields)
           // 3. It's not an empty array (for select fields with multi-select)
           // 4. For boolean fields, explicitly include false values
-          const isArray = Array.isArray(field.fieldValue);
-          const isEmptyArray = isArray && field.fieldValue.length === 0;
-          const isEmptyString = !isArray && field.fieldValue === "";
+          const isEmptyArray = Array.isArray(field.fieldValue) && field.fieldValue.length === 0;
+          const isEmptyString = !Array.isArray(field.fieldValue) && field.fieldValue === "";
           
           const shouldInclude = 
             field.fieldValue !== undefined && 
