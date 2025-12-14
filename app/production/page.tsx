@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@/hooks/useUser";
 import { useAuth } from "@/hooks/useAuth";
-import { useJobs } from "@/hooks/useJobs";
+import { useJobsV2 } from "@/hooks/useJobsV2";
 import { useProduction } from "@/hooks/useProduction";
 import {
   startOfWeek,
@@ -124,12 +124,16 @@ export default function ProductionPage() {
     }
   }, [granularity, currentDate]);
 
-  // Fetch jobs and production data
+  // Fetch jobs and production data using v2 API with search support
   const {
     jobs,
     isLoading: jobsLoading,
     refetch: refetchJobs,
-  } = useJobs(selectedFacility);
+  } = useJobsV2({
+    facilities_id: selectedFacility || 0,
+    search: searchQuery.trim() || undefined, // Pass search to API when provided
+    fetchAll: true, // Fetch all jobs for production tracking
+  });
   const {
     comparisons,
     productionEntries,
@@ -164,21 +168,14 @@ export default function ProductionPage() {
       const job = comparison.job;
 
       // Date range filter - when showOnlyInDateRange is true, only show jobs with activity
-      if (showOnlyInDateRange) {
+      // Skip date range filter when searching - show all search results regardless of date range
+      if (showOnlyInDateRange && !searchQuery.trim()) {
         const hasActivity = comparison.projected_quantity > 0 || comparison.actual_quantity > 0;
         if (!hasActivity) return false;
       }
 
-      // Search query filter
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        const matchesSearch =
-          job.job_name?.toLowerCase().includes(searchLower) ||
-          job.client?.name?.toLowerCase().includes(searchLower) ||
-          job.job_number?.toString().includes(searchLower);
-
-        if (!matchesSearch) return false;
-      }
+      // Search is handled by API, so skip client-side search filtering
+      // (API already filtered results based on searchQuery)
 
       // Schedule filter
       if (scheduleFilter !== "all") {

@@ -212,7 +212,7 @@ function calculateProcessTypeCounts(
 export function useProjections(startDate: Date, filters: ProjectionFilters) {
   // Fetch both jobs and production entries in parallel
   // Use v2 API which includes time_split data for more accurate projections
-  // Note: Search filtering is handled client-side to work with other filters
+  // Pass search query to API when provided for server-side search
   const {
     jobs,
     isLoading,
@@ -222,6 +222,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   } = useJobsV2({
     facilities_id: filters.facility || 0,
     fetchAll: true, // Fetch all jobs for projections
+    search: filters.searchQuery.trim() || undefined, // Pass search to API when provided
   });
   const granularity = filters.granularity || "week";
 
@@ -280,14 +281,17 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   // 3. Job projections - only recalculates when jobs or timeRanges change
   const adjustedJobProjections = useMemo<JobProjection[]>(() => {
     if (!jobs || jobs.length === 0) {
+      console.log("[useProjections] No jobs received from API");
       return [];
     }
 
+    console.log(`[useProjections] Calculating projections for ${jobs.length} jobs`);
     // Calculate projections for all jobs using generic function
     const jobProjections = calculateGenericJobProjections(
       jobs,
       timeRanges,
     );
+    console.log(`[useProjections] Created ${jobProjections.length} job projections`);
 
     // Adjust projections based on actual production
     return jobProjections.map((projection) => {
@@ -360,8 +364,10 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     });
 
     // Apply date range filter first if enabled
+    // Skip date range filter when searching - show all search results regardless of date range
     let projectionsToFilter = adjustedJobProjections;
-    if (filters.showOnlyInDateRange) {
+    const hasSearchQuery = filters.searchQuery.trim().length > 0;
+    if (filters.showOnlyInDateRange && !hasSearchQuery) {
       const beforeDateFilter = projectionsToFilter.length;
       projectionsToFilter = adjustedJobProjections.filter((projection) => {
         // Check if any of the visible columns have production quantity > 0
@@ -377,15 +383,22 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         console.warn(`[useProjections] ⚠️ Date range filter removed ALL jobs! This might be why no jobs are showing.`);
       }
     } else {
-      console.log(
-        `[useProjections] Date range filter: OFF, Projections to filter: ${projectionsToFilter.length}`,
-      );
+      if (hasSearchQuery) {
+        console.log(
+          `[useProjections] Date range filter: SKIPPED (search active), Projections to filter: ${projectionsToFilter.length}`,
+        );
+      } else {
+        console.log(
+          `[useProjections] Date range filter: OFF, Projections to filter: ${projectionsToFilter.length}`,
+        );
+      }
     }
 
     // Determine which filters are active
     const hasClientFilter = filters.clients && filters.clients.length > 0;
     const hasServiceTypeFilter = filters.serviceTypes.length > 0;
-    const hasSearchFilter = filters.searchQuery.trim().length > 0;
+    // Skip client-side search filter when API search is being used
+    const hasSearchFilter = false; // API handles search, so skip client-side search filtering
     const hasScheduleFilter =
       filters.scheduleFilter && filters.scheduleFilter !== "all";
     const hasDynamicFieldFilter =
@@ -430,16 +443,8 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
               }
             );
           });
-        const matchesSearch =
-          hasSearchFilter &&
-          (() => {
-            const query = filters.searchQuery.toLowerCase();
-            return (
-              p.job.job_number.toString().includes(query) ||
-              p.job.client?.name.toLowerCase().includes(query) ||
-              p.job.description?.toLowerCase().includes(query)
-            );
-          })();
+        // Search is handled by API, so skip client-side search matching
+        const matchesSearch = false;
         const matchesSchedule =
           hasScheduleFilter &&
           (() => {
@@ -515,17 +520,8 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         console.log(`[ServiceTypeFilter] Filtered from ${beforeCount} to ${result.length} jobs with service types:`, filters.serviceTypes);
       }
 
-      if (hasSearchFilter) {
-        const query = filters.searchQuery.toLowerCase();
-        result = result.filter((p) => {
-          const job = p.job;
-          return (
-            job.job_number.toString().includes(query) ||
-            job.client?.name.toLowerCase().includes(query) ||
-            job.description?.toLowerCase().includes(query)
-          );
-        });
-      }
+      // Search is handled by API, so skip client-side search filtering
+      // (API already filtered results based on searchQuery)
 
       if (hasScheduleFilter) {
         result = result.filter((p) => {
