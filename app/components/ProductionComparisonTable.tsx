@@ -34,7 +34,13 @@ interface BatchEntryData {
 type SortField =
   | "job_number"
   | "job_name"
+  | "facility"
   | "client"
+  | "sub_client"
+  | "description"
+  | "quantity"
+  | "start_date"
+  | "due_date"
   | "date_entered"
   | "projected"
   | "actual"
@@ -131,9 +137,33 @@ export default function ProductionComparisonTable({
         aValue = a.job.job_name.toLowerCase();
         bValue = b.job.job_name.toLowerCase();
         break;
+      case "facility":
+        aValue = a.job.facility?.name.toLowerCase() || "";
+        bValue = b.job.facility?.name.toLowerCase() || "";
+        break;
       case "client":
         aValue = a.job.client?.name.toLowerCase() || "";
         bValue = b.job.client?.name.toLowerCase() || "";
+        break;
+      case "sub_client":
+        aValue = (a.job.sub_client || "").toLowerCase();
+        bValue = (b.job.sub_client || "").toLowerCase();
+        break;
+      case "description":
+        aValue = (a.job.description || "").toLowerCase();
+        bValue = (b.job.description || "").toLowerCase();
+        break;
+      case "quantity":
+        aValue = a.job.quantity;
+        bValue = b.job.quantity;
+        break;
+      case "start_date":
+        aValue = a.job.start_date || 0;
+        bValue = b.job.start_date || 0;
+        break;
+      case "due_date":
+        aValue = a.job.due_date || 0;
+        bValue = b.job.due_date || 0;
         break;
       case "date_entered":
         aValue = a.last_updated_at || 0;
@@ -540,31 +570,71 @@ export default function ProductionComparisonTable({
             <tr>
               <th
                 onClick={() => !isBatchMode && handleSort("job_number")}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   Job # {!isBatchMode && <SortIcon field="job_number" />}
                 </div>
               </th>
               <th
-                onClick={() => !isBatchMode && handleSort("job_name")}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                onClick={() => !isBatchMode && handleSort("facility")}
+                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
-                  Job Name {!isBatchMode && <SortIcon field="job_name" />}
+                  Facility {!isBatchMode && <SortIcon field="facility" />}
                 </div>
               </th>
               <th
                 onClick={() => !isBatchMode && handleSort("client")}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   Client {!isBatchMode && <SortIcon field="client" />}
                 </div>
               </th>
               <th
+                onClick={() => !isBatchMode && handleSort("sub_client")}
+                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+              >
+                <div className="flex items-center gap-2">
+                  Sub Client {!isBatchMode && <SortIcon field="sub_client" />}
+                </div>
+              </th>
+              <th
+                onClick={() => !isBatchMode && handleSort("description")}
+                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+              >
+                <div className="flex items-center gap-2">
+                  Description {!isBatchMode && <SortIcon field="description" />}
+                </div>
+              </th>
+              <th
+                onClick={() => !isBatchMode && handleSort("quantity")}
+                className={`px-2 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Qty {!isBatchMode && <SortIcon field="quantity" />}
+                </div>
+              </th>
+              <th
+                onClick={() => !isBatchMode && handleSort("start_date")}
+                className={`px-2 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Start {!isBatchMode && <SortIcon field="start_date" />}
+                </div>
+              </th>
+              <th
+                onClick={() => !isBatchMode && handleSort("due_date")}
+                className={`px-2 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  End {!isBatchMode && <SortIcon field="due_date" />}
+                </div>
+              </th>
+              <th
                 onClick={() => !isBatchMode && handleSort("date_entered")}
-                className={`px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   Date Entered{" "}
@@ -573,7 +643,7 @@ export default function ProductionComparisonTable({
               </th>
               <th
                 onClick={() => !isBatchMode && handleSort("projected")}
-                className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                className={`px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center justify-end gap-2">
                   Projected {getDisplayLabel()}{" "}
@@ -582,7 +652,7 @@ export default function ProductionComparisonTable({
               </th>
               <th
                 onClick={() => !isBatchMode && handleSort("actual")}
-                className={`px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                className={`px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
               >
                 <div className="flex items-center justify-end gap-2">
                   {isBatchMode ? "Current" : "Actual"} {getDisplayLabel()}{" "}
@@ -591,16 +661,16 @@ export default function ProductionComparisonTable({
               </th>
               {isBatchMode ? (
                 <>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                     Add Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                     Set Total
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                     New Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                     Notes
                   </th>
                 </>
@@ -608,13 +678,13 @@ export default function ProductionComparisonTable({
                 <>
                   <th
                     onClick={() => handleSort("variance")}
-                    className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   >
                     <div className="flex items-center justify-end gap-2">
                       Variance <SortIcon field="variance" />
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                     Variance %
                   </th>
                 </>
@@ -636,36 +706,57 @@ export default function ProductionComparisonTable({
                     !isEditing && !isBatchMode && onEdit && onEdit(comparison)
                   }
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
                     {comparison.job.job_number}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {comparison.job.job_name}
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
+                    {comparison.job.facility?.name || "Unknown"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
                     {comparison.job.client?.name || "Unknown"}
-                    {comparison.job.sub_client && (
-                      <span className="text-gray-400">
-                        {" "}
-                        / {comparison.job.sub_client}
-                      </span>
-                    )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
+                    {comparison.job.sub_client || "-"}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-gray-900 max-w-[200px] truncate">
+                    {comparison.job.description || "N/A"}
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-gray-900">
+                    {comparison.job.quantity.toLocaleString()}
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-600">
+                    {comparison.job.start_date
+                      ? new Date(comparison.job.start_date).toLocaleDateString("en-US", {
+                          month: "numeric",
+                          day: "numeric",
+                          year: "2-digit",
+                        })
+                      : "N/A"}
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-600">
+                    {comparison.job.due_date
+                      ? new Date(comparison.job.due_date).toLocaleDateString("en-US", {
+                          month: "numeric",
+                          day: "numeric",
+                          year: "2-digit",
+                        })
+                      : "N/A"}
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
                     {comparison.last_updated_at
                       ? new Date(
                           comparison.last_updated_at,
                         ).toLocaleDateString()
                       : "-"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-right">
                     {formatDisplayValue(
                       comparison.projected_quantity,
                       comparison.job,
                     )}
                   </td>
                   <td
-                    className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
+                    className={`px-2 py-2 whitespace-nowrap text-xs text-right font-semibold ${
                       comparison.actual_quantity > 0
                         ? "text-blue-600"
                         : "text-gray-900"
@@ -710,7 +801,7 @@ export default function ProductionComparisonTable({
                   </td>
                   {isBatchMode ? (
                     <>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 whitespace-nowrap">
                         <input
                           type="text"
                           value={
@@ -725,10 +816,10 @@ export default function ProductionComparisonTable({
                             )
                           }
                           placeholder="Add..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                         />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 whitespace-nowrap">
                         <input
                           type="text"
                           value={
@@ -743,17 +834,17 @@ export default function ProductionComparisonTable({
                             )
                           }
                           placeholder="Set..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                         />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
                         <span
                           className={`font-semibold ${hasInput ? "text-blue-600" : "text-gray-400"}`}
                         >
                           {newTotal.toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 whitespace-nowrap">
                         <input
                           type="text"
                           value={batchEntry?.notes || ""}
@@ -764,13 +855,13 @@ export default function ProductionComparisonTable({
                             )
                           }
                           placeholder="Optional notes"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                         />
                       </td>
                     </>
                   ) : (
                     <>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
                         <span
                           className={
                             comparison.variance >= 0
@@ -784,7 +875,7 @@ export default function ProductionComparisonTable({
                             : comparison.variance.toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
                             comparison.variance_percentage,
@@ -816,14 +907,20 @@ export default function ProductionComparisonTable({
                 <div className="font-semibold text-gray-900">
                   Job #{comparison.job.job_number}
                 </div>
-                <div className="text-sm text-gray-600">
-                  {comparison.job.job_name}
+                <div className="text-xs text-gray-500 mt-1">
+                  {comparison.job.facility?.name || "Unknown"}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
                   {comparison.job.client?.name || "Unknown"}
+                  {comparison.job.sub_client && ` / ${comparison.job.sub_client}`}
                 </div>
+                {comparison.job.description && (
+                  <div className="text-xs text-gray-600 mt-1 truncate">
+                    {comparison.job.description}
+                  </div>
+                )}
                 <div className="text-xs text-gray-500 mt-1">
-                  Entered:{" "}
+                  Qty: {comparison.job.quantity.toLocaleString()} | Entered:{" "}
                   {comparison.last_updated_at
                     ? new Date(comparison.last_updated_at).toLocaleDateString()
                     : "-"}

@@ -131,7 +131,7 @@ export default function ProductionPage() {
     refetch: refetchJobs,
   } = useJobsV2({
     facilities_id: selectedFacility || 0,
-    search: searchQuery.trim() || undefined, // Pass search to API when provided
+    search: searchQuery.trim() || "", // Pass search to API (empty string if no search)
     fetchAll: true, // Fetch all jobs for production tracking
   });
   const {

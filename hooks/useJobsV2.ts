@@ -152,26 +152,32 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
   const [allJobs, setAllJobs] = useState<ParsedJob[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  // Normalize search to always be a string (empty string if undefined or empty)
+  const normalizedSearch = search || "";
+
   // Create params object for the fetcher (page 1 only for initial fetch)
   const fetcherParams: UseJobsV2Params = {
     facilities_id,
     page: 1, // Always fetch page 1 first
     per_page,
-    search,
+    search: normalizedSearch,
     fetchAll: false, // Don't use fetchAll - we'll handle it manually
   };
 
-  // Create a unique key for SWR caching (page 1 only)
-  const key = JSON.stringify({
-    jobsV2: true,
-    ...fetcherParams,
-    page: 1,
-  });
+  // Create a unique key for SWR caching that includes all relevant params
+  // This ensures SWR refetches when search, facility, or per_page changes
+  const swrKey = [
+    "jobsV2",
+    facilities_id,
+    normalizedSearch,
+    per_page,
+    1, // page
+  ];
 
   // Fetch page 1 immediately using SWR
   const { data, error, isLoading, mutate } = useSWR(
-    [key, fetcherParams],
-    fetcher,
+    swrKey,
+    () => fetcher([swrKey.join("-"), fetcherParams]),
     {
       revalidateOnFocus: false,
       dedupingInterval: 10000,
@@ -188,7 +194,7 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
   useEffect(() => {
     setAllJobs([]);
     setIsLoadingMore(false);
-  }, [facilities_id, per_page, search]);
+  }, [facilities_id, per_page, normalizedSearch]);
 
   // Update accumulated jobs when page 1 loads
   useEffect(() => {
@@ -239,7 +245,7 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
 
     fetchRemainingPages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchAll, data?.pagination?.nextPage, data?.jobs?.length, isLoading]);
+  }, [fetchAll, data?.pagination?.nextPage, data?.jobs?.length, isLoading, normalizedSearch, facilities_id, per_page]);
 
   // Parse jobs data with memoization
   const jobs = useMemo(() => {
