@@ -1165,11 +1165,17 @@ export type DataHealthIssueType =
 // Get jobs that are missing cost entries (no job_cost_entry records)
 export const getJobsMissingCostEntries = async (
   facilitiesId?: number | null,
+  search?: string | null,
 ): Promise<Job[]> => {
   const params = new URLSearchParams();
   params.append("facilities_id", (facilitiesId ?? 0).toString());
+  if (search && search.trim()) {
+    params.append("search", search.trim());
+  }
 
   const endpoint = `/data_health/missing_price_per_m?${params.toString()}`;
+  
+  console.log("[getJobsMissingCostEntries] Calling API:", endpoint);
 
   const jobs = await apiFetch<Job[]>(
     endpoint,
@@ -1191,10 +1197,11 @@ export const getJobsMissingCostEntries = async (
 export const getJobsByHealthIssue = async (
   issueType: DataHealthIssueType,
   facilitiesId?: number | null,
+  search?: string | null,
 ): Promise<Job[]> => {
   // Handle missing_cost_per_m separately since it requires cost entries lookup
   if (issueType === "missing_cost_per_m") {
-    return getJobsMissingCostEntries(facilitiesId);
+    return getJobsMissingCostEntries(facilitiesId, search);
   }
 
   // Use the V2 API which is more reliable

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   getJobsByHealthIssue,
   bulkUpdateJobsWithProgress,
@@ -99,27 +99,51 @@ export default function DataHealthBulkFixModal({
   } | null>(null);
   const [bulkDate, setBulkDate] = useState<string>("");
   const [bulkCost, setBulkCost] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
   const [expandedJobs, setExpandedJobs] = useState<Set<number>>(new Set());
   const [editedServices, setEditedServices] = useState<Map<number, Map<number, string>>>(new Map());
   const [editingJobIds, setEditingJobIds] = useState<Set<number>>(new Set());
   const [editingRequirements, setEditingRequirements] = useState<Map<number, JobRequirement[]>>(new Map());
   const [savingJobIds, setSavingJobIds] = useState<Set<number>>(new Set());
+  const hasInitialFetch = useRef(false);
 
   const config = ISSUE_CONFIG[issueType];
   const isCostIssue = issueType === "missing_cost_per_m";
   const IconComponent = config.icon;
 
+  // Debounce search query
+  useEffect(() => {
+    if (!isCostIssue) return;
+    
+    console.log("[DataHealthBulkFixModal] Search query changed:", searchQuery);
+    
+    const timer = setTimeout(() => {
+      console.log("[DataHealthBulkFixModal] Debounced search query set to:", searchQuery);
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isCostIssue]);
+
   // Fetch jobs when modal opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      hasInitialFetch.current = false;
+      return;
+    }
 
     const fetchJobs = async () => {
       setIsLoading(true);
       setError(null);
       setSaveResult(null);
+      
+      // Reset state when modal first opens
       setEditedJobs(new Map());
       setBulkDate("");
       setBulkCost("");
+      setSearchQuery("");
+      setDebouncedSearchQuery("");
       setExpandedJobs(new Set());
       setEditedServices(new Map());
       setEditingJobIds(new Set());
@@ -129,8 +153,60 @@ export default function DataHealthBulkFixModal({
       try {
         const fetchedJobs = await getJobsByHealthIssue(
           issueType,
-          facilitiesId
+          facilitiesId,
+          isCostIssue ? "" : null
         );
+        setJobs(fetchedJobs);
+        hasInitialFetch.current = true;
+      } catch (err) {
+        console.error("[DataHealthBulkFixModal] Error fetching jobs:", err);
+        setError(err instanceof Error ? err.message : "Failed to load jobs");
+        hasInitialFetch.current = true;
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [isOpen, issueType, facilitiesId, isCostIssue]);
+
+  // Fetch jobs when search query changes (debounced)
+  useEffect(() => {
+    console.log("[DataHealthBulkFixModal] Search effect triggered:", {
+      isOpen,
+      isCostIssue,
+      hasInitialFetch: hasInitialFetch.current,
+      debouncedSearchQuery
+    });
+    
+    if (!isOpen || !isCostIssue) {
+      console.log("[DataHealthBulkFixModal] Search effect skipped: modal not open or not cost issue");
+      return;
+    }
+    
+    // If initial fetch hasn't completed, mark it as complete and proceed with search
+    // This allows search to work even if user types before initial load finishes
+    if (!hasInitialFetch.current) {
+      hasInitialFetch.current = true;
+    }
+    
+    const fetchJobs = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const searchParam = debouncedSearchQuery && debouncedSearchQuery.trim() 
+          ? debouncedSearchQuery.trim() 
+          : null;
+        
+        console.log("[DataHealthBulkFixModal] Fetching jobs with search:", searchParam);
+        
+        const fetchedJobs = await getJobsByHealthIssue(
+          issueType,
+          facilitiesId,
+          searchParam
+        );
+        console.log("[DataHealthBulkFixModal] Jobs fetched:", fetchedJobs.length);
         setJobs(fetchedJobs);
       } catch (err) {
         console.error("[DataHealthBulkFixModal] Error fetching jobs:", err);
@@ -141,7 +217,7 @@ export default function DataHealthBulkFixModal({
     };
 
     fetchJobs();
-  }, [isOpen, issueType, facilitiesId]);
+  }, [debouncedSearchQuery, isOpen, issueType, facilitiesId, isCostIssue]);
 
   // Auto-calculate cost when inline editing requirements change
   useEffect(() => {
@@ -1029,6 +1105,19 @@ export default function DataHealthBulkFixModal({
                   )}
                 </div>
               </div>
+
+              {/* Search - Only for missing_cost_per_m */}
+              {isCostIssue && (
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search jobs by job number, client, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
 
               {/* Jobs Table */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">
