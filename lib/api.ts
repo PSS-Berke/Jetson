@@ -1208,6 +1208,7 @@ export const getJobsByHealthIssue = async (
   const response = await getJobsV2({
     facilities_id: facilitiesId || 0,
     per_page: 10000, // Get all jobs
+    search: search || "",
   });
 
   // Convert JobV2 to Job format (they're compatible for our needs)

@@ -114,8 +114,6 @@ export default function DataHealthBulkFixModal({
 
   // Debounce search query
   useEffect(() => {
-    if (!isCostIssue) return;
-    
     console.log("[DataHealthBulkFixModal] Search query changed:", searchQuery);
     
     const timer = setTimeout(() => {
@@ -124,7 +122,7 @@ export default function DataHealthBulkFixModal({
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
-  }, [searchQuery, isCostIssue]);
+  }, [searchQuery]);
 
   // Fetch jobs when modal opens
   useEffect(() => {
@@ -154,7 +152,7 @@ export default function DataHealthBulkFixModal({
         const fetchedJobs = await getJobsByHealthIssue(
           issueType,
           facilitiesId,
-          isCostIssue ? "" : null
+          ""
         );
         setJobs(fetchedJobs);
         hasInitialFetch.current = true;
@@ -168,19 +166,18 @@ export default function DataHealthBulkFixModal({
     };
 
     fetchJobs();
-  }, [isOpen, issueType, facilitiesId, isCostIssue]);
+  }, [isOpen, issueType, facilitiesId]);
 
   // Fetch jobs when search query changes (debounced)
   useEffect(() => {
     console.log("[DataHealthBulkFixModal] Search effect triggered:", {
       isOpen,
-      isCostIssue,
       hasInitialFetch: hasInitialFetch.current,
       debouncedSearchQuery
     });
     
-    if (!isOpen || !isCostIssue) {
-      console.log("[DataHealthBulkFixModal] Search effect skipped: modal not open or not cost issue");
+    if (!isOpen) {
+      console.log("[DataHealthBulkFixModal] Search effect skipped: modal not open");
       return;
     }
     
@@ -197,7 +194,7 @@ export default function DataHealthBulkFixModal({
       try {
         const searchParam = debouncedSearchQuery && debouncedSearchQuery.trim() 
           ? debouncedSearchQuery.trim() 
-          : null;
+          : "";
         
         console.log("[DataHealthBulkFixModal] Fetching jobs with search:", searchParam);
         
@@ -217,7 +214,7 @@ export default function DataHealthBulkFixModal({
     };
 
     fetchJobs();
-  }, [debouncedSearchQuery, isOpen, issueType, facilitiesId, isCostIssue]);
+  }, [debouncedSearchQuery, isOpen, issueType, facilitiesId]);
 
   // Auto-calculate cost when inline editing requirements change
   useEffect(() => {
@@ -1106,18 +1103,16 @@ export default function DataHealthBulkFixModal({
                 </div>
               </div>
 
-              {/* Search - Only for missing_cost_per_m */}
-              {isCostIssue && (
-                <div className="mb-4">
-                  <input
-                    type="text"
-                    placeholder="Search jobs by job number, client, or description..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              )}
+              {/* Search */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Search jobs by job number, client, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
               {/* Jobs Table */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">
