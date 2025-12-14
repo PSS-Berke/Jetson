@@ -13,6 +13,9 @@ interface AddJobModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  initialFormData?: JobFormData | null;
+  sideBySide?: boolean;
+  version?: number;
 }
 
 interface Requirement {
@@ -61,10 +64,13 @@ interface JobTemplate {
   job_number?: string;
 }
 
-export default function AddJobModal({
+function AddJobModal({
   isOpen,
   onClose,
   onSuccess,
+  initialFormData = null,
+  sideBySide = false,
+  version = 1,
 }: AddJobModalProps) {
   const [creationMode, setCreationMode] = useState<JobCreationMode>(null);
   const [currentStep, setCurrentStep] = useState(0); // Start at step 0 for mode selection
@@ -97,6 +103,8 @@ export default function AddJobModal({
   const [selectedTemplate, setSelectedTemplate] = useState<JobTemplate | null>(null);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showNewVersionModal, setShowNewVersionModal] = useState(false);
+  const [newVersionFormData, setNewVersionFormData] = useState<JobFormData | null>(null);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
@@ -260,6 +268,15 @@ export default function AddJobModal({
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
+
+  // Initialize form data when modal opens with initialFormData
+  useEffect(() => {
+    if (isOpen && initialFormData) {
+      setFormData(initialFormData);
+      setCreationMode("new");
+      setCurrentStep(1); // Start at job details step
+    }
+  }, [isOpen, initialFormData]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -848,10 +865,7 @@ export default function AddJobModal({
       if (splitResults.length > 0) {
         const splitTotal = getSplitResultsTotal();
         const quantity = parseInt(formData.quantity || "0");
-        if (splitTotal !== quantity) {
-          alert("Calculated quantity split total must equal the total quantity");
-          return;
-        }
+
       }
       setCurrentStep(2);
       return;
@@ -938,6 +952,19 @@ export default function AddJobModal({
         setCurrentStep(currentStep - 1);
       }
     }
+  };
+
+  // Handle opening new version modal with pre-filled data
+  const handleNewVersion = () => {
+    // Create a copy of current form data for the new version
+    const versionedFormData: JobFormData = {
+      ...formData,
+      // Optionally modify job_number to indicate it's a new version
+      // For now, we'll keep it the same and let the user modify it
+      job_number: formData.job_number, // User can modify this in the new modal
+    };
+    setNewVersionFormData(versionedFormData);
+    setShowNewVersionModal(true);
   };
 
   // Get the maximum step number based on mode
@@ -1468,14 +1495,21 @@ export default function AddJobModal({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
-      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10">
+    <div className={`fixed inset-0 flex items-center ${sideBySide ? 'z-[55]' : showNewVersionModal ? 'z-50' : 'z-50'} p-2 sm:p-4 ${sideBySide ? 'justify-end' : showNewVersionModal ? 'justify-start' : 'justify-center'}`}>
+      {!sideBySide && <div className="absolute inset-0 bg-black/30" onClick={handleClose} />}
+      <div className={`bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10 ${sideBySide ? 'mr-4' : showNewVersionModal ? 'ml-4' : ''}`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
-          <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
-            Add New Job
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
+              Add New Job
+            </h2>
+            {version > 1 && (
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                Version {version}
+              </span>
+            )}
+          </div>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
@@ -2690,6 +2724,15 @@ export default function AddJobModal({
                   </button>
                 ) : (
                   <>
+                    {!isCreatingTemplate && (
+                      <button
+                        type="button"
+                        onClick={handleNewVersion}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                      >
+                        New Version
+                      </button>
+                    )}
                     {isCreatingTemplate ? (
                       <button
                         type="button"
@@ -2921,6 +2964,29 @@ export default function AddJobModal({
           onClose={() => setShowSuccessToast(false)}
         />
       )}
+
+      {/* New Version Modal - Positioned to the right */}
+      {showNewVersionModal && newVersionFormData && (
+        <AddJobModal
+          isOpen={showNewVersionModal}
+          onClose={() => {
+            setShowNewVersionModal(false);
+            setNewVersionFormData(null);
+          }}
+          onSuccess={() => {
+            setShowNewVersionModal(false);
+            setNewVersionFormData(null);
+            if (onSuccess) {
+              onSuccess();
+            }
+          }}
+          initialFormData={newVersionFormData}
+          sideBySide={true}
+          version={version + 1}
+        />
+      )}
     </div>
   );
 }
+
+export default AddJobModal;
