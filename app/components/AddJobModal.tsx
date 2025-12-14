@@ -16,6 +16,11 @@ interface AddJobModalProps {
   initialFormData?: JobFormData | null;
   sideBySide?: boolean;
   version?: number;
+  versionName?: string;
+  versionGroupUuid?: string;
+  onVersionDataUpdate?: (version: number, data: JobFormData, versionName: string, splitResults: Array<{ Date: string; CalendarDayInWeek: number; CalendarWeek: number; Quantity: number }>, scheduleType: string) => void;
+  onSubmitAllVersions?: () => Promise<void>;
+  parentVersionRef?: React.MutableRefObject<{ submit: () => Promise<void> } | null>;
 }
 
 interface Requirement {
@@ -64,6 +69,16 @@ interface JobTemplate {
   job_number?: string;
 }
 
+// Helper function to generate a 20-character random string
+const generateVersionGroupUuid = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 20; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
 function AddJobModal({
   isOpen,
   onClose,
@@ -71,6 +86,11 @@ function AddJobModal({
   initialFormData = null,
   sideBySide = false,
   version = 1,
+  versionName: initialVersionName = "",
+  versionGroupUuid: providedVersionGroupUuid,
+  onVersionDataUpdate,
+  onSubmitAllVersions,
+  parentVersionRef,
 }: AddJobModalProps) {
   const [creationMode, setCreationMode] = useState<JobCreationMode>(null);
   const [currentStep, setCurrentStep] = useState(0); // Start at step 0 for mode selection
@@ -105,6 +125,11 @@ function AddJobModal({
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [showNewVersionModal, setShowNewVersionModal] = useState(false);
   const [newVersionFormData, setNewVersionFormData] = useState<JobFormData | null>(null);
+  const defaultVersionName = initialVersionName || `v${version}`;
+  const [versionName, setVersionName] = useState<string>(defaultVersionName);
+  const [versionGroupUuid] = useState<string>(() => providedVersionGroupUuid || generateVersionGroupUuid());
+  const [allVersionsData, setAllVersionsData] = useState<Map<number, { data: JobFormData; versionName: string; splitResults: typeof splitResults; scheduleType: string }>>(new Map());
+  const submitRef = useRef<{ submit: () => Promise<void> } | null>(null);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
@@ -276,7 +301,40 @@ function AddJobModal({
       setCreationMode("new");
       setCurrentStep(1); // Start at job details step
     }
-  }, [isOpen, initialFormData]);
+    if (isOpen) {
+      setVersionName(initialVersionName || `v${version}`);
+    }
+  }, [isOpen, initialFormData, initialVersionName, version]);
+
+  // Update version data whenever formData, versionName, splitResults, or scheduleType changes
+  useEffect(() => {
+    if (isOpen && onVersionDataUpdate) {
+      onVersionDataUpdate(version, formData, versionName, splitResults, scheduleType);
+    }
+    // Also update local tracking
+    setAllVersionsData(prev => {
+      const updated = new Map(prev);
+      updated.set(version, { data: formData, versionName, splitResults, scheduleType });
+      return updated;
+    });
+  }, [formData, versionName, splitResults, scheduleType, version, isOpen, onVersionDataUpdate]);
+
+  // Expose submit function via ref for parent access
+  useEffect(() => {
+    if (parentVersionRef) {
+      parentVersionRef.current = {
+        submit: async () => {
+          if (currentStep === 3) {
+            setCanSubmit(true);
+            const form = document.querySelector("form");
+            if (form) {
+              form.requestSubmit();
+            }
+          }
+        },
+      };
+    }
+  }, [parentVersionRef, currentStep]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -291,6 +349,7 @@ function AddJobModal({
       setRunSaturdays(false);
       setSplitResults([]);
       setScheduleType("soft schedule");
+      setVersionName("v1");
       setFormData({
         job_number: "",
         clients_id: null,
@@ -1265,6 +1324,82 @@ function AddJobModal({
     });
   };
 
+  // Helper function to build payload for a single version
+  const buildVersionPayload = (
+    versionData: JobFormData,
+    versionNum: number,
+    versionNameStr: string,
+    versionSplitResults: typeof splitResults,
+    versionScheduleType: string,
+  ): Record<string, unknown> => {
+    // Filter to only valid requirements
+    const validRequirements = getValidRequirements(versionData.requirements);
+    const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
+
+    // Calculate total billing
+    const quantity = parseInt(versionData.quantity) || 0;
+    const calculatedRevenue = cleanedRequirements.reduce((total, req) => {
+      const pricePerM = parseFloat(String(req.price_per_m || "0")) || 0;
+      const additionalCosts = calculateAdditionalCosts(req, quantity);
+      return total + (quantity / 1000) * pricePerM + additionalCosts;
+    }, 0);
+
+    const addOnCharges = parseFloat(String(versionData.add_on_charges || "0")) || 0;
+    const calculatedTotalBilling = calculatedRevenue + addOnCharges;
+    const actualPricePerM = quantity > 0 ? calculatedTotalBilling / (quantity / 1000) : null;
+
+    // Convert date strings to timestamps
+    const startDateTimestamp: number | undefined = versionData.start_date
+      ? new Date(versionData.start_date).getTime()
+      : undefined;
+    const dueDateTimestamp: number | undefined = versionData.due_date
+      ? new Date(versionData.due_date).getTime()
+      : undefined;
+
+    // Convert splitResults to daily_split format
+    const formatDateToDDMMYYYY = (dateString: string): string => {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
+    };
+
+    const dailySplit = versionSplitResults.length > 0
+      ? versionSplitResults.map((item) => ({
+          date: formatDateToDDMMYYYY(item.Date),
+          quantity: item.Quantity,
+        }))
+      : [];
+
+    return {
+      job_number: versionData.job_number || "",
+      service_type: versionData.service_type || "",
+      quantity: quantity,
+      description: versionData.description || "",
+      start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : null,
+      due_date: dueDateTimestamp && dueDateTimestamp > 0 ? dueDateTimestamp : null,
+      time_estimate: null,
+      clients_id: versionData.clients_id || 0,
+      machines_id: versionData.machines_id || [],
+      job_name: versionData.job_name || "",
+      prgm: versionData.prgm || "",
+      csr: versionData.csr || "",
+      requirements: cleanedRequirements || [],
+      total_billing: calculatedTotalBilling > 0 ? calculatedTotalBilling : null,
+      actual_cost_per_m: actualPricePerM !== null && !Number.isNaN(actualPricePerM) ? actualPricePerM : null,
+      facilities_id: versionData.facilities_id,
+      daily_split: dailySplit,
+      sub_client_id: versionData.sub_clients_id || 0,
+      schedule_type: versionScheduleType || "soft schedule",
+      version_group_uuid: versionGroupUuid,
+      version_name: versionNameStr,
+      exclude_from_calculations: versionNum > 1, // true for all except v1
+      actual_quantity: quantity,
+      actual_quantity_entered: null,
+    };
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -1273,161 +1408,103 @@ function AddJobModal({
       return;
     }
 
-    setCanSubmit(false); // Reset the flag
+    // If this is a child modal (version > 1) and we have a parent submit handler, trigger it
+    if (version > 1 && onSubmitAllVersions) {
+      // Update parent with current data first
+      if (onVersionDataUpdate) {
+        onVersionDataUpdate(version, formData, versionName, splitResults, scheduleType);
+      }
+      // Trigger parent submission
+      await onSubmitAllVersions();
+      return;
+    }
+
+    setCanSubmit(false);
     setSubmitting(true);
 
     try {
       const token = getToken();
 
-      // Filter to only valid requirements (those with process_type and at least one field)
-      const validRequirements = getValidRequirements(formData.requirements);
-      
-      // Clean each requirement to remove unselected fields (false, empty, null, undefined)
-      // This ensures unselected fields are completely omitted from the POST request
-      const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
-
-      // Calculate total billing from valid requirements only
-      const quantity = parseInt(formData.quantity) || 0;
-      const calculatedRevenue = cleanedRequirements.reduce((total, req) => {
-        const pricePerM = parseFloat(String(req.price_per_m || "0")) || 0;
-
-        // Calculate additional field costs (only for selected fields)
-        const additionalCosts = calculateAdditionalCosts(req, quantity);
-
-        return total + (quantity / 1000) * pricePerM + additionalCosts;
-      }, 0);
-
-      const addOnCharges = parseFloat(String(formData.add_on_charges || "0")) || 0;
-      const calculatedTotalBilling = calculatedRevenue + addOnCharges;
-      const actualPricePerM =
-        quantity > 0 ? calculatedTotalBilling / (quantity / 1000) : null;
-
-      // Convert date strings to timestamps
-      const startDateTimestamp: number | undefined = formData.start_date
-        ? new Date(formData.start_date).getTime()
-        : undefined;
-      const dueDateTimestamp: number | undefined = formData.due_date
-        ? new Date(formData.due_date).getTime()
-        : undefined;
-
-      // Convert splitResults to daily_split format for new API
-      // Format: [{ date: "01.01.2026", quantity: 1000 }]
-      // Date format: DD.MM.YYYY
-      const formatDateToDDMMYYYY = (dateString: string): string => {
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}.${month}.${year}`;
-      };
-
-      const dailySplit = splitResults.length > 0
-        ? splitResults.map((item) => ({
-            date: formatDateToDDMMYYYY(item.Date),
-            quantity: item.Quantity,
-          }))
-        : [];
-
-      // Use the selected schedule type directly
-
-      // Prepare the payload according to the new v2 API specification
-      // Only include valid requirements in the request body
-      const payload: Record<string, unknown> = {
-        job_number: formData.job_number || "",
-        service_type: formData.service_type || "",
-        quantity: quantity,
-        description: formData.description || "",
-        start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : null,
-        due_date: dueDateTimestamp && dueDateTimestamp > 0 ? dueDateTimestamp : null,
-        time_estimate: null,
-        clients_id: formData.clients_id || 0,
-        machines_id: formData.machines_id || [],
-        job_name: formData.job_name || "",
-        prgm: formData.prgm || "",
-        csr: formData.csr || "",
-        requirements: cleanedRequirements || [],
-        total_billing: calculatedTotalBilling > 0 ? calculatedTotalBilling : null,
-        actual_cost_per_m:
-          actualPricePerM !== null && !Number.isNaN(actualPricePerM)
-            ? actualPricePerM
-            : null,
-        facilities_id: formData.facilities_id,
-        daily_split: dailySplit,
-        sub_client_id: formData.sub_clients_id || 0,
-        schedule_type: scheduleType || "soft schedule",
-      };
-
-      console.log(
-        "[AddJobModal] All requirements:",
-        formData.requirements,
-      );
-      console.log(
-        "[AddJobModal] Valid requirements (filtered):",
-        validRequirements,
-      );
-      console.log(
-        "[AddJobModal] Cleaned requirements (unselected fields removed):",
-        cleanedRequirements,
-      );
-      console.log(
-        "[AddJobModal] Requirements after stringify:",
-        JSON.stringify(cleanedRequirements),
-      );
-      console.log(
-        "[AddJobModal] facilities_id in formData:",
-        formData.facilities_id,
-      );
-      console.log(
-        "[AddJobModal] facilities_id in payload:",
-        payload.facilities_id,
-      );
-      console.log("[AddJobModal] Full payload being sent to Xano:", payload);
-      console.log(
-        "[AddJobModal] JSON stringified payload:",
-        JSON.stringify(payload, null, 2),
-      );
-
-      const response = await fetch(
-        "https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/v2",
+      // Collect all versions - start with current version
+      const allVersions: Array<{ version: number; data: JobFormData; versionName: string; splitResults: typeof splitResults; scheduleType: string }> = [
         {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+          version,
+          data: formData,
+          versionName,
+          splitResults,
+          scheduleType,
         },
-      );
+      ];
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Xano API Error:", errorData);
-        throw new Error(`Failed to create job: ${JSON.stringify(errorData)}`);
-      }
+      // Add other versions from tracking
+      allVersionsData.forEach((versionInfo, versionNum) => {
+        if (versionNum !== version) {
+          allVersions.push({
+            version: versionNum,
+            data: versionInfo.data,
+            versionName: versionInfo.versionName,
+            splitResults: versionInfo.splitResults,
+            scheduleType: versionInfo.scheduleType,
+          });
+        }
+      });
 
-      const responseData = await response.json();
-      console.log("Xano API Response:", responseData);
-      console.log(
-        "[AddJobModal] facilities_id in API response:",
-        responseData.facilities_id,
-      );
+      // Sort by version number
+      allVersions.sort((a, b) => a.version - b.version);
 
-      // Auto-sync job_cost_entry from valid requirements only
-      try {
-        const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
-        await syncJobCostEntryFromRequirements(
-          responseData.id,
-          cleanedRequirements,
-          formData.start_date,
-          formData.facilities_id || undefined,
+      // Submit all versions
+      const submitPromises = allVersions.map(async (versionInfo) => {
+        const payload = buildVersionPayload(
+          versionInfo.data,
+          versionInfo.version,
+          versionInfo.versionName,
+          versionInfo.splitResults,
+          versionInfo.scheduleType,
         );
-        console.log("[AddJobModal] Job cost entry synced successfully");
-      } catch (costError) {
-        console.error(
-          "[AddJobModal] Failed to sync job cost entry (non-blocking):",
-          costError,
+
+        console.log(`[AddJobModal] Submitting version ${versionInfo.version} (${versionInfo.versionName}):`, payload);
+
+        const response = await fetch(
+          "https://xnpm-iauo-ef2d.n7e.xano.io/api:1RpGaTf6/jobs/v2",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          },
         );
-        // Don't fail job creation if cost entry sync fails
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(`[AddJobModal] Error submitting version ${versionInfo.version}:`, errorData);
+          throw new Error(`Failed to create job version ${versionInfo.version}: ${JSON.stringify(errorData)}`);
+        }
+
+        const responseData = await response.json();
+        console.log(`[AddJobModal] Version ${versionInfo.version} created:`, responseData);
+        return responseData;
+      });
+
+      const results = await Promise.all(submitPromises);
+
+      // Auto-sync job_cost_entry for the first (primary) version
+      if (results.length > 0 && results[0].id) {
+        try {
+          const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
+          const validRequirements = getValidRequirements(formData.requirements);
+          const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
+          await syncJobCostEntryFromRequirements(
+            results[0].id,
+            cleanedRequirements,
+            formData.start_date,
+            formData.facilities_id || undefined,
+          );
+          console.log("[AddJobModal] Job cost entry synced successfully");
+        } catch (costError) {
+          console.error("[AddJobModal] Failed to sync job cost entry (non-blocking):", costError);
+        }
       }
 
       const jobNum = parseInt(formData.job_number);
@@ -1495,20 +1572,46 @@ function AddJobModal({
   };
 
   return (
-    <div className={`fixed inset-0 flex items-center ${sideBySide ? 'z-[55]' : showNewVersionModal ? 'z-50' : 'z-50'} p-2 sm:p-4 ${sideBySide ? 'justify-end' : showNewVersionModal ? 'justify-start' : 'justify-center'}`}>
-      {!sideBySide && <div className="absolute inset-0 bg-black/30" onClick={handleClose} />}
-      <div className={`bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10 ${sideBySide ? 'mr-4' : showNewVersionModal ? 'ml-4' : ''}`}>
+    <div 
+      className={`fixed inset-0 flex items-center ${sideBySide ? 'z-[55]' : showNewVersionModal ? 'z-[51]' : 'z-50'} p-2 sm:p-4 ${sideBySide ? 'justify-end' : showNewVersionModal ? 'justify-start' : 'justify-center'}`}
+      style={sideBySide ? { pointerEvents: 'none' } : {}}
+    >
+      {!sideBySide && !showNewVersionModal && (
+        <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
+      )}
+      {!sideBySide && showNewVersionModal && (
+        <div 
+          className="absolute inset-0 bg-black/20" 
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
+      <div 
+        className={`bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10 ${sideBySide ? 'mr-4' : showNewVersionModal ? 'ml-4' : ''}`}
+        style={{ pointerEvents: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
               Add New Job
             </h2>
-            {version > 1 && (
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
-                Version {version}
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full whitespace-nowrap">
+                {versionName}
               </span>
-            )}
+              <input
+                type="text"
+                value={versionName}
+                onChange={(e) => setVersionName(e.target.value)}
+                placeholder={`v${version}`}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{ minWidth: '150px', maxWidth: '200px' }}
+              />
+            </div>
           </div>
           <button
             onClick={handleClose}
@@ -1761,9 +1864,11 @@ function AddJobModal({
                     Sub Client
                   </label>
                   <SmartClientSelect
+                    key={`sub-client-${formData.sub_clients_id}-${formData.sub_client_name}`}
                     value={formData.sub_clients_id}
                     onChange={handleSubClientChange}
                     required={false}
+                    initialClientName={formData.sub_client_name || undefined}
                   />
                 </div>
               </div>
@@ -2983,6 +3088,25 @@ function AddJobModal({
           initialFormData={newVersionFormData}
           sideBySide={true}
           version={version + 1}
+          versionName={`v${version + 1}`}
+          versionGroupUuid={versionGroupUuid}
+          onVersionDataUpdate={(v, data, vName, vSplitResults, vScheduleType) => {
+            setAllVersionsData(prev => {
+              const updated = new Map(prev);
+              updated.set(v, { data, versionName: vName, splitResults: vSplitResults, scheduleType: vScheduleType });
+              return updated;
+            });
+          }}
+          onSubmitAllVersions={async () => {
+            // Trigger parent's submit
+            if (currentStep === 3) {
+              setCanSubmit(true);
+              const form = document.querySelector("form");
+              if (form) {
+                form.requestSubmit();
+              }
+            }
+          }}
         />
       )}
     </div>
