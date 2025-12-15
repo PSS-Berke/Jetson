@@ -1022,7 +1022,7 @@ export interface TimeSplit {
 /**
  * Job with time_split data from v2 API
  */
-export interface JobV2 extends Omit<Job, "machines_id" | "client"> {
+export interface JobV2 extends Omit<Job, "machines_id" | "client" | "daily_split"> {
   machines_id: number[]; // Array instead of string
   time_split: TimeSplit | null;
   sub_client_id?: number;
