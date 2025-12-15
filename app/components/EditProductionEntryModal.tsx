@@ -47,7 +47,7 @@ export default function EditProductionEntryModal({
           comparison.projected_quantity) *
         100
       : 0;
-
+    console.log("")
   // Load existing production entry when modal opens
   useEffect(() => {
     const loadExistingEntry = async () => {
