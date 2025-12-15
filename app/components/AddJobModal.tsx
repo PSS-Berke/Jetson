@@ -14,13 +14,6 @@ interface AddJobModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   initialFormData?: JobFormData | null;
-  sideBySide?: boolean;
-  version?: number;
-  versionName?: string;
-  versionGroupUuid?: string;
-  onVersionDataUpdate?: (version: number, data: JobFormData, versionName: string, splitResults: Array<{ Date: string; CalendarDayInWeek: number; CalendarWeek: number; Quantity: number }>, scheduleType: string) => void;
-  onSubmitAllVersions?: () => Promise<void>;
-  parentVersionRef?: React.MutableRefObject<{ submit: () => Promise<void> } | null>;
 }
 
 interface Requirement {
@@ -84,13 +77,6 @@ function AddJobModal({
   onClose,
   onSuccess,
   initialFormData = null,
-  sideBySide = false,
-  version = 1,
-  versionName: initialVersionName = "",
-  versionGroupUuid: providedVersionGroupUuid,
-  onVersionDataUpdate,
-  onSubmitAllVersions,
-  parentVersionRef,
 }: AddJobModalProps) {
   const [creationMode, setCreationMode] = useState<JobCreationMode>(null);
   const [currentStep, setCurrentStep] = useState(0); // Start at step 0 for mode selection
@@ -123,13 +109,18 @@ function AddJobModal({
   const [selectedTemplate, setSelectedTemplate] = useState<JobTemplate | null>(null);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [showNewVersionModal, setShowNewVersionModal] = useState(false);
-  const [newVersionFormData, setNewVersionFormData] = useState<JobFormData | null>(null);
-  const defaultVersionName = initialVersionName || `v${version}`;
-  const [versionName, setVersionName] = useState<string>(defaultVersionName);
-  const [versionGroupUuid] = useState<string>(() => providedVersionGroupUuid || generateVersionGroupUuid());
-  const [allVersionsData, setAllVersionsData] = useState<Map<number, { data: JobFormData; versionName: string; splitResults: typeof splitResults; scheduleType: string }>>(new Map());
-  const submitRef = useRef<{ submit: () => Promise<void> } | null>(null);
+  // Version management - single modal approach
+  const [currentVersionNumber, setCurrentVersionNumber] = useState(1);
+  const [versionName, setVersionName] = useState<string>("v1");
+  const [versionGroupUuid] = useState<string>(() => generateVersionGroupUuid());
+  const [savedVersions, setSavedVersions] = useState<Array<{
+    versionNumber: number;
+    versionName: string;
+    data: JobFormData;
+    splitResults: Array<{ Date: string; CalendarDayInWeek: number; CalendarWeek: number; Quantity: number }>;
+    scheduleType: string;
+  }>>([]);
+  const [editingVersionIndex, setEditingVersionIndex] = useState<number | null>(null);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
@@ -301,40 +292,7 @@ function AddJobModal({
       setCreationMode("new");
       setCurrentStep(1); // Start at job details step
     }
-    if (isOpen) {
-      setVersionName(initialVersionName || `v${version}`);
-    }
-  }, [isOpen, initialFormData, initialVersionName, version]);
-
-  // Update version data whenever formData, versionName, splitResults, or scheduleType changes
-  useEffect(() => {
-    if (isOpen && onVersionDataUpdate) {
-      onVersionDataUpdate(version, formData, versionName, splitResults, scheduleType);
-    }
-    // Also update local tracking
-    setAllVersionsData(prev => {
-      const updated = new Map(prev);
-      updated.set(version, { data: formData, versionName, splitResults, scheduleType });
-      return updated;
-    });
-  }, [formData, versionName, splitResults, scheduleType, version, isOpen, onVersionDataUpdate]);
-
-  // Expose submit function via ref for parent access
-  useEffect(() => {
-    if (parentVersionRef) {
-      parentVersionRef.current = {
-        submit: async () => {
-          if (currentStep === 3) {
-            setCanSubmit(true);
-            const form = document.querySelector("form");
-            if (form) {
-              form.requestSubmit();
-            }
-          }
-        },
-      };
-    }
-  }, [parentVersionRef, currentStep]);
+  }, [isOpen, initialFormData]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -350,6 +308,9 @@ function AddJobModal({
       setSplitResults([]);
       setScheduleType("soft schedule");
       setVersionName("v1");
+      setCurrentVersionNumber(1);
+      setSavedVersions([]);
+      setEditingVersionIndex(null);
       setFormData({
         job_number: "",
         clients_id: null,
@@ -1013,17 +974,78 @@ function AddJobModal({
     }
   };
 
-  // Handle opening new version modal with pre-filled data
-  const handleNewVersion = () => {
-    // Create a copy of current form data for the new version
-    const versionedFormData: JobFormData = {
-      ...formData,
-      // Optionally modify job_number to indicate it's a new version
-      // For now, we'll keep it the same and let the user modify it
-      job_number: formData.job_number, // User can modify this in the new modal
-    };
-    setNewVersionFormData(versionedFormData);
-    setShowNewVersionModal(true);
+  // Handle adding a new version - saves current and copies data for next
+  const handleAddVersion = () => {
+    // Save current version to the list
+    setSavedVersions(prev => [...prev, {
+      versionNumber: editingVersionIndex !== null ? savedVersions[editingVersionIndex].versionNumber : currentVersionNumber,
+      versionName: versionName,
+      data: { ...formData },
+      splitResults: [...splitResults],
+      scheduleType: scheduleType,
+    }]);
+
+    // If we were editing an existing version, remove it from saved (it's now updated)
+    if (editingVersionIndex !== null) {
+      setSavedVersions(prev => prev.filter((_, i) => i !== editingVersionIndex));
+      // Re-add the updated version
+      setSavedVersions(prev => {
+        const updated = [...prev];
+        updated.splice(editingVersionIndex, 0, {
+          versionNumber: savedVersions[editingVersionIndex].versionNumber,
+          versionName: versionName,
+          data: { ...formData },
+          splitResults: [...splitResults],
+          scheduleType: scheduleType,
+        });
+        return updated;
+      });
+    }
+
+    // Increment version number for new version, KEEP form data as starting point
+    const nextVersionNumber = currentVersionNumber + 1;
+    setCurrentVersionNumber(nextVersionNumber);
+    setVersionName(`v${nextVersionNumber}`);
+    setEditingVersionIndex(null);
+    // Form data stays the same - user modifies what's different
+    setCurrentStep(1); // Go back to job details for new version
+  };
+
+  // Handle editing an existing saved version
+  const handleEditVersion = (index: number) => {
+    const versionToEdit = savedVersions[index];
+    // Load the version data into the form
+    setFormData(versionToEdit.data);
+    setVersionName(versionToEdit.versionName);
+    setSplitResults(versionToEdit.splitResults);
+    setScheduleType(versionToEdit.scheduleType);
+    setCurrentVersionNumber(versionToEdit.versionNumber);
+    setEditingVersionIndex(index);
+    setCurrentStep(1); // Go to details step for editing
+  };
+
+  // Handle removing a saved version
+  const handleRemoveVersion = (index: number) => {
+    setSavedVersions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle saving current version without adding another
+  const handleSaveVersion = () => {
+    if (editingVersionIndex !== null) {
+      // Update existing version in the list
+      setSavedVersions(prev => {
+        const updated = [...prev];
+        updated[editingVersionIndex] = {
+          versionNumber: savedVersions[editingVersionIndex].versionNumber,
+          versionName: versionName,
+          data: { ...formData },
+          splitResults: [...splitResults],
+          scheduleType: scheduleType,
+        };
+        return updated;
+      });
+      setEditingVersionIndex(null);
+    }
   };
 
   // Get the maximum step number based on mode
@@ -1408,46 +1430,48 @@ function AddJobModal({
       return;
     }
 
-    // If this is a child modal (version > 1) and we have a parent submit handler, trigger it
-    if (version > 1 && onSubmitAllVersions) {
-      // Update parent with current data first
-      if (onVersionDataUpdate) {
-        onVersionDataUpdate(version, formData, versionName, splitResults, scheduleType);
-      }
-      // Trigger parent submission
-      await onSubmitAllVersions();
-      return;
-    }
-
     setCanSubmit(false);
     setSubmitting(true);
 
     try {
       const token = getToken();
 
-      // Collect all versions - start with current version
-      const allVersions: Array<{ version: number; data: JobFormData; versionName: string; splitResults: typeof splitResults; scheduleType: string }> = [
-        {
-          version,
+      // Collect all versions - saved versions + current version
+      const allVersions: Array<{ version: number; data: JobFormData; versionName: string; splitResults: typeof splitResults; scheduleType: string }> = [];
+
+      // Add saved versions first
+      savedVersions.forEach((ver) => {
+        allVersions.push({
+          version: ver.versionNumber,
+          data: ver.data,
+          versionName: ver.versionName,
+          splitResults: ver.splitResults,
+          scheduleType: ver.scheduleType,
+        });
+      });
+
+      // Add current version (unless we're editing an existing one that's already in savedVersions)
+      if (editingVersionIndex === null) {
+        allVersions.push({
+          version: currentVersionNumber,
           data: formData,
           versionName,
           splitResults,
           scheduleType,
-        },
-      ];
-
-      // Add other versions from tracking
-      allVersionsData.forEach((versionInfo, versionNum) => {
-        if (versionNum !== version) {
-          allVersions.push({
-            version: versionNum,
-            data: versionInfo.data,
-            versionName: versionInfo.versionName,
-            splitResults: versionInfo.splitResults,
-            scheduleType: versionInfo.scheduleType,
-          });
+        });
+      } else {
+        // Update the version we're editing
+        const editIdx = allVersions.findIndex(v => v.version === savedVersions[editingVersionIndex].versionNumber);
+        if (editIdx !== -1) {
+          allVersions[editIdx] = {
+            version: savedVersions[editingVersionIndex].versionNumber,
+            data: formData,
+            versionName,
+            splitResults,
+            scheduleType,
+          };
         }
-      });
+      }
 
       // Sort by version number
       allVersions.sort((a, b) => a.version - b.version);
@@ -1572,22 +1596,12 @@ function AddJobModal({
   };
 
   return (
-    <div 
-      className={`fixed inset-0 flex items-center ${sideBySide ? 'z-[55]' : showNewVersionModal ? 'z-[51]' : 'z-50'} p-2 sm:p-4 ${sideBySide ? 'justify-end' : showNewVersionModal ? 'justify-start' : 'justify-center'}`}
-      style={sideBySide ? { pointerEvents: 'none' } : {}}
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4"
     >
-      {!sideBySide && !showNewVersionModal && (
-        <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
-      )}
-      {!sideBySide && showNewVersionModal && (
-        <div 
-          className="absolute inset-0 bg-black/20" 
-          style={{ pointerEvents: 'none' }}
-        />
-      )}
-      <div 
-        className={`bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10 ${sideBySide ? 'mr-4' : showNewVersionModal ? 'ml-4' : ''}`}
-        style={{ pointerEvents: 'auto' }}
+      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
+      <div
+        className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
@@ -1904,7 +1918,7 @@ function AddJobModal({
                     value={versionName}
                     onChange={(e) => setVersionName(e.target.value)}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                    placeholder={`v${version}`}
+                    placeholder={`v${currentVersionNumber}`}
                   />
                 </div>
                 <div>
@@ -2351,6 +2365,65 @@ function AddJobModal({
           {/* Step 3: Review */}
           {currentStep === 3 && (
             <div className="space-y-6">
+              {/* Saved Versions List */}
+              {savedVersions.length > 0 && !isCreatingTemplate && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-[var(--text-dark)] mb-3">
+                    Saved Versions ({savedVersions.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {savedVersions.map((ver, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
+                            {ver.versionName}
+                          </span>
+                          <span className="text-sm text-[var(--text-dark)]">
+                            {ver.data.job_name || ver.data.job_number || "Untitled"}
+                          </span>
+                          <span className="text-xs text-[var(--text-light)]">
+                            Qty: {parseInt(ver.data.quantity || "0").toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditVersion(index)}
+                            className="px-3 py-1 text-sm text-[var(--primary-blue)] hover:bg-blue-50 rounded transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveVersion(index)}
+                            className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Current Version Label */}
+              {!isCreatingTemplate && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-semibold rounded">
+                    {editingVersionIndex !== null ? "Editing" : "Current"}: {versionName}
+                  </span>
+                  {editingVersionIndex !== null && (
+                    <span className="text-xs text-[var(--text-light)]">
+                      (editing saved version)
+                    </span>
+                  )}
+                </div>
+              )}
+
               {isCreatingTemplate && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
                   <p className="text-sm text-yellow-800 font-medium">
@@ -2834,13 +2907,28 @@ function AddJobModal({
                 ) : (
                   <>
                     {!isCreatingTemplate && (
-                      <button
-                        type="button"
-                        onClick={handleNewVersion}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
-                      >
-                        New Version
-                      </button>
+                      <>
+                        {/* Save Version button when editing an existing version */}
+                        {editingVersionIndex !== null && (
+                          <button
+                            type="button"
+                            onClick={handleSaveVersion}
+                            className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                          >
+                            Save Version
+                          </button>
+                        )}
+                        {/* Add Another Version button */}
+                        <button
+                          type="button"
+                          onClick={handleAddVersion}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                        >
+                          {savedVersions.length > 0 || editingVersionIndex !== null
+                            ? "Save & Add Another"
+                            : "Save Version & Add Another"}
+                        </button>
+                      </>
                     )}
                     {isCreatingTemplate ? (
                       <button
@@ -2867,7 +2955,11 @@ function AddJobModal({
                         disabled={submitting}
                         className="px-6 py-2 bg-[#EF3340] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {submitting ? "Creating Job..." : "Submit Job"}
+                        {submitting
+                          ? "Creating Job..."
+                          : savedVersions.length > 0
+                            ? `Submit All Versions (${savedVersions.length + 1})`
+                            : "Submit Job"}
                       </button>
                     )}
                   </>
@@ -3074,45 +3166,6 @@ function AddJobModal({
         />
       )}
 
-      {/* New Version Modal - Positioned to the right */}
-      {showNewVersionModal && newVersionFormData && (
-        <AddJobModal
-          isOpen={showNewVersionModal}
-          onClose={() => {
-            setShowNewVersionModal(false);
-            setNewVersionFormData(null);
-          }}
-          onSuccess={() => {
-            setShowNewVersionModal(false);
-            setNewVersionFormData(null);
-            if (onSuccess) {
-              onSuccess();
-            }
-          }}
-          initialFormData={newVersionFormData}
-          sideBySide={true}
-          version={version + 1}
-          versionName={`v${version + 1}`}
-          versionGroupUuid={versionGroupUuid}
-          onVersionDataUpdate={(v, data, vName, vSplitResults, vScheduleType) => {
-            setAllVersionsData(prev => {
-              const updated = new Map(prev);
-              updated.set(v, { data, versionName: vName, splitResults: vSplitResults, scheduleType: vScheduleType });
-              return updated;
-            });
-          }}
-          onSubmitAllVersions={async () => {
-            // Trigger parent's submit
-            if (currentStep === 3) {
-              setCanSubmit(true);
-              const form = document.querySelector("form");
-              if (form) {
-                form.requestSubmit();
-              }
-            }
-          }}
-        />
-      )}
     </div>
   );
 }

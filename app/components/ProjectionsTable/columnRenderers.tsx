@@ -64,6 +64,7 @@ export interface CellRenderContext {
   // Time data
   timeRanges: TimeRange[];
   granularity: "weekly" | "monthly" | "quarterly";
+  lastModifiedTimestamp?: number;
 
   // Notes
   showNotes: boolean;
@@ -458,6 +459,34 @@ function renderStaticCell(
                 year: "2-digit",
               })
             : showContent ? "N/A" : ""}
+        </td>
+      );
+
+    case "updated_at":
+      if (!showContent) {
+        return <td key="updated_at" className="px-2 py-2"></td>;
+      }
+
+      const timestamp = context.lastModifiedTimestamp;
+      const fallbackTimestamp = job.updated_at
+        ? new Date(job.updated_at).getTime()
+        : undefined;
+      const displayTimestamp = timestamp ?? fallbackTimestamp;
+
+      return (
+        <td
+          key="updated_at"
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+        >
+          {displayTimestamp
+            ? new Date(displayTimestamp).toLocaleString("en-US", {
+                month: "numeric",
+                day: "numeric",
+                year: "2-digit",
+                hour: "numeric",
+                minute: "2-digit",
+              })
+            : "-"}
         </td>
       );
 

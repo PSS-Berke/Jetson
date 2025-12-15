@@ -2,6 +2,7 @@
 
 import { formatQuantity, TimeRange } from "@/lib/projectionUtils";
 import type { SummaryPrimaryCategory } from "@/lib/tieredFilterUtils";
+import { ChevronRight, ChevronDown } from "lucide-react";
 
 interface PrimaryCategoryRowProps {
   category: SummaryPrimaryCategory;
@@ -13,7 +14,7 @@ interface PrimaryCategoryRowProps {
   onToggleExpand: () => void;
   onCategoryClick?: (processType: string, primaryCategory: string, subField?: string, subFieldValue?: string, timeRangeLabel?: string) => void;
   isCategoryFilterActive?: boolean;
-  orderedColumnKeys?: string[];
+  visibleStaticColumnKeys?: string[];
   isColumnVisible?: (key: string) => boolean;
 }
 
@@ -33,16 +34,19 @@ export function PrimaryCategoryRow({
   processType,
   timeRanges,
   showNotes,
+  isExpanded,
+  hasSubCategories,
+  onToggleExpand,
   onCategoryClick,
   isCategoryFilterActive = false,
-  orderedColumnKeys,
+  visibleStaticColumnKeys,
   isColumnVisible,
 }: PrimaryCategoryRowProps) {
   const formattedTotal = formatQuantity(Math.round(category.grandTotal));
 
   // Determine which static columns are visible (excluding checkbox, start_date, due_date)
-  const staticColumnsToRender = orderedColumnKeys && isColumnVisible
-    ? orderedColumnKeys.filter(key =>
+  const staticColumnsToRender = visibleStaticColumnKeys && isColumnVisible
+    ? visibleStaticColumnKeys.filter(key =>
         isColumnVisible(key) &&
         !["checkbox", "start_date", "due_date"].includes(key)
       )
@@ -73,8 +77,27 @@ export function PrimaryCategoryRow({
       ))}
       {/* Start & End columns - Primary category label */}
       {dateColSpan > 0 && (
-        <td colSpan={dateColSpan} className="px-2 py-2 text-left pl-8">
-          <div className="flex items-center gap-2 text-gray-700">
+        <td colSpan={dateColSpan} className="px-2 py-2 text-left pl-6">
+          <div className="flex items-center gap-1 text-gray-700">
+            {/* Expand/collapse button */}
+            {hasSubCategories ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand();
+                }}
+                className="p-0.5 hover:bg-blue-200 rounded transition-colors"
+                title={isExpanded ? "Collapse jobs" : "Expand jobs"}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-600" />
+                )}
+              </button>
+            ) : (
+              <span className="w-5" />
+            )}
             <span className="text-gray-500">↳</span>
             <span className="font-medium">{category.value}</span>
             <span className="text-xs text-gray-500">({category.count} jobs)</span>
