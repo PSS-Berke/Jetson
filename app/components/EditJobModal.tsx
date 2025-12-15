@@ -60,7 +60,7 @@ export default function EditJobModal({
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
-  const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "Hard Schedule", "soft schedule", "Cancelled", "projected", "completed"
+  const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "hard schedule", "soft schedule", "cancelled", "projected", "completed"
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
@@ -2209,14 +2209,14 @@ export default function EditJobModal({
                   onChange={(e) => setScheduleType(e.target.value)}
                   className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] bg-white"
                 >
-                  <option value="soft schedule">Soft Schedule</option>
-                  <option value="Hard Schedule">Hard Schedule</option>
-                  <option value="projected">Projected</option>
-                  <option value="completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
+                  <option value="soft schedule">soft schedule</option>
+                  <option value="hard schedule">hard schedule</option>
+                  <option value="projected">projected</option>
+                  <option value="completed">completed</option>
+                  <option value="cancelled">cancelled</option>
                 </select>
                 <p className="text-sm text-[var(--text-light)] mt-3">
-                  {scheduleType === "Hard Schedule"
+                  {scheduleType === "hard schedule"
                     ? "✓ This job will be confirmed and scheduled immediately."
                     : scheduleType === "soft schedule"
                       ? "ℹ This job will be added as a soft schedule and can be confirmed later."
@@ -2224,7 +2224,7 @@ export default function EditJobModal({
                         ? "📊 This job is projected for future planning."
                         : scheduleType === "completed"
                           ? "✅ This job has been completed."
-                          : scheduleType === "Cancelled"
+                          : scheduleType === "cancelled"
                             ? "❌ This job has been cancelled."
                             : ""}
                 </p>

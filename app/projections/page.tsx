@@ -30,7 +30,6 @@ import FinancialsPDFSummary from "../components/FinancialsPDFSummary";
 import FinancialsPDFTables from "../components/FinancialsPDFTables";
 import CFODashboard from "../components/CFODashboard";
 import ProjectionsLoading from "../components/ProjectionsLoading";
-import ServiceTypeLoadTable from "../components/ServiceTypeLoadTable";
 
 // Dynamically import calendar and modals - only loaded when needed
 const EmbeddedCalendar = dynamic(
@@ -56,7 +55,7 @@ const BulkJobUploadModal = dynamic(
   },
 );
 
-type ViewMode = "table" | "calendar" | "financials" | "revenue-table" | "service-load";
+type ViewMode = "table" | "calendar" | "financials" | "revenue-table";
 
 export default function ProjectionsPage() {
   const [granularity, setGranularity] = useState<Granularity>("week");
@@ -123,6 +122,7 @@ export default function ProjectionsPage() {
     totalRevenue,
     totalJobsInTimeframe,
     totalJobsFromAPI,
+    lastModifiedByJob,
     isLoading,
     error,
     refetch,
@@ -165,7 +165,7 @@ export default function ProjectionsPage() {
   // Automatically show all items when filtering by service type or dynamic field filters
   useEffect(() => {
     if (selectedServiceTypes.length > 0 || (dynamicFieldFilters && dynamicFieldFilters.length > 0)) {
-      setItemsPerPage(-1); // Show all when service type or dynamic field filters are active
+      setItemsPerPage(-1); // Show all when filters are active
     }
   }, [selectedServiceTypes, dynamicFieldFilters]);
 
@@ -370,16 +370,6 @@ export default function ProjectionsPage() {
             >
               Financials
             </button>
-            <button
-              onClick={() => setViewMode("service-load")}
-              className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
-                viewMode === "service-load"
-                  ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
-                  : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
-              }`}
-            >
-              Service Load
-            </button>
           </div>
         </div>
 
@@ -469,6 +459,7 @@ export default function ProjectionsPage() {
                     onShowNotesChange={setShowNotes}
                     granularity={granularity}
                     fullFilteredProjections={jobProjections}
+                    lastModifiedByJob={lastModifiedByJob}
                   />
 
                   {/* Pagination */}
@@ -594,14 +585,6 @@ export default function ProjectionsPage() {
                     </>
                   )}
                 </>
-              )}
-
-              {/* Service Load View */}
-              {viewMode === "service-load" && (
-                <ServiceTypeLoadTable
-                  facilitiesId={selectedFacility}
-                  granularity={granularity}
-                />
               )}
             </>
           )}

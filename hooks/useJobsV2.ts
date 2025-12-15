@@ -54,6 +54,26 @@ function convertJobV2ToParsedJob(jobV2: JobV2): ParsedJob {
     (parsed as any).time_split = jobV2.time_split;
   }
 
+  // Preserve schedule_type from JobV2
+  if (jobV2.schedule_type) {
+    (parsed as any).schedule_type = jobV2.schedule_type;
+  }
+
+  // Preserve version_name from JobV2 (for multi-version jobs)
+  if ((jobV2 as any).version_name) {
+    (parsed as any).version_name = (jobV2 as any).version_name;
+  }
+
+  // Preserve version_group_uuid from JobV2 (for grouping versions)
+  if ((jobV2 as any).version_group_uuid) {
+    (parsed as any).version_group_uuid = (jobV2 as any).version_group_uuid;
+  }
+
+  // Preserve exclude_from_calculations from JobV2
+  if ((jobV2 as any).exclude_from_calculations !== undefined) {
+    (parsed as any).exclude_from_calculations = (jobV2 as any).exclude_from_calculations;
+  }
+
   return parsed;
 }
 

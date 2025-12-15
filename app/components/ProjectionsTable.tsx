@@ -15,6 +15,8 @@ import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
 import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
 import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
+import { PrimaryCategoryRow } from "./PrimaryCategoryRow";
+import { buildSummaryTieredData } from "@/lib/tieredFilterUtils";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
@@ -61,6 +63,7 @@ interface ProjectionsTableProps {
   onShowNotesChange?: (show: boolean) => void;
   granularity?: "week" | "month" | "quarter"; // NEW: for cell-level notes
   fullFilteredProjections?: JobProjection[]; // NEW: Full filtered data for breakdown calculations
+  lastModifiedByJob?: Map<number, number>; // Map of job ID to last modified timestamp
 }
 
 // Type guard to check if summary has facility information
@@ -93,6 +96,7 @@ const ProjectionTableRow = memo(
     cellNotesMap,
     isColumnVisible,
     orderedColumnKeys,
+    lastModifiedByJob,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -114,6 +118,7 @@ const ProjectionTableRow = memo(
     cellNotesMap?: Map<string, JobNote[]>;
     isColumnVisible: (key: string) => boolean;
     orderedColumnKeys: string[];
+    lastModifiedByJob?: Map<number, number>;
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
@@ -131,10 +136,57 @@ const ProjectionTableRow = memo(
               {formatJobNumber(job.job_number)}
             </td>
           );
+        case "version":
+          const versionName = (job as any).version_name as string | undefined;
+          return (
+            <td
+              key="version"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-light)]"
+            >
+              {versionName || "v1"}
+            </td>
+          );
+        case "status":
+          const scheduleType = (job as any).schedule_type as string | undefined;
+          const statusLower = (scheduleType || "soft schedule").toLowerCase();
+          let statusClass: string;
+          let displayLabel: string;
+          if (statusLower.includes("hard")) {
+            statusClass = "bg-green-100 text-green-800";
+            displayLabel = "Hard";
+          } else if (statusLower.includes("cancel")) {
+            statusClass = "bg-red-100 text-red-800";
+            displayLabel = "Cancelled";
+          } else if (statusLower.includes("complete")) {
+            statusClass = "bg-purple-100 text-purple-800";
+            displayLabel = "Completed";
+          } else if (statusLower.includes("projected")) {
+            statusClass = "bg-blue-100 text-blue-800";
+            displayLabel = "Projected";
+          } else {
+            statusClass = "bg-yellow-100 text-yellow-800";
+            displayLabel = "Soft";
+          }
+          return (
+            <td key="status" className="px-2 py-2 whitespace-nowrap text-xs text-center">
+              <span
+                className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass}`}
+                title={scheduleType || "Soft Schedule"}
+              >
+                {displayLabel}
+              </span>
+            </td>
+          );
         case "facility":
           return (
             <td key="facility" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
               {job.facility?.name || "Unknown"}
+            </td>
+          );
+        case "client":
+          return (
+            <td key="client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+              {job.client?.name || "-"}
             </td>
           );
         case "sub_client":
@@ -201,6 +253,24 @@ const ProjectionTableRow = memo(
                     year: "2-digit",
                   })
                 : "N/A"}
+            </td>
+          );
+        case "updated_at":
+          const lastModified = lastModifiedByJob?.get(job.id);
+          return (
+            <td
+              key="updated_at"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+            >
+              {lastModified
+                ? new Date(lastModified).toLocaleString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "2-digit",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                : "-"}
             </td>
           );
         default:
@@ -481,6 +551,7 @@ const ProcessProjectionTableRow = memo(
     cellNotesMap,
     isColumnVisible,
     orderedColumnKeys,
+    lastModifiedByJob,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -503,6 +574,7 @@ const ProcessProjectionTableRow = memo(
     cellNotesMap?: Map<string, JobNote[]>;
     isColumnVisible: (key: string) => boolean;
     orderedColumnKeys: string[];
+    lastModifiedByJob?: Map<number, number>;
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
@@ -522,6 +594,40 @@ const ProcessProjectionTableRow = memo(
           ) : (
             <td key="job_number" className="px-2 py-2"></td>
           );
+        case "status":
+          if (!isFirstInGroup) {
+            return <td key="status" className="px-2 py-2"></td>;
+          }
+          const processScheduleType = (job as any).schedule_type as string | undefined;
+          const processStatusLower = (processScheduleType || "soft schedule").toLowerCase();
+          let processStatusClass: string;
+          let processDisplayLabel: string;
+          if (processStatusLower.includes("hard")) {
+            processStatusClass = "bg-green-100 text-green-800";
+            processDisplayLabel = "Hard";
+          } else if (processStatusLower.includes("cancel")) {
+            processStatusClass = "bg-red-100 text-red-800";
+            processDisplayLabel = "Cancelled";
+          } else if (processStatusLower.includes("complete")) {
+            processStatusClass = "bg-purple-100 text-purple-800";
+            processDisplayLabel = "Completed";
+          } else if (processStatusLower.includes("projected")) {
+            processStatusClass = "bg-blue-100 text-blue-800";
+            processDisplayLabel = "Projected";
+          } else {
+            processStatusClass = "bg-yellow-100 text-yellow-800";
+            processDisplayLabel = "Soft";
+          }
+          return (
+            <td key="status" className="px-2 py-2 whitespace-nowrap text-xs text-center">
+              <span
+                className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${processStatusClass}`}
+                title={processScheduleType || "Soft Schedule"}
+              >
+                {processDisplayLabel}
+              </span>
+            </td>
+          );
         case "facility":
           return isFirstInGroup ? (
             <td key="facility" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
@@ -529,6 +635,14 @@ const ProcessProjectionTableRow = memo(
             </td>
           ) : (
             <td key="facility" className="px-2 py-2"></td>
+          );
+        case "client":
+          return isFirstInGroup ? (
+            <td key="client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
+              {job.client?.name || "-"}
+            </td>
+          ) : (
+            <td key="client" className="px-2 py-2"></td>
           );
         case "sub_client":
           return isFirstInGroup ? (
@@ -584,6 +698,24 @@ const ProcessProjectionTableRow = memo(
                     month: "numeric",
                     day: "numeric",
                     year: "2-digit",
+                  })
+                : ""}
+            </td>
+          );
+        case "updated_at":
+          const lastModifiedProcess = lastModifiedByJob?.get(job.id);
+          return (
+            <td
+              key="updated_at"
+              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+            >
+              {isFirstInGroup && lastModifiedProcess
+                ? new Date(lastModifiedProcess).toLocaleString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "2-digit",
+                    hour: "numeric",
+                    minute: "2-digit",
                   })
                 : ""}
             </td>
@@ -1168,6 +1300,7 @@ export default function ProjectionsTable({
   onShowNotesChange,
   granularity = "week",
   fullFilteredProjections,
+  lastModifiedByJob,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -1227,9 +1360,10 @@ export default function ProjectionsTable({
   }, [getOrderedColumns, externalColumnControls]);
 
   // Legacy: Get ordered visible column keys for backward compatibility with row components
+  // Include both "static" and "status" column types (excludes checkbox, time_range, total, notes)
   const orderedColumnKeys = useMemo(() => {
     return orderedColumns
-      .filter((col) => col.isVisible && col.config.type === "static")
+      .filter((col) => col.isVisible && (col.config.type === "static" || col.config.type === "status"))
       .map((col) => col.config.key);
   }, [orderedColumns]);
 
@@ -1245,8 +1379,9 @@ export default function ProjectionsTable({
   // Category filter state - tracks which category/breakdown is selected
   const [categoryFilter, setCategoryFilter] = useState<{
     processType: string;
-    fieldName?: string;
-    fieldValue?: any;
+    primaryCategory?: string;     // Tier 2: Basic OE / Envelope Size value
+    fieldName?: string;           // Legacy: for ProcessTypeBreakdownRow compatibility
+    fieldValue?: any;             // Legacy: for ProcessTypeBreakdownRow compatibility
     timeRangeLabel?: string;
   } | null>(null);
 
@@ -1289,6 +1424,33 @@ export default function ProjectionsTable({
 
   const handleCollapseAll = () => {
     setExpandedSummaries(new Set());
+  };
+
+  // Handler for tiered category clicks (Tier 2: Primary Category / Basic OE)
+  const handleTieredCategoryClick = (
+    processType: string,
+    primaryCategory: string,
+    _subField?: string,
+    _subFieldValue?: string,
+    timeRangeLabel?: string
+  ) => {
+    // If clicking the same filter, clear it
+    if (
+      categoryFilter &&
+      categoryFilter.processType === processType &&
+      categoryFilter.primaryCategory === primaryCategory &&
+      categoryFilter.timeRangeLabel === timeRangeLabel
+    ) {
+      setCategoryFilter(null);
+      return;
+    }
+
+    // Set new filter
+    setCategoryFilter({
+      processType,
+      primaryCategory,
+      timeRangeLabel,
+    });
   };
 
   // Category filter handlers
@@ -1377,24 +1539,37 @@ export default function ProjectionsTable({
         const matchingRequirements = requirements.filter((req) => {
           const rawProcessType = req.process_type || "";
 
-          // If filtering by breakdown field, use normalizeProcessType (breakdowns use normalized keys)
-          // If filtering by summary row only, use exact case-insensitive match (summaries use original names)
-          let processTypeMatches: boolean;
-          if (categoryFilter.fieldName) {
-            // Breakdown filter - use normalized comparison
-            const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
-            const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
-            processTypeMatches = reqProcessType === filterProcessType;
-          } else {
-            // Summary filter - use exact case-insensitive comparison
-            processTypeMatches = rawProcessType.toLowerCase() === categoryFilter.processType.toLowerCase();
-          }
+          // Always normalize process types for comparison
+          const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
+          const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
+          const processTypeMatches = reqProcessType === filterProcessType;
 
           if (!processTypeMatches) {
             return false;
           }
 
-          // If filtering by breakdown field, check field value
+          // Handle tiered filter: primary category (Tier 2)
+          if (categoryFilter.primaryCategory) {
+            // Check basic_oe first, then paper_size
+            const basicOe = (req as any).basic_oe;
+            const paperSize = (req as any).paper_size;
+            const primaryValue = (basicOe && basicOe !== "" && basicOe !== "undefined" && basicOe !== "null")
+              ? String(basicOe)
+              : (paperSize && paperSize !== "" && paperSize !== "undefined" && paperSize !== "null")
+                ? String(paperSize)
+                : undefined;
+
+            // Special handling for "Misc" category - matches jobs WITHOUT a primary category
+            if (categoryFilter.primaryCategory === "Misc") {
+              if (primaryValue !== undefined) {
+                return false;
+              }
+            } else if (primaryValue !== categoryFilter.primaryCategory) {
+              return false;
+            }
+          }
+
+          // Legacy: If filtering by breakdown field, check field value
           if (categoryFilter.fieldName && categoryFilter.fieldValue !== undefined) {
             const fieldValue = req[categoryFilter.fieldName];
 
@@ -1420,37 +1595,8 @@ export default function ProjectionsTable({
 
         return true;
       });
-      
+
       console.log(`[Category Filter] Filtered from ${originalCount} to ${projections.length} jobs with filter:`, categoryFilter);
-      if (projections.length === 0 && originalCount > 0) {
-        console.warn(`[Category Filter] No jobs matched! Filter:`, categoryFilter);
-        // Sample a few jobs to see what their requirements look like
-        const sampleJobs = jobProjections.slice(0, 3);
-        sampleJobs.forEach((proj, idx) => {
-          const matchingReqs = proj.job.requirements?.filter(req => {
-            const rawProcessType = req.process_type || "";
-            // Use same logic as main filter
-            if (categoryFilter.fieldName) {
-              const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
-              const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
-              return reqProcessType === filterProcessType;
-            } else {
-              return rawProcessType.toLowerCase() === categoryFilter.processType.toLowerCase();
-            }
-          }) || [];
-          console.warn(`[Category Filter] Sample job ${idx + 1} (${proj.job.job_number}):`, {
-            processType: categoryFilter.processType,
-            fieldName: categoryFilter.fieldName,
-            filterValue: categoryFilter.fieldValue,
-            filterValueType: typeof categoryFilter.fieldValue,
-            matchingRequirements: matchingReqs.map(req => ({
-              process_type: req.process_type,
-              [categoryFilter.fieldName || '']: req[categoryFilter.fieldName || ''],
-              fieldValueType: typeof req[categoryFilter.fieldName || ''],
-            })),
-          });
-        });
-      }
     }
 
     if (showExpandedProcesses) {
@@ -1870,6 +2016,10 @@ export default function ProjectionsTable({
           aValue = aJob.job.facility?.name?.toLowerCase() || "";
           bValue = bJob.job.facility?.name?.toLowerCase() || "";
           break;
+        case "client":
+          aValue = aJob.job.client?.name?.toLowerCase() || "";
+          bValue = bJob.job.client?.name?.toLowerCase() || "";
+          break;
         case "sub_client":
           aValue = aJob.job.sub_client?.toLowerCase() || "";
           bValue = bJob.job.sub_client?.toLowerCase() || "";
@@ -1890,9 +2040,27 @@ export default function ProjectionsTable({
           aValue = aJob.job.due_date || 0;
           bValue = bJob.job.due_date || 0;
           break;
+        case "updated_at":
+          aValue = lastModifiedByJob?.get(aJob.job.id) || 0;
+          bValue = lastModifiedByJob?.get(bJob.job.id) || 0;
+          break;
         case "total":
           aValue = aJob.totalQuantity;
           bValue = bJob.totalQuantity;
+          break;
+        case "status":
+          // Sort by status priority: hard schedule > soft schedule > projected > completed > cancelled
+          const getStatusPriority = (job: any): number => {
+            const scheduleType = (job.schedule_type || "soft schedule").toLowerCase();
+            if (scheduleType.includes("hard")) return 1;
+            if (scheduleType.includes("soft")) return 2;
+            if (scheduleType.includes("projected")) return 3;
+            if (scheduleType.includes("complete")) return 4;
+            if (scheduleType.includes("cancel")) return 5;
+            return 2; // default to soft schedule
+          };
+          aValue = getStatusPriority(aJob.job);
+          bValue = getStatusPriority(bJob.job);
           break;
         default:
           aValue = aJob.job.job_number;
@@ -1903,7 +2071,7 @@ export default function ProjectionsTable({
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [displayProjections, sortField, sortDirection, showExpandedProcesses]);
+  }, [displayProjections, sortField, sortDirection, showExpandedProcesses, lastModifiedByJob]);
 
   // Calculate selection state
   const allSelected =
@@ -1943,6 +2111,9 @@ export default function ProjectionsTable({
               Filtered by:{" "}
               <span className="font-normal">
                 {categoryFilter.processType}
+                {categoryFilter.primaryCategory && (
+                  <> → {categoryFilter.primaryCategory}</>
+                )}
                 {categoryFilter.fieldName && categoryFilter.fieldValue !== undefined && (
                   <> - {categoryFilter.fieldName}: {String(categoryFilter.fieldValue)}</>
                 )}
@@ -2218,6 +2389,47 @@ export default function ProjectionsTable({
                         orderedColumnKeys={orderedColumnKeys}
                         isColumnVisible={isColumnVisible}
                       />
+                      {/* Render tiered category rows (Tier 2: Primary Category / Basic OE) if expanded */}
+                      {isExpanded && (() => {
+                        // Get projections for this process type
+                        const projectionsToUse = fullFilteredProjections || jobProjections;
+                        const facilityFilteredProjections = isFacilitySummary(summary)
+                          ? projectionsToUse.filter(p => p.job.facilities_id === summary.facilityId)
+                          : projectionsToUse;
+
+                        // Build tiered summary data
+                        const tieredData = buildSummaryTieredData(
+                          facilityFilteredProjections,
+                          normalizedProcessType,
+                          timeRanges
+                        );
+
+                        return tieredData.primaryCategories.map((primaryCategory) => {
+                          const primaryCategoryKey = `${normalizedProcessType}:${primaryCategory.value}`;
+
+                          // Check if this primary category row matches the active filter
+                          const isPrimaryCategoryFilterActive = categoryFilter &&
+                            categoryFilter.processType === normalizedProcessType &&
+                            categoryFilter.primaryCategory === primaryCategory.value;
+
+                          return (
+                            <PrimaryCategoryRow
+                              key={primaryCategoryKey}
+                              category={primaryCategory}
+                              processType={normalizedProcessType}
+                              timeRanges={timeRanges}
+                              showNotes={showNotes}
+                              isExpanded={false}
+                              hasSubCategories={false}
+                              onToggleExpand={() => {}}
+                              onCategoryClick={handleTieredCategoryClick}
+                              isCategoryFilterActive={!!isPrimaryCategoryFilterActive}
+                              orderedColumnKeys={orderedColumnKeys}
+                              isColumnVisible={isColumnVisible}
+                            />
+                          );
+                        });
+                      })()}
                       {/* Render breakdown rows for all fields if expanded */}
                       {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
                         <React.Fragment key={`${summaryKey}-field-${field.name}`}>
@@ -2324,6 +2536,7 @@ export default function ProjectionsTable({
                       cellNotesMap={cellNotesMap}
                       isColumnVisible={isColumnVisible}
                       orderedColumnKeys={orderedColumnKeys}
+                      lastModifiedByJob={lastModifiedByJob}
                     />
                   );
                 },
@@ -2358,6 +2571,7 @@ export default function ProjectionsTable({
                     cellNotesMap={cellNotesMap}
                     isColumnVisible={isColumnVisible}
                     orderedColumnKeys={orderedColumnKeys}
+                    lastModifiedByJob={lastModifiedByJob}
                   />
                 );
               })

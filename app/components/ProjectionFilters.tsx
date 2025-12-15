@@ -711,6 +711,7 @@ export default function ProjectionFilters({
           </div>
         )}
 
+
         {/* Dynamic Field Filters - Advanced Mode Only */}
         {filterViewMode === "advanced" && onDynamicFieldFiltersChange && onDynamicFieldFilterLogicChange && (
           <div className="w-full">

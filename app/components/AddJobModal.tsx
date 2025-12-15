@@ -98,7 +98,7 @@ function AddJobModal({
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [canSubmit, setCanSubmit] = useState(false);
-  const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "Hard Schedule", "soft schedule", "Cancelled", "projected", "completed"
+  const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "hard schedule", "soft schedule", "cancelled", "projected", "completed"
   const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
     useState(false);
   const [pendingRedistribution, setPendingRedistribution] = useState<{
@@ -1599,19 +1599,11 @@ function AddJobModal({
             <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
               Add New Job
             </h2>
-            <div className="flex items-center gap-2">
+            {versionName && (
               <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full whitespace-nowrap">
                 {versionName}
               </span>
-              <input
-                type="text"
-                value={versionName}
-                onChange={(e) => setVersionName(e.target.value)}
-                placeholder={`v${version}`}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ minWidth: '150px', maxWidth: '200px' }}
-              />
-            </div>
+            )}
           </div>
           <button
             onClick={handleClose}
@@ -1887,9 +1879,6 @@ function AddJobModal({
                     placeholder="Job name"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
                     Job #
@@ -1901,6 +1890,21 @@ function AddJobModal({
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
                     placeholder="e.g., 43"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Version Name
+                  </label>
+                  <input
+                    type="text"
+                    value={versionName}
+                    onChange={(e) => setVersionName(e.target.value)}
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                    placeholder={`v${version}`}
                   />
                 </div>
                 <div>
@@ -2762,14 +2766,14 @@ function AddJobModal({
                     onChange={(e) => setScheduleType(e.target.value)}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] bg-white"
                   >
-                    <option value="soft schedule">Soft Schedule</option>
-                    <option value="Hard Schedule">Hard Schedule</option>
-                    <option value="projected">Projected</option>
-                    <option value="completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
+                    <option value="soft schedule">soft schedule</option>
+                    <option value="hard schedule">hard schedule</option>
+                    <option value="projected">projected</option>
+                    <option value="completed">completed</option>
+                    <option value="cancelled">cancelled</option>
                   </select>
                   <p className="text-sm text-[var(--text-light)] mt-3">
-                    {scheduleType === "Hard Schedule"
+                    {scheduleType === "hard schedule"
                       ? "✓ This job will be confirmed and scheduled immediately."
                       : scheduleType === "soft schedule"
                         ? "ℹ This job will be added as a soft schedule and can be confirmed later."
@@ -2777,7 +2781,7 @@ function AddJobModal({
                           ? "📊 This job is projected for future planning."
                           : scheduleType === "completed"
                             ? "✅ This job has been completed."
-                            : scheduleType === "Cancelled"
+                            : scheduleType === "cancelled"
                               ? "❌ This job has been cancelled."
                               : ""}
                   </p>

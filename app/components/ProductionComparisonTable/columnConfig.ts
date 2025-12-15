@@ -1,31 +1,29 @@
-import { ReactNode } from "react";
-
-// Sort field types (matching ProjectionsTable.tsx)
+// Sort field types for production comparison table
 export type SortField =
   | "job_number"
   | "version"
+  | "job_name"
   | "facility"
   | "client"
   | "sub_client"
-  | "process_type"
   | "description"
   | "quantity"
   | "start_date"
   | "due_date"
-  | "updated_at"
-  | "total"
+  | "date_entered"
+  | "projected"
+  | "actual"
+  | "variance"
   | "status";
 
 // Column types for unified handling
 export type ColumnType =
-  | "static"      // Regular data columns (job_number, facility, etc.)
-  | "checkbox"    // Selection checkbox
-  | "time_range"  // Dynamic time period columns (placeholder - actual ranges are dynamic)
-  | "total"       // Aggregation column
-  | "notes"       // Notes column
-  | "status";     // Status badge column
+  | "static"     // Regular data columns
+  | "editable"   // Editable columns (actual)
+  | "variance"   // Variance display columns
+  | "status";    // Status badge column
 
-export interface ProjectionColumnConfig {
+export interface ProductionColumnConfig {
   key: string;
   type: ColumnType;
   label: string;
@@ -35,22 +33,11 @@ export interface ProjectionColumnConfig {
   minWidth?: string;
   align?: "left" | "center" | "right";
   sticky?: "left" | "right";
-  required?: boolean;        // Cannot be hidden (e.g., checkbox)
+  required?: boolean;        // Cannot be hidden
   reorderable?: boolean;     // Can be reordered via drag-drop (default true)
-  externalControl?: string;  // Visibility controlled by external prop (e.g., "showNotes")
 }
 
-export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
-  {
-    key: "checkbox",
-    type: "checkbox",
-    label: "",
-    sortable: false,
-    sticky: "left",
-    width: "48px",
-    required: true,
-    reorderable: false,
-  },
+export const DEFAULT_COLUMNS: ProductionColumnConfig[] = [
   {
     key: "job_number",
     type: "static",
@@ -58,7 +45,9 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     sortable: true,
     sortField: "job_number",
     width: "80px",
-    reorderable: true,
+    sticky: "left",
+    required: true,
+    reorderable: false,
   },
   {
     key: "version",
@@ -104,13 +93,6 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     reorderable: true,
   },
   {
-    key: "processes",
-    type: "static",
-    label: "Processes",
-    sortable: false,
-    reorderable: true,
-  },
-  {
     key: "description",
     type: "static",
     label: "Description",
@@ -151,37 +133,45 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     type: "static",
     label: "Modified",
     sortable: true,
-    sortField: "updated_at",
+    sortField: "date_entered",
     align: "center",
     reorderable: true,
   },
-  // Time period columns placeholder - actual ranges are dynamic
   {
-    key: "time_ranges",
-    type: "time_range",
-    label: "Time Periods",
-    sortable: false,
+    key: "projected",
+    type: "static",
+    label: "Projected",
+    sortable: true,
+    sortField: "projected",
+    align: "right",
+    reorderable: true,
+  },
+  {
+    key: "actual",
+    type: "editable",
+    label: "Actual",
+    sortable: true,
+    sortField: "actual",
+    align: "right",
     required: true,
     reorderable: false,
   },
   {
-    key: "total",
-    type: "total",
-    label: "Total",
+    key: "variance",
+    type: "variance",
+    label: "Variance",
     sortable: true,
-    sortField: "total",
-    sticky: "right",
-    align: "center",
+    sortField: "variance",
+    align: "right",
     reorderable: true,
   },
   {
-    key: "notes",
-    type: "notes",
-    label: "Notes",
+    key: "variance_pct",
+    type: "variance",
+    label: "Variance %",
     sortable: false,
-    minWidth: "200px",
-    reorderable: false,
-    externalControl: "showNotes", // Visibility controlled by showNotes prop
+    align: "right",
+    reorderable: true,
   },
 ];
 
@@ -193,21 +183,19 @@ export const getDefaultColumnOrder = (): string[] => {
 // Get column config by key
 export const getColumnByKey = (
   key: string
-): ProjectionColumnConfig | undefined => {
+): ProductionColumnConfig | undefined => {
   return DEFAULT_COLUMNS.find((col) => col.key === key);
 };
 
 // Get all reorderable columns (for UI)
-export const getReorderableColumns = (): ProjectionColumnConfig[] => {
+export const getReorderableColumns = (): ProductionColumnConfig[] => {
   return DEFAULT_COLUMNS.filter((col) => col.reorderable !== false);
 };
 
-// Get all columns that can be hidden (not required and no external control)
-export const getToggleableColumns = (): ProjectionColumnConfig[] => {
-  return DEFAULT_COLUMNS.filter(
-    (col) => !col.required && !col.externalControl
-  );
+// Get all columns that can be hidden (not required)
+export const getToggleableColumns = (): ProductionColumnConfig[] => {
+  return DEFAULT_COLUMNS.filter((col) => !col.required);
 };
 
 // localStorage key for persistence
-export const COLUMN_SETTINGS_STORAGE_KEY = "projections-table-columns";
+export const COLUMN_SETTINGS_STORAGE_KEY = "production-comparison-table-columns";

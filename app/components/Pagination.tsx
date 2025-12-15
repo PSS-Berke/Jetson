@@ -76,7 +76,7 @@ export default function Pagination({
   // When showing all items, hide pagination buttons
   if (itemsPerPage === -1) {
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pb-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pb-4 px-6">
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-600">
             Showing <span className="font-semibold">all {totalItems}</span> jobs
@@ -110,7 +110,7 @@ export default function Pagination({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pb-4">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pb-4 px-6">
       {/* Items info and per-page selector */}
       <div className="flex items-center gap-4">
         <p className="text-sm text-gray-600">

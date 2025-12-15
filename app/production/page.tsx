@@ -29,6 +29,7 @@ import ProductionFilters from "../components/ProductionFilters";
 import ProductionPDFHeader from "../components/ProductionPDFHeader";
 import ProductionPDFSummary from "../components/ProductionPDFSummary";
 import ProductionPDFTable from "../components/ProductionPDFTable";
+import ServiceTypeLoadTable from "../components/ServiceTypeLoadTable";
 import { calculateProductionSummary } from "@/lib/productionUtils";
 import { applyDynamicFieldFilters } from "@/lib/dynamicFieldFilters";
 import type { ProductionComparison } from "@/types";
@@ -64,7 +65,7 @@ export default function ProductionPage() {
   const [selectedComparison, setSelectedComparison] =
     useState<ProductionComparison | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [activeView, setActiveView] = useState<"table" | "analytics">("table");
+  const [activeView, setActiveView] = useState<"table" | "analytics" | "service-load">("table");
 
   // Filter states
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
@@ -435,6 +436,16 @@ export default function ProductionPage() {
           >
             Analytics
           </button>
+          <button
+            onClick={() => setActiveView("service-load")}
+            className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition-colors relative whitespace-nowrap ${
+              activeView === "service-load"
+                ? "text-[var(--dark-blue)] border-b-2 border-[var(--dark-blue)]"
+                : "text-[var(--text-light)] hover:text-[var(--dark-blue)]"
+            }`}
+          >
+            Service Load
+          </button>
         </div>
 
         {/* Filters */}
@@ -564,6 +575,14 @@ export default function ProductionPage() {
                   <ProductionCharts comparisons={filteredComparisons} />
                 </div>
               </>
+            )}
+
+            {/* Service Load View */}
+            {activeView === "service-load" && (
+              <ServiceTypeLoadTable
+                facilitiesId={selectedFacility}
+                granularity={granularity === "day" ? "week" : granularity}
+              />
             )}
           </>
         )}

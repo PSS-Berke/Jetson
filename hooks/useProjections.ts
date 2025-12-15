@@ -19,12 +19,14 @@ import {
   type TimeRange,
 } from "@/lib/projectionUtils";
 import { generateMonthRanges, generateQuarterRanges } from "@/lib/dateUtils";
-import { getProductionEntries } from "@/lib/api";
+import { getProductionEntries, getJobEditLogs } from "@/lib/api";
+import type { JobEditLog } from "./useJobEditLogs";
 import { aggregateProductionByJob } from "@/lib/productionUtils";
 import type { Granularity } from "@/app/components/GranularityToggle";
 import type { ProductionEntry } from "@/types";
 import { normalizeProcessType, getLabelToKeyMap } from "@/lib/processTypeConfig";
 import { applyDynamicFieldFilters } from "@/lib/dynamicFieldFilters";
+import { applyTieredFilters, type TieredFilter } from "@/lib/tieredFilterUtils";
 
 /**
  * Calculate revenue from requirements.price_per_m if available, otherwise use total_billing
@@ -92,6 +94,7 @@ export interface ProjectionsData {
   totalRevenue: number;
   totalJobsInTimeframe: number;
   totalJobsFromAPI: number; // Total jobs received from API before filtering
+  lastModifiedByJob: Map<number, number>; // Map of job ID to last modified timestamp
 }
 
 export interface ProjectionFilters {
@@ -106,6 +109,7 @@ export interface ProjectionFilters {
   groupByFacility?: boolean;
   dynamicFieldFilters?: import("@/types").DynamicFieldFilter[];
   dynamicFieldFilterLogic?: "and" | "or";
+  tieredFilters?: TieredFilter;
 }
 
 // Helper function to count process types from job projections
@@ -232,6 +236,9 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   );
   const [productionLoading, setProductionLoading] = useState(false);
 
+  // Fetch job edit logs for "last modified" column
+  const [editLogs, setEditLogs] = useState<JobEditLog[]>([]);
+
   useEffect(() => {
     const fetchProduction = async () => {
       setProductionLoading(true);
@@ -254,6 +261,61 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
 
     fetchProduction();
   }, [filters.facility]);
+
+  // Fetch all job edit logs once on mount
+  useEffect(() => {
+    const fetchEditLogs = async () => {
+      try {
+        const logs = await getJobEditLogs();
+        console.log("[useProjections] Fetched edit logs:", logs.length);
+        if (logs.length > 0) {
+          console.log("[useProjections] Sample edit log structure:", JSON.stringify(logs[0], null, 2));
+        }
+        setEditLogs(logs);
+      } catch (err) {
+        console.log("[useProjections] Edit logs not available:", err);
+        setEditLogs([]);
+      }
+    };
+    fetchEditLogs();
+  }, []);
+
+  // Build a map of job ID to most recent edit timestamp
+  // Falls back to job's created_at if no edit logs exist
+  const lastModifiedByJob = useMemo(() => {
+    const map = new Map<number, number>();
+
+    // First, populate with job created_at timestamps as baseline
+    if (jobs) {
+      for (const job of jobs) {
+        if (job.id && job.created_at) {
+          map.set(job.id, job.created_at);
+        }
+      }
+    }
+
+    // Then override with edit log timestamps (which are more recent)
+    for (const log of editLogs) {
+      // Try multiple locations for job ID
+      const jobId =
+        (log as any).jobs_id ||
+        (log as any).job_id ||
+        log.new?.id ||
+        log.old?.id;
+
+      if (jobId && (!map.has(jobId) || log.created_at > map.get(jobId)!)) {
+        map.set(jobId, log.created_at);
+      }
+    }
+
+    // Debug: log first edit log structure if available
+    if (editLogs.length > 0) {
+      console.log("[useProjections] First edit log keys:", Object.keys(editLogs[0]));
+      console.log("[useProjections] First edit log sample:", JSON.stringify(editLogs[0], null, 2).slice(0, 500));
+    }
+    console.log("[useProjections] lastModifiedByJob map size:", map.size, "from", editLogs.length, "edit logs and", jobs?.length || 0, "jobs");
+    return map;
+  }, [editLogs, jobs]);
 
   // 1. Time ranges - only recalculates when granularity or startDate changes
   const timeRanges = useMemo<TimeRange[]>(() => {
@@ -546,6 +608,21 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         );
       }
 
+      // Apply tiered filters if active
+      if (filters.tieredFilters) {
+        const hasTieredFilters = filters.tieredFilters.processType ||
+          filters.tieredFilters.primaryCategory ||
+          (filters.tieredFilters.subCategories && Object.keys(filters.tieredFilters.subCategories).length > 0);
+
+        if (hasTieredFilters) {
+          const jobsToFilter = result.map(p => p.job);
+          const filteredJobs = applyTieredFilters(jobsToFilter, filters.tieredFilters);
+          const filteredJobIds = new Set(filteredJobs.map(j => j.id));
+          result = result.filter(p => filteredJobIds.has(p.job.id));
+          console.log(`[useProjections] Tiered filter applied: ${result.length} jobs remaining`);
+        }
+      }
+
       return result;
     }
   }, [adjustedJobProjections, filters]);
@@ -635,6 +712,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         totalRevenue: 0,
         totalJobsInTimeframe: 0,
         totalJobsFromAPI,
+        lastModifiedByJob,
       };
     }
 
@@ -650,6 +728,7 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
       totalRevenue,
       totalJobsInTimeframe,
       totalJobsFromAPI,
+      lastModifiedByJob,
     };
   }, [
     jobs,
@@ -663,9 +742,10 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     totalRevenue,
     totalJobsInTimeframe,
     pagination,
+    lastModifiedByJob,
   ]);
 
-  // Refetch function that refetches both jobs and production in parallel
+  // Refetch function that refetches jobs, production, and edit logs in parallel
   const refetch = async () => {
     await Promise.all([
       refetchJobs(),
@@ -683,6 +763,14 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
           setProductionEntries([]);
         } finally {
           setProductionLoading(false);
+        }
+      })(),
+      (async () => {
+        try {
+          const logs = await getJobEditLogs();
+          setEditLogs(logs);
+        } catch (err) {
+          console.log("[useProjections] Edit logs not available:", err);
         }
       })(),
     ]);
