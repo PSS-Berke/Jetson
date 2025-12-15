@@ -87,6 +87,7 @@ export default function ProductionFilters({
 }: ProductionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchQuery);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +113,22 @@ export default function ProductionFilters({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Keep local search input in sync when external searchQuery changes
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  // Debounce search input changes before notifying parent
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (localSearch !== searchQuery) {
+        onSearchChange(localSearch);
+      }
+    }, 300);
+
+    return () => clearTimeout(handle);
+  }, [localSearch, searchQuery, onSearchChange]);
 
   // Extract unique clients from jobs
   const clients = useMemo(() => {
@@ -245,8 +262,8 @@ export default function ProductionFilters({
             <input
               type="text"
               placeholder="Search jobs..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

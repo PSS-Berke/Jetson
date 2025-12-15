@@ -1030,6 +1030,16 @@ export interface JobV2 extends Omit<Job, "machines_id" | "client"> {
   sub_client?: string;
   facility?: string;
   client?: string; // Optional in v2 API
+  // Optional daily_split and actual_quantity fields returned by v2 API
+  daily_split?: Array<{
+    date: string; // "DD.MM.YYYY"
+    quantity: number;
+  }>;
+  actual_quantity?: Array<{
+    date: string; // "DD.MM.YYYY"
+    quantity: number;
+    date_entered?: string; // "DD.MM.YYYY"
+  }>;
 }
 
 /**

@@ -5,13 +5,14 @@ import {
   mergeProjectionsWithActuals,
   calculateProductionSummary,
 } from "@/lib/productionUtils";
-import { useJobs } from "./useJobs";
+import { useJobsV2 } from "./useJobsV2";
 import type { ProductionEntry, ProductionComparison } from "@/types";
 
 interface UseProductionOptions {
   facilitiesId?: number;
   startDate?: number;
   endDate?: number;
+  search?: string;
 }
 
 interface UseProductionReturn {
@@ -47,14 +48,20 @@ const productionFetcher = async (
 export const useProduction = (
   options: UseProductionOptions = {},
 ): UseProductionReturn => {
-  const { facilitiesId, startDate, endDate } = options;
+  const { facilitiesId, startDate, endDate, search } = options;
 
-  // Fetch jobs using existing hook (now with SWR caching)
+  // Fetch jobs using v2 API (includes actual_quantity from jobs table)
   const {
     jobs,
     isLoading: isLoadingJobs,
     refetch: refetchJobs,
-  } = useJobs(facilitiesId);
+  } = useJobsV2({
+    facilities_id: facilitiesId ?? 0,
+    fetchAll: true,
+    // When a search term is provided, only fetch matching jobs so
+    // production comparisons respect the API-level search results.
+    search: search ?? "",
+  });
 
   // Create unique SWR key for production entries
   const productionKey = useMemo(

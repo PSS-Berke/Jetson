@@ -2,9 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import {
-  getProductionEntries,
-  updateProductionEntry,
-  addProductionEntry,
+  updateJob,
 } from "@/lib/api";
 import Toast from "./Toast";
 import type { ProductionComparison } from "@/types";
@@ -34,7 +32,6 @@ export default function EditProductionEntryModal({
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [existingEntryId, setExistingEntryId] = useState<number | null>(null);
 
   // Calculate live variance
   const variance =
@@ -47,45 +44,22 @@ export default function EditProductionEntryModal({
           comparison.projected_quantity) *
         100
       : 0;
-    console.log("")
-  // Load existing production entry when modal opens
+
+  // Load existing actual quantity from job when modal opens
   useEffect(() => {
-    const loadExistingEntry = async () => {
-      if (isOpen && comparison) {
-        try {
-          // Fetch production entries for this job
-          const entries = await getProductionEntries(
-            facilitiesId,
-            startDate,
-            endDate,
-          );
-          const jobEntry = entries.find((e) => e.job === comparison.job.id);
+    if (isOpen && comparison) {
+      // Prefill with existing aggregated actual quantity for this period, if present
+      setActualQuantity(
+        comparison.actual_quantity && comparison.actual_quantity > 0
+          ? comparison.actual_quantity.toString()
+          : "",
+      );
 
-          if (jobEntry) {
-            setExistingEntryId(jobEntry.id);
-            setActualQuantity(jobEntry.actual_quantity.toString());
-            setNotes(jobEntry.notes || "");
-          } else {
-            // No existing entry, start fresh
-            setExistingEntryId(null);
-            setActualQuantity("");
-            setNotes("");
-          }
-        } catch (error) {
-          console.error(
-            "[EditProductionEntryModal] Error loading entry:",
-            error,
-          );
-          // Start fresh if we can't load
-          setExistingEntryId(null);
-          setActualQuantity("");
-          setNotes("");
-        }
-      }
-    };
-
-    loadExistingEntry();
-  }, [isOpen, comparison, facilitiesId, startDate, endDate]);
+      // Notes are no longer stored on a separate production entry record,
+      // so we reset to empty when opening the modal
+      setNotes("");
+    }
+  }, [isOpen, comparison]);
 
   // Handle quantity input with comma formatting
   const handleQuantityChange = (value: string) => {
@@ -110,40 +84,112 @@ export default function EditProductionEntryModal({
       }
 
       console.log("[EditProductionEntryModal] Submitting:", {
-        existingEntryId,
         quantity,
         notes,
         jobId: comparison.job.id,
       });
 
-      if (existingEntryId) {
-        // Update existing entry
-        console.log(
-          "[EditProductionEntryModal] Updating entry",
-          existingEntryId,
-          "with quantity:",
-          quantity,
+      // Helper to format timestamps as DD.MM.YYYY for JSON storage
+      const formatDate = (timestamp: number): string => {
+        const dateObj = new Date(timestamp);
+        const day = String(dateObj.getDate()).padStart(2, "0");
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const year = dateObj.getFullYear();
+        return `${day}.${month}.${year}`;
+      };
+
+      // Helper to get all weekdays (Mon–Fri) between two timestamps (inclusive)
+      const getWeekdayDatesInRange = (from: number, to: number): string[] => {
+        const dates: string[] = [];
+        const start = new Date(from);
+        const end = new Date(to);
+
+        // Normalize to midnight to avoid timezone drift
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+
+        for (
+          let d = new Date(start.getTime());
+          d.getTime() <= end.getTime();
+          d.setDate(d.getDate() + 1)
+        ) {
+          const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            dates.push(formatDate(d.getTime()));
+          }
+        }
+
+        // Fallback: if no weekdays (shouldn't happen), at least return the start date
+        if (dates.length === 0) {
+          dates.push(formatDate(start.getTime()));
+        }
+
+        return dates;
+      };
+
+      const enteredDate = formatDate(Date.now());
+
+      // Decide how to spread the quantity:
+      // - If the range spans more than 1 day, divide across all weekdays in the range
+      // - Otherwise, treat it as a single-day entry
+      const weekdayDates = getWeekdayDatesInRange(startDate, endDate);
+      const isMultiDayRange = weekdayDates.length > 1;
+
+      const perDayQuantity = isMultiDayRange
+        ? quantity / weekdayDates.length
+        : quantity;
+
+      const newEntries = weekdayDates.map((date) => ({
+        date,
+        quantity: perDayQuantity,
+        date_entered: enteredDate,
+      }));
+
+      // Start from any existing actual_quantity JSON already on the job
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let existingEntries: any[] = [];
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const jobAny: any = comparison.job;
+        if (jobAny.actual_quantity) {
+          if (typeof jobAny.actual_quantity === "string") {
+            existingEntries = JSON.parse(jobAny.actual_quantity);
+          } else if (Array.isArray(jobAny.actual_quantity)) {
+            existingEntries = jobAny.actual_quantity;
+          }
+        }
+      } catch (parseError) {
+        console.warn(
+          "[EditProductionEntryModal] Failed to parse existing actual_quantity JSON, starting fresh:",
+          parseError,
         );
-        const result = await updateProductionEntry(existingEntryId, {
-          actual_quantity: quantity,
-          notes: notes || undefined,
-        });
-        console.log("[EditProductionEntryModal] Update result:", result);
-      } else {
-        // Create new entry
-        console.log(
-          "[EditProductionEntryModal] Creating new entry for job:",
-          comparison.job.id,
-        );
-        const result = await addProductionEntry({
-          job: comparison.job.id,
-          date: startDate,
-          actual_quantity: quantity,
-          notes: notes || undefined,
-          facilities_id: facilitiesId,
-        });
-        console.log("[EditProductionEntryModal] Create result:", result);
+        existingEntries = [];
       }
+
+      // Remove any existing entries for dates in this range, then add the new ones
+      const datesInRange = new Set(weekdayDates);
+      const filteredExisting = existingEntries.filter(
+        (entry) => !datesInRange.has(entry.date),
+      );
+      const updatedEntries = [...filteredExisting, ...newEntries];
+
+      console.log(
+        "[EditProductionEntryModal] Updating job with actuals JSON",
+        comparison.job.id,
+        updatedEntries,
+      );
+
+      // Prepare payload: include notes (if any) and the actual_quantity JSON array
+      const payload: any = {
+        actual_quantity: updatedEntries,
+      };
+
+      if (notes) {
+        payload.production_notes = notes;
+      }
+
+      const result = await updateJob(comparison.job.id, payload);
+      console.log("[EditProductionEntryModal] Job update result:", result);
 
       // Show success and trigger callbacks
       setShowSuccessToast(true);
@@ -173,7 +219,6 @@ export default function EditProductionEntryModal({
       setTimeout(() => {
         setActualQuantity("");
         setNotes("");
-        setExistingEntryId(null);
         setErrorMessage("");
       }, 300);
     }
@@ -300,11 +345,7 @@ export default function EditProductionEntryModal({
               disabled={submitting}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting
-                ? "Saving..."
-                : existingEntryId
-                  ? "Update Entry"
-                  : "Create Entry"}
+              {submitting ? "Saving..." : "Save Entry"}
             </button>
           </div>
         </form>

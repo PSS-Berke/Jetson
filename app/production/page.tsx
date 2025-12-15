@@ -143,6 +143,8 @@ export default function ProductionPage() {
     facilitiesId: selectedFacility || undefined,
     startDate,
     endDate,
+    // Pass search so production comparisons are limited to API search results
+    search: searchQuery.trim() || "",
   });
 
   const isLoading = jobsLoading || productionLoading;

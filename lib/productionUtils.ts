@@ -159,15 +159,35 @@ export const mergeProjectionsWithActuals = (
   startDate: number,
   endDate: number,
 ): ProductionComparison[] => {
-  // Aggregate actual production by job, filtering by date range
-  const actualByJob = aggregateProductionByJob(
+  // Filter jobs to those in the time range
+  const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
+
+  // Helper to parse "DD.MM.YYYY" into a timestamp
+  const parseDotDateToTimestamp = (dateStr: string): number | null => {
+    const parts = dateStr.split(".");
+    if (parts.length !== 3) return null;
+    const [dayStr, monthStr, yearStr] = parts;
+    const day = parseInt(dayStr, 10);
+    const month = parseInt(monthStr, 10) - 1; // JS months are 0-based
+    const year = parseInt(yearStr, 10);
+    if (
+      Number.isNaN(day) ||
+      Number.isNaN(month) ||
+      Number.isNaN(year)
+    ) {
+      return null;
+    }
+    const d = new Date(year, month, day);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+
+  // Aggregate actuals from legacy production entries (fallback)
+  const actualByJobFromEntries = aggregateProductionByJob(
     productionEntries,
     startDate,
     endDate,
   );
-
-  // Filter jobs to those in the time range
-  const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
 
   // Create comparison for each job
   return relevantJobs.map((job) => {
@@ -183,13 +203,40 @@ export const mergeProjectionsWithActuals = (
         ? Math.round((job.quantity * periodDuration) / totalDuration)
         : job.quantity;
 
-    // Get actual quantity and entry IDs from production entries
-    const jobData = actualByJob.get(job.id) || {
-      total: 0,
-      entryIds: [],
-      lastUpdatedAt: undefined,
-    };
-    const actual_quantity = jobData.total;
+    // Prefer actual_quantity array coming directly from jobs v2 API when available
+    let actual_quantity = 0;
+    let lastUpdatedAt: number | undefined = undefined;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jobAny: any = job;
+    if (Array.isArray(jobAny.actual_quantity) && jobAny.actual_quantity.length > 0) {
+      jobAny.actual_quantity.forEach((entry: any) => {
+        if (!entry || typeof entry.date !== "string") return;
+        const ts = parseDotDateToTimestamp(entry.date);
+        if (ts === null) return;
+        if (ts < startDate || ts > endDate) return;
+
+        const qty = typeof entry.quantity === "number" ? entry.quantity : Number(entry.quantity) || 0;
+        actual_quantity += qty;
+
+        if (entry.date_entered) {
+          const enteredTs = parseDotDateToTimestamp(entry.date_entered);
+          if (enteredTs !== null) {
+            lastUpdatedAt = lastUpdatedAt ? Math.max(lastUpdatedAt, enteredTs) : enteredTs;
+          }
+        }
+      });
+    } else {
+      // Fallback to legacy production_entry table aggregation
+      const jobData = actualByJobFromEntries.get(job.id) || {
+        total: 0,
+        entryIds: [],
+        lastUpdatedAt: undefined,
+      };
+      actual_quantity = jobData.total;
+      lastUpdatedAt = jobData.lastUpdatedAt;
+    }
+
 
     // Calculate variance
     const { variance, variance_percentage } = calculateVariance(
@@ -203,8 +250,8 @@ export const mergeProjectionsWithActuals = (
       actual_quantity,
       variance,
       variance_percentage,
-      entry_ids: jobData.entryIds,
-      last_updated_at: jobData.lastUpdatedAt,
+      entry_ids: [], // No discrete production_entry IDs when using jobs v2 actual_quantity
+      last_updated_at: lastUpdatedAt,
     };
   });
 };
