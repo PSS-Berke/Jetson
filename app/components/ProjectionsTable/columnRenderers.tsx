@@ -64,6 +64,7 @@ export interface CellRenderContext {
   // Time data
   timeRanges: TimeRange[];
   granularity: "weekly" | "monthly" | "quarterly";
+  lastModifiedTimestamp?: number;
 
   // Notes
   showNotes: boolean;
@@ -120,6 +121,8 @@ export function renderColumnHeader(
       return renderCheckboxHeader(config, context);
     case "static":
       return renderStaticHeader(config, context);
+    case "status":
+      return renderStatusHeader(config, context);
     case "time_range":
       return renderTimeRangeHeaders(config, context);
     case "total":
@@ -136,7 +139,7 @@ function renderCheckboxHeader(
   context: HeaderRenderContext
 ): React.ReactNode {
   return (
-    <th key="checkbox" className="px-2 py-2 text-left w-12">
+    <th key="checkbox" className="pl-2 pr-1 py-2 text-left w-10">
       <input
         type="checkbox"
         checked={context.allSelected}
@@ -204,6 +207,34 @@ function renderStaticHeader(
   );
 }
 
+function renderStatusHeader(
+  config: ProjectionColumnConfig,
+  context: HeaderRenderContext
+): React.ReactNode {
+  const isSortable = config.sortable && config.sortField;
+
+  return (
+    <th
+      key={config.key}
+      className={`px-2 py-2 text-center text-[10px] font-medium text-[var(--text-dark)] uppercase tracking-wider ${
+        isSortable ? "cursor-pointer hover:bg-gray-50" : ""
+      }`}
+      onClick={isSortable ? () => context.onSort?.(config.sortField!) : undefined}
+    >
+      <div className="flex items-center justify-center gap-1">
+        {config.label}
+        {isSortable && config.sortField && (
+          <SortIcon
+            field={config.sortField}
+            currentSortField={context.sortField}
+            sortDirection={context.sortDirection}
+          />
+        )}
+      </div>
+    </th>
+  );
+}
+
 function renderTimeRangeHeaders(
   config: ProjectionColumnConfig,
   context: HeaderRenderContext
@@ -264,6 +295,8 @@ export function renderCell(
       return renderCheckboxCell(config, context);
     case "static":
       return renderStaticCell(config, context);
+    case "status":
+      return renderStatusCell(config, context);
     case "time_range":
       return renderTimeRangeCells(config, context);
     case "total":
@@ -281,11 +314,11 @@ function renderCheckboxCell(
 ): React.ReactNode {
   // For process rows, only show checkbox on first in group
   if (context.isFirstInGroup === false) {
-    return <td key="checkbox" className="px-2 py-2 w-12"></td>;
+    return <td key="checkbox" className="pl-2 pr-1 py-2 w-10"></td>;
   }
 
   return (
-    <td key="checkbox" className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
+    <td key="checkbox" className="pl-2 pr-1 py-2 w-10" onClick={(e) => e.stopPropagation()}>
       <input
         type="checkbox"
         checked={context.isSelected}
@@ -309,10 +342,21 @@ function renderStaticCell(
       return (
         <td
           key="job_number"
-          className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
+          className="pl-1 pr-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
           title={job.job_number}
         >
           {showContent ? formatJobNumber(job.job_number) : ""}
+        </td>
+      );
+
+    case "version":
+      const versionName = (job as any).version_name as string | undefined;
+      return (
+        <td
+          key="version"
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-light)]"
+        >
+          {showContent ? (versionName || "v1") : ""}
         </td>
       );
 
@@ -323,10 +367,21 @@ function renderStaticCell(
         </td>
       );
 
-    case "sub_client":
+    case "client":
+      const clientName = job.client?.name || "-";
+      const truncatedClient = clientName.length > 7 ? clientName.slice(0, 7) + "…" : clientName;
       return (
-        <td key="sub_client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-          {showContent ? (job.sub_client || "-") : ""}
+        <td key="client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]" title={clientName}>
+          {showContent ? truncatedClient : ""}
+        </td>
+      );
+
+    case "sub_client":
+      const subClientName = job.sub_client || "-";
+      const truncatedSubClient = subClientName.length > 7 ? subClientName.slice(0, 7) + "…" : subClientName;
+      return (
+        <td key="sub_client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]" title={subClientName}>
+          {showContent ? truncatedSubClient : ""}
         </td>
       );
 
@@ -407,9 +462,82 @@ function renderStaticCell(
         </td>
       );
 
+    case "updated_at":
+      if (!showContent) {
+        return <td key="updated_at" className="px-2 py-2"></td>;
+      }
+
+      const timestamp = context.lastModifiedTimestamp;
+      const fallbackTimestamp = job.updated_at
+        ? new Date(job.updated_at).getTime()
+        : undefined;
+      const displayTimestamp = timestamp ?? fallbackTimestamp;
+
+      return (
+        <td
+          key="updated_at"
+          className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
+        >
+          {displayTimestamp
+            ? new Date(displayTimestamp).toLocaleString("en-US", {
+                month: "numeric",
+                day: "numeric",
+                year: "2-digit",
+                hour: "numeric",
+                minute: "2-digit",
+              })
+            : "-"}
+        </td>
+      );
+
     default:
       return null;
   }
+}
+
+function renderStatusCell(
+  config: ProjectionColumnConfig,
+  context: CellRenderContext
+): React.ReactNode {
+  const { job, isFirstInGroup, processProjection } = context;
+  const isProcessRow = processProjection !== undefined;
+  const showContent = !isProcessRow || isFirstInGroup !== false;
+
+  if (!showContent) {
+    return <td key="status" className="px-2 py-2"></td>;
+  }
+
+  const scheduleType = (job as any).schedule_type as string | undefined;
+  const statusLower = (scheduleType || "soft schedule").toLowerCase();
+  let statusClass: string;
+  let displayLabel: string;
+  if (statusLower.includes("hard")) {
+    statusClass = "bg-green-100 text-green-800";
+    displayLabel = "Hard";
+  } else if (statusLower.includes("cancel")) {
+    statusClass = "bg-red-100 text-red-800";
+    displayLabel = "Cancelled";
+  } else if (statusLower.includes("complete")) {
+    statusClass = "bg-purple-100 text-purple-800";
+    displayLabel = "Completed";
+  } else if (statusLower.includes("projected")) {
+    statusClass = "bg-blue-100 text-blue-800";
+    displayLabel = "Projected";
+  } else {
+    statusClass = "bg-yellow-100 text-yellow-800";
+    displayLabel = "Soft";
+  }
+
+  return (
+    <td key="status" className="px-2 py-2 whitespace-nowrap text-xs text-center">
+      <span
+        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass}`}
+        title={scheduleType || "Soft Schedule"}
+      >
+        {displayLabel}
+      </span>
+    </td>
+  );
 }
 
 function renderTimeRangeCells(

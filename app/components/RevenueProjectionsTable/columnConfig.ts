@@ -1,9 +1,8 @@
-import { ReactNode } from "react";
-
-// Sort field types (matching ProjectionsTable.tsx)
+// Sort field types for revenue projections table
 export type SortField =
   | "job_number"
   | "version"
+  | "status"
   | "facility"
   | "client"
   | "sub_client"
@@ -13,19 +12,19 @@ export type SortField =
   | "start_date"
   | "due_date"
   | "updated_at"
-  | "total"
-  | "status";
+  | "total";
 
 // Column types for unified handling
 export type ColumnType =
-  | "static"      // Regular data columns (job_number, facility, etc.)
+  | "static"      // Regular data columns
   | "checkbox"    // Selection checkbox
-  | "time_range"  // Dynamic time period columns (placeholder - actual ranges are dynamic)
+  | "status"      // Status badge column
+  | "time_range"  // Dynamic time period columns
   | "total"       // Aggregation column
   | "notes"       // Notes column
-  | "status";     // Status badge column
+  | "currency";   // Currency formatted values
 
-export interface ProjectionColumnConfig {
+export interface RevenueColumnConfig {
   key: string;
   type: ColumnType;
   label: string;
@@ -35,12 +34,12 @@ export interface ProjectionColumnConfig {
   minWidth?: string;
   align?: "left" | "center" | "right";
   sticky?: "left" | "right";
-  required?: boolean;        // Cannot be hidden (e.g., checkbox)
+  required?: boolean;        // Cannot be hidden
   reorderable?: boolean;     // Can be reordered via drag-drop (default true)
   externalControl?: string;  // Visibility controlled by external prop (e.g., "showNotes")
 }
 
-export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
+export const DEFAULT_COLUMNS: RevenueColumnConfig[] = [
   {
     key: "checkbox",
     type: "checkbox",
@@ -171,7 +170,7 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     sortable: true,
     sortField: "total",
     sticky: "right",
-    align: "center",
+    align: "right",
     reorderable: true,
   },
   {
@@ -193,21 +192,21 @@ export const getDefaultColumnOrder = (): string[] => {
 // Get column config by key
 export const getColumnByKey = (
   key: string
-): ProjectionColumnConfig | undefined => {
+): RevenueColumnConfig | undefined => {
   return DEFAULT_COLUMNS.find((col) => col.key === key);
 };
 
 // Get all reorderable columns (for UI)
-export const getReorderableColumns = (): ProjectionColumnConfig[] => {
+export const getReorderableColumns = (): RevenueColumnConfig[] => {
   return DEFAULT_COLUMNS.filter((col) => col.reorderable !== false);
 };
 
 // Get all columns that can be hidden (not required and no external control)
-export const getToggleableColumns = (): ProjectionColumnConfig[] => {
+export const getToggleableColumns = (): RevenueColumnConfig[] => {
   return DEFAULT_COLUMNS.filter(
     (col) => !col.required && !col.externalControl
   );
 };
 
 // localStorage key for persistence
-export const COLUMN_SETTINGS_STORAGE_KEY = "projections-table-columns";
+export const COLUMN_SETTINGS_STORAGE_KEY = "revenue-projections-table-columns";

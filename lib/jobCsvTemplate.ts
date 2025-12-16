@@ -38,7 +38,7 @@ export function generateJobTemplate(format: "csv" | "xlsx" = "xlsx"): Blob {
   // Sample data rows
   const sampleData = [
     {
-      schedule_type: "Hard Schedule",
+      schedule_type: "hard schedule",
       facility: "Bolingbrook",
       job_number: 33579,
       sub_client: "INDEED",
@@ -61,7 +61,7 @@ export function generateJobTemplate(format: "csv" | "xlsx" = "xlsx"): Blob {
       color: "",
     },
     {
-      schedule_type: "Soft Schedule",
+      schedule_type: "soft schedule",
       facility: "Lemont",
       job_number: 7006,
       sub_client: "CLEAN CHOICE",
@@ -84,7 +84,7 @@ export function generateJobTemplate(format: "csv" | "xlsx" = "xlsx"): Blob {
       color: "",
     },
     {
-      schedule_type: "Hard Schedule",
+      schedule_type: "hard schedule",
       facility: "Bolingbrook",
       job_number: 31014,
       sub_client: "CAPITAL ONE",
@@ -124,7 +124,7 @@ export function generateJobTemplate(format: "csv" | "xlsx" = "xlsx"): Blob {
       "- process_type: Type of process - can be multiple separated by commas (insert, sort, inkjet, labelApply, fold, laser, hpPress)",
     ],
     ["- price_per_m: Price per thousand (decimal, defaults to 0)"],
-    ['- schedule_type: "Hard Schedule" or "Soft Schedule" (defaults to Soft)'],
+    ['- schedule_type: "hard schedule" or "soft schedule" (defaults to soft schedule)'],
     ['- facility: "Bolingbrook" or "Lemont" (defaults to Bolingbrook)'],
     [
       "- sub_client: Client name - you will map this to actual clients during upload",
@@ -136,8 +136,8 @@ export function generateJobTemplate(format: "csv" | "xlsx" = "xlsx"): Blob {
     ["- end_date: Due date (flexible formats)"],
     [""],
     ["PROCESS-SPECIFIC COLUMNS:"],
-    ["Insert: paper_size (required), pockets (optional)"],
-    ["  - paper_size options: 6x9, 6x12, 9x12, 10x13, 12x15, #10, 11x17"],
+    ["Insert: envelope_size (required), pockets (optional)"],
+    ["  - envelope_size options: 6x9, 6x12, 9x12, 10x13, 12x15, #10, 11x17"],
     [""],
     ["Sort: sort_type (required), paper_size (required)"],
     ["  - sort_type options: Standard Sort, Presort, EDDM, Full Service"],

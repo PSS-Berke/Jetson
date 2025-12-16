@@ -54,6 +54,8 @@ interface ProjectionFiltersProps {
   dynamicFieldFilterLogic?: "and" | "or";
   onDynamicFieldFilterLogicChange?: (logic: "and" | "or") => void;
   facilitiesId?: number | null;
+  versionGroupingEnabled?: boolean;
+  onVersionGroupingChange?: (enabled: boolean) => void;
 }
 
 export default function ProjectionFilters({
@@ -90,6 +92,8 @@ export default function ProjectionFilters({
   dynamicFieldFilterLogic = "and",
   onDynamicFieldFilterLogicChange,
   facilitiesId,
+  versionGroupingEnabled = true,
+  onVersionGroupingChange,
 }: ProjectionFiltersProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
@@ -681,6 +685,32 @@ export default function ProjectionFilters({
               />
             )}
 
+            {/* Version Grouping Toggle */}
+            {onVersionGroupingChange && (
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => onVersionGroupingChange(true)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    versionGroupingEnabled
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Versions Combined
+                </button>
+                <button
+                  onClick={() => onVersionGroupingChange(false)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    !versionGroupingEnabled
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Versions Expanded
+                </button>
+              </div>
+            )}
+
             {/* Mobile View Toggle (Cards vs Table) - Only visible on mobile */}
             {onMobileViewModeChange && (
               <div className="flex md:hidden items-center gap-1 bg-gray-100 rounded-lg p-1">
@@ -710,6 +740,7 @@ export default function ProjectionFilters({
             )}
           </div>
         )}
+
 
         {/* Dynamic Field Filters - Advanced Mode Only */}
         {filterViewMode === "advanced" && onDynamicFieldFiltersChange && onDynamicFieldFilterLogicChange && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { getVarianceStatus } from "@/lib/productionUtils";
 import {
   addProductionEntry,
@@ -9,6 +9,16 @@ import {
 } from "@/lib/api";
 import type { ProductionComparison } from "@/types";
 import type { ProductionEntry } from "@/types";
+import { useColumnSettings } from "./ProductionComparisonTable/useColumnSettings";
+import ColumnSettingsPopover from "./ProductionComparisonTable/ColumnSettingsPopover";
+import {
+  renderColumnHeader,
+  renderCell,
+  HeaderRenderContext,
+  CellRenderContext,
+} from "./ProductionComparisonTable/columnRenderers";
+import { SortField, getColumnByKey } from "./ProductionComparisonTable/columnConfig";
+import Pagination from "./Pagination";
 
 interface ProductionComparisonTableProps {
   comparisons: ProductionComparison[];
@@ -31,20 +41,6 @@ interface BatchEntryData {
   notes: string;
 }
 
-type SortField =
-  | "job_number"
-  | "job_name"
-  | "facility"
-  | "client"
-  | "sub_client"
-  | "description"
-  | "quantity"
-  | "start_date"
-  | "due_date"
-  | "date_entered"
-  | "projected"
-  | "actual"
-  | "variance";
 type SortDirection = "asc" | "desc";
 
 export default function ProductionComparisonTable({
@@ -62,7 +58,7 @@ export default function ProductionComparisonTable({
   const [sortField, setSortField] = useState<SortField>("job_number");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [editingCell, setEditingCell] = useState<{
     jobId: number;
     entryId: number | null;
@@ -70,6 +66,19 @@ export default function ProductionComparisonTable({
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Column settings hook
+  const {
+    columnSettings,
+    isColumnVisible,
+    toggleColumnVisibility,
+    setColumnOrder,
+    resetToDefaults,
+    getOrderedColumns,
+  } = useColumnSettings();
+
+  // Get ordered columns for rendering
+  const orderedColumns = useMemo(() => getOrderedColumns(), [getOrderedColumns]);
 
   // Batch mode state
   const [batchData, setBatchData] = useState<Map<number, BatchEntryData>>(
@@ -108,11 +117,6 @@ export default function ProductionComparisonTable({
     return pieces.toLocaleString();
   };
 
-  // Helper function to get the display label
-  const getDisplayLabel = (): string => {
-    return dataDisplayMode === "revenue" ? "Revenue" : "Pieces";
-  };
-
   // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -132,6 +136,10 @@ export default function ProductionComparisonTable({
       case "job_number":
         aValue = a.job.job_number;
         bValue = b.job.job_number;
+        break;
+      case "version":
+        aValue = (a.job as any).version || 1;
+        bValue = (b.job as any).version || 1;
         break;
       case "job_name":
         aValue = a.job.job_name.toLowerCase();
@@ -181,6 +189,20 @@ export default function ProductionComparisonTable({
         aValue = a.variance_percentage;
         bValue = b.variance_percentage;
         break;
+      case "status":
+        // Sort by status priority: hard schedule > soft schedule > projected > completed > cancelled
+        const getStatusPriority = (job: any): number => {
+          const scheduleType = (job.schedule_type || "soft schedule").toLowerCase();
+          if (scheduleType.includes("hard")) return 1;
+          if (scheduleType.includes("soft")) return 2;
+          if (scheduleType.includes("projected")) return 3;
+          if (scheduleType.includes("complete")) return 4;
+          if (scheduleType.includes("cancel")) return 5;
+          return 2; // default to soft schedule
+        };
+        aValue = getStatusPriority(a.job);
+        bValue = getStatusPriority(b.job);
+        break;
       default:
         aValue = a.job.job_number;
         bValue = b.job.job_number;
@@ -191,11 +213,13 @@ export default function ProductionComparisonTable({
     return 0;
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(sortedComparisons.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedComparisons = sortedComparisons.slice(startIndex, endIndex);
+  // Pagination logic - support "All" option with itemsPerPage === -1
+  const paginatedComparisons = itemsPerPage === -1
+    ? sortedComparisons
+    : sortedComparisons.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      );
 
   // Reset to page 1 when items per page changes
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -498,10 +522,13 @@ export default function ProductionComparisonTable({
     }
   };
 
-  // Render sort icon
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <span className="text-gray-400">⇅</span>;
-    return <span>{sortDirection === "asc" ? "↑" : "↓"}</span>;
+  // Create header render context
+  const headerContext: HeaderRenderContext = {
+    sortField,
+    sortDirection,
+    onSort: handleSort,
+    isBatchMode,
+    dataDisplayMode,
   };
 
   if (comparisons.length === 0) {
@@ -535,6 +562,15 @@ export default function ProductionComparisonTable({
           )}
         </div>
         <div className="flex gap-2">
+          {!isBatchMode && (
+            <ColumnSettingsPopover
+              columnOrder={columnSettings.order}
+              hiddenColumns={columnSettings.hidden}
+              onToggleColumn={toggleColumnVisibility}
+              onReorderColumns={setColumnOrder}
+              onResetToDefaults={resetToDefaults}
+            />
+          )}
           {isBatchMode ? (
             <>
               <button
@@ -568,98 +604,15 @@ export default function ProductionComparisonTable({
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th
-                onClick={() => !isBatchMode && handleSort("job_number")}
-                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  Job # {!isBatchMode && <SortIcon field="job_number" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("facility")}
-                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  Facility {!isBatchMode && <SortIcon field="facility" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("client")}
-                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  Client {!isBatchMode && <SortIcon field="client" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("sub_client")}
-                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  Sub Client {!isBatchMode && <SortIcon field="sub_client" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("description")}
-                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  Description {!isBatchMode && <SortIcon field="description" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("quantity")}
-                className={`px-2 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  Qty {!isBatchMode && <SortIcon field="quantity" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("start_date")}
-                className={`px-2 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  Start {!isBatchMode && <SortIcon field="start_date" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("due_date")}
-                className={`px-2 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  End {!isBatchMode && <SortIcon field="due_date" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("date_entered")}
-                className={`px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center gap-2">
-                  Date Entered{" "}
-                  {!isBatchMode && <SortIcon field="date_entered" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("projected")}
-                className={`px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center justify-end gap-2">
-                  Projected {getDisplayLabel()}{" "}
-                  {!isBatchMode && <SortIcon field="projected" />}
-                </div>
-              </th>
-              <th
-                onClick={() => !isBatchMode && handleSort("actual")}
-                className={`px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider ${!isBatchMode ? "cursor-pointer hover:bg-gray-100" : ""}`}
-              >
-                <div className="flex items-center justify-end gap-2">
-                  {isBatchMode ? "Current" : "Actual"} {getDisplayLabel()}{" "}
-                  {!isBatchMode && <SortIcon field="actual" />}
-                </div>
-              </th>
-              {isBatchMode ? (
+              {orderedColumns.map((col) => {
+                if (!col.isVisible) return null;
+                // Skip variance columns in batch mode
+                if (isBatchMode && (col.config.key === "variance" || col.config.key === "variance_pct")) {
+                  return null;
+                }
+                return renderColumnHeader(col.config, headerContext);
+              })}
+              {isBatchMode && (
                 <>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                     Add Amount
@@ -674,20 +627,6 @@ export default function ProductionComparisonTable({
                     Notes
                   </th>
                 </>
-              ) : (
-                <>
-                  <th
-                    onClick={() => handleSort("variance")}
-                    className="px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  >
-                    <div className="flex items-center justify-end gap-2">
-                      Variance <SortIcon field="variance" />
-                    </div>
-                  </th>
-                  <th className="px-2 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Variance %
-                  </th>
-                </>
               )}
             </tr>
           </thead>
@@ -698,6 +637,23 @@ export default function ProductionComparisonTable({
               const newTotal = getBatchNewTotal(comparison.job.id);
               const hasInput = batchEntry?.addAmount || batchEntry?.setTotal;
 
+              // Create cell render context for this row
+              const cellContext: CellRenderContext = {
+                comparison,
+                dataDisplayMode,
+                isBatchMode,
+                isEditing,
+                editValue,
+                saving,
+                inputRef,
+                onStartEdit: handleStartEdit,
+                onEditInputChange: handleEditInputChange,
+                onSaveEdit: handleSaveEdit,
+                onKeyDown: handleKeyDown,
+                calculateRevenue,
+                formatDisplayValue,
+              };
+
               return (
                 <tr
                   key={comparison.job.id}
@@ -706,100 +662,15 @@ export default function ProductionComparisonTable({
                     !isEditing && !isBatchMode && onEdit && onEdit(comparison)
                   }
                 >
-                  <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                    {comparison.job.job_number}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
-                    {comparison.job.facility?.name || "Unknown"}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
-                    {comparison.job.client?.name || "Unknown"}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
-                    {comparison.job.sub_client || "-"}
-                  </td>
-                  <td className="px-2 py-2 text-xs text-gray-900 max-w-[200px] truncate">
-                    {comparison.job.description || "N/A"}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-gray-900">
-                    {comparison.job.quantity.toLocaleString()}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-600">
-                    {comparison.job.start_date
-                      ? new Date(comparison.job.start_date).toLocaleDateString("en-US", {
-                          month: "numeric",
-                          day: "numeric",
-                          year: "2-digit",
-                        })
-                      : "N/A"}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-600">
-                    {comparison.job.due_date
-                      ? new Date(comparison.job.due_date).toLocaleDateString("en-US", {
-                          month: "numeric",
-                          day: "numeric",
-                          year: "2-digit",
-                        })
-                      : "N/A"}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-600">
-                    {comparison.last_updated_at
-                      ? new Date(
-                          comparison.last_updated_at,
-                        ).toLocaleDateString()
-                      : "-"}
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-right">
-                    {formatDisplayValue(
-                      comparison.projected_quantity,
-                      comparison.job,
-                    )}
-                  </td>
-                  <td
-                    className={`px-2 py-2 whitespace-nowrap text-xs text-right font-semibold ${
-                      comparison.actual_quantity > 0
-                        ? "text-blue-600"
-                        : "text-gray-900"
-                    }`}
-                    onClick={(e) =>
-                      !isEditing &&
-                      !isBatchMode &&
-                      handleStartEdit(comparison, e)
+                  {orderedColumns.map((col) => {
+                    if (!col.isVisible) return null;
+                    // Skip variance columns in batch mode
+                    if (isBatchMode && (col.config.key === "variance" || col.config.key === "variance_pct")) {
+                      return null;
                     }
-                  >
-                    {isEditing && !isBatchMode ? (
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={
-                          editValue
-                            ? dataDisplayMode === "revenue"
-                              ? `$${calculateRevenue(parseInt(editValue), comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                              : parseInt(editValue).toLocaleString()
-                            : ""
-                        }
-                        onChange={(e) => handleEditInputChange(e.target.value)}
-                        onBlur={() => handleSaveEdit(comparison)}
-                        onKeyDown={(e) => handleKeyDown(e, comparison)}
-                        className="w-full px-2 py-1 border border-blue-500 rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={saving}
-                      />
-                    ) : (
-                      <span
-                        className={
-                          !isBatchMode
-                            ? "cursor-text hover:bg-blue-50 px-2 py-1 rounded"
-                            : ""
-                        }
-                      >
-                        {formatDisplayValue(
-                          comparison.actual_quantity,
-                          comparison.job,
-                        )}
-                      </span>
-                    )}
-                  </td>
-                  {isBatchMode ? (
+                    return renderCell(col.config, cellContext);
+                  })}
+                  {isBatchMode && (
                     <>
                       <td className="px-2 py-2 whitespace-nowrap">
                         <input
@@ -859,33 +730,6 @@ export default function ProductionComparisonTable({
                         />
                       </td>
                     </>
-                  ) : (
-                    <>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
-                        <span
-                          className={
-                            comparison.variance >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }
-                        >
-                          {comparison.variance >= 0 ? "+" : ""}
-                          {dataDisplayMode === "revenue"
-                            ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : comparison.variance.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
-                        <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
-                            comparison.variance_percentage,
-                          )}`}
-                        >
-                          {comparison.variance_percentage >= 0 ? "+" : ""}
-                          {comparison.variance_percentage.toFixed(1)}%
-                        </span>
-                      </td>
-                    </>
                   )}
                 </tr>
               );
@@ -907,135 +751,104 @@ export default function ProductionComparisonTable({
                 <div className="font-semibold text-gray-900">
                   Job #{comparison.job.job_number}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {comparison.job.facility?.name || "Unknown"}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {comparison.job.client?.name || "Unknown"}
-                  {comparison.job.sub_client && ` / ${comparison.job.sub_client}`}
-                </div>
-                {comparison.job.description && (
+                {isColumnVisible("facility") && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {comparison.job.facility?.name || "Unknown"}
+                  </div>
+                )}
+                {(isColumnVisible("client") || isColumnVisible("sub_client")) && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {isColumnVisible("client") && (comparison.job.client?.name || "Unknown")}
+                    {isColumnVisible("sub_client") && comparison.job.sub_client && ` / ${comparison.job.sub_client}`}
+                  </div>
+                )}
+                {isColumnVisible("description") && comparison.job.description && (
                   <div className="text-xs text-gray-600 mt-1 truncate">
                     {comparison.job.description}
                   </div>
                 )}
                 <div className="text-xs text-gray-500 mt-1">
-                  Qty: {comparison.job.quantity.toLocaleString()} | Entered:{" "}
-                  {comparison.last_updated_at
-                    ? new Date(comparison.last_updated_at).toLocaleDateString()
-                    : "-"}
+                  {isColumnVisible("quantity") && `Qty: ${comparison.job.quantity.toLocaleString()}`}
+                  {isColumnVisible("updated_at") && ` | Modified: ${
+                    comparison.last_updated_at
+                      ? new Date(comparison.last_updated_at).toLocaleDateString("en-US", {
+                          month: "numeric",
+                          day: "numeric",
+                          year: "2-digit",
+                        })
+                      : "-"
+                  }`}
                 </div>
               </div>
-              <span
-                className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
-                  comparison.variance_percentage,
-                )}`}
-              >
-                {comparison.variance_percentage >= 0 ? "+" : ""}
-                {comparison.variance_percentage.toFixed(1)}%
-              </span>
+              {isColumnVisible("variance_pct") && (
+                <span
+                  className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${getStatusClass(
+                    comparison.variance_percentage,
+                  )}`}
+                >
+                  {comparison.variance_percentage >= 0 ? "+" : ""}
+                  {comparison.variance_percentage.toFixed(1)}%
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-              <div>
-                <span className="text-gray-500">Projected:</span>
-                <span className="ml-2 font-medium">
-                  {formatDisplayValue(
-                    comparison.projected_quantity,
-                    comparison.job,
-                  )}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Actual:</span>
-                <span
-                  className={`ml-2 font-semibold ${
-                    comparison.actual_quantity > 0
-                      ? "text-blue-600"
-                      : "text-gray-900"
-                  }`}
-                >
-                  {formatDisplayValue(
-                    comparison.actual_quantity,
-                    comparison.job,
-                  )}
-                </span>
-              </div>
-              <div className="col-span-2">
-                <span className="text-gray-500">Variance:</span>
-                <span
-                  className={`ml-2 font-medium ${
-                    comparison.variance >= 0 ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {comparison.variance >= 0 ? "+" : ""}
-                  {dataDisplayMode === "revenue"
-                    ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : comparison.variance.toLocaleString()}
-                </span>
-              </div>
+              {isColumnVisible("projected") && (
+                <div>
+                  <span className="text-gray-500">Projected:</span>
+                  <span className="ml-2 font-medium">
+                    {formatDisplayValue(
+                      comparison.projected_quantity,
+                      comparison.job,
+                    )}
+                  </span>
+                </div>
+              )}
+              {isColumnVisible("actual") && (
+                <div>
+                  <span className="text-gray-500">Actual:</span>
+                  <span
+                    className={`ml-2 font-semibold ${
+                      comparison.actual_quantity > 0
+                        ? "text-blue-600"
+                        : "text-gray-900"
+                    }`}
+                  >
+                    {formatDisplayValue(
+                      comparison.actual_quantity,
+                      comparison.job,
+                    )}
+                  </span>
+                </div>
+              )}
+              {isColumnVisible("variance") && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">Variance:</span>
+                  <span
+                    className={`ml-2 font-medium ${
+                      comparison.variance >= 0 ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    {comparison.variance >= 0 ? "+" : ""}
+                    {dataDisplayMode === "revenue"
+                      ? `$${calculateRevenue(comparison.variance, comparison.job).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : comparison.variance.toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}
       </div>
 
       {/* Pagination Controls */}
-      {comparisons.length > 10 && (
-        <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Items per page selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-700">Show:</span>
-              <select
-                value={itemsPerPage}
-                onChange={(e) =>
-                  handleItemsPerPageChange(Number(e.target.value))
-                }
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span className="text-sm text-gray-700">per page</span>
-            </div>
-
-            {/* Page info and navigation */}
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-700">
-                Showing {startIndex + 1} to{" "}
-                {Math.min(endIndex, sortedComparisons.length)} of{" "}
-                {sortedComparisons.length} jobs
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(1, prev - 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-700">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Pagination
+        currentPage={currentPage}
+        totalItems={sortedComparisons.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={handleItemsPerPageChange}
+      />
     </div>
   );
 }

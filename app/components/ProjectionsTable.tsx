@@ -15,21 +15,16 @@ import JobNotesModal from "./JobNotesModal";
 import ProcessTypeBadge from "./ProcessTypeBadge";
 import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
 import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
+import { PrimaryCategoryRow } from "./PrimaryCategoryRow";
+import { SubCategoryRow } from "./SubCategoryRow";
+import { buildSummaryTieredData, getPrimaryCategoryValue } from "@/lib/tieredFilterUtils";
+import { groupProjectionsByVersion, isVersionGroup, type VersionGroup } from "@/lib/versionGroupUtils";
+import { VersionGroupHeaderRow, VersionRow } from "./VersionGroupRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
 import type { CellIdentifier, CellGranularity } from "@/types";
 import { useCellNotes } from "@/hooks/useCellNotes";
-
-// Convert toggle granularity to cell granularity
-const toCellGranularity = (granularity: "week" | "month" | "quarter" | undefined): CellGranularity => {
-  switch (granularity) {
-    case "week": return "weekly";
-    case "month": return "monthly";
-    case "quarter": return "quarterly";
-    default: return "weekly";
-  }
-};
 import {
   useColumnSettings,
   ColumnSettingsPopover,
@@ -39,7 +34,29 @@ import {
   hexToRgba,
   calculateColumnCount,
 } from "./ProjectionsTable/index";
-import type { HeaderRenderContext, CellRenderContext, SortField } from "./ProjectionsTable/index";
+import type {
+  HeaderRenderContext,
+  CellRenderContext,
+  SortField,
+  ProjectionColumnConfig,
+  OrderedColumn,
+} from "./ProjectionsTable/index";
+
+// Convert toggle granularity to cell granularity
+const toCellGranularity = (
+  granularity: "week" | "month" | "quarter" | undefined,
+): CellGranularity => {
+  switch (granularity) {
+    case "week":
+      return "weekly";
+    case "month":
+      return "monthly";
+    case "quarter":
+      return "quarterly";
+    default:
+      return "weekly";
+  }
+};
 
 type SortDirection = "asc" | "desc";
 
@@ -61,6 +78,8 @@ interface ProjectionsTableProps {
   onShowNotesChange?: (show: boolean) => void;
   granularity?: "week" | "month" | "quarter"; // NEW: for cell-level notes
   fullFilteredProjections?: JobProjection[]; // NEW: Full filtered data for breakdown calculations
+  lastModifiedByJob?: Map<number, number>; // Map of job ID to last modified timestamp
+  versionGroupingEnabled?: boolean; // Whether to group job versions together
 }
 
 // Type guard to check if summary has facility information
@@ -91,8 +110,8 @@ const ProjectionTableRow = memo(
     onOpenNotesModal,
     granularity,
     cellNotesMap,
-    isColumnVisible,
-    orderedColumnKeys,
+    orderedColumns,
+    lastModifiedByJob,
   }: {
     projection: JobProjection;
     timeRanges: TimeRange[];
@@ -112,344 +131,45 @@ const ProjectionTableRow = memo(
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
     granularity?: "week" | "month" | "quarter";
     cellNotesMap?: Map<string, JobNote[]>;
-    isColumnVisible: (key: string) => boolean;
-    orderedColumnKeys: string[];
+    orderedColumns: OrderedColumn<ProjectionColumnConfig>[];
+    lastModifiedByJob?: Map<number, number>;
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
 
-    // Render a single cell based on column key
-    const renderCell = (columnKey: string) => {
-      switch (columnKey) {
-        case "job_number":
-          return (
-            <td
-              key="job_number"
-              className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
-              title={job.job_number}
-            >
-              {formatJobNumber(job.job_number)}
-            </td>
-          );
-        case "facility":
-          return (
-            <td key="facility" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-              {job.facility?.name || "Unknown"}
-            </td>
-          );
-        case "sub_client":
-          return (
-            <td key="sub_client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-              {job.sub_client || "-"}
-            </td>
-          );
-        case "processes":
-          return (
-            <td key="processes" className="px-2 py-2 text-xs text-[var(--text-dark)]">
-              <div className="flex flex-wrap gap-1">
-                {job.requirements && job.requirements.length > 0 ? (
-                  [...new Set(job.requirements.map((req) => req.process_type).filter(Boolean))].map(
-                    (processType, idx) => (
-                      <ProcessTypeBadge key={idx} processType={processType as string} />
-                    )
-                  )
-                ) : (
-                  <span className="text-gray-400 text-xs">No processes</span>
-                )}
-              </div>
-            </td>
-          );
-        case "description":
-          return (
-            <td key="description" className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
-              {job.description || "N/A"}
-            </td>
-          );
-        case "quantity":
-          return (
-            <td key="quantity" className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
-              {job.quantity.toLocaleString()}
-            </td>
-          );
-        case "start_date":
-          return (
-            <td
-              key="start_date"
-              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {job.start_date
-                ? new Date(job.start_date).toLocaleDateString("en-US", {
-                    month: "numeric",
-                    day: "numeric",
-                    year: "2-digit",
-                  })
-                : "N/A"}
-            </td>
-          );
-        case "due_date":
-          return (
-            <td
-              key="due_date"
-              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {job.due_date
-                ? new Date(job.due_date).toLocaleDateString("en-US", {
-                    month: "numeric",
-                    day: "numeric",
-                    year: "2-digit",
-                  })
-                : "N/A"}
-            </td>
-          );
-        default:
-          return null;
-      }
+    const cellContext: CellRenderContext = {
+      job,
+      projection,
+      isSelected,
+      onToggleSelect,
+      timeRanges,
+      granularity: toCellGranularity(granularity),
+      showNotes: showNotes ?? false,
+      jobNotes: jobNotes ?? [],
+      noteColor,
+      cellNotesMap,
+      editingNoteId,
+      editingText,
+      onStartEdit,
+      onCancelEdit,
+      onSaveEdit,
+      onTextChange,
+      isSavingNote,
+      onOpenNotesModal,
+      lastModifiedTimestamp: lastModifiedByJob?.get(job.id),
     };
 
-    // Helper to get cell key
-    const getCellKeyForRange = (range: TimeRange): string => {
-      return `${job.id}:${granularity || "weekly"}:${range.startDate.getTime()}:${range.endDate.getTime()}`;
-    };
-
-    // Helper to check if a cell has notes
-    const cellHasNotesForRange = (range: TimeRange): boolean => {
-      if (!cellNotesMap) return false;
-      const cellKey = getCellKeyForRange(range);
-      const notes = cellNotesMap.get(cellKey);
-      return notes !== undefined && notes.length > 0;
-    };
-    
-    // Helper function to convert hex to rgba with opacity
-    const hexToRgba = (hex: string, opacity: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    };
-
-    // Determine row background color
-    let rowBgColor = "";
-    if (isSelected) {
-      rowBgColor = "bg-blue-100";
-    }
+    const highlightStyle = hasNotes && noteColor && showNotes && !isSelected
+      ? { backgroundColor: hexToRgba(noteColor, 0.08) }
+      : undefined;
 
     return (
       <tr
-        className={`cursor-pointer ${rowBgColor}`}
-        style={
-          hasNotes && noteColor && showNotes && !isSelected
-            ? { backgroundColor: hexToRgba(noteColor, 0.08) }
-            : undefined
-        }
+        className={`cursor-pointer ${isSelected ? "bg-blue-100" : ""}`}
+        style={highlightStyle}
         onClick={() => onJobClick(job)}
       >
-        <td className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={onToggleSelect}
-            className="w-4 h-4 cursor-pointer"
-          />
-        </td>
-        {/* Render cells in configured order */}
-        {orderedColumnKeys.map((columnKey) => {
-          // Skip "total" - it's rendered after time ranges
-          if (columnKey === "total") return null;
-          return renderCell(columnKey);
-        })}
-        {timeRanges.map((range, index) => {
-          const quantity = projection.weeklyQuantities.get(range.label) || 0;
-          const displayValue = formatQuantity(quantity);
-          const hasCellNote = cellHasNotesForRange(range);
-
-          return (
-            <td
-              key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer relative ${
-                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-              } ${hasCellNote ? "ring-2 ring-inset ring-blue-400 bg-blue-50/50" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenNotesModal?.({
-                  jobId: job.id,
-                  periodLabel: range.label,
-                  periodStart: range.startDate.getTime(),
-                  periodEnd: range.endDate.getTime(),
-                  granularity: toCellGranularity(granularity),
-                });
-              }}
-            >
-              {displayValue}
-              {hasCellNote && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
-              )}
-            </td>
-          );
-        })}
-        {isColumnVisible("total") && (
-          <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-            {formatQuantity(projection.totalQuantity)}
-          </td>
-        )}
-        {showNotes && (
-          <td
-            className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Show cell-specific notes in compressed format */}
-            {cellNotesMap && cellNotesMap.size > 0 && (
-              <div className="mb-2 space-y-0.5">
-                {Array.from(cellNotesMap.entries())
-                  .filter(([cellKey]) => cellKey.startsWith(`${job.id}:`))
-                  .map(([cellKey, notes]) => {
-                    const parts = cellKey.split(":");
-                    const periodLabel = notes[0]?.cell_period_label || parts[1] || "";
-                    return notes.map((note, idx) => (
-                      <div
-                        key={`${cellKey}-${idx}`}
-                        className="text-[10px] text-gray-600 truncate"
-                        title={`${note.name || "Unknown"} - ${periodLabel}: ${note.notes}`}
-                      >
-                        <span className="font-medium">{note.name || "Unknown"}</span>
-                        <span className="mx-1">•</span>
-                        <span className="text-gray-500">{periodLabel}</span>
-                      </div>
-                    ));
-                  })}
-              </div>
-            )}
-
-            {/* Show job-level notes (existing functionality) */}
-            {hasNotes ? (
-              <div className="space-y-1">
-                {jobNotes!.filter((note) => note && note.notes).map((note, idx) => {
-                  const isEditing = editingNoteId === note.id;
-                  const noteColorValue = note.color || noteColor || "#000000";
-                  
-                  return (
-                    <div
-                      key={note.id || idx}
-                      className="px-2 py-1 rounded border-l-2 relative group"
-                      style={{
-                        borderLeftColor: noteColorValue,
-                        backgroundColor: (() => {
-                          const color = noteColorValue;
-                          const r = parseInt(color.slice(1, 3), 16);
-                          const g = parseInt(color.slice(3, 5), 16);
-                          const b = parseInt(color.slice(5, 7), 16);
-                          return `rgba(${r}, ${g}, ${b}, 0.1)`;
-                        })(),
-                      }}
-                    >
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editingText || ""}
-                            onChange={(e) => onTextChange?.(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.stopPropagation();
-                                onCancelEdit?.();
-                              } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (note.id && editingText?.trim()) {
-                                  onSaveEdit?.(note.id);
-                                }
-                              }
-                            }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[var(--primary-blue)] resize-none"
-                            rows={3}
-                            disabled={isSavingNote}
-                            onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                          />
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCancelEdit?.();
-                              }}
-                              disabled={isSavingNote}
-                              className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
-                              title="Cancel (Esc)"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (note.id) onSaveEdit?.(note.id);
-                              }}
-                              disabled={isSavingNote || !note.id || !editingText?.trim()}
-                              className="p-1 text-[var(--primary-blue)] hover:text-[var(--dark-blue)] disabled:opacity-50"
-                              title="Save (Ctrl+Enter)"
-                            >
-                              {isSavingNote ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--primary-blue)]"></div>
-                              ) : (
-                                <Save className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <p
-                              className={`text-xs whitespace-pre-wrap break-words flex-1 ${note.id ? 'cursor-pointer hover:underline' : ''}`}
-                              style={{ color: noteColorValue }}
-                              onClick={(e) => {
-                                if (note.id && note.notes) {
-                                  e.stopPropagation();
-                                  onStartEdit?.(note.id, note.notes);
-                                }
-                              }}
-                              title={note.id ? "Click to edit" : "Read-only note"}
-                            >
-                              {note.notes}
-                            </p>
-                            {note.id && note.notes ? (
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  onStartEdit?.(note.id!, note.notes);
-                                }}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                                className="opacity-70 hover:opacity-100 p-1.5 text-[var(--primary-blue)] hover:bg-blue-50 rounded transition-all flex-shrink-0 cursor-pointer"
-                                title="Click to edit note"
-                                type="button"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 italic">(read-only)</span>
-                            )}
-                          </div>
-                          {(note.name || note.email) && (
-                            <p className="text-[10px] text-gray-500 mt-0.5">
-                              {note.name || note.email}
-                              {note.created_at &&
-                                ` • ${new Date(note.created_at).toLocaleDateString()}`}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </td>
-        )}
+        {orderedColumns.map((col) => (col.isVisible ? renderCell(col.config, cellContext) : null))}
       </tr>
     );
   },
@@ -457,7 +177,6 @@ const ProjectionTableRow = memo(
 
 ProjectionTableRow.displayName = "ProjectionTableRow";
 
-// Memoized process table row component
 const ProcessProjectionTableRow = memo(
   ({
     processProjection,
@@ -479,8 +198,8 @@ const ProcessProjectionTableRow = memo(
     onOpenNotesModal,
     granularity,
     cellNotesMap,
-    isColumnVisible,
-    orderedColumnKeys,
+    orderedColumns,
+    lastModifiedByJob,
   }: {
     processProjection: ProcessProjection;
     timeRanges: TimeRange[];
@@ -501,327 +220,56 @@ const ProcessProjectionTableRow = memo(
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
     granularity?: "week" | "month" | "quarter";
     cellNotesMap?: Map<string, JobNote[]>;
-    isColumnVisible: (key: string) => boolean;
-    orderedColumnKeys: string[];
+    orderedColumns: OrderedColumn<ProjectionColumnConfig>[];
+    lastModifiedByJob?: Map<number, number>;
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
 
-    // Render a single cell based on column key
-    const renderCell = (columnKey: string) => {
-      switch (columnKey) {
-        case "job_number":
-          return isFirstInGroup ? (
-            <td
-              key="job_number"
-              className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
-              title={job.job_number}
-            >
-              {formatJobNumber(job.job_number)}
-            </td>
-          ) : (
-            <td key="job_number" className="px-2 py-2"></td>
-          );
-        case "facility":
-          return isFirstInGroup ? (
-            <td key="facility" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-dark)]">
-              {job.facility?.name || "Unknown"}
-            </td>
-          ) : (
-            <td key="facility" className="px-2 py-2"></td>
-          );
-        case "sub_client":
-          return isFirstInGroup ? (
-            <td key="sub_client" className="px-2 py-2 whitespace-nowrap text-xs text-[var(--text-light)]">
-              {job.sub_client || "-"}
-            </td>
-          ) : (
-            <td key="sub_client" className="px-2 py-2"></td>
-          );
-        case "processes":
-          return (
-            <td key="processes" className="px-2 py-2 text-xs text-[var(--text-dark)] pl-6">
-              <ProcessTypeBadge processType={processProjection.processType} />
-            </td>
-          );
-        case "description":
-          return (
-            <td key="description" className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[200px] truncate">
-              {isFirstInGroup ? job.description || "N/A" : ""}
-            </td>
-          );
-        case "quantity":
-          return (
-            <td key="quantity" className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]">
-              {processProjection.totalQuantity.toLocaleString()}
-            </td>
-          );
-        case "start_date":
-          return (
-            <td
-              key="start_date"
-              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {isFirstInGroup && job.start_date
-                ? new Date(job.start_date).toLocaleDateString("en-US", {
-                    month: "numeric",
-                    day: "numeric",
-                    year: "2-digit",
-                  })
-                : ""}
-            </td>
-          );
-        case "due_date":
-          return (
-            <td
-              key="due_date"
-              className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {isFirstInGroup && job.due_date
-                ? new Date(job.due_date).toLocaleDateString("en-US", {
-                    month: "numeric",
-                    day: "numeric",
-                    year: "2-digit",
-                  })
-                : ""}
-            </td>
-          );
-        default:
-          return null;
-      }
+    const cellContext: CellRenderContext = {
+      job,
+      projection: processProjection,
+      processProjection,
+      isFirstInGroup,
+      isSelected,
+      onToggleSelect,
+      timeRanges,
+      granularity: toCellGranularity(granularity),
+      showNotes: showNotes ?? false,
+      jobNotes: jobNotes ?? [],
+      noteColor,
+      cellNotesMap,
+      editingNoteId,
+      editingText,
+      onStartEdit,
+      onCancelEdit,
+      onSaveEdit,
+      onTextChange,
+      isSavingNote,
+      onOpenNotesModal,
+      lastModifiedTimestamp: lastModifiedByJob?.get(job.id),
     };
 
-    // Helper to get cell key
-    const getCellKeyForRange = (range: TimeRange): string => {
-      return `${job.id}:${granularity || "weekly"}:${range.startDate.getTime()}:${range.endDate.getTime()}`;
-    };
-
-    // Helper to check if a cell has notes
-    const cellHasNotesForRange = (range: TimeRange): boolean => {
-      if (!cellNotesMap) return false;
-      const cellKey = getCellKeyForRange(range);
-      const notes = cellNotesMap.get(cellKey);
-      return notes !== undefined && notes.length > 0;
-    };
-
-    // Helper function to convert hex to rgba with opacity
-    const hexToRgba = (hex: string, opacity: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    };
+    const highlightStyle = hasNotes && noteColor && showNotes && !isSelected && isFirstInGroup
+      ? { backgroundColor: hexToRgba(noteColor, 0.08) }
+      : undefined;
 
     return (
       <tr
         className={`cursor-pointer border-l-4 ${
           isSelected ? "bg-blue-100 border-l-blue-500" : "border-l-gray-300"
         } ${isFirstInGroup ? "border-t-2 border-t-gray-400" : ""}`}
-        style={
-          hasNotes && noteColor && showNotes && !isSelected && isFirstInGroup
-            ? { backgroundColor: hexToRgba(noteColor, 0.08) }
-            : undefined
-        }
+        style={highlightStyle}
         onClick={() => onJobClick(job)}
       >
-        {/* Checkbox - only show on first row of group */}
-        <td className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
-          {isFirstInGroup && (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={onToggleSelect}
-              className="w-4 h-4 cursor-pointer"
-            />
-          )}
-        </td>
-
-        {/* Render cells in configured order */}
-        {orderedColumnKeys.map((columnKey) => {
-          // Skip "total" - it's rendered after time ranges
-          if (columnKey === "total") return null;
-          return renderCell(columnKey);
-        })}
-
-        {/* Time period columns - per process */}
-        {timeRanges.map((range, index) => {
-          const quantity =
-            processProjection.weeklyQuantities.get(range.label) || 0;
-          const displayValue = formatQuantity(quantity);
-          const hasCellNote = cellHasNotesForRange(range);
-
-          return (
-            <td
-              key={range.label}
-              className={`px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)] cursor-pointer relative ${
-                index % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
-              } ${hasCellNote ? "ring-2 ring-inset ring-blue-400 bg-blue-50/50" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenNotesModal?.({
-                  jobId: job.id,
-                  periodLabel: range.label,
-                  periodStart: range.startDate.getTime(),
-                  periodEnd: range.endDate.getTime(),
-                  granularity: toCellGranularity(granularity),
-                });
-              }}
-            >
-              {displayValue}
-              {hasCellNote && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
-              )}
-            </td>
-          );
-        })}
-
-        {/* Total - per process */}
-        {isColumnVisible("total") && (
-          <td className="px-2 py-2 whitespace-nowrap text-xs text-center font-bold text-[var(--text-dark)]">
-            {formatQuantity(processProjection.totalQuantity)}
-          </td>
-        )}
-        {showNotes && (
-          <td 
-            className="px-2 py-2 text-xs text-[var(--text-dark)] max-w-[300px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isFirstInGroup && hasNotes ? (
-              <div className="space-y-1">
-                {jobNotes!.map((note, idx) => {
-                  const isEditing = editingNoteId === note.id;
-                  const noteColorValue = note.color || noteColor || "#000000";
-                  
-                  return (
-                    <div
-                      key={note.id || idx}
-                      className="px-2 py-1 rounded border-l-2 relative group"
-                      style={{
-                        borderLeftColor: noteColorValue,
-                        backgroundColor: (() => {
-                          const color = noteColorValue;
-                          const r = parseInt(color.slice(1, 3), 16);
-                          const g = parseInt(color.slice(3, 5), 16);
-                          const b = parseInt(color.slice(5, 7), 16);
-                          return `rgba(${r}, ${g}, ${b}, 0.1)`;
-                        })(),
-                      }}
-                    >
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editingText || ""}
-                            onChange={(e) => onTextChange?.(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.stopPropagation();
-                                onCancelEdit?.();
-                              } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (note.id && editingText?.trim()) {
-                                  onSaveEdit?.(note.id);
-                                }
-                              }
-                            }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[var(--primary-blue)] resize-none"
-                            rows={3}
-                            disabled={isSavingNote}
-                            onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                          />
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCancelEdit?.();
-                              }}
-                              disabled={isSavingNote}
-                              className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
-                              title="Cancel (Esc)"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (note.id) onSaveEdit?.(note.id);
-                              }}
-                              disabled={isSavingNote || !note.id || !editingText?.trim()}
-                              className="p-1 text-[var(--primary-blue)] hover:text-[var(--dark-blue)] disabled:opacity-50"
-                              title="Save (Ctrl+Enter)"
-                            >
-                              {isSavingNote ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--primary-blue)]"></div>
-                              ) : (
-                                <Save className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <p
-                              className={`text-xs whitespace-pre-wrap break-words flex-1 ${note.id ? 'cursor-pointer hover:underline' : ''}`}
-                              style={{ color: noteColorValue }}
-                              onClick={(e) => {
-                                if (note.id && note.notes) {
-                                  e.stopPropagation();
-                                  onStartEdit?.(note.id, note.notes);
-                                }
-                              }}
-                              title={note.id ? "Click to edit" : "Read-only note"}
-                            >
-                              {note.notes}
-                            </p>
-                            {note.id && note.notes ? (
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  onStartEdit?.(note.id!, note.notes);
-                                }}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                                className="opacity-70 hover:opacity-100 p-1.5 text-[var(--primary-blue)] hover:bg-blue-50 rounded transition-all flex-shrink-0 cursor-pointer"
-                                title="Click to edit note"
-                                type="button"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 italic">(read-only)</span>
-                            )}
-                          </div>
-                          {(note.name || note.email) && (
-                            <p className="text-[10px] text-gray-500 mt-0.5">
-                              {note.name || note.email}
-                              {note.created_at &&
-                                ` • ${new Date(note.created_at).toLocaleDateString()}`}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </td>
-        )}
+        {orderedColumns.map((col) => (col.isVisible ? renderCell(col.config, cellContext) : null))}
       </tr>
     );
   },
 );
 
 ProcessProjectionTableRow.displayName = "ProcessProjectionTableRow";
+
 
 // Memoized mobile card component
 const ProjectionMobileCard = memo(
@@ -1123,7 +571,7 @@ const MobileTableRow = memo(
         onClick={() => onJobClick(job)}
       >
         <td
-          className="px-2 py-2 w-12 sticky left-0 bg-white"
+          className="pl-2 pr-1 py-2 w-10 sticky left-0 bg-white"
           onClick={(e) => e.stopPropagation()}
         >
           <input
@@ -1134,7 +582,7 @@ const MobileTableRow = memo(
           />
         </td>
         <td
-          className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]"
+          className="pl-1 pr-2 py-2 text-xs font-medium text-[var(--text-dark)]"
           title={job.job_number}
         >
           {formatJobNumber(job.job_number)}
@@ -1168,6 +616,8 @@ export default function ProjectionsTable({
   onShowNotesChange,
   granularity = "week",
   fullFilteredProjections,
+  lastModifiedByJob,
+  versionGroupingEnabled = true,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -1208,7 +658,6 @@ export default function ProjectionsTable({
   // Column settings hook
   const {
     columnSettings,
-    visibleColumns,
     isColumnVisible,
     toggleColumnVisibility,
     resetToDefaults: resetColumnSettings,
@@ -1226,10 +675,10 @@ export default function ProjectionsTable({
     return getOrderedColumns(externalColumnControls);
   }, [getOrderedColumns, externalColumnControls]);
 
-  // Legacy: Get ordered visible column keys for backward compatibility with row components
-  const orderedColumnKeys = useMemo(() => {
+  // Visible static column keys for summary/category rows (excludes dynamic/time columns)
+  const visibleStaticColumnKeys = useMemo(() => {
     return orderedColumns
-      .filter((col) => col.isVisible && col.config.type === "static")
+      .filter((col) => col.isVisible && (col.config.type === "static" || col.config.type === "status"))
       .map((col) => col.config.key);
   }, [orderedColumns]);
 
@@ -1240,13 +689,19 @@ export default function ProjectionsTable({
 
   // Process type breakdown state
   const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
+  const [expandedPrimaryCategories, setExpandedPrimaryCategories] = useState<Set<string>>(new Set());
+  const [expandedSubCategories, setExpandedSubCategories] = useState<Set<string>>(new Set());
   const [machineVariables, setMachineVariables] = useState<any[]>([]);
+
+  // Version grouping expansion state (versionGroupingEnabled is now a prop)
+  const [expandedVersionGroups, setExpandedVersionGroups] = useState<Set<string>>(new Set());
 
   // Category filter state - tracks which category/breakdown is selected
   const [categoryFilter, setCategoryFilter] = useState<{
     processType: string;
-    fieldName?: string;
-    fieldValue?: any;
+    primaryCategory?: string;     // Tier 2: Basic OE / Envelope Size value
+    fieldName?: string;           // Legacy: for ProcessTypeBreakdownRow compatibility
+    fieldValue?: any;             // Legacy: for ProcessTypeBreakdownRow compatibility
     timeRangeLabel?: string;
   } | null>(null);
 
@@ -1265,6 +720,32 @@ export default function ProjectionsTable({
         next.delete(processType);
       } else {
         next.add(processType);
+      }
+      return next;
+    });
+  };
+
+  // Handler for primary category expansion (Tier 2)
+  const handleTogglePrimaryCategory = (primaryCategoryKey: string) => {
+    setExpandedPrimaryCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(primaryCategoryKey)) {
+        next.delete(primaryCategoryKey);
+      } else {
+        next.add(primaryCategoryKey);
+      }
+      return next;
+    });
+  };
+
+  // Handler for sub-category expansion (Tier 3)
+  const handleToggleSubCategory = (subCategoryKey: string) => {
+    setExpandedSubCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(subCategoryKey)) {
+        next.delete(subCategoryKey);
+      } else {
+        next.add(subCategoryKey);
       }
       return next;
     });
@@ -1289,6 +770,50 @@ export default function ProjectionsTable({
 
   const handleCollapseAll = () => {
     setExpandedSummaries(new Set());
+  };
+
+  // Handler for version group expansion
+  const handleToggleVersionGroup = (groupId: string) => {
+    setExpandedVersionGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  // Handler for tiered category clicks (Tier 2: Primary Category / Basic OE)
+  const handleTieredCategoryClick = (
+    processType: string,
+    primaryCategory: string,
+    subField?: string,
+    subFieldValue?: string,
+    timeRangeLabel?: string
+  ) => {
+    // If clicking the same filter, clear it
+    if (
+      categoryFilter &&
+      categoryFilter.processType === processType &&
+      categoryFilter.primaryCategory === primaryCategory &&
+      categoryFilter.fieldName === subField &&
+      String(categoryFilter.fieldValue) === String(subFieldValue) &&
+      categoryFilter.timeRangeLabel === timeRangeLabel
+    ) {
+      setCategoryFilter(null);
+      return;
+    }
+
+    // Set new filter (include sub-category fields if provided)
+    setCategoryFilter({
+      processType,
+      primaryCategory,
+      fieldName: subField,
+      fieldValue: subFieldValue,
+      timeRangeLabel,
+    });
   };
 
   // Category filter handlers
@@ -1377,24 +902,37 @@ export default function ProjectionsTable({
         const matchingRequirements = requirements.filter((req) => {
           const rawProcessType = req.process_type || "";
 
-          // If filtering by breakdown field, use normalizeProcessType (breakdowns use normalized keys)
-          // If filtering by summary row only, use exact case-insensitive match (summaries use original names)
-          let processTypeMatches: boolean;
-          if (categoryFilter.fieldName) {
-            // Breakdown filter - use normalized comparison
-            const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
-            const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
-            processTypeMatches = reqProcessType === filterProcessType;
-          } else {
-            // Summary filter - use exact case-insensitive comparison
-            processTypeMatches = rawProcessType.toLowerCase() === categoryFilter.processType.toLowerCase();
-          }
+          // Always normalize process types for comparison
+          const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
+          const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
+          const processTypeMatches = reqProcessType === filterProcessType;
 
           if (!processTypeMatches) {
             return false;
           }
 
-          // If filtering by breakdown field, check field value
+          // Handle tiered filter: primary category (Tier 2)
+          if (categoryFilter.primaryCategory) {
+            // Check basic_oe first, then paper_size
+            const basicOe = (req as any).basic_oe;
+            const paperSize = (req as any).paper_size;
+            const primaryValue = (basicOe && basicOe !== "" && basicOe !== "undefined" && basicOe !== "null")
+              ? String(basicOe)
+              : (paperSize && paperSize !== "" && paperSize !== "undefined" && paperSize !== "null")
+                ? String(paperSize)
+                : undefined;
+
+            // Special handling for "Misc" category - matches jobs WITHOUT a primary category
+            if (categoryFilter.primaryCategory === "Misc") {
+              if (primaryValue !== undefined) {
+                return false;
+              }
+            } else if (primaryValue !== categoryFilter.primaryCategory) {
+              return false;
+            }
+          }
+
+          // Legacy: If filtering by breakdown field, check field value
           if (categoryFilter.fieldName && categoryFilter.fieldValue !== undefined) {
             const fieldValue = req[categoryFilter.fieldName];
 
@@ -1420,37 +958,8 @@ export default function ProjectionsTable({
 
         return true;
       });
-      
+
       console.log(`[Category Filter] Filtered from ${originalCount} to ${projections.length} jobs with filter:`, categoryFilter);
-      if (projections.length === 0 && originalCount > 0) {
-        console.warn(`[Category Filter] No jobs matched! Filter:`, categoryFilter);
-        // Sample a few jobs to see what their requirements look like
-        const sampleJobs = jobProjections.slice(0, 3);
-        sampleJobs.forEach((proj, idx) => {
-          const matchingReqs = proj.job.requirements?.filter(req => {
-            const rawProcessType = req.process_type || "";
-            // Use same logic as main filter
-            if (categoryFilter.fieldName) {
-              const reqProcessType = normalizeProcessType(rawProcessType).toLowerCase();
-              const filterProcessType = normalizeProcessType(categoryFilter.processType).toLowerCase();
-              return reqProcessType === filterProcessType;
-            } else {
-              return rawProcessType.toLowerCase() === categoryFilter.processType.toLowerCase();
-            }
-          }) || [];
-          console.warn(`[Category Filter] Sample job ${idx + 1} (${proj.job.job_number}):`, {
-            processType: categoryFilter.processType,
-            fieldName: categoryFilter.fieldName,
-            filterValue: categoryFilter.fieldValue,
-            filterValueType: typeof categoryFilter.fieldValue,
-            matchingRequirements: matchingReqs.map(req => ({
-              process_type: req.process_type,
-              [categoryFilter.fieldName || '']: req[categoryFilter.fieldName || ''],
-              fieldValueType: typeof req[categoryFilter.fieldName || ''],
-            })),
-          });
-        });
-      }
     }
 
     if (showExpandedProcesses) {
@@ -1870,6 +1379,10 @@ export default function ProjectionsTable({
           aValue = aJob.job.facility?.name?.toLowerCase() || "";
           bValue = bJob.job.facility?.name?.toLowerCase() || "";
           break;
+        case "client":
+          aValue = aJob.job.client?.name?.toLowerCase() || "";
+          bValue = bJob.job.client?.name?.toLowerCase() || "";
+          break;
         case "sub_client":
           aValue = aJob.job.sub_client?.toLowerCase() || "";
           bValue = bJob.job.sub_client?.toLowerCase() || "";
@@ -1890,9 +1403,27 @@ export default function ProjectionsTable({
           aValue = aJob.job.due_date || 0;
           bValue = bJob.job.due_date || 0;
           break;
+        case "updated_at":
+          aValue = lastModifiedByJob?.get(aJob.job.id) || 0;
+          bValue = lastModifiedByJob?.get(bJob.job.id) || 0;
+          break;
         case "total":
           aValue = aJob.totalQuantity;
           bValue = bJob.totalQuantity;
+          break;
+        case "status":
+          // Sort by status priority: hard schedule > soft schedule > projected > completed > cancelled
+          const getStatusPriority = (job: any): number => {
+            const scheduleType = (job.schedule_type || "soft schedule").toLowerCase();
+            if (scheduleType.includes("hard")) return 1;
+            if (scheduleType.includes("soft")) return 2;
+            if (scheduleType.includes("projected")) return 3;
+            if (scheduleType.includes("complete")) return 4;
+            if (scheduleType.includes("cancel")) return 5;
+            return 2; // default to soft schedule
+          };
+          aValue = getStatusPriority(aJob.job);
+          bValue = getStatusPriority(bJob.job);
           break;
         default:
           aValue = aJob.job.job_number;
@@ -1903,7 +1434,7 @@ export default function ProjectionsTable({
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [displayProjections, sortField, sortDirection, showExpandedProcesses]);
+  }, [displayProjections, sortField, sortDirection, showExpandedProcesses, lastModifiedByJob]);
 
   // Calculate selection state
   const allSelected =
@@ -1933,6 +1464,22 @@ export default function ProjectionsTable({
     return calculateColumnCount(orderedColumns, timeRanges.length);
   }, [orderedColumns, timeRanges.length]);
 
+  // Process version grouping for job projections (only in Jobs view, not expanded processes)
+  const versionGroupedData = useMemo(() => {
+    if (showExpandedProcesses) {
+      // Don't apply version grouping to expanded processes view
+      return {
+        groups: new Map<string, VersionGroup>(),
+        standalone: [],
+        processedProjections: sortedJobProjections,
+      };
+    }
+    return groupProjectionsByVersion(
+      sortedJobProjections as JobProjection[],
+      versionGroupingEnabled
+    );
+  }, [sortedJobProjections, versionGroupingEnabled, showExpandedProcesses]);
+
   return (
     <>
       {/* Category Filter Banner */}
@@ -1943,6 +1490,9 @@ export default function ProjectionsTable({
               Filtered by:{" "}
               <span className="font-normal">
                 {categoryFilter.processType}
+                {categoryFilter.primaryCategory && (
+                  <> → {categoryFilter.primaryCategory}</>
+                )}
                 {categoryFilter.fieldName && categoryFilter.fieldValue !== undefined && (
                   <> - {categoryFilter.fieldName}: {String(categoryFilter.fieldValue)}</>
                 )}
@@ -2085,6 +1635,7 @@ export default function ProjectionsTable({
 
       {/* Table Controls */}
       <div className="hidden md:flex justify-end mb-3">
+        {/* Column Settings */}
         <ColumnSettingsPopover
           columnOrder={columnSettings.order}
           hiddenColumns={columnSettings.hidden}
@@ -2215,50 +1766,146 @@ export default function ProjectionsTable({
                         expandCollapseAllButton={expandCollapseAllButton}
                         onCategoryClick={handleCategoryClick}
                         isCategoryFilterActive={!!isSummaryFilterActive}
-                        orderedColumnKeys={orderedColumnKeys}
+                        visibleStaticColumnKeys={visibleStaticColumnKeys}
                         isColumnVisible={isColumnVisible}
                       />
-                      {/* Render breakdown rows for all fields if expanded */}
-                      {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
-                        <React.Fragment key={`${summaryKey}-field-${field.name}`}>
-                          {breakdowns.map((breakdown) => {
-                            // Check if this breakdown row matches the active filter
-                            let isBreakdownFilterActive = false;
-                            if (categoryFilter) {
-                              const processTypeMatch = categoryFilter.processType === breakdown.processType;
-                              const fieldNameMatch = categoryFilter.fieldName === breakdown.fieldName;
-                              
-                              // Compare field values with proper type handling
-                              let fieldValueMatch = false;
-                              if (categoryFilter.fieldValue !== undefined) {
-                                if (typeof categoryFilter.fieldValue === "boolean" && typeof breakdown.fieldValue === "boolean") {
-                                  fieldValueMatch = categoryFilter.fieldValue === breakdown.fieldValue;
-                                } else {
-                                  fieldValueMatch = String(categoryFilter.fieldValue) === String(breakdown.fieldValue);
-                                }
-                              } else {
-                                fieldValueMatch = true; // No field value filter means match
-                              }
-                              
-                              isBreakdownFilterActive = processTypeMatch && fieldNameMatch && fieldValueMatch;
-                            }
+                      {/* Render tiered category rows (Tier 2: Primary Category / Basic OE) if expanded */}
+                      {isExpanded && (() => {
+                        // Get projections for this process type
+                        const projectionsToUse = fullFilteredProjections || jobProjections;
+                        const facilityFilteredProjections = isFacilitySummary(summary)
+                          ? projectionsToUse.filter(p => p.job.facilities_id === summary.facilityId)
+                          : projectionsToUse;
 
-                            return (
-                              <ProcessTypeBreakdownRow
-                                key={`${summaryKey}-${field.name}-${breakdown.fieldValue}`}
-                                breakdown={breakdown}
-                                fieldDisplayLabel={field.label}
+                        // Build tiered summary data
+                        const tieredData = buildSummaryTieredData(
+                          facilityFilteredProjections,
+                          normalizedProcessType,
+                          timeRanges
+                        );
+
+                        return tieredData.primaryCategories.map((primaryCategory) => {
+                          const primaryCategoryKey = `${normalizedProcessType}:${primaryCategory.value}`;
+                          const isPrimaryCategoryExpanded = expandedPrimaryCategories.has(primaryCategoryKey);
+
+                          // Check if this primary category row matches the active filter
+                          const isPrimaryCategoryFilterActive = categoryFilter &&
+                            categoryFilter.processType === normalizedProcessType &&
+                            categoryFilter.primaryCategory === primaryCategory.value;
+
+                          // Filter jobs belonging to this primary category when expanded
+                          const categoryJobs = isPrimaryCategoryExpanded
+                            ? facilityFilteredProjections.filter((proj) => {
+                                const primaryValue = getPrimaryCategoryValue(proj.job, normalizedProcessType);
+                                if (primaryCategory.value === "Misc") {
+                                  return !primaryValue; // Jobs without primary category
+                                }
+                                return primaryValue === primaryCategory.value;
+                              })
+                            : [];
+
+                          return (
+                            <React.Fragment key={primaryCategoryKey}>
+                              <PrimaryCategoryRow
+                                category={primaryCategory}
+                                processType={normalizedProcessType}
                                 timeRanges={timeRanges}
                                 showNotes={showNotes}
-                                onCategoryClick={handleCategoryClick}
-                                isCategoryFilterActive={isBreakdownFilterActive}
-                                orderedColumnKeys={orderedColumnKeys}
+                                isExpanded={isPrimaryCategoryExpanded}
+                                hasSubCategories={primaryCategory.count > 0}
+                                onToggleExpand={() => handleTogglePrimaryCategory(primaryCategoryKey)}
+                                onCategoryClick={handleTieredCategoryClick}
+                                isCategoryFilterActive={!!isPrimaryCategoryFilterActive}
+                                visibleStaticColumnKeys={visibleStaticColumnKeys}
                                 isColumnVisible={isColumnVisible}
                               />
-                            );
-                          })}
-                        </React.Fragment>
-                      ))}
+                              {/* Render sub-category rows when this category is expanded */}
+                              {isPrimaryCategoryExpanded && (() => {
+                                // Get sub-categories for this primary category
+                                const subCategoriesForPrimary = tieredData.subCategories.get(primaryCategory.value) || [];
+
+                                return subCategoriesForPrimary.map((subCategory) => {
+                                  const subCategoryKey = `${normalizedProcessType}:${primaryCategory.value}:${subCategory.fieldName}:${subCategory.value}`;
+                                  const isSubCategoryExpanded = expandedSubCategories.has(subCategoryKey);
+
+                                  // Check if this sub-category is the active filter
+                                  const isSubCategoryFilterActive = categoryFilter &&
+                                    categoryFilter.processType === normalizedProcessType &&
+                                    categoryFilter.primaryCategory === primaryCategory.value &&
+                                    categoryFilter.fieldName === subCategory.fieldName &&
+                                    String(categoryFilter.fieldValue) === subCategory.value;
+
+                                  // Filter jobs for this specific sub-category when expanded
+                                  // Jobs must match the sub-category field value
+                                  const subCategoryJobs = isSubCategoryExpanded
+                                    ? categoryJobs.filter((proj) => {
+                                        const requirement = proj.job.requirements?.find(
+                                          (r: any) => normalizeProcessType(r.process_type) === normalizedProcessType
+                                        );
+                                        if (!requirement) return false;
+                                        const fieldValue = (requirement as any)[subCategory.fieldName];
+                                        return String(fieldValue) === subCategory.value;
+                                      })
+                                    : [];
+
+                                  return (
+                                    <React.Fragment key={subCategoryKey}>
+                                      <SubCategoryRow
+                                        subCategory={subCategory}
+                                        processType={normalizedProcessType}
+                                        primaryCategory={primaryCategory.value}
+                                        timeRanges={timeRanges}
+                                        showNotes={showNotes}
+                                        isExpanded={isSubCategoryExpanded}
+                                        hasJobs={subCategory.count > 0}
+                                        onToggleExpand={() => handleToggleSubCategory(subCategoryKey)}
+                                        onCategoryClick={handleTieredCategoryClick}
+                                        isCategoryFilterActive={!!isSubCategoryFilterActive}
+                                        orderedColumnKeys={visibleStaticColumnKeys}
+                                        isColumnVisible={isColumnVisible}
+                                      />
+                                      {/* Render job rows when this sub-category is expanded */}
+                                      {isSubCategoryExpanded && subCategoryJobs.map((projection, idx) => {
+                                        const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
+                                        const hasNotes = jobNotes.length > 0;
+                                        const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+
+                                        return (
+                                          <ProjectionTableRow
+                                            key={`${subCategoryKey}-job-${projection.job.id}-${idx}`}
+                                            projection={projection}
+                                            timeRanges={timeRanges}
+                                            onJobClick={handleJobClick}
+                                            isSelected={selectedJobIds.has(projection.job.id)}
+                                            onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                                            showNotes={showNotes}
+                                            jobNotes={jobNotes}
+                                            noteColor={noteColor}
+                                            editingNoteId={editingNoteId}
+                                            editingText={editingText}
+                                            onStartEdit={handleStartEdit}
+                                            onCancelEdit={handleCancelEdit}
+                                            onSaveEdit={handleSaveEdit}
+                                            onTextChange={setEditingText}
+                                            isSavingNote={isSavingNote}
+                                            onOpenNotesModal={handleOpenNotesModal}
+                                            granularity={granularity}
+                                            cellNotesMap={cellNotesMap}
+                                            orderedColumns={orderedColumns}
+                                            lastModifiedByJob={lastModifiedByJob}
+                                          />
+                                        );
+                                      })}
+                                    </React.Fragment>
+                                  );
+                                });
+                              })()}
+                            </React.Fragment>
+                          );
+                        });
+                      })()}
+                      {/* Legacy ProcessTypeBreakdownRow removed - now using 3-tier hierarchy:
+                          ProcessTypeSummaryRow -> PrimaryCategoryRow -> SubCategoryRow -> Jobs */}
                     </React.Fragment>
                   );
                 })}
@@ -2322,44 +1969,114 @@ export default function ProjectionsTable({
                       onOpenNotesModal={handleOpenNotesModal}
                       granularity={granularity}
                       cellNotesMap={cellNotesMap}
-                      isColumnVisible={isColumnVisible}
-                      orderedColumnKeys={orderedColumnKeys}
+                      orderedColumns={orderedColumns}
+                      lastModifiedByJob={lastModifiedByJob}
                     />
                   );
                 },
               )
             ) : (
-              // Jobs view or Consolidated view (standard jobs table)
-              (sortedJobProjections as JobProjection[]).map((projection, index) => {
-                const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
-                const hasNotes = jobNotes.length > 0;
-                const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+              // Jobs view or Consolidated view (standard jobs table with version grouping)
+              versionGroupedData.processedProjections.map((item, index) => {
+                // Check if this item is a VersionGroup or a regular JobProjection
+                if (isVersionGroup(item)) {
+                  const versionGroup = item as VersionGroup;
+                  const isExpanded = expandedVersionGroups.has(versionGroup.groupId);
 
-                return (
-                  <ProjectionTableRow
-                    key={`job-${projection.job.id}-${index}`}
-                    projection={projection}
-                    timeRanges={timeRanges}
-                    onJobClick={handleJobClick}
-                    isSelected={selectedJobIds.has(projection.job.id)}
-                    onToggleSelect={() => handleToggleSelect(projection.job.id)}
-                    showNotes={showNotes}
-                    jobNotes={jobNotes}
-                    noteColor={noteColor}
-                    editingNoteId={editingNoteId}
-                    editingText={editingText}
-                    onStartEdit={handleStartEdit}
-                    onCancelEdit={handleCancelEdit}
-                    onSaveEdit={handleSaveEdit}
-                    onTextChange={setEditingText}
-                    isSavingNote={isSavingNote}
-                    onOpenNotesModal={handleOpenNotesModal}
-                    granularity={granularity}
-                    cellNotesMap={cellNotesMap}
-                    isColumnVisible={isColumnVisible}
-                    orderedColumnKeys={orderedColumnKeys}
-                  />
-                );
+                  return (
+                    <React.Fragment key={`version-group-${versionGroup.groupId}`}>
+                      {/* Version Group Header Row */}
+                      <VersionGroupHeaderRow
+                        versionGroup={versionGroup}
+                        timeRanges={timeRanges}
+                        isExpanded={isExpanded}
+                        onToggleExpand={() => handleToggleVersionGroup(versionGroup.groupId)}
+                        onJobClick={handleJobClick}
+                        showNotes={showNotes}
+                        orderedColumns={orderedColumns}
+                        granularity={granularity}
+                      />
+                      {/* Expanded Version Rows */}
+                      {isExpanded &&
+                        versionGroup.allVersions.map((versionProjection, versionIndex) => {
+                          const jobNotes = showNotes
+                            ? jobNotesMap.get(versionProjection.job.id) || []
+                            : [];
+                          const hasNotes = jobNotes.length > 0;
+                          const noteColor = hasNotes
+                            ? jobNotes[0].color || "#000000"
+                            : undefined;
+                          const isLastInGroup =
+                            versionIndex === versionGroup.allVersions.length - 1;
+
+                          return (
+                            <VersionRow
+                              key={`version-${versionGroup.groupId}-${versionProjection.job.id}`}
+                              projection={versionProjection}
+                              timeRanges={timeRanges}
+                              onJobClick={handleJobClick}
+                              isSelected={selectedJobIds.has(versionProjection.job.id)}
+                              onToggleSelect={() =>
+                                handleToggleSelect(versionProjection.job.id)
+                              }
+                              showNotes={showNotes}
+                              jobNotes={jobNotes}
+                              noteColor={noteColor}
+                              editingNoteId={editingNoteId}
+                              editingText={editingText}
+                              onStartEdit={handleStartEdit}
+                              onCancelEdit={handleCancelEdit}
+                              onSaveEdit={handleSaveEdit}
+                              onTextChange={setEditingText}
+                              isSavingNote={isSavingNote}
+                              onOpenNotesModal={handleOpenNotesModal}
+                              granularity={granularity}
+                              cellNotesMap={cellNotesMap}
+                              orderedColumns={orderedColumns}
+                              lastModifiedByJob={lastModifiedByJob}
+                              isLastInGroup={isLastInGroup}
+                            />
+                          );
+                        })}
+                    </React.Fragment>
+                  );
+                } else {
+                  // Regular JobProjection (standalone or single version)
+                  const projection = item as JobProjection;
+                  const jobNotes = showNotes
+                    ? jobNotesMap.get(projection.job.id) || []
+                    : [];
+                  const hasNotes = jobNotes.length > 0;
+                  const noteColor = hasNotes
+                    ? jobNotes[0].color || "#000000"
+                    : undefined;
+
+                  return (
+                    <ProjectionTableRow
+                      key={`job-${projection.job.id}-${index}`}
+                      projection={projection}
+                      timeRanges={timeRanges}
+                      onJobClick={handleJobClick}
+                      isSelected={selectedJobIds.has(projection.job.id)}
+                      onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                      showNotes={showNotes}
+                      jobNotes={jobNotes}
+                      noteColor={noteColor}
+                      editingNoteId={editingNoteId}
+                      editingText={editingText}
+                      onStartEdit={handleStartEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onTextChange={setEditingText}
+                      isSavingNote={isSavingNote}
+                      onOpenNotesModal={handleOpenNotesModal}
+                      granularity={granularity}
+                      cellNotesMap={cellNotesMap}
+                      orderedColumns={orderedColumns}
+                      lastModifiedByJob={lastModifiedByJob}
+                    />
+                  );
+                }
               })
             )}
           </tbody>
@@ -2437,7 +2154,7 @@ export default function ProjectionsTable({
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-2 py-2 text-left w-12 sticky left-0 bg-gray-50">
+                  <th className="pl-2 pr-1 py-2 text-left w-10 sticky left-0 bg-gray-50">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2450,7 +2167,7 @@ export default function ProjectionsTable({
                       className="w-4 h-4 cursor-pointer"
                     />
                   </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
+                  <th className="pl-1 pr-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
                     Job #
                   </th>
                   <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">

@@ -15,7 +15,7 @@ interface ProcessTypeSummaryRowProps {
   expandCollapseAllButton?: React.ReactNode;
   onCategoryClick?: (processType: string, timeRangeLabel?: string) => void;
   isCategoryFilterActive?: boolean;
-  orderedColumnKeys?: string[];
+  visibleStaticColumnKeys?: string[];
   isColumnVisible?: (key: string) => boolean;
 }
 
@@ -41,15 +41,15 @@ export function ProcessTypeSummaryRow({
   expandCollapseAllButton,
   onCategoryClick,
   isCategoryFilterActive = false,
-  orderedColumnKeys,
+  visibleStaticColumnKeys,
   isColumnVisible,
 }: ProcessTypeSummaryRowProps) {
   const displayValue = summary.grandTotal;
   const formattedTotal = formatQuantity(Math.round(displayValue));
 
   // Determine which static columns are visible (excluding checkbox, start_date, due_date)
-  const staticColumnsToRender = orderedColumnKeys && isColumnVisible
-    ? orderedColumnKeys.filter(key =>
+  const staticColumnsToRender = visibleStaticColumnKeys && isColumnVisible
+    ? visibleStaticColumnKeys.filter(key =>
         isColumnVisible(key) &&
         !["checkbox", "start_date", "due_date"].includes(key)
       )

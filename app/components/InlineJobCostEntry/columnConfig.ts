@@ -1,31 +1,31 @@
-import { ReactNode } from "react";
-
-// Sort field types (matching ProjectionsTable.tsx)
+// Sort field types for inline job cost entry table
 export type SortField =
   | "job_number"
   | "version"
+  | "job_name"
+  | "status"
   | "facility"
-  | "client"
+  | "client_name"
   | "sub_client"
-  | "process_type"
   | "description"
   | "quantity"
   | "start_date"
   | "due_date"
   | "updated_at"
-  | "total"
-  | "status";
+  | "billing_rate_per_m"
+  | "current_cost_per_m"
+  | "profit_percentage";
 
 // Column types for unified handling
 export type ColumnType =
-  | "static"      // Regular data columns (job_number, facility, etc.)
-  | "checkbox"    // Selection checkbox
-  | "time_range"  // Dynamic time period columns (placeholder - actual ranges are dynamic)
-  | "total"       // Aggregation column
-  | "notes"       // Notes column
-  | "status";     // Status badge column
+  | "static"      // Regular data columns
+  | "status"      // Status badge column
+  | "editable"    // Editable columns (add_to_cost, set_total_cost, notes)
+  | "currency"    // Currency formatted values
+  | "percentage"  // Percentage formatted values
+  | "profit";     // Profit with color coding
 
-export interface ProjectionColumnConfig {
+export interface InlineJobCostColumnConfig {
   key: string;
   type: ColumnType;
   label: string;
@@ -35,22 +35,13 @@ export interface ProjectionColumnConfig {
   minWidth?: string;
   align?: "left" | "center" | "right";
   sticky?: "left" | "right";
-  required?: boolean;        // Cannot be hidden (e.g., checkbox)
+  required?: boolean;        // Cannot be hidden
   reorderable?: boolean;     // Can be reordered via drag-drop (default true)
-  externalControl?: string;  // Visibility controlled by external prop (e.g., "showNotes")
+  batchModeOnly?: boolean;   // Only shown in batch mode
 }
 
-export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
-  {
-    key: "checkbox",
-    type: "checkbox",
-    label: "",
-    sortable: false,
-    sticky: "left",
-    width: "48px",
-    required: true,
-    reorderable: false,
-  },
+export const DEFAULT_COLUMNS: InlineJobCostColumnConfig[] = [
+  // Basic job columns
   {
     key: "job_number",
     type: "static",
@@ -58,7 +49,9 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     sortable: true,
     sortField: "job_number",
     width: "80px",
-    reorderable: true,
+    sticky: "left",
+    required: true,
+    reorderable: false,
   },
   {
     key: "version",
@@ -80,6 +73,15 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     reorderable: true,
   },
   {
+    key: "job_name",
+    type: "static",
+    label: "Job Name",
+    sortable: true,
+    sortField: "job_name",
+    width: "150px",
+    reorderable: true,
+  },
+  {
     key: "facility",
     type: "static",
     label: "Facility",
@@ -88,11 +90,11 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     reorderable: true,
   },
   {
-    key: "client",
+    key: "client_name",
     type: "static",
     label: "Client",
     sortable: true,
-    sortField: "client",
+    sortField: "client_name",
     reorderable: true,
   },
   {
@@ -101,13 +103,6 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     label: "Sub Client",
     sortable: true,
     sortField: "sub_client",
-    reorderable: true,
-  },
-  {
-    key: "processes",
-    type: "static",
-    label: "Processes",
-    sortable: false,
     reorderable: true,
   },
   {
@@ -125,7 +120,7 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     label: "Qty",
     sortable: true,
     sortField: "quantity",
-    align: "center",
+    align: "right",
     reorderable: true,
   },
   {
@@ -155,33 +150,70 @@ export const DEFAULT_COLUMNS: ProjectionColumnConfig[] = [
     align: "center",
     reorderable: true,
   },
-  // Time period columns placeholder - actual ranges are dynamic
+  // Financial columns
   {
-    key: "time_ranges",
-    type: "time_range",
-    label: "Time Periods",
-    sortable: false,
-    required: true,
-    reorderable: false,
-  },
-  {
-    key: "total",
-    type: "total",
-    label: "Total",
+    key: "billing_rate_per_m",
+    type: "currency",
+    label: "Billing Rate (per/M)",
     sortable: true,
-    sortField: "total",
-    sticky: "right",
-    align: "center",
+    sortField: "billing_rate_per_m",
+    align: "right",
     reorderable: true,
   },
   {
+    key: "current_cost_per_m",
+    type: "currency",
+    label: "Current Cost (per/M)",
+    sortable: true,
+    sortField: "current_cost_per_m",
+    align: "right",
+    reorderable: true,
+  },
+  // Batch mode editable columns
+  {
+    key: "add_to_cost",
+    type: "editable",
+    label: "Add to Cost",
+    sortable: false,
+    align: "center",
+    reorderable: false,
+    batchModeOnly: true,
+  },
+  {
+    key: "set_total_cost",
+    type: "editable",
+    label: "Set Total Cost",
+    sortable: false,
+    align: "center",
+    reorderable: false,
+    batchModeOnly: true,
+  },
+  {
+    key: "profit_preview",
+    type: "profit",
+    label: "New Profit %",
+    sortable: false,
+    align: "right",
+    reorderable: false,
+    batchModeOnly: true,
+  },
+  {
     key: "notes",
-    type: "notes",
+    type: "editable",
     label: "Notes",
     sortable: false,
-    minWidth: "200px",
     reorderable: false,
-    externalControl: "showNotes", // Visibility controlled by showNotes prop
+    batchModeOnly: true,
+  },
+  // Non-batch mode profit column
+  {
+    key: "profit_percentage",
+    type: "profit",
+    label: "Profit %",
+    sortable: true,
+    sortField: "profit_percentage",
+    align: "right",
+    reorderable: true,
   },
 ];
 
@@ -193,21 +225,19 @@ export const getDefaultColumnOrder = (): string[] => {
 // Get column config by key
 export const getColumnByKey = (
   key: string
-): ProjectionColumnConfig | undefined => {
+): InlineJobCostColumnConfig | undefined => {
   return DEFAULT_COLUMNS.find((col) => col.key === key);
 };
 
 // Get all reorderable columns (for UI)
-export const getReorderableColumns = (): ProjectionColumnConfig[] => {
+export const getReorderableColumns = (): InlineJobCostColumnConfig[] => {
   return DEFAULT_COLUMNS.filter((col) => col.reorderable !== false);
 };
 
-// Get all columns that can be hidden (not required and no external control)
-export const getToggleableColumns = (): ProjectionColumnConfig[] => {
-  return DEFAULT_COLUMNS.filter(
-    (col) => !col.required && !col.externalControl
-  );
+// Get all columns that can be hidden (not required)
+export const getToggleableColumns = (): InlineJobCostColumnConfig[] => {
+  return DEFAULT_COLUMNS.filter((col) => !col.required);
 };
 
 // localStorage key for persistence
-export const COLUMN_SETTINGS_STORAGE_KEY = "projections-table-columns";
+export const COLUMN_SETTINGS_STORAGE_KEY = "inline-job-cost-entry-columns";

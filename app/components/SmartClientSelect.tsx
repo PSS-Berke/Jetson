@@ -35,6 +35,13 @@ export default function SmartClientSelect({
   const [deletingClient, setDeletingClient] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Client-side filtering based on search query
+  const filteredClients = searchQuery.trim()
+    ? clients.filter(client =>
+        client.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : clients;
+
   console.log("SmartClientSelect - Props:", {
     value,
     initialClientName,
@@ -106,7 +113,8 @@ export default function SmartClientSelect({
     } else if (!value && !initialClientName) {
       setSelectedClient(null);
     }
-  }, [value, initialClientName, selectedClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, initialClientName]);
 
   // Fetch and set the selected client when value changes (only if we don't have initialClientName)
   useEffect(() => {
@@ -168,12 +176,12 @@ export default function SmartClientSelect({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, initialClientName]);
 
-  // Fetch clients on mount and when search changes
+  // Fetch all clients once when dropdown opens
   useEffect(() => {
-    if (isOpen) {
-      fetchClients(searchQuery);
+    if (isOpen && clients.length === 0) {
+      fetchClients();
     }
-  }, [searchQuery, isOpen]);
+  }, [isOpen]);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -349,12 +357,12 @@ export default function SmartClientSelect({
               <div className="p-4 text-center text-[var(--text-light)]">
                 Loading...
               </div>
-            ) : clients.length === 0 ? (
+            ) : filteredClients.length === 0 ? (
               <div className="p-4 text-center text-[var(--text-light)]">
                 No clients found
               </div>
             ) : (
-              clients.map((client) => (
+              filteredClients.map((client) => (
                 <div
                   key={client.id}
                   className="flex items-center hover:bg-gray-50 transition-colors group"

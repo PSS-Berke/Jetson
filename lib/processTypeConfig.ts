@@ -249,7 +249,7 @@ export const PROCESS_TYPE_CONFIGS: ProcessTypeConfig[] = [
     fields: [
       {
         name: "paper_size",
-        label: "Paper Size",
+        label: "Envelope Size",
         type: "dropdown",
         required: true,
         options: COMMON_PAPER_SIZES,

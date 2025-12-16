@@ -158,9 +158,12 @@ export const mergeProjectionsWithActuals = (
   productionEntries: ProductionEntry[],
   startDate: number,
   endDate: number,
+  search?: string,
 ): ProductionComparison[] => {
-  // Filter jobs to those in the time range
-  const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
+  // When searching, include all jobs; otherwise filter by date range
+  const relevantJobs = search?.trim()
+    ? jobs
+    : getJobsInTimeRange(jobs, startDate, endDate);
 
   // Helper to parse "DD.MM.YYYY" into a timestamp
   const parseDotDateToTimestamp = (dateStr: string): number | null => {

@@ -99,10 +99,11 @@ export const useProduction = (
         productionEntries,
         startDate,
         endDate,
+        search,
       );
     }
     return [];
-  }, [jobs, productionEntries, startDate, endDate]);
+  }, [jobs, productionEntries, startDate, endDate, search]);
 
   // Calculate summary statistics
   const summary = useMemo(
