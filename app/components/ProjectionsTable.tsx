@@ -131,7 +131,7 @@ const ProjectionTableRow = memo(
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
     granularity?: "week" | "month" | "quarter";
     cellNotesMap?: Map<string, JobNote[]>;
-    orderedColumns: OrderedColumn<ProjectionColumnConfig>[];
+    orderedColumns: OrderedColumn[];
     lastModifiedByJob?: Map<number, number>;
   }) => {
     const job = projection.job;
@@ -220,7 +220,7 @@ const ProcessProjectionTableRow = memo(
     onOpenNotesModal?: (cellId: CellIdentifier) => void;
     granularity?: "week" | "month" | "quarter";
     cellNotesMap?: Map<string, JobNote[]>;
-    orderedColumns: OrderedColumn<ProjectionColumnConfig>[];
+    orderedColumns: OrderedColumn[];
     lastModifiedByJob?: Map<number, number>;
   }) => {
     const job = processProjection.job;
