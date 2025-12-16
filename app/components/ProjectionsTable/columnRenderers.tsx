@@ -468,9 +468,7 @@ function renderStaticCell(
       }
 
       const timestamp = context.lastModifiedTimestamp;
-      const fallbackTimestamp = job.updated_at
-        ? new Date(job.updated_at).getTime()
-        : undefined;
+      const fallbackTimestamp = (job as any).updated_at || job.created_at;
       const displayTimestamp = timestamp ?? fallbackTimestamp;
 
       return (
