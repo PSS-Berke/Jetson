@@ -23,7 +23,8 @@ export default function JobDetailsModal({
   onRefresh,
 }: JobDetailsModalProps) {
   const [isRevisionHistoryOpen, setIsRevisionHistoryOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'details' | 'edit'>('details');
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
@@ -232,11 +233,36 @@ export default function JobDetailsModal({
     setIsSavingSplit(true);
 
     try {
-      // Convert splitResults to daily_split format
-      const dailySplit = splitResults.map((item) => ({
-        date: item.Date,
-        quantity: item.Quantity,
-      }));
+      // Group splitResults by week and track first date for each week (for chronological sorting)
+      const weeklyData: Record<number, Record<number, number>> = {};
+      const weekFirstDates: Record<number, string> = {};
+      splitResults.forEach((item) => {
+        if (!weeklyData[item.CalendarWeek]) {
+          weeklyData[item.CalendarWeek] = {};
+          weekFirstDates[item.CalendarWeek] = item.Date;
+        }
+        weeklyData[item.CalendarWeek][item.CalendarDayInWeek] = item.Quantity;
+        // Track the earliest date for each week
+        if (item.Date < weekFirstDates[item.CalendarWeek]) {
+          weekFirstDates[item.CalendarWeek] = item.Date;
+        }
+      });
+
+      // Sort weeks chronologically by date (handles year boundaries correctly)
+      const sortedWeeks = Object.keys(weeklyData)
+        .map(Number)
+        .sort((a, b) => {
+          const dateA = new Date(weekFirstDates[a]);
+          const dateB = new Date(weekFirstDates[b]);
+          return dateA.getTime() - dateB.getTime();
+        });
+
+      // Convert to daily_split format: 2D array where each sub-array is a week with 7 days (Mon-Sun)
+      const dailySplit: number[][] = sortedWeeks.map((week) => {
+        const weekData = weeklyData[week];
+        // Days 1-7 represent Mon-Sun
+        return [1, 2, 3, 4, 5, 6, 7].map((day) => weekData[day] || 0);
+      });
 
       // Calculate weekly_split from splitResults
       const weeklyTotals: Record<number, number> = {};
@@ -246,14 +272,11 @@ export default function JobDetailsModal({
         }
         weeklyTotals[item.CalendarWeek] += item.Quantity;
       });
-      const weeklySplit = Object.keys(weeklyTotals)
-        .sort((a, b) => parseInt(a) - parseInt(b))
-        .map((week) => weeklyTotals[parseInt(week)]);
+      // Use same chronological ordering for weekly split
+      const weeklySplit = sortedWeeks.map((week) => weeklyTotals[week]);
 
-      // Convert lockedSplitWeeks to locked_weeks array
-      const lockedWeeks = Object.keys(weeklyTotals)
-        .sort((a, b) => parseInt(a) - parseInt(b))
-        .map((week) => lockedSplitWeeks[parseInt(week)] || false);
+      // Convert lockedSplitWeeks to locked_weeks array (same chronological order)
+      const lockedWeeks = sortedWeeks.map((week) => lockedSplitWeeks[week] || false);
 
       await updateJob(job.id, {
         daily_split: dailySplit,
@@ -277,24 +300,59 @@ export default function JobDetailsModal({
     }
   };
 
+  // Transition handlers for edit mode
+  const handleEditClick = () => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setViewMode('edit');
+      setIsTransitioning(false);
+    }, 250);
+  };
+
+  const handleBackToDetails = () => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setViewMode('details');
+      setIsTransitioning(false);
+    }, 250);
+  };
+
+  const handleEditSuccess = () => {
+    handleBackToDetails();
+    if (onRefresh) onRefresh();
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
-          <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
-            Job Details
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
-          >
-            &times;
-          </button>
-        </div>
+      <div className={`bg-white rounded-xl shadow-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-10 transition-all duration-500 ease-in-out ${viewMode === 'edit' ? 'max-w-3xl' : 'max-w-6xl'}`}>
+        {/* Fade transition wrapper */}
+        <div className={`flex-1 flex flex-col min-h-0 transition-opacity duration-200 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+          {viewMode === 'edit' ? (
+            <EditJobModal
+              isOpen={true}
+              job={job}
+              onClose={onClose}
+              onBack={handleBackToDetails}
+              onSuccess={handleEditSuccess}
+              embedded={true}
+            />
+          ) : (
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border)]">
+                <h2 className="text-xl sm:text-2xl font-bold text-[var(--dark-blue)]">
+                  Job Details
+                </h2>
+                <button
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
+                >
+                  &times;
+                </button>
+              </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Two-Column Layout: Job Information | Assignment & Timeline */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column: Job Information */}
@@ -594,27 +652,19 @@ export default function JobDetailsModal({
                     })}
                   </div>
                 ) : (
-                  // Single version or no version_group_uuid
-                  <>
-                    <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                      <span className="text-sm font-medium text-[var(--text-dark)]">
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {(displayedJob as any)?.version_name || "v1"} (current)
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--text-light)] italic mt-2">
+                  // Single version
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className="text-sm font-medium text-[var(--text-dark)]">
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      {(job as any)?.version_group_uuid
-                        ? "No other versions found"
-                        : "This job has no other versions"}
-                    </p>
-                  </>
+                      {(displayedJob as any)?.version_name || "v1"}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Right: Services (2/3 width) - renamed from Requirements Details */}
+            {/* Right: Services (2/3 width) */}
             <div className="lg:col-span-2 bg-gray-50 rounded-lg p-4 border border-gray-200">
               <h3 className="text-lg font-semibold text-[var(--dark-blue)] mb-4">
                 Services
@@ -995,10 +1045,11 @@ export default function JobDetailsModal({
               Revision History
             </button>
             <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+              onClick={handleEditClick}
+              disabled={isTransitioning}
+              className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              Edit Job
+              {isTransitioning ? "Loading..." : "Edit Job"}
             </button>
             <button
               onClick={onClose}
@@ -1007,6 +1058,9 @@ export default function JobDetailsModal({
               Close
             </button>
           </div>
+        </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1054,18 +1108,6 @@ export default function JobDetailsModal({
         jobName={job.job_name}
       />
 
-      {/* Edit Job Modal */}
-      {isEditModalOpen && (
-        <EditJobModal
-          isOpen={isEditModalOpen}
-          job={job}
-          onClose={() => setIsEditModalOpen(false)}
-          onSuccess={() => {
-            setIsEditModalOpen(false);
-            if (onRefresh) onRefresh();
-          }}
-        />
-      )}
 
       {/* Success Toasts */}
       {showDeleteToast && deletedJobNumber && (

@@ -19,7 +19,7 @@ import { PrimaryCategoryRow } from "./PrimaryCategoryRow";
 import { SubCategoryRow } from "./SubCategoryRow";
 import { buildSummaryTieredData, getPrimaryCategoryValue } from "@/lib/tieredFilterUtils";
 import { groupProjectionsByVersion, isVersionGroup, type VersionGroup } from "@/lib/versionGroupUtils";
-import { VersionGroupHeaderRow, VersionRow } from "./VersionGroupRow";
+import { VersionGroupHeaderRow } from "./VersionGroupRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
@@ -1981,64 +1981,20 @@ export default function ProjectionsTable({
                 // Check if this item is a VersionGroup or a regular JobProjection
                 if (isVersionGroup(item)) {
                   const versionGroup = item as VersionGroup;
-                  const isExpanded = expandedVersionGroups.has(versionGroup.groupId);
 
+                  // Render a single combined row for the version group
                   return (
-                    <React.Fragment key={`version-group-${versionGroup.groupId}`}>
-                      {/* Version Group Header Row */}
-                      <VersionGroupHeaderRow
-                        versionGroup={versionGroup}
-                        timeRanges={timeRanges}
-                        isExpanded={isExpanded}
-                        onToggleExpand={() => handleToggleVersionGroup(versionGroup.groupId)}
-                        onJobClick={handleJobClick}
-                        showNotes={showNotes}
-                        orderedColumns={orderedColumns}
-                        granularity={granularity}
-                      />
-                      {/* Expanded Version Rows */}
-                      {isExpanded &&
-                        versionGroup.allVersions.map((versionProjection, versionIndex) => {
-                          const jobNotes = showNotes
-                            ? jobNotesMap.get(versionProjection.job.id) || []
-                            : [];
-                          const hasNotes = jobNotes.length > 0;
-                          const noteColor = hasNotes
-                            ? jobNotes[0].color || "#000000"
-                            : undefined;
-                          const isLastInGroup =
-                            versionIndex === versionGroup.allVersions.length - 1;
-
-                          return (
-                            <VersionRow
-                              key={`version-${versionGroup.groupId}-${versionProjection.job.id}`}
-                              projection={versionProjection}
-                              timeRanges={timeRanges}
-                              onJobClick={handleJobClick}
-                              isSelected={selectedJobIds.has(versionProjection.job.id)}
-                              onToggleSelect={() =>
-                                handleToggleSelect(versionProjection.job.id)
-                              }
-                              showNotes={showNotes}
-                              jobNotes={jobNotes}
-                              noteColor={noteColor}
-                              editingNoteId={editingNoteId}
-                              editingText={editingText}
-                              onStartEdit={handleStartEdit}
-                              onCancelEdit={handleCancelEdit}
-                              onSaveEdit={handleSaveEdit}
-                              onTextChange={setEditingText}
-                              isSavingNote={isSavingNote}
-                              onOpenNotesModal={handleOpenNotesModal}
-                              granularity={granularity}
-                              cellNotesMap={cellNotesMap}
-                              orderedColumns={orderedColumns}
-                              lastModifiedByJob={lastModifiedByJob}
-                              isLastInGroup={isLastInGroup}
-                            />
-                          );
-                        })}
-                    </React.Fragment>
+                    <VersionGroupHeaderRow
+                      key={`version-group-${versionGroup.groupId}`}
+                      versionGroup={versionGroup}
+                      timeRanges={timeRanges}
+                      isExpanded={false}
+                      onToggleExpand={() => {}}
+                      onJobClick={handleJobClick}
+                      showNotes={showNotes}
+                      orderedColumns={orderedColumns}
+                      granularity={granularity}
+                    />
                   );
                 } else {
                   // Regular JobProjection (standalone or single version)

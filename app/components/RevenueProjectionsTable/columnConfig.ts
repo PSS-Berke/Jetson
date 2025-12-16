@@ -1,3 +1,6 @@
+// Revenue Projections Table Column Configuration
+// Financial/revenue-focused column definitions for the CFO revenue view
+
 // Sort field types for revenue projections table
 export type SortField =
   | "job_number"
@@ -12,7 +15,7 @@ export type SortField =
   | "start_date"
   | "due_date"
   | "updated_at"
-  | "total";
+  | "total_revenue";
 
 // Column types for unified handling
 export type ColumnType =
@@ -154,21 +157,21 @@ export const DEFAULT_COLUMNS: RevenueColumnConfig[] = [
     align: "center",
     reorderable: true,
   },
-  // Time period columns placeholder - actual ranges are dynamic
+  // Time period revenue columns placeholder - actual ranges are dynamic
   {
     key: "time_ranges",
     type: "time_range",
-    label: "Time Periods",
+    label: "Revenue by Period",
     sortable: false,
     required: true,
     reorderable: false,
   },
   {
-    key: "total",
+    key: "total_revenue",
     type: "total",
-    label: "Total",
+    label: "Total Revenue",
     sortable: true,
-    sortField: "total",
+    sortField: "total_revenue",
     sticky: "right",
     align: "right",
     reorderable: true,

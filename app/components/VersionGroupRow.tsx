@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useState } from "react";
-import { ChevronRight, ChevronDown, Layers } from "lucide-react";
+import { Layers, ChevronDown } from "lucide-react";
 import { ParsedJob } from "@/hooks/useJobs";
 import { JobProjection, TimeRange, formatQuantity } from "@/lib/projectionUtils";
 import { VersionGroup, getVersionName } from "@/lib/versionGroupUtils";
@@ -61,6 +61,7 @@ export const VersionGroupHeaderRow = memo(
     granularity,
   }: VersionGroupHeaderRowProps) => {
     const [showAggregatedTotal, setShowAggregatedTotal] = useState(false);
+    const [showVersionDropdown, setShowVersionDropdown] = useState(false);
     const { primaryJob, allVersions, aggregatedTotalQuantity } = versionGroup;
     const job = primaryJob.job;
     const versionCount = allVersions.length;
@@ -98,24 +99,14 @@ export const VersionGroupHeaderRow = memo(
         {orderedColumns.map((col) => {
           if (!col.isVisible) return null;
 
-          // Custom rendering for checkbox column - show expand chevron
+          // Custom rendering for checkbox column - show layers icon as visual indicator
           if (col.config.key === "checkbox") {
             return (
               <td
                 key="checkbox"
-                className="pl-2 pr-1 py-2 w-10 version-expand-btn"
-                onClick={handleCheckboxClick}
+                className="pl-2 pr-1 py-2 w-10"
               >
-                <button
-                  className="p-0.5 hover:bg-indigo-200 rounded transition-colors"
-                  title={isExpanded ? "Collapse versions" : "Expand versions"}
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-indigo-600" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-indigo-600" />
-                  )}
-                </button>
+                <Layers className="w-4 h-4 text-indigo-500" />
               </td>
             );
           }
@@ -129,7 +120,6 @@ export const VersionGroupHeaderRow = memo(
                 title={job.job_number}
               >
                 <div className="flex items-center gap-1">
-                  <Layers className="w-3 h-3 text-indigo-500" />
                   <span>{formatJobNumber(job.job_number)}</span>
                   <span className="text-[10px] text-indigo-600 bg-indigo-100 px-1 rounded">
                     {versionCount}v
@@ -139,14 +129,87 @@ export const VersionGroupHeaderRow = memo(
             );
           }
 
-          // Custom rendering for version column - show "Multiple"
+          // Custom rendering for version column - show dropdown with all versions
           if (col.config.key === "version") {
             return (
               <td
                 key="version"
-                className="px-2 py-2 whitespace-nowrap text-xs text-center text-indigo-600 font-medium"
+                className="px-2 py-2 whitespace-nowrap text-xs text-center relative"
               >
-                {versionCount} versions
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowVersionDropdown(!showVersionDropdown);
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-indigo-200 transition-colors text-indigo-600 font-medium"
+                >
+                  {versionCount} versions
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showVersionDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Version dropdown popover */}
+                {showVersionDropdown && (
+                  <>
+                    {/* Backdrop to close dropdown */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowVersionDropdown(false);
+                      }}
+                    />
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[280px] py-2">
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <span className="text-xs font-semibold text-[var(--text-light)] uppercase tracking-wide">
+                          All Versions
+                        </span>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {allVersions.map((versionProjection, idx) => {
+                          const vJob = versionProjection.job;
+                          const vName = getVersionName(vJob);
+                          const vQty = versionProjection.totalQuantity;
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          const scheduleType = (vJob as any).schedule_type || "soft schedule";
+
+                          return (
+                            <button
+                              key={vJob.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowVersionDropdown(false);
+                                onJobClick(vJob);
+                              }}
+                              className="w-full px-3 py-2 hover:bg-gray-50 text-left flex items-center justify-between gap-3 transition-colors"
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-[var(--text-dark)]">
+                                  {vName}
+                                </span>
+                                <span className="text-xs text-[var(--text-light)]">
+                                  {scheduleType}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-sm font-semibold text-[var(--text-dark)]">
+                                  {formatQuantity(Math.round(vQty))}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 rounded-b-lg">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-medium text-[var(--text-light)]">Total:</span>
+                          <span className="font-semibold text-indigo-600">
+                            {formatQuantity(Math.round(aggregatedTotalQuantity))}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </td>
             );
           }
@@ -299,7 +362,7 @@ export const VersionRow = memo(
     return (
       <tr
         className={`cursor-pointer border-l-4 border-l-indigo-300 ${
-          isSelected ? "bg-blue-100" : "bg-indigo-50/30 hover:bg-indigo-50/50"
+          isSelected ? "bg-blue-100" : "hover:bg-gray-50"
         } ${isLastInGroup ? "border-b-2 border-b-indigo-200" : ""}`}
         style={highlightStyle}
         onClick={() => onJobClick(job)}
@@ -307,50 +370,47 @@ export const VersionRow = memo(
         {orderedColumns.map((col) => {
           if (!col.isVisible) return null;
 
-          // Custom rendering for checkbox column - show indent connector
+          // Custom rendering for checkbox column
           if (col.config.key === "checkbox") {
             return (
               <td key="checkbox" className="pl-2 pr-1 py-2 w-10">
-                <div className="flex items-center pl-1">
-                  <span className="text-indigo-300 mr-0.5">└</span>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      onToggleSelect();
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-3.5 h-3.5 text-[var(--primary-blue)] rounded border-gray-300 focus:ring-[var(--primary-blue)] focus:ring-opacity-50"
-                  />
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onToggleSelect();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-3.5 h-3.5 text-[var(--primary-blue)] rounded border-gray-300 focus:ring-[var(--primary-blue)] focus:ring-opacity-50"
+                />
+              </td>
+            );
+          }
+
+          // Custom rendering for job_number column - show job number with version indicator
+          if (col.config.key === "job_number") {
+            return (
+              <td
+                key="job_number"
+                className="pl-1 pr-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
+                title={job.job_number}
+              >
+                <div className="flex items-center gap-1">
+                  <span>{formatJobNumber(job.job_number)}</span>
                 </div>
               </td>
             );
           }
 
-          // Custom rendering for job_number column - show version name instead
-          if (col.config.key === "job_number") {
-            return (
-              <td
-                key="job_number"
-                className="pl-1 pr-2 py-2 whitespace-nowrap text-xs text-indigo-600"
-              >
-                <span className="font-medium">{versionName}</span>
-              </td>
-            );
-          }
-
-          // Hide version column for version rows (redundant with job_number showing version)
+          // Show version name in version column
           if (col.config.key === "version") {
-            // Get the schedule_type/status for display
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const scheduleType = (job as any).schedule_type || "soft schedule";
             return (
               <td
                 key="version"
-                className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-light)]"
+                className="px-2 py-2 whitespace-nowrap text-xs text-center text-indigo-600 font-medium"
               >
-                {scheduleType}
+                {versionName}
               </td>
             );
           }

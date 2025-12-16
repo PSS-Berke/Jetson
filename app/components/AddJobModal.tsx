@@ -237,6 +237,7 @@ function AddJobModal({
             end: endDate,
             quantity: quantity.toString(),
             saturday: (jobOpts.runSat1st || jobOpts.runSat2nd || jobOpts.run12sAllWeekend).toString(),
+            sunday: (jobOpts.runSun1st || jobOpts.runSun2nd || jobOpts.run12sAllWeekend).toString(),
             run_1st_ot: jobOpts.run1stOT.toString(),
             run_2nd_ot: jobOpts.run2ndOT.toString(),
             run_sat_1st: jobOpts.runSat1st.toString(),
@@ -281,7 +282,8 @@ function AddJobModal({
 
       calculateSplit();
     }
-  }, [formData.quantity, formData.start_date, formData.due_date, scheduleConfig, currentStep, creationMode, isCreatingTemplate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.quantity, formData.start_date, formData.due_date, JSON.stringify(scheduleConfig.jobDefaults), currentStep, creationMode, isCreatingTemplate]);
 
   // Adjust description textarea height on mount and when description changes
   useEffect(() => {
@@ -531,6 +533,7 @@ function AddJobModal({
         end: endDate,
         quantity: quantity.toString(),
         saturday: (jobOpts.runSat1st || jobOpts.runSat2nd || jobOpts.run12sAllWeekend).toString(),
+        sunday: (jobOpts.runSun1st || jobOpts.runSun2nd || jobOpts.run12sAllWeekend).toString(),
         run_1st_ot: jobOpts.run1stOT.toString(),
         run_2nd_ot: jobOpts.run2ndOT.toString(),
         run_sat_1st: jobOpts.runSat1st.toString(),

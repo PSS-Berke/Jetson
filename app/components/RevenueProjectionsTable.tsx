@@ -18,17 +18,22 @@ import { calculateProcessTypeBreakdownByField } from "@/lib/projectionUtils";
 import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
 import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
 import { getFacilityName, getFacilityColors } from "@/lib/facilityUtils";
+import { hexToRgba, formatRevenue } from "@/lib/tableUtils";
+import {
+  groupProjectionsByVersion,
+  isVersionGroup,
+  VersionGroup,
+} from "@/lib/versionGroupUtils";
 
-type SortField =
-  | "job_number"
-  | "facility"
-  | "sub_client"
-  | "process_type"
-  | "description"
-  | "quantity"
-  | "start_date"
-  | "due_date"
-  | "total";
+// Import column system components
+import {
+  useColumnSettings,
+  ColumnSettingsPopover,
+  SortField,
+  RevenueVersionGroupHeaderRow,
+  RevenueVersionRow,
+} from "./RevenueProjectionsTable/index";
+
 type SortDirection = "asc" | "desc";
 
 interface RevenueProjectionsTableProps {
@@ -54,16 +59,6 @@ function isFacilitySummary(
   summary: ProcessTypeSummary | ProcessTypeFacilitySummary
 ): summary is ProcessTypeFacilitySummary {
   return 'facilityId' in summary && 'facilityName' in summary;
-}
-
-// Format currency for display
-function formatRevenue(amount: number): string {
-  return amount.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
 }
 
 // Memoized desktop table row component
@@ -105,14 +100,6 @@ const RevenueTableRow = memo(
   }) => {
     const job = projection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
-
-    // Helper function to convert hex to rgba with opacity
-    const hexToRgba = (hex: string, opacity: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    };
 
     // Determine row background color
     let rowBgColor = "";
@@ -407,14 +394,6 @@ const ProcessRevenueTableRow = memo(
   }) => {
     const job = processProjection.job;
     const hasNotes = jobNotes && jobNotes.length > 0;
-
-    // Helper function to convert hex to rgba with opacity
-    const hexToRgba = (hex: string, opacity: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    };
 
     return (
       <tr
@@ -1084,6 +1063,19 @@ export default function RevenueProjectionsTable({
   const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
   const [machineVariables, setMachineVariables] = useState<any[]>([]);
 
+  // Version grouping state
+  const [enableVersionGrouping, setEnableVersionGrouping] = useState(true);
+  const [expandedVersionGroups, setExpandedVersionGroups] = useState<Set<string>>(new Set());
+
+  // Column settings hook for column visibility, ordering, and persistence
+  const {
+    columnSettings,
+    toggleColumnVisibility,
+    setColumnOrder,
+    resetToDefaults,
+    getOrderedColumns,
+  } = useColumnSettings();
+
   // Load machine variables for breakdown fields
   useEffect(() => {
     getAllMachineVariables()
@@ -1099,6 +1091,19 @@ export default function RevenueProjectionsTable({
         next.delete(processType);
       } else {
         next.add(processType);
+      }
+      return next;
+    });
+  };
+
+  // Handler for version group expansion
+  const handleToggleVersionGroup = (groupId: string) => {
+    setExpandedVersionGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
       }
       return next;
     });
@@ -1132,6 +1137,22 @@ export default function RevenueProjectionsTable({
     }
     return jobProjections;
   }, [showExpandedProcesses, jobProjections]);
+
+  // Group projections by version when not in expanded process view
+  const versionGroupedProjections = useMemo(() => {
+    // Version grouping only applies to job view, not process view
+    if (showExpandedProcesses) {
+      return {
+        groups: new Map<string, VersionGroup>(),
+        standalone: [],
+        processedProjections: displayProjections as JobProjection[],
+      };
+    }
+    return groupProjectionsByVersion(
+      displayProjections as JobProjection[],
+      enableVersionGrouping
+    );
+  }, [displayProjections, enableVersionGrouping, showExpandedProcesses]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
 
@@ -1477,7 +1498,7 @@ export default function RevenueProjectionsTable({
             return a.processType.localeCompare(b.processType);
 
           case "quantity":
-          case "total":
+          case "total_revenue":
             compareValue = a.totalRevenue - b.totalRevenue;
             break;
 
@@ -1531,7 +1552,7 @@ export default function RevenueProjectionsTable({
           aValue = aJob.job.due_date || 0;
           bValue = bJob.job.due_date || 0;
           break;
-        case "total":
+        case "total_revenue":
           aValue = aJob.totalRevenue;
           bValue = bJob.totalRevenue;
           break;
@@ -1681,6 +1702,17 @@ export default function RevenueProjectionsTable({
           </div>
         </div>
       )}
+
+      {/* Column Settings - Desktop only */}
+      <div className="hidden md:flex justify-end mb-4">
+        <ColumnSettingsPopover
+          columnOrder={columnSettings.order}
+          hiddenColumns={columnSettings.hidden}
+          onToggleColumn={toggleColumnVisibility}
+          onReorderColumns={setColumnOrder}
+          onResetToDefaults={resetToDefaults}
+        />
+      </div>
 
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
@@ -1959,11 +1991,11 @@ export default function RevenueProjectionsTable({
                 </th>
               ))}
               <th
-                onClick={() => handleSort("total")}
+                onClick={() => handleSort("total_revenue")}
                 className="px-2 py-2 text-center text-[10px] font-medium text-green-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-center gap-1">
-                  Total Revenue <SortIcon field="total" />
+                  Total Revenue <SortIcon field="total_revenue" />
                 </div>
               </th>
               {showNotes && (
@@ -2023,32 +2055,96 @@ export default function RevenueProjectionsTable({
                 },
               )
             ) : (
-              (sortedJobProjections as JobProjection[]).map((projection, index) => {
-                const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
-                const hasNotes = jobNotes.length > 0;
-                const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+              // Render with version grouping support
+              versionGroupedProjections.processedProjections.map((item, index) => {
+                if (isVersionGroup(item)) {
+                  // Render version group
+                  const group = item;
+                  const isGroupExpanded = expandedVersionGroups.has(group.groupId);
 
-                return (
-                  <RevenueTableRow
-                    key={`job-${projection.job.id}-${index}`}
-                    projection={projection}
-                    timeRanges={timeRanges}
-                    onJobClick={handleJobClick}
-                    isSelected={selectedJobIds.has(projection.job.id)}
-                    onToggleSelect={() => handleToggleSelect(projection.job.id)}
-                    showNotes={showNotes}
-                    jobNotes={jobNotes}
-                    noteColor={noteColor}
-                    editingNoteId={editingNoteId}
-                    editingText={editingText}
-                    onStartEdit={handleStartEdit}
-                    onCancelEdit={handleCancelEdit}
-                    onSaveEdit={handleSaveEdit}
-                    onTextChange={setEditingText}
-                    isSavingNote={isSavingNote}
-                    onOpenNotesModal={handleOpenNotesModal}
-                  />
-                );
+                  return (
+                    <React.Fragment key={`version-group-${group.groupId}`}>
+                      {/* Version group header row */}
+                      <RevenueVersionGroupHeaderRow
+                        versionGroup={group}
+                        timeRanges={timeRanges}
+                        isExpanded={isGroupExpanded}
+                        onToggleExpand={() => handleToggleVersionGroup(group.groupId)}
+                        onJobClick={handleJobClick}
+                        showNotes={showNotes}
+                      />
+
+                      {/* Expanded version rows */}
+                      {isGroupExpanded &&
+                        group.allVersions.map((versionProjection, vIdx) => {
+                          const vJob = versionProjection.job;
+                          const vJobNotes = showNotes
+                            ? jobNotesMap.get(vJob.id) || []
+                            : [];
+                          const vHasNotes = vJobNotes.length > 0;
+                          const vNoteColor = vHasNotes
+                            ? vJobNotes[0].color || "#000000"
+                            : undefined;
+                          const isLastInGroup = vIdx === group.allVersions.length - 1;
+
+                          return (
+                            <RevenueVersionRow
+                              key={`version-${vJob.id}`}
+                              projection={versionProjection}
+                              timeRanges={timeRanges}
+                              onJobClick={handleJobClick}
+                              isSelected={selectedJobIds.has(vJob.id)}
+                              onToggleSelect={() => handleToggleSelect(vJob.id)}
+                              showNotes={showNotes}
+                              jobNotes={vJobNotes}
+                              noteColor={vNoteColor}
+                              editingNoteId={editingNoteId}
+                              editingText={editingText}
+                              onStartEdit={handleStartEdit}
+                              onCancelEdit={handleCancelEdit}
+                              onSaveEdit={handleSaveEdit}
+                              onTextChange={setEditingText}
+                              isSavingNote={isSavingNote}
+                              onOpenNotesModal={handleOpenNotesModal}
+                              isLastInGroup={isLastInGroup}
+                            />
+                          );
+                        })}
+                    </React.Fragment>
+                  );
+                } else {
+                  // Render standalone job projection
+                  const projection = item;
+                  const jobNotes = showNotes
+                    ? jobNotesMap.get(projection.job.id) || []
+                    : [];
+                  const hasNotes = jobNotes.length > 0;
+                  const noteColor = hasNotes
+                    ? jobNotes[0].color || "#000000"
+                    : undefined;
+
+                  return (
+                    <RevenueTableRow
+                      key={`job-${projection.job.id}-${index}`}
+                      projection={projection}
+                      timeRanges={timeRanges}
+                      onJobClick={handleJobClick}
+                      isSelected={selectedJobIds.has(projection.job.id)}
+                      onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                      showNotes={showNotes}
+                      jobNotes={jobNotes}
+                      noteColor={noteColor}
+                      editingNoteId={editingNoteId}
+                      editingText={editingText}
+                      onStartEdit={handleStartEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onTextChange={setEditingText}
+                      isSavingNote={isSavingNote}
+                      onOpenNotesModal={handleOpenNotesModal}
+                    />
+                  );
+                }
               })
             )}
           </tbody>
