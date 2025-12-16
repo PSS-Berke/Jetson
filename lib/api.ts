@@ -1503,126 +1503,6 @@ export const batchCreateProductionEntries = async (
 };
 
 // ============================================================================
-// Job Cost Entry API Functions
-// ============================================================================
-
-// These APIs should not be used anymore, there is a new field in the jobs table called "actual_cost_per_m" that is used to store the cost per thousand.
-// Use updateJob to update the actual_cost_per_m field.
-// Use response from jobs v2 API to get the actual_cost_per_m field
-
-// Get job cost entries with optional filters
-export const getJobCostEntries = async (
-  facilitiesId?: number,
-  startDate?: number,
-  endDate?: number,
-): Promise<JobCostEntry[]> => {
-  const params = new URLSearchParams();
-
-  if (facilitiesId !== undefined && facilitiesId !== null) {
-    params.append("facilities_id", facilitiesId.toString());
-  }
-
-  if (startDate !== undefined && startDate !== null) {
-    params.append("start_date", startDate.toString());
-  }
-
-  if (endDate !== undefined && endDate !== null) {
-    params.append("end_date", endDate.toString());
-  }
-
-  const queryString = params.toString();
-  const endpoint = queryString
-    ? `/job_cost_entry?${queryString}`
-    : "/job_cost_entry";
-
-  console.log("[getJobCostEntries] Fetching from:", endpoint);
-  const result = await apiFetch<JobCostEntry[]>(
-    endpoint,
-    {
-      method: "GET",
-    },
-    "jobs",
-  );
-  console.log(
-    "[getJobCostEntries] Received",
-    result.length,
-    "entries:",
-    result,
-  );
-  return result;
-};
-
-// Add a new job cost entry
-export const addJobCostEntry = async (
-  data: Omit<JobCostEntry, "id" | "created_at" | "updated_at">,
-): Promise<JobCostEntry> => {
-  console.log("[addJobCostEntry] Submitting entry:", data);
-  const result = await apiFetch<JobCostEntry>(
-    "/job_cost_entry",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    },
-    "jobs",
-  );
-  console.log("[addJobCostEntry] Response:", result);
-  return result;
-};
-
-// Update an existing job cost entry
-export const updateJobCostEntry = async (
-  id: number,
-  data: Partial<Omit<JobCostEntry, "id" | "created_at" | "updated_at">>,
-): Promise<JobCostEntry> => {
-  console.log("[updateJobCostEntry] Updating entry:", id, "with data:", data);
-  const result = await apiFetch<JobCostEntry>(
-    `/job_cost_entry/${id}`,
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    },
-    "jobs",
-  );
-  console.log("[updateJobCostEntry] Response:", result);
-  return result;
-};
-
-// Delete a job cost entry
-export const deleteJobCostEntry = async (id: number): Promise<void> => {
-  console.log("[deleteJobCostEntry] Deleting entry:", id);
-  await apiFetch<void>(
-    `/job_cost_entry/${id}`,
-    {
-      method: "DELETE",
-    },
-    "jobs",
-  );
-  console.log("[deleteJobCostEntry] Entry deleted successfully");
-};
-
-// Batch create multiple job cost entries
-// Since Xano doesn't have a /batch endpoint, we'll make individual POST requests in parallel
-export const batchCreateJobCostEntries = async (
-  entries: Omit<JobCostEntry, "id" | "created_at" | "updated_at">[],
-): Promise<JobCostEntry[]> => {
-  console.log(
-    "[batchCreateJobCostEntries] Creating",
-    entries.length,
-    "entries in parallel",
-  );
-  // Create all entries in parallel for much faster performance
-  const createdEntries = await Promise.all(
-    entries.map((entry) => addJobCostEntry(entry)),
-  );
-  console.log(
-    "[batchCreateJobCostEntries] Successfully created",
-    createdEntries.length,
-    "entries",
-  );
-  return createdEntries;
-};
-
-// ============================================================================
 // Bulk Job Operations
 // ============================================================================
 
@@ -1934,21 +1814,21 @@ export const updateMachineVariables = async (
 // ============================================================================
 
 /**
- * Automatically sync job_cost_entry record from job requirements
+ * Automatically sync actual_cost_per_m from job requirements
  * Called after job creation or update to populate actual_cost_per_m from price_per_m
  *
  * @param jobId - The job ID
  * @param requirements - Array of job requirements (can be JSON string or array)
- * @param startDate - Job start date (used as entry date)
- * @param facilitiesId - Facility ID
- * @returns Created/updated JobCostEntry or null if no valid pricing
+ * @param startDate - Job start date (kept for compatibility but not used)
+ * @param facilitiesId - Facility ID (kept for compatibility but not used)
+ * @returns Updated Job or null if no valid pricing
  */
 export const syncJobCostEntryFromRequirements = async (
   jobId: number,
   requirements: string | any[], // eslint-disable-line @typescript-eslint/no-explicit-any
   startDate: string | number,
   facilitiesId?: number,
-): Promise<JobCostEntry | null> => {
+): Promise<Job | null> => {
   try {
     console.log(
       "[syncJobCostEntryFromRequirements] Starting sync for job:",
@@ -1981,76 +1861,27 @@ export const syncJobCostEntryFromRequirements = async (
       return null;
     }
 
-    // Convert start date to timestamp if it's a string
-    let dateTimestamp: number;
-    if (typeof startDate === "string") {
-      dateTimestamp = new Date(startDate).getTime();
-    } else {
-      dateTimestamp = startDate;
-    }
-
     console.log(
       "[syncJobCostEntryFromRequirements] Calculated average cost:",
       averageCost,
     );
 
-    // Check if a job_cost_entry already exists for this job and date range
-    // We'll look for entries within a day of the start date to avoid duplicates
-    const dayStart = dateTimestamp;
-    const dayEnd = dateTimestamp + 24 * 60 * 60 * 1000;
-
-    try {
-      const existingEntries = await getJobCostEntries(
-        facilitiesId,
-        dayStart,
-        dayEnd,
-      );
-      const existingEntry = existingEntries.find(
-        (entry) => entry.job === jobId,
-      );
-
-      if (existingEntry) {
-        // Update existing entry
-        console.log(
-          "[syncJobCostEntryFromRequirements] Updating existing entry:",
-          existingEntry.id,
-        );
-        const updated = await updateJobCostEntry(existingEntry.id, {
-          actual_cost_per_m: averageCost,
-          notes: existingEntry.notes || "Auto-synced from requirements",
-        });
-        console.log(
-          "[syncJobCostEntryFromRequirements] Entry updated successfully",
-        );
-        return updated;
-      }
-    } catch {
-      // If fetching existing entries fails, continue to create new one
-      console.log(
-        "[syncJobCostEntryFromRequirements] Could not fetch existing entries, will create new",
-      );
-    }
-
-    // Create new entry
-    const newEntry = await addJobCostEntry({
-      job: jobId,
-      date: dateTimestamp,
+    // Update job directly with the calculated cost
+    const updatedJob = await updateJob(jobId, {
       actual_cost_per_m: averageCost,
-      notes: "Auto-synced from requirements",
-      facilities_id: facilitiesId,
     });
 
     console.log(
-      "[syncJobCostEntryFromRequirements] New entry created:",
-      newEntry.id,
+      "[syncJobCostEntryFromRequirements] Job updated with cost:",
+      updatedJob.id,
     );
-    return newEntry;
+    return updatedJob;
   } catch (error) {
     console.error(
-      "[syncJobCostEntryFromRequirements] Error syncing job cost entry:",
+      "[syncJobCostEntryFromRequirements] Error syncing job cost:",
       error,
     );
-    // Don't throw - we don't want to fail job creation/update if cost entry sync fails
+    // Don't throw - we don't want to fail job creation/update if cost sync fails
     return null;
   }
 };

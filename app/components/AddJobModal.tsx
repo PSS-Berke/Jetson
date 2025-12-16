@@ -1387,7 +1387,7 @@ function AddJobModal({
       csr: versionData.csr || "",
       requirements: cleanedRequirements || [],
       total_billing: calculatedTotalBilling > 0 ? calculatedTotalBilling : null,
-      actual_cost_per_m: actualPricePerM !== null && !Number.isNaN(actualPricePerM) ? actualPricePerM : null,
+      projected_const_per_m: actualPricePerM !== null && !Number.isNaN(actualPricePerM) ? actualPricePerM : null,
       facilities_id: versionData.facilities_id,
       daily_split: dailySplit,
       sub_client_id: versionData.sub_clients_id || 0,
@@ -1395,7 +1395,6 @@ function AddJobModal({
       version_group_uuid: versionGroupUuid,
       version_name: versionNameStr,
       exclude_from_calculations: versionNum > 1, // true for all except v1
-      actual_quantity: quantity,
       actual_quantity_entered: null,
     };
   };

@@ -8,14 +8,9 @@ import {
   formatPercentage,
   getProfitTextColor,
 } from "@/lib/jobCostUtils";
-import {
-  getJobCostEntries,
-  batchCreateJobCostEntries,
-  deleteJobCostEntry,
-} from "@/lib/api";
+import { getJobsV2, updateJob, type JobV2 } from "@/lib/api";
 import Toast from "./Toast";
 import type { ParsedJob } from "@/hooks/useJobs";
-import type { JobCostEntry } from "@/lib/jobCostUtils";
 
 interface BatchJobCostEntryModalProps {
   isOpen: boolean;
@@ -62,23 +57,43 @@ export default function BatchJobCostEntryModal({
       const loadEntriesWithCosts = async () => {
         const relevantJobs = getJobsInTimeRange(jobs, startDate, endDate);
 
-        // Fetch existing cost entries for this period from API
+        // Fetch jobs from v2 API to get actual_cost_per_m
         try {
-          const existingEntries = await getJobCostEntries(
-            facilitiesId,
-            startDate,
-            endDate,
-          );
+          // Fetch all jobs for the facility to get their actual_cost_per_m values
+          // Handle pagination to get all jobs
+          const allJobs: JobV2[] = [];
+          let currentPage = 1;
+          let hasMore = true;
 
-          // Create map of job_id to current cost
+          while (hasMore) {
+            const jobsResponse = await getJobsV2({
+              facilities_id: facilitiesId || 0,
+              page: currentPage,
+              per_page: 1000,
+            });
+
+            allJobs.push(...jobsResponse.items);
+
+            // Check if there are more pages
+            if (jobsResponse.nextPage !== null) {
+              currentPage = jobsResponse.nextPage;
+            } else {
+              hasMore = false;
+            }
+          }
+
+          // Create map of job_id to current cost from the jobs
           const costsMap = new Map<number, number>();
-          existingEntries.forEach((entry) => {
-            costsMap.set(entry.job, entry.actual_cost_per_m);
+          allJobs.forEach((job) => {
+            if (job.actual_cost_per_m !== null && job.actual_cost_per_m !== undefined) {
+              costsMap.set(job.id, job.actual_cost_per_m);
+            }
           });
 
           const entries: JobCostEntryData[] = relevantJobs.map((job) => {
             const billingRate = calculateBillingRatePerM(job);
-            const currentCost = costsMap.get(job.id) || 0;
+            // Get cost from map, or from the job itself if available, or default to 0
+            const currentCost = costsMap.get(job.id) ?? job.actual_cost_per_m ?? 0;
 
             return {
               job_id: job.id,
@@ -212,18 +227,11 @@ export default function BatchJobCostEntryModal({
             }
           }
 
-          const costEntry: Omit<
-            JobCostEntry,
-            "id" | "created_at" | "updated_at"
-          > = {
-            job: entry.job_id,
-            date: Date.now(),
-            actual_cost_per_m: final_cost_per_m,
-            notes: entry.notes || undefined,
-            facilities_id: facilitiesId,
+          return {
+            job_id: entry.job_id,
+            final_cost_per_m,
+            notes: entry.notes,
           };
-
-          return costEntry;
         });
 
       console.log(
@@ -238,27 +246,18 @@ export default function BatchJobCostEntryModal({
         return;
       }
 
-      // Delete old entries for these jobs first
-      const jobIds = entriesToSubmit.map((e) => e.job);
-      const existingEntries = await getJobCostEntries(
-        facilitiesId,
-        startDate,
-        endDate,
-      );
-      const entriesToDelete = existingEntries.filter((e) =>
-        jobIds.includes(e.job),
+      // Update jobs directly with new actual_cost_per_m values
+      const updatePromises = entriesToSubmit.map((entry) =>
+        updateJob(entry.job_id, {
+          actual_cost_per_m: entry.final_cost_per_m,
+        }),
       );
 
-      if (entriesToDelete.length > 0) {
-        await Promise.all(entriesToDelete.map((e) => deleteJobCostEntry(e.id)));
-      }
-
-      // Create new entries
-      const createdEntries = await batchCreateJobCostEntries(entriesToSubmit);
+      const updatedJobs = await Promise.all(updatePromises);
       console.log(
-        "[BatchJobCostEntryModal] Successfully created",
-        createdEntries.length,
-        "entries",
+        "[BatchJobCostEntryModal] Successfully updated",
+        updatedJobs.length,
+        "jobs",
       );
 
       // Trigger refresh to fetch updated costs
