@@ -667,8 +667,8 @@ export function calculateProcessTypeSummaries(
     // Process each requirement
     job.requirements.forEach((requirement) => {
       const processType = requirement.process_type || "Unknown";
-      // Normalize to lowercase for grouping (case-insensitive)
-      const normalizedKey = processType.toLowerCase();
+      // Normalize process type for grouping (handles variants like "fold"/"folding")
+      const normalizedKey = normalizeProcessType(processType);
 
       // Store canonical name (first occurrence's casing)
       if (!canonicalNames.has(normalizedKey)) {
@@ -730,7 +730,7 @@ export function calculateProcessTypeSummaries(
     const processTypesInJob = new Set<string>();
     job.requirements.forEach((req) => {
       const processType = req.process_type || "Unknown";
-      processTypesInJob.add(processType.toLowerCase());
+      processTypesInJob.add(normalizeProcessType(processType));
     });
 
     // Increment job count for each process type in this job
@@ -913,8 +913,8 @@ export function calculateProcessTypeSummariesByFacility(
     // Process each requirement
     job.requirements.forEach((requirement) => {
       const processType = requirement.process_type || "Unknown";
-      // Normalize to lowercase for grouping (case-insensitive)
-      const normalizedKey = processType.toLowerCase();
+      // Normalize process type for grouping (handles variants like "fold"/"folding")
+      const normalizedKey = normalizeProcessType(processType);
 
       // Store canonical name (first occurrence's casing)
       if (!canonicalNames.has(normalizedKey)) {
@@ -983,7 +983,7 @@ export function calculateProcessTypeSummariesByFacility(
     const processTypesInJob = new Set<string>();
     job.requirements.forEach((req) => {
       const processType = req.process_type || "Unknown";
-      processTypesInJob.add(processType.toLowerCase());
+      processTypesInJob.add(normalizeProcessType(processType));
     });
 
     // Increment job count for each process type + facility combo in this job

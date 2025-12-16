@@ -224,6 +224,7 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
   }, [data?.jobs]);
 
   // Fetch remaining pages in the background if fetchAll is true
+  // Uses parallel fetching for better performance
   useEffect(() => {
     if (!fetchAll || !data?.pagination?.nextPage || isLoading || isLoadingMore) {
       return;
@@ -231,39 +232,96 @@ export const useJobsV2 = (params: UseJobsV2Params = {}): UseJobsV2Return => {
 
     // Track if we've already started fetching to prevent duplicate fetches
     let isFetching = false;
+    let isCancelled = false;
 
-    // Fetch remaining pages in the background
+    // Fetch remaining pages in parallel batches for better performance
     const fetchRemainingPages = async () => {
       if (isFetching) return;
       isFetching = true;
       setIsLoadingMore(true);
 
       const accumulatedJobs = [...(data.jobs || [])];
-      let currentPage = data.pagination.nextPage;
 
       try {
-        while (currentPage !== null) {
-          const result = await fetchPage(fetcherParams, currentPage);
+        // First, fetch page 2 to determine total pages from pagination
+        const page2Result = await fetchPage(fetcherParams, data.pagination.nextPage);
+        if (isCancelled) return;
 
-          // Avoid duplicates by checking job IDs
-          const existingIds = new Set(accumulatedJobs.map((j) => j.id));
-          const newJobs = result.jobs.filter((j) => !existingIds.has(j.id));
-          accumulatedJobs.push(...newJobs);
+        // Add page 2 jobs
+        const existingIds = new Set(accumulatedJobs.map((j) => j.id));
+        const newJobsPage2 = page2Result.jobs.filter((j) => !existingIds.has(j.id));
+        accumulatedJobs.push(...newJobsPage2);
+        newJobsPage2.forEach((j) => existingIds.add(j.id));
 
-          currentPage = result.pagination.nextPage;
+        // Update UI with page 2 data
+        setAllJobs([...accumulatedJobs]);
 
-          // Update state incrementally so UI updates as pages load
-          setAllJobs([...accumulatedJobs]);
+        // If there are more pages, fetch them in parallel
+        if (page2Result.pagination.nextPage !== null) {
+          // Build list of remaining pages to fetch
+          const pagesToFetch: number[] = [];
+          let nextPage = page2Result.pagination.nextPage;
+
+          // Estimate remaining pages (we'll fetch in batches of 5)
+          // Since we don't know total pages upfront, fetch in batches
+          const BATCH_SIZE = 5;
+
+          // Fetch pages in parallel batches
+          while (nextPage !== null && !isCancelled) {
+            // Build batch of pages to fetch
+            pagesToFetch.length = 0;
+            for (let i = 0; i < BATCH_SIZE && nextPage !== null; i++) {
+              pagesToFetch.push(nextPage);
+              nextPage = nextPage + 1; // Assume sequential pages
+            }
+
+            // Fetch batch in parallel
+            const batchResults = await Promise.all(
+              pagesToFetch.map((pageNum) =>
+                fetchPage(fetcherParams, pageNum).catch(() => null)
+              )
+            );
+
+            if (isCancelled) return;
+
+            // Process results and determine if there are more pages
+            let hasMore = false;
+            for (const result of batchResults) {
+              if (result === null) continue; // Skip failed fetches
+
+              const newJobs = result.jobs.filter((j) => !existingIds.has(j.id));
+              accumulatedJobs.push(...newJobs);
+              newJobs.forEach((j) => existingIds.add(j.id));
+
+              if (result.pagination.nextPage !== null) {
+                hasMore = true;
+                nextPage = result.pagination.nextPage;
+              }
+            }
+
+            // Update UI after each batch
+            setAllJobs([...accumulatedJobs]);
+
+            if (!hasMore) {
+              nextPage = null;
+            }
+          }
         }
       } catch (err) {
         console.error("[useJobsV2] Error fetching remaining pages:", err);
       } finally {
-        setIsLoadingMore(false);
+        if (!isCancelled) {
+          setIsLoadingMore(false);
+        }
         isFetching = false;
       }
     };
 
     fetchRemainingPages();
+
+    return () => {
+      isCancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAll, data?.pagination?.nextPage, data?.jobs?.length, isLoading, normalizedSearch, facilities_id, per_page]);
 

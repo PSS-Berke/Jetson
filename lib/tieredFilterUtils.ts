@@ -52,6 +52,32 @@ export interface TieredData {
  * Get the primary category value from a job's requirements
  * Checks for basic_oe first (preferred), then paper_size
  */
+/**
+ * Normalize an envelope size value for consistent grouping
+ * - Trims whitespace
+ * - Removes extra spaces
+ * - Converts to standard format for known envelope sizes using regex patterns
+ */
+function normalizeEnvelopeSize(value: string): string {
+  // Convert to string, trim, and normalize whitespace
+  const trimmed = String(value).trim().replace(/\s+/g, '');
+
+  // Standard envelope sizes - use regex for flexible matching (case-insensitive)
+  // 6x9 variations
+  if (/^6\s*x\s*9$/i.test(trimmed)) return "6x9";
+  // 9x12 variations
+  if (/^9\s*x\s*12$/i.test(trimmed)) return "9x12";
+  // #10 variations (including "No. 10", "No 10", "#10", "# 10")
+  if (/^(#\s*10|no\.?\s*10)$/i.test(trimmed)) return "#10";
+  // 6x11.5 variations
+  if (/^6\s*x\s*11\.?5$/i.test(trimmed)) return "6x11.5";
+  // 10x13 variations
+  if (/^10\s*x\s*13$/i.test(trimmed)) return "10x13";
+
+  // Return the original trimmed value (with spaces normalized) if no standard match
+  return String(value).trim();
+}
+
 export function getPrimaryCategoryValue(
   job: ParsedJob,
   processType: string
@@ -75,13 +101,13 @@ export function getPrimaryCategoryValue(
   // Check for basic_oe first (it's the preferred field name)
   const basicOe = (requirement as any).basic_oe;
   if (basicOe && basicOe !== "" && basicOe !== "undefined" && basicOe !== "null") {
-    return String(basicOe);
+    return normalizeEnvelopeSize(basicOe);
   }
 
   // Fall back to paper_size
   const paperSize = (requirement as any).paper_size;
   if (paperSize && paperSize !== "" && paperSize !== "undefined" && paperSize !== "null") {
-    return String(paperSize);
+    return normalizeEnvelopeSize(paperSize);
   }
 
   return undefined;
@@ -147,15 +173,16 @@ export function getSubCategoryFields(processType: string): Array<{ name: string;
     return [];
   }
 
-  // Exclude price fields and the primary category field (paper_size)
+  // Exclude price fields and the primary category fields (basic_oe and paper_size)
+  // These are used for Tier 2 (primary category) so shouldn't appear in Tier 3 (sub-categories)
   return config.fields
     .filter((field) => {
       // Exclude currency/price fields
       if (field.type === "currency" || field.name.includes("price")) {
         return false;
       }
-      // Exclude the primary category field
-      if (field.name === "paper_size") {
+      // Exclude the primary category fields (used for envelope size grouping)
+      if (field.name === "paper_size" || field.name === "basic_oe") {
         return false;
       }
       return true;

@@ -139,7 +139,7 @@ function renderCheckboxHeader(
   context: HeaderRenderContext
 ): React.ReactNode {
   return (
-    <th key="checkbox" className="px-2 py-2 text-left w-12">
+    <th key="checkbox" className="pl-2 pr-1 py-2 text-left w-10">
       <input
         type="checkbox"
         checked={context.allSelected}
@@ -314,11 +314,11 @@ function renderCheckboxCell(
 ): React.ReactNode {
   // For process rows, only show checkbox on first in group
   if (context.isFirstInGroup === false) {
-    return <td key="checkbox" className="px-2 py-2 w-12"></td>;
+    return <td key="checkbox" className="pl-2 pr-1 py-2 w-10"></td>;
   }
 
   return (
-    <td key="checkbox" className="px-2 py-2 w-12" onClick={(e) => e.stopPropagation()}>
+    <td key="checkbox" className="pl-2 pr-1 py-2 w-10" onClick={(e) => e.stopPropagation()}>
       <input
         type="checkbox"
         checked={context.isSelected}
@@ -342,7 +342,7 @@ function renderStaticCell(
       return (
         <td
           key="job_number"
-          className="px-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
+          className="pl-1 pr-2 py-2 whitespace-nowrap text-xs font-medium text-[var(--text-dark)]"
           title={job.job_number}
         >
           {showContent ? formatJobNumber(job.job_number) : ""}

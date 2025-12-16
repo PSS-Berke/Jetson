@@ -2,6 +2,7 @@
 
 import { formatQuantity, TimeRange } from "@/lib/projectionUtils";
 import type { SummarySubCategory } from "@/lib/tieredFilterUtils";
+import { ChevronRight, ChevronDown } from "lucide-react";
 
 interface SubCategoryRowProps {
   subCategory: SummarySubCategory;
@@ -9,6 +10,9 @@ interface SubCategoryRowProps {
   primaryCategory: string;
   timeRanges: TimeRange[];
   showNotes: boolean;
+  isExpanded: boolean;
+  hasJobs: boolean;
+  onToggleExpand: () => void;
   onCategoryClick?: (
     processType: string,
     primaryCategory: string,
@@ -38,6 +42,9 @@ export function SubCategoryRow({
   primaryCategory,
   timeRanges,
   showNotes,
+  isExpanded,
+  hasJobs,
+  onToggleExpand,
   onCategoryClick,
   isCategoryFilterActive = false,
   orderedColumnKeys,
@@ -83,8 +90,27 @@ export function SubCategoryRow({
       ))}
       {/* Start & End columns - Sub-category label */}
       {dateColSpan > 0 && (
-        <td colSpan={dateColSpan} className="px-2 py-1.5 text-left pl-14">
-          <div className="flex items-center gap-2 text-gray-600">
+        <td colSpan={dateColSpan} className="px-2 py-1.5 text-left pl-12">
+          <div className="flex items-center gap-1 text-gray-600">
+            {/* Expand/collapse button */}
+            {hasJobs ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand();
+                }}
+                className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                title={isExpanded ? "Collapse jobs" : "Expand jobs"}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+                )}
+              </button>
+            ) : (
+              <span className="w-4" />
+            )}
             <span className="text-gray-400">↳↳</span>
             <span className="text-xs text-gray-500">{subCategory.fieldLabel}:</span>
             <span className="font-medium text-xs">{subCategory.value}</span>

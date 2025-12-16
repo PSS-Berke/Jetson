@@ -5,9 +5,16 @@ import SmartClientSelect from "./SmartClientSelect";
 import FacilityToggle from "./FacilityToggle";
 import DynamicRequirementFields from "./DynamicRequirementFields";
 import RecommendedMachines from "./RecommendedMachines";
+import QuantitySplitEditor from "./QuantitySplitEditor";
+import ScheduleOptionsCheckboxes from "./ScheduleOptionsCheckboxes";
+import WeeklySplitEditor from "./WeeklySplitEditor";
 import { getToken, getJobTemplates, createJobTemplate } from "@/lib/api";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
 import Toast from "./Toast";
+import {
+  JobScheduleConfig,
+  DEFAULT_JOB_SCHEDULE_CONFIG,
+} from "@/lib/scheduleTypes";
 
 interface AddJobModalProps {
   isOpen: boolean;
@@ -85,20 +92,17 @@ function AddJobModal({
   const [createdJobNumber, setCreatedJobNumber] = useState<number | null>(null);
   const [canSubmit, setCanSubmit] = useState(false);
   const [scheduleType, setScheduleType] = useState<string>("soft schedule"); // "hard schedule", "soft schedule", "cancelled", "projected", "completed"
-  const [showBackwardRedistributeWarning, setShowBackwardRedistributeWarning] =
-    useState(false);
-  const [pendingRedistribution, setPendingRedistribution] = useState<{
-    weekIndex: number;
-    newValue: number;
-  } | null>(null);
-  const [tempWeekQuantity, setTempWeekQuantity] = useState<string>("");
-  const [runSaturdays, setRunSaturdays] = useState<boolean>(false);
+  const [scheduleConfig, setScheduleConfig] = useState<JobScheduleConfig>(() => ({
+    ...DEFAULT_JOB_SCHEDULE_CONFIG,
+  }));
+  const [showScheduleOptions, setShowScheduleOptions] = useState<boolean>(false);
   const [splitResults, setSplitResults] = useState<Array<{
     Date: string;
     CalendarDayInWeek: number;
     CalendarWeek: number;
     Quantity: number;
   }>>([]);
+  const [lockedSplitWeeks, setLockedSplitWeeks] = useState<Record<number, boolean>>({});
   const [loadingSplit, setLoadingSplit] = useState<boolean>(false);
 
   // Template selection state
@@ -226,11 +230,24 @@ function AddJobModal({
           const startDate = formData.start_date;
           const endDate = formData.due_date;
 
+          // Build schedule params from job defaults
+          const jobOpts = scheduleConfig.jobDefaults;
           const params = new URLSearchParams({
             start: startDate,
             end: endDate,
             quantity: quantity.toString(),
-            saturday: runSaturdays.toString(),
+            saturday: (jobOpts.runSat1st || jobOpts.runSat2nd || jobOpts.run12sAllWeekend).toString(),
+            run_1st_ot: jobOpts.run1stOT.toString(),
+            run_2nd_ot: jobOpts.run2ndOT.toString(),
+            run_sat_1st: jobOpts.runSat1st.toString(),
+            run_sat_1st_hours: jobOpts.runSat1stHours.toString(),
+            run_sat_2nd: jobOpts.runSat2nd.toString(),
+            run_sat_2nd_hours: jobOpts.runSat2ndHours.toString(),
+            run_sun_1st: jobOpts.runSun1st.toString(),
+            run_sun_1st_hours: jobOpts.runSun1stHours.toString(),
+            run_sun_2nd: jobOpts.runSun2nd.toString(),
+            run_sun_2nd_hours: jobOpts.runSun2ndHours.toString(),
+            run_12s_weekend: jobOpts.run12sAllWeekend.toString(),
           });
 
           const response = await fetch(
@@ -251,10 +268,12 @@ function AddJobModal({
 
           const data = await response.json();
           setSplitResults(data);
+          setLockedSplitWeeks({}); // Reset locked weeks when new split is calculated
         } catch (error) {
           console.error("Error calculating split:", error);
           // Don't show alert on automatic calls, just log the error
           setSplitResults([]);
+          setLockedSplitWeeks({});
         } finally {
           setLoadingSplit(false);
         }
@@ -262,7 +281,7 @@ function AddJobModal({
 
       calculateSplit();
     }
-  }, [formData.quantity, formData.start_date, formData.due_date, runSaturdays, currentStep, creationMode, isCreatingTemplate]);
+  }, [formData.quantity, formData.start_date, formData.due_date, scheduleConfig, currentStep, creationMode, isCreatingTemplate]);
 
   // Adjust description textarea height on mount and when description changes
   useEffect(() => {
@@ -304,8 +323,9 @@ function AddJobModal({
       setTemplates([]);
       setSelectedTemplate(null);
       setIsCreatingTemplate(false);
-      setRunSaturdays(false);
+      setScheduleConfig({ ...DEFAULT_JOB_SCHEDULE_CONFIG });
       setSplitResults([]);
+      setLockedSplitWeeks({});
       setScheduleType("soft schedule");
       setVersionName("v1");
       setCurrentVersionNumber(1);
@@ -504,11 +524,24 @@ function AddJobModal({
       const startDate = formData.start_date;
       const endDate = formData.due_date;
 
+      // Build schedule params from job defaults
+      const jobOpts = scheduleConfig.jobDefaults;
       const params = new URLSearchParams({
         start: startDate,
         end: endDate,
         quantity: quantity.toString(),
-        saturday: runSaturdays.toString(),
+        saturday: (jobOpts.runSat1st || jobOpts.runSat2nd || jobOpts.run12sAllWeekend).toString(),
+        run_1st_ot: jobOpts.run1stOT.toString(),
+        run_2nd_ot: jobOpts.run2ndOT.toString(),
+        run_sat_1st: jobOpts.runSat1st.toString(),
+        run_sat_1st_hours: jobOpts.runSat1stHours.toString(),
+        run_sat_2nd: jobOpts.runSat2nd.toString(),
+        run_sat_2nd_hours: jobOpts.runSat2ndHours.toString(),
+        run_sun_1st: jobOpts.runSun1st.toString(),
+        run_sun_1st_hours: jobOpts.runSun1stHours.toString(),
+        run_sun_2nd: jobOpts.runSun2nd.toString(),
+        run_sun_2nd_hours: jobOpts.runSun2ndHours.toString(),
+        run_12s_weekend: jobOpts.run12sAllWeekend.toString(),
       });
 
       const response = await fetch(
@@ -529,10 +562,12 @@ function AddJobModal({
 
       const data = await response.json();
       setSplitResults(data);
+      setLockedSplitWeeks({}); // Reset locked weeks when new split is calculated
     } catch (error) {
       console.error("Error calculating split:", error);
       alert("Failed to calculate split. Please try again.");
       setSplitResults([]);
+      setLockedSplitWeeks({});
     } finally {
       setLoadingSplit(false);
     }
@@ -630,174 +665,6 @@ function AddJobModal({
     }));
   };
 
-  const handleWeeklySplitChange = (weekIndex: number, value: string) => {
-    // Remove commas from the input value before parsing
-    const cleanedValue = value.replace(/,/g, "");
-    const newValue = parseInt(cleanedValue) || 0;
-
-    performRedistribution(weekIndex, newValue, false);
-  };
-
-  const performRedistribution = (
-    weekIndex: number,
-    newValue: number,
-    allowBackward: boolean,
-  ) => {
-    setFormData((prev) => {
-      const totalQuantity = parseInt(prev.quantity) || 0;
-      const newSplit = [...prev.weekly_split];
-      const newLockedWeeks = [...prev.locked_weeks];
-
-      // Update the changed week and lock it
-      newSplit[weekIndex] = newValue;
-      newLockedWeeks[weekIndex] = true;
-
-      // Calculate how much quantity is left to distribute
-      const currentTotal = newSplit.reduce((sum, val) => sum + val, 0);
-      const difference = totalQuantity - currentTotal;
-
-      // If there's a difference, redistribute it
-      if (difference !== 0) {
-        // Get indices of unlocked weeks AFTER the changed week
-        const unlockedWeeksAfter = newSplit
-          .map((_, idx) => idx)
-          .filter((idx) => idx > weekIndex && !newLockedWeeks[idx]);
-
-        // If no unlocked weeks after, check if we should redistribute backward
-        if (unlockedWeeksAfter.length === 0 && !allowBackward) {
-          // Show warning and store pending redistribution
-          setPendingRedistribution({ weekIndex, newValue });
-          setTempWeekQuantity(newValue.toString());
-          setShowBackwardRedistributeWarning(true);
-          return prev; // Don't update yet
-        }
-
-        // Determine which weeks to redistribute to
-        let targetWeekIndices = unlockedWeeksAfter;
-        if (unlockedWeeksAfter.length === 0 && allowBackward) {
-          // Get all unlocked weeks (forward and backward)
-          targetWeekIndices = newSplit
-            .map((_, idx) => idx)
-            .filter((idx) => idx !== weekIndex && !newLockedWeeks[idx]);
-        }
-
-        if (targetWeekIndices.length > 0) {
-          // Calculate base adjustment per week
-          const baseAdjustment = Math.floor(
-            difference / targetWeekIndices.length,
-          );
-          const remainder = difference % targetWeekIndices.length;
-
-          // Apply adjustments to target weeks
-          targetWeekIndices.forEach((idx, position) => {
-            // Add base adjustment
-            let adjustment = baseAdjustment;
-
-            // Distribute remainder across first few weeks
-            if (position < Math.abs(remainder)) {
-              adjustment += remainder > 0 ? 1 : -1;
-            }
-
-            // Apply adjustment, ensuring non-negative values
-            newSplit[idx] = Math.max(0, newSplit[idx] + adjustment);
-          });
-        }
-      }
-
-      return { ...prev, weekly_split: newSplit, locked_weeks: newLockedWeeks };
-    });
-  };
-
-  const handleBackwardRedistributeConfirm = () => {
-    if (pendingRedistribution) {
-      const cleanedValue = tempWeekQuantity.replace(/,/g, "");
-      const finalValue = parseInt(cleanedValue) || 0;
-      performRedistribution(pendingRedistribution.weekIndex, finalValue, true);
-      setPendingRedistribution(null);
-      setTempWeekQuantity("");
-    }
-    setShowBackwardRedistributeWarning(false);
-  };
-
-  const handleBackwardRedistributeCancel = () => {
-    setPendingRedistribution(null);
-    setTempWeekQuantity("");
-    setShowBackwardRedistributeWarning(false);
-  };
-
-  const handleUnlockWeek = (weekIndex: number) => {
-    setFormData((prev) => {
-      const newLockedWeeks = [...prev.locked_weeks];
-      newLockedWeeks[weekIndex] = false;
-      return { ...prev, locked_weeks: newLockedWeeks };
-    });
-  };
-
-  const handleUnlockWeekInDialog = (weekIndex: number) => {
-    // Unlock week in the actual form data so it's available for redistribution
-    handleUnlockWeek(weekIndex);
-  };
-
-  const handleTempQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const cleanedValue = e.target.value.replace(/,/g, "");
-    setTempWeekQuantity(cleanedValue);
-  };
-
-  // Calculate redistribution preview for dialog
-  const calculateRedistributionPreview = () => {
-    if (!pendingRedistribution) return null;
-
-    const cleanedValue = tempWeekQuantity.replace(/,/g, "");
-    const proposedValue = parseInt(cleanedValue) || 0;
-    const totalQuantity = parseInt(formData.quantity) || 0;
-    const weekIndex = pendingRedistribution.weekIndex;
-
-    // Calculate what the split would look like
-    const tempSplit = [...formData.weekly_split];
-    tempSplit[weekIndex] = proposedValue;
-
-    const currentTotal = tempSplit.reduce((sum, val) => sum + val, 0);
-    const difference = totalQuantity - currentTotal;
-
-    // Get unlocked weeks before the adjusted week
-    const unlockedBefore = formData.weekly_split
-      .map((_, idx) => idx)
-      .filter((idx) => idx < weekIndex && !formData.locked_weeks[idx]);
-
-    const lockedBefore = formData.weekly_split
-      .map((val, idx) => ({ idx, val }))
-      .filter(({ idx }) => idx < weekIndex && formData.locked_weeks[idx]);
-
-    const canRedistribute = unlockedBefore.length > 0;
-
-    // Calculate preview of changes
-    const preview: { weekIndex: number; oldValue: number; newValue: number }[] =
-      [];
-
-    if (canRedistribute) {
-      const baseAdjustment = Math.floor(difference / unlockedBefore.length);
-      const remainder = difference % unlockedBefore.length;
-
-      unlockedBefore.forEach((idx, position) => {
-        let adjustment = baseAdjustment;
-        if (position < Math.abs(remainder)) {
-          adjustment += remainder > 0 ? 1 : -1;
-        }
-        const newValue = Math.max(0, tempSplit[idx] + adjustment);
-        preview.push({ weekIndex: idx, oldValue: tempSplit[idx], newValue });
-      });
-    }
-
-    return {
-      difference,
-      unlockedBefore,
-      lockedBefore,
-      canRedistribute,
-      preview,
-      hasNegativeValues: preview.some((p) => p.newValue < 0),
-    };
-  };
-
   const getWeeklySplitSum = () => {
     return formData.weekly_split.reduce((sum, val) => sum + val, 0);
   };
@@ -805,6 +672,15 @@ function AddJobModal({
   const getWeeklySplitDifference = () => {
     const quantity = parseInt(formData.quantity) || 0;
     return getWeeklySplitSum() - quantity;
+  };
+
+  // Handler for WeeklySplitEditor component
+  const handleWeeklySplitEditorChange = (newSplit: number[], newLockedWeeks: boolean[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      weekly_split: newSplit,
+      locked_weeks: newLockedWeeks,
+    }));
   };
 
   // Handler to update splitResults quantity
@@ -2000,32 +1876,18 @@ function AddJobModal({
                     Quantity
                   </label>
                   <div className="flex gap-4 items-center justify-between">
-                    <div className="flex gap-4 items-center flex-1">
-                      <input
-                        type="text"
-                        name="quantity"
-                        value={
-                          formData.quantity
-                            ? parseInt(formData.quantity).toLocaleString()
-                            : ""
-                        }
-                        onChange={handleQuantityChange}
-                        className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                        placeholder="e.g., 73"
-                      />
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          id="runSaturdays"
-                          checked={runSaturdays}
-                          onChange={(e) => setRunSaturdays(e.target.checked)}
-                          className="w-4 h-4 text-[var(--primary-blue)] border-[var(--border)] rounded focus:ring-[var(--primary-blue)]"
-                        />
-                        <label htmlFor="runSaturdays" className="text-sm text-[var(--text-dark)] whitespace-nowrap">
-                          Run Saturdays
-                        </label>
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      name="quantity"
+                      value={
+                        formData.quantity
+                          ? parseInt(formData.quantity).toLocaleString()
+                          : ""
+                      }
+                      onChange={handleQuantityChange}
+                      className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
+                      placeholder="e.g., 73"
+                    />
                     {loadingSplit && (
                       <div className="flex items-center gap-2 text-sm text-[var(--text-light)]">
                         <svg className="animate-spin h-4 w-4 text-[var(--primary-blue)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -2037,224 +1899,69 @@ function AddJobModal({
                     )}
                   </div>
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
+                    Schedule Options
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleOptions(!showScheduleOptions)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${
+                      showScheduleOptions
+                        ? "bg-[var(--primary-blue)] text-white border-[var(--primary-blue)]"
+                        : "bg-white text-[var(--text-dark)] border-[var(--border)] hover:bg-gray-50"
+                    }`}
+                  >
+                    <svg
+                      className={`w-4 h-4 transition-transform flex-shrink-0 ${showScheduleOptions ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Overtime
+                  </button>
+                </div>
               </div>
 
-              {/* Split Results Display */}
-              {splitResults.length > 0 && (
-                <div className="border border-[var(--border)] rounded-lg p-4 bg-blue-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-[var(--text-dark)]">
-                      Calculated Quantity Split
-                    </h4>
-                    <div
-                      className={`text-sm font-semibold ${getSplitResultsTotal() === parseInt(formData.quantity || "0")
-                        ? "text-green-600"
-                        : "text-red-600"
-                        }`}
-                    >
-                      Total: {getSplitResultsTotal().toLocaleString()} /{" "}
-                      {parseInt(formData.quantity || "0").toLocaleString()}
-                      {getSplitResultsTotal() !== parseInt(formData.quantity || "0") && (
-                        <span className="ml-1">
-                          ({getSplitResultsTotal() - parseInt(formData.quantity || "0") > 0 ? "+" : ""}
-                          {(getSplitResultsTotal() - parseInt(formData.quantity || "0")).toLocaleString()})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {(() => {
-                      // Group results by CalendarWeek
-                      const groupedByWeek = splitResults.reduce((acc, item) => {
-                        if (!acc[item.CalendarWeek]) {
-                          acc[item.CalendarWeek] = [];
-                        }
-                        acc[item.CalendarWeek].push(item);
-                        return acc;
-                      }, {} as Record<number, typeof splitResults>);
-
-                      // Sort weeks and days within each week
-                      const sortedWeeks = Object.keys(groupedByWeek)
-                        .map(Number)
-                        .sort((a, b) => a - b);
-
-                      const dayNames = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-                      return sortedWeeks.map((week) => {
-                        const weekData = groupedByWeek[week].sort(
-                          (a, b) => a.CalendarDayInWeek - b.CalendarDayInWeek
-                        );
-                        const weekTotal = weekData.reduce((sum, item) => sum + item.Quantity, 0);
-                        const startDate = weekData[0]?.Date || "";
-                        const endDate = weekData[weekData.length - 1]?.Date || "";
-
-                        return (
-                          <div
-                            key={week}
-                            className="bg-white border border-[var(--border)] rounded-lg p-3"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="font-semibold text-[var(--text-dark)]">
-                                  Week {week}
-                                </span>
-                                <span className="text-sm text-[var(--text-light)] ml-2">
-                                  ({startDate} to {endDate})
-                                </span>
-                              </div>
-                              <span className="font-semibold text-[var(--primary-blue)]">
-                                Total: {weekTotal.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                              {weekData.map((item, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex flex-col gap-1"
-                                >
-                                  <label className="text-xs text-[var(--text-light)]">
-                                    {dayNames[item.CalendarDayInWeek]}:
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={item.Quantity.toLocaleString()}
-                                    onChange={(e) =>
-                                      handleSplitResultQuantityChange(
-                                        item.Date,
-                                        item.CalendarDayInWeek,
-                                        item.CalendarWeek,
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-full px-2 py-1 border border-[var(--border)] rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm bg-white"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
+              {/* Job-Level Schedule Options - Collapsible */}
+              {showScheduleOptions && (
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50 animate-in slide-in-from-top-2 duration-200">
+                  <ScheduleOptionsCheckboxes
+                    options={scheduleConfig.jobDefaults}
+                    onChange={(newOptions) =>
+                      setScheduleConfig((prev) => ({
+                        ...prev,
+                        jobDefaults: newOptions,
+                      }))
+                    }
+                  />
                 </div>
+              )}
+
+              {/* Split Results Display - Using QuantitySplitEditor */}
+              {splitResults.length > 0 && (
+                <QuantitySplitEditor
+                  splitResults={splitResults}
+                  lockedWeeks={lockedSplitWeeks}
+                  totalQuantity={parseInt(formData.quantity || "0")}
+                  onSplitChange={setSplitResults}
+                  onLockedWeeksChange={setLockedSplitWeeks}
+                  scheduleConfig={scheduleConfig}
+                  onScheduleConfigChange={setScheduleConfig}
+                  showScheduleOptions={true}
+                />
               )}
 
               {/* Weekly Split Section */}
               {formData.weekly_split.length > 0 && (
-                <div className="border border-[var(--border)] rounded-lg p-4 bg-gray-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-[var(--text-dark)]">
-                      Weekly Quantity Split ({formData.weekly_split.length}{" "}
-                      weeks)
-                    </h4>
-                    <div
-                      className={`text-sm font-semibold ${getWeeklySplitDifference() === 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                        }`}
-                    >
-                      Total: {getWeeklySplitSum().toLocaleString()} /{" "}
-                      {parseInt(formData.quantity || "0").toLocaleString()}
-                      {getWeeklySplitDifference() !== 0 && (
-                        <span className="ml-1">
-                          ({getWeeklySplitDifference() > 0 ? "+" : ""}
-                          {getWeeklySplitDifference()})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {formData.weekly_split.map((amount, index) => {
-                      const isLocked = formData.locked_weeks[index];
-                      return (
-                        <div key={index} className="relative">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-medium text-[var(--text-light)]">
-                              Week {index + 1}
-                            </label>
-                            {isLocked && (
-                              <button
-                                type="button"
-                                onClick={() => handleUnlockWeek(index)}
-                                className="text-xs hover:opacity-70 transition-opacity flex items-center gap-1"
-                                title="Unlock this week to allow auto-redistribution"
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#2563eb"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <rect
-                                    x="3"
-                                    y="11"
-                                    width="18"
-                                    height="11"
-                                    rx="2"
-                                    ry="2"
-                                  />
-                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={amount.toLocaleString()}
-                              onChange={(e) =>
-                                handleWeeklySplitChange(index, e.target.value)
-                              }
-                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${isLocked
-                                ? "bg-blue-50 border-blue-300 font-semibold pr-8"
-                                : "border-[var(--border)]"
-                                }`}
-                              title={
-                                isLocked
-                                  ? "This week is locked and won't be auto-adjusted"
-                                  : "Edit to lock this week"
-                              }
-                            />
-                            {isLocked && (
-                              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <svg
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#2563eb"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <rect
-                                    x="3"
-                                    y="11"
-                                    width="18"
-                                    height="11"
-                                    rx="2"
-                                    ry="2"
-                                  />
-                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {getWeeklySplitDifference() !== 0 && (
-                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                      ⚠️ Weekly split total must equal the total quantity
-                    </div>
-                  )}
-                </div>
+                <WeeklySplitEditor
+                  weeklySplit={formData.weekly_split}
+                  lockedWeeks={formData.locked_weeks}
+                  totalQuantity={parseInt(formData.quantity || "0")}
+                  onSplitChange={handleWeeklySplitEditorChange}
+                />
               )}
 
               <div>
@@ -2969,193 +2676,6 @@ function AddJobModal({
           )}
         </form>
       </div>
-
-      {/* Backward Redistribution Warning Modal */}
-      {showBackwardRedistributeWarning &&
-        pendingRedistribution &&
-        (() => {
-          const preview = calculateRedistributionPreview();
-          if (!preview) return null;
-
-          return (
-            <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
-              <div
-                className="absolute inset-0 bg-black/50"
-                onClick={handleBackwardRedistributeCancel}
-              />
-              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full relative z-10 max-h-[90vh] overflow-y-auto">
-                {/* Header */}
-                <div className="p-6 border-b border-[var(--border)]">
-                  <h3 className="text-xl font-bold text-[var(--dark-blue)]">
-                    Adjust Week {pendingRedistribution.weekIndex + 1} Quantity
-                  </h3>
-                </div>
-
-                {/* Content */}
-                <div className="p-6 space-y-4">
-                  {/* Quantity Input */}
-                  <div>
-                    <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">
-                      Week {pendingRedistribution.weekIndex + 1} Quantity
-                    </label>
-                    <input
-                      type="text"
-                      value={
-                        tempWeekQuantity
-                          ? parseInt(tempWeekQuantity).toLocaleString()
-                          : ""
-                      }
-                      onChange={handleTempQuantityChange}
-                      className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)]"
-                      placeholder="Enter quantity"
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Redistribution Info */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <div className="text-sm">
-                      <div className="flex justify-between mb-2">
-                        <span className="text-[var(--text-light)]">
-                          Total Job Quantity:
-                        </span>
-                        <span className="font-semibold">
-                          {parseInt(formData.quantity || "0").toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--text-light)]">
-                          Amount to redistribute:
-                        </span>
-                        <span
-                          className={`font-semibold ${preview.difference < 0 ? "text-red-600" : "text-green-600"}`}
-                        >
-                          {preview.difference > 0 ? "+" : ""}
-                          {preview.difference.toLocaleString()} pieces
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Preview or Error Message */}
-                  {preview.canRedistribute ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-semibold text-[var(--text-dark)]">
-                        This will redistribute{" "}
-                        {Math.abs(preview.difference).toLocaleString()} pieces
-                        from:
-                      </p>
-                      <div className="space-y-2">
-                        {preview.preview.map(
-                          ({ weekIndex, oldValue, newValue }) => (
-                            <div
-                              key={weekIndex}
-                              className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-2"
-                            >
-                              <span className="text-[var(--text-dark)]">
-                                Week {weekIndex + 1}:
-                              </span>
-                              <span className="font-semibold">
-                                {oldValue.toLocaleString()} →{" "}
-                                {newValue.toLocaleString()}
-                                <span
-                                  className={`ml-2 ${newValue - oldValue < 0 ? "text-red-600" : "text-green-600"}`}
-                                >
-                                  ({newValue - oldValue > 0 ? "+" : ""}
-                                  {(newValue - oldValue).toLocaleString()})
-                                </span>
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                      {preview.lockedBefore.length > 0 && (
-                        <p className="text-xs text-[var(--text-light)] italic">
-                          {preview.lockedBefore.length} week(s) before Week{" "}
-                          {pendingRedistribution.weekIndex + 1} remain locked
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <p className="text-sm text-red-800 font-semibold mb-2">
-                          ⚠️ Cannot redistribute - all previous weeks are locked
-                        </p>
-                        <p className="text-xs text-red-700">
-                          Unlock one or more weeks below to proceed with this
-                          adjustment.
-                        </p>
-                      </div>
-
-                      {preview.lockedBefore.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold text-[var(--text-dark)]">
-                            Locked weeks:
-                          </p>
-                          {preview.lockedBefore.map(({ idx, val }) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded px-3 py-2"
-                            >
-                              <span className="text-sm text-[var(--text-dark)]">
-                                Week {idx + 1}: {val.toLocaleString()} pieces
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUnlockWeekInDialog(idx)}
-                                className="text-xs text-[var(--primary-blue)] hover:opacity-70 transition-opacity flex items-center gap-1 font-semibold"
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#2563eb"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <rect
-                                    x="3"
-                                    y="11"
-                                    width="18"
-                                    height="11"
-                                    rx="2"
-                                    ry="2"
-                                  />
-                                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                                </svg>
-                                Unlock
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
-                  <button
-                    onClick={handleBackwardRedistributeCancel}
-                    className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleBackwardRedistributeConfirm}
-                    disabled={!preview.canRedistribute}
-                    className="px-6 py-2 bg-[var(--primary-blue)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Confirm
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
       {/* Success Toast */}
       {showSuccessToast && createdJobNumber && (

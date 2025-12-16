@@ -16,7 +16,10 @@ import ProcessTypeBadge from "./ProcessTypeBadge";
 import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
 import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
 import { PrimaryCategoryRow } from "./PrimaryCategoryRow";
+import { SubCategoryRow } from "./SubCategoryRow";
 import { buildSummaryTieredData, getPrimaryCategoryValue } from "@/lib/tieredFilterUtils";
+import { groupProjectionsByVersion, isVersionGroup, type VersionGroup } from "@/lib/versionGroupUtils";
+import { VersionGroupHeaderRow, VersionRow } from "./VersionGroupRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
@@ -76,6 +79,7 @@ interface ProjectionsTableProps {
   granularity?: "week" | "month" | "quarter"; // NEW: for cell-level notes
   fullFilteredProjections?: JobProjection[]; // NEW: Full filtered data for breakdown calculations
   lastModifiedByJob?: Map<number, number>; // Map of job ID to last modified timestamp
+  versionGroupingEnabled?: boolean; // Whether to group job versions together
 }
 
 // Type guard to check if summary has facility information
@@ -567,7 +571,7 @@ const MobileTableRow = memo(
         onClick={() => onJobClick(job)}
       >
         <td
-          className="px-2 py-2 w-12 sticky left-0 bg-white"
+          className="pl-2 pr-1 py-2 w-10 sticky left-0 bg-white"
           onClick={(e) => e.stopPropagation()}
         >
           <input
@@ -578,7 +582,7 @@ const MobileTableRow = memo(
           />
         </td>
         <td
-          className="px-2 py-2 text-xs font-medium text-[var(--text-dark)]"
+          className="pl-1 pr-2 py-2 text-xs font-medium text-[var(--text-dark)]"
           title={job.job_number}
         >
           {formatJobNumber(job.job_number)}
@@ -613,6 +617,7 @@ export default function ProjectionsTable({
   granularity = "week",
   fullFilteredProjections,
   lastModifiedByJob,
+  versionGroupingEnabled = true,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
@@ -685,7 +690,11 @@ export default function ProjectionsTable({
   // Process type breakdown state
   const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
   const [expandedPrimaryCategories, setExpandedPrimaryCategories] = useState<Set<string>>(new Set());
+  const [expandedSubCategories, setExpandedSubCategories] = useState<Set<string>>(new Set());
   const [machineVariables, setMachineVariables] = useState<any[]>([]);
+
+  // Version grouping expansion state (versionGroupingEnabled is now a prop)
+  const [expandedVersionGroups, setExpandedVersionGroups] = useState<Set<string>>(new Set());
 
   // Category filter state - tracks which category/breakdown is selected
   const [categoryFilter, setCategoryFilter] = useState<{
@@ -729,6 +738,19 @@ export default function ProjectionsTable({
     });
   };
 
+  // Handler for sub-category expansion (Tier 3)
+  const handleToggleSubCategory = (subCategoryKey: string) => {
+    setExpandedSubCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(subCategoryKey)) {
+        next.delete(subCategoryKey);
+      } else {
+        next.add(subCategoryKey);
+      }
+      return next;
+    });
+  };
+
   // Handlers for expand/collapse all
   const handleExpandAll = () => {
     if (!processTypeSummaries) return;
@@ -750,12 +772,25 @@ export default function ProjectionsTable({
     setExpandedSummaries(new Set());
   };
 
+  // Handler for version group expansion
+  const handleToggleVersionGroup = (groupId: string) => {
+    setExpandedVersionGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
   // Handler for tiered category clicks (Tier 2: Primary Category / Basic OE)
   const handleTieredCategoryClick = (
     processType: string,
     primaryCategory: string,
-    _subField?: string,
-    _subFieldValue?: string,
+    subField?: string,
+    subFieldValue?: string,
     timeRangeLabel?: string
   ) => {
     // If clicking the same filter, clear it
@@ -763,16 +798,20 @@ export default function ProjectionsTable({
       categoryFilter &&
       categoryFilter.processType === processType &&
       categoryFilter.primaryCategory === primaryCategory &&
+      categoryFilter.fieldName === subField &&
+      String(categoryFilter.fieldValue) === String(subFieldValue) &&
       categoryFilter.timeRangeLabel === timeRangeLabel
     ) {
       setCategoryFilter(null);
       return;
     }
 
-    // Set new filter
+    // Set new filter (include sub-category fields if provided)
     setCategoryFilter({
       processType,
       primaryCategory,
+      fieldName: subField,
+      fieldValue: subFieldValue,
       timeRangeLabel,
     });
   };
@@ -1425,6 +1464,22 @@ export default function ProjectionsTable({
     return calculateColumnCount(orderedColumns, timeRanges.length);
   }, [orderedColumns, timeRanges.length]);
 
+  // Process version grouping for job projections (only in Jobs view, not expanded processes)
+  const versionGroupedData = useMemo(() => {
+    if (showExpandedProcesses) {
+      // Don't apply version grouping to expanded processes view
+      return {
+        groups: new Map<string, VersionGroup>(),
+        standalone: [],
+        processedProjections: sortedJobProjections,
+      };
+    }
+    return groupProjectionsByVersion(
+      sortedJobProjections as JobProjection[],
+      versionGroupingEnabled
+    );
+  }, [sortedJobProjections, versionGroupingEnabled, showExpandedProcesses]);
+
   return (
     <>
       {/* Category Filter Banner */}
@@ -1580,6 +1635,7 @@ export default function ProjectionsTable({
 
       {/* Table Controls */}
       <div className="hidden md:flex justify-end mb-3">
+        {/* Column Settings */}
         <ColumnSettingsPopover
           columnOrder={columnSettings.order}
           hiddenColumns={columnSettings.hidden}
@@ -1763,83 +1819,93 @@ export default function ProjectionsTable({
                                 visibleStaticColumnKeys={visibleStaticColumnKeys}
                                 isColumnVisible={isColumnVisible}
                               />
-                              {/* Render job rows when this category is expanded */}
-                              {isPrimaryCategoryExpanded && categoryJobs.map((projection, idx) => {
-                                const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
-                                const hasNotes = jobNotes.length > 0;
-                                const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+                              {/* Render sub-category rows when this category is expanded */}
+                              {isPrimaryCategoryExpanded && (() => {
+                                // Get sub-categories for this primary category
+                                const subCategoriesForPrimary = tieredData.subCategories.get(primaryCategory.value) || [];
 
-                                return (
-                                  <ProjectionTableRow
-                                    key={`${primaryCategoryKey}-job-${projection.job.id}-${idx}`}
-                                    projection={projection}
-                                    timeRanges={timeRanges}
-                                    onJobClick={handleJobClick}
-                                    isSelected={selectedJobIds.has(projection.job.id)}
-                                    onToggleSelect={() => handleToggleSelect(projection.job.id)}
-                                    showNotes={showNotes}
-                                    jobNotes={jobNotes}
-                                    noteColor={noteColor}
-                                    editingNoteId={editingNoteId}
-                                    editingText={editingText}
-                                    onStartEdit={handleStartEdit}
-                                    onCancelEdit={handleCancelEdit}
-                                    onSaveEdit={handleSaveEdit}
-                                    onTextChange={setEditingText}
-                                    isSavingNote={isSavingNote}
-                                    onOpenNotesModal={handleOpenNotesModal}
-                                    granularity={granularity}
-                                    cellNotesMap={cellNotesMap}
-                                    orderedColumns={orderedColumns}
-                                    lastModifiedByJob={lastModifiedByJob}
-                                  />
-                                );
-                              })}
+                                return subCategoriesForPrimary.map((subCategory) => {
+                                  const subCategoryKey = `${normalizedProcessType}:${primaryCategory.value}:${subCategory.fieldName}:${subCategory.value}`;
+                                  const isSubCategoryExpanded = expandedSubCategories.has(subCategoryKey);
+
+                                  // Check if this sub-category is the active filter
+                                  const isSubCategoryFilterActive = categoryFilter &&
+                                    categoryFilter.processType === normalizedProcessType &&
+                                    categoryFilter.primaryCategory === primaryCategory.value &&
+                                    categoryFilter.fieldName === subCategory.fieldName &&
+                                    String(categoryFilter.fieldValue) === subCategory.value;
+
+                                  // Filter jobs for this specific sub-category when expanded
+                                  // Jobs must match the sub-category field value
+                                  const subCategoryJobs = isSubCategoryExpanded
+                                    ? categoryJobs.filter((proj) => {
+                                        const requirement = proj.job.requirements?.find(
+                                          (r: any) => normalizeProcessType(r.process_type) === normalizedProcessType
+                                        );
+                                        if (!requirement) return false;
+                                        const fieldValue = (requirement as any)[subCategory.fieldName];
+                                        return String(fieldValue) === subCategory.value;
+                                      })
+                                    : [];
+
+                                  return (
+                                    <React.Fragment key={subCategoryKey}>
+                                      <SubCategoryRow
+                                        subCategory={subCategory}
+                                        processType={normalizedProcessType}
+                                        primaryCategory={primaryCategory.value}
+                                        timeRanges={timeRanges}
+                                        showNotes={showNotes}
+                                        isExpanded={isSubCategoryExpanded}
+                                        hasJobs={subCategory.count > 0}
+                                        onToggleExpand={() => handleToggleSubCategory(subCategoryKey)}
+                                        onCategoryClick={handleTieredCategoryClick}
+                                        isCategoryFilterActive={!!isSubCategoryFilterActive}
+                                        orderedColumnKeys={visibleStaticColumnKeys}
+                                        isColumnVisible={isColumnVisible}
+                                      />
+                                      {/* Render job rows when this sub-category is expanded */}
+                                      {isSubCategoryExpanded && subCategoryJobs.map((projection, idx) => {
+                                        const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
+                                        const hasNotes = jobNotes.length > 0;
+                                        const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+
+                                        return (
+                                          <ProjectionTableRow
+                                            key={`${subCategoryKey}-job-${projection.job.id}-${idx}`}
+                                            projection={projection}
+                                            timeRanges={timeRanges}
+                                            onJobClick={handleJobClick}
+                                            isSelected={selectedJobIds.has(projection.job.id)}
+                                            onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                                            showNotes={showNotes}
+                                            jobNotes={jobNotes}
+                                            noteColor={noteColor}
+                                            editingNoteId={editingNoteId}
+                                            editingText={editingText}
+                                            onStartEdit={handleStartEdit}
+                                            onCancelEdit={handleCancelEdit}
+                                            onSaveEdit={handleSaveEdit}
+                                            onTextChange={setEditingText}
+                                            isSavingNote={isSavingNote}
+                                            onOpenNotesModal={handleOpenNotesModal}
+                                            granularity={granularity}
+                                            cellNotesMap={cellNotesMap}
+                                            orderedColumns={orderedColumns}
+                                            lastModifiedByJob={lastModifiedByJob}
+                                          />
+                                        );
+                                      })}
+                                    </React.Fragment>
+                                  );
+                                });
+                              })()}
                             </React.Fragment>
                           );
                         });
                       })()}
-                      {/* Render breakdown rows for all fields if expanded */}
-                      {isExpanded && allBreakdowns.map(({ field, breakdowns }) => (
-                        <React.Fragment key={`${summaryKey}-field-${field.name}`}>
-                          {breakdowns.map((breakdown) => {
-                            // Check if this breakdown row matches the active filter
-                            let isBreakdownFilterActive = false;
-                            if (categoryFilter) {
-                              const processTypeMatch = categoryFilter.processType === breakdown.processType;
-                              const fieldNameMatch = categoryFilter.fieldName === breakdown.fieldName;
-                              
-                              // Compare field values with proper type handling
-                              let fieldValueMatch = false;
-                              if (categoryFilter.fieldValue !== undefined) {
-                                if (typeof categoryFilter.fieldValue === "boolean" && typeof breakdown.fieldValue === "boolean") {
-                                  fieldValueMatch = categoryFilter.fieldValue === breakdown.fieldValue;
-                                } else {
-                                  fieldValueMatch = String(categoryFilter.fieldValue) === String(breakdown.fieldValue);
-                                }
-                              } else {
-                                fieldValueMatch = true; // No field value filter means match
-                              }
-                              
-                              isBreakdownFilterActive = processTypeMatch && fieldNameMatch && fieldValueMatch;
-                            }
-
-                            return (
-                              <ProcessTypeBreakdownRow
-                                key={`${summaryKey}-${field.name}-${breakdown.fieldValue}`}
-                                breakdown={breakdown}
-                                fieldDisplayLabel={field.label}
-                                timeRanges={timeRanges}
-                                showNotes={showNotes}
-                                onCategoryClick={handleCategoryClick}
-                                isCategoryFilterActive={isBreakdownFilterActive}
-                                visibleStaticColumnKeys={visibleStaticColumnKeys}
-                                isColumnVisible={isColumnVisible}
-                              />
-                            );
-                          })}
-                        </React.Fragment>
-                      ))}
+                      {/* Legacy ProcessTypeBreakdownRow removed - now using 3-tier hierarchy:
+                          ProcessTypeSummaryRow -> PrimaryCategoryRow -> SubCategoryRow -> Jobs */}
                     </React.Fragment>
                   );
                 })}
@@ -1910,37 +1976,107 @@ export default function ProjectionsTable({
                 },
               )
             ) : (
-              // Jobs view or Consolidated view (standard jobs table)
-              (sortedJobProjections as JobProjection[]).map((projection, index) => {
-                const jobNotes = showNotes ? jobNotesMap.get(projection.job.id) || [] : [];
-                const hasNotes = jobNotes.length > 0;
-                const noteColor = hasNotes ? (jobNotes[0].color || "#000000") : undefined;
+              // Jobs view or Consolidated view (standard jobs table with version grouping)
+              versionGroupedData.processedProjections.map((item, index) => {
+                // Check if this item is a VersionGroup or a regular JobProjection
+                if (isVersionGroup(item)) {
+                  const versionGroup = item as VersionGroup;
+                  const isExpanded = expandedVersionGroups.has(versionGroup.groupId);
 
-                return (
-                  <ProjectionTableRow
-                    key={`job-${projection.job.id}-${index}`}
-                    projection={projection}
-                    timeRanges={timeRanges}
-                    onJobClick={handleJobClick}
-                    isSelected={selectedJobIds.has(projection.job.id)}
-                    onToggleSelect={() => handleToggleSelect(projection.job.id)}
-                    showNotes={showNotes}
-                    jobNotes={jobNotes}
-                    noteColor={noteColor}
-                    editingNoteId={editingNoteId}
-                    editingText={editingText}
-                    onStartEdit={handleStartEdit}
-                    onCancelEdit={handleCancelEdit}
-                    onSaveEdit={handleSaveEdit}
-                    onTextChange={setEditingText}
-                    isSavingNote={isSavingNote}
-                    onOpenNotesModal={handleOpenNotesModal}
-                    granularity={granularity}
-                    cellNotesMap={cellNotesMap}
-                    orderedColumns={orderedColumns}
-                    lastModifiedByJob={lastModifiedByJob}
-                  />
-                );
+                  return (
+                    <React.Fragment key={`version-group-${versionGroup.groupId}`}>
+                      {/* Version Group Header Row */}
+                      <VersionGroupHeaderRow
+                        versionGroup={versionGroup}
+                        timeRanges={timeRanges}
+                        isExpanded={isExpanded}
+                        onToggleExpand={() => handleToggleVersionGroup(versionGroup.groupId)}
+                        onJobClick={handleJobClick}
+                        showNotes={showNotes}
+                        orderedColumns={orderedColumns}
+                        granularity={granularity}
+                      />
+                      {/* Expanded Version Rows */}
+                      {isExpanded &&
+                        versionGroup.allVersions.map((versionProjection, versionIndex) => {
+                          const jobNotes = showNotes
+                            ? jobNotesMap.get(versionProjection.job.id) || []
+                            : [];
+                          const hasNotes = jobNotes.length > 0;
+                          const noteColor = hasNotes
+                            ? jobNotes[0].color || "#000000"
+                            : undefined;
+                          const isLastInGroup =
+                            versionIndex === versionGroup.allVersions.length - 1;
+
+                          return (
+                            <VersionRow
+                              key={`version-${versionGroup.groupId}-${versionProjection.job.id}`}
+                              projection={versionProjection}
+                              timeRanges={timeRanges}
+                              onJobClick={handleJobClick}
+                              isSelected={selectedJobIds.has(versionProjection.job.id)}
+                              onToggleSelect={() =>
+                                handleToggleSelect(versionProjection.job.id)
+                              }
+                              showNotes={showNotes}
+                              jobNotes={jobNotes}
+                              noteColor={noteColor}
+                              editingNoteId={editingNoteId}
+                              editingText={editingText}
+                              onStartEdit={handleStartEdit}
+                              onCancelEdit={handleCancelEdit}
+                              onSaveEdit={handleSaveEdit}
+                              onTextChange={setEditingText}
+                              isSavingNote={isSavingNote}
+                              onOpenNotesModal={handleOpenNotesModal}
+                              granularity={granularity}
+                              cellNotesMap={cellNotesMap}
+                              orderedColumns={orderedColumns}
+                              lastModifiedByJob={lastModifiedByJob}
+                              isLastInGroup={isLastInGroup}
+                            />
+                          );
+                        })}
+                    </React.Fragment>
+                  );
+                } else {
+                  // Regular JobProjection (standalone or single version)
+                  const projection = item as JobProjection;
+                  const jobNotes = showNotes
+                    ? jobNotesMap.get(projection.job.id) || []
+                    : [];
+                  const hasNotes = jobNotes.length > 0;
+                  const noteColor = hasNotes
+                    ? jobNotes[0].color || "#000000"
+                    : undefined;
+
+                  return (
+                    <ProjectionTableRow
+                      key={`job-${projection.job.id}-${index}`}
+                      projection={projection}
+                      timeRanges={timeRanges}
+                      onJobClick={handleJobClick}
+                      isSelected={selectedJobIds.has(projection.job.id)}
+                      onToggleSelect={() => handleToggleSelect(projection.job.id)}
+                      showNotes={showNotes}
+                      jobNotes={jobNotes}
+                      noteColor={noteColor}
+                      editingNoteId={editingNoteId}
+                      editingText={editingText}
+                      onStartEdit={handleStartEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onTextChange={setEditingText}
+                      isSavingNote={isSavingNote}
+                      onOpenNotesModal={handleOpenNotesModal}
+                      granularity={granularity}
+                      cellNotesMap={cellNotesMap}
+                      orderedColumns={orderedColumns}
+                      lastModifiedByJob={lastModifiedByJob}
+                    />
+                  );
+                }
               })
             )}
           </tbody>
@@ -2018,7 +2154,7 @@ export default function ProjectionsTable({
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-2 py-2 text-left w-12 sticky left-0 bg-gray-50">
+                  <th className="pl-2 pr-1 py-2 text-left w-10 sticky left-0 bg-gray-50">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2031,7 +2167,7 @@ export default function ProjectionsTable({
                       className="w-4 h-4 cursor-pointer"
                     />
                   </th>
-                  <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
+                  <th className="pl-1 pr-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">
                     Job #
                   </th>
                   <th className="px-2 py-2 text-left text-[10px] font-medium text-[var(--text-dark)] uppercase">

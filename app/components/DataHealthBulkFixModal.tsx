@@ -1119,9 +1119,7 @@ export default function DataHealthBulkFixModal({
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      {isCostIssue && (
-                        <th className="px-2 py-3 w-8"></th>
-                      )}
+                      <th className="px-2 py-3 w-8"></th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Job #
                       </th>
@@ -1155,12 +1153,12 @@ export default function DataHealthBulkFixModal({
                       const isValid = isJobValid(job);
                       const isEdited = editedJobs.has(job.id);
                       const isExpanded = expandedJobs.has(job.id);
-                      const requirements = isCostIssue ? getJobRequirements(job) : [];
+                      const requirements = getJobRequirements(job);
 
                       return (
                         <React.Fragment key={job.id}>
                           <tr
-                            onClick={() => isCostIssue && toggleJobExpanded(job.id)}
+                            onClick={() => toggleJobExpanded(job.id)}
                             className={`${
                               isExpanded
                                 ? "bg-blue-50"
@@ -1169,17 +1167,15 @@ export default function DataHealthBulkFixModal({
                                 : !isValid
                                 ? "bg-red-50"
                                 : "bg-white"
-                            } ${isCostIssue ? "cursor-pointer hover:bg-gray-50" : ""}`}
+                            } cursor-pointer hover:bg-gray-50`}
                           >
-                            {isCostIssue && (
-                              <td className="px-2 py-3 w-8">
-                                <ChevronRight
-                                  className={`w-4 h-4 text-gray-400 transition-transform ${
-                                    isExpanded ? "rotate-90" : ""
-                                  }`}
-                                />
-                              </td>
-                            )}
+                            <td className="px-2 py-3 w-8">
+                              <ChevronRight
+                                className={`w-4 h-4 text-gray-400 transition-transform ${
+                                  isExpanded ? "rotate-90" : ""
+                                }`}
+                              />
+                            </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                               {job.job_number}
                             </td>
@@ -1256,190 +1252,343 @@ export default function DataHealthBulkFixModal({
                               )}
                             </td>
                           </tr>
-                          {/* Expanded Services Row */}
-                          {isCostIssue && isExpanded && (
+                          {/* Expanded Job Details Row */}
+                          {isExpanded && (
                             <tr className="bg-gray-50">
-                              <td colSpan={6} className="px-4 py-3">
-                                <div className="ml-6 space-y-3">
-                                  {/* Header with Edit/Save/Cancel Buttons */}
-                                  <div className="flex items-center justify-between">
-                                    <div className="text-xs font-semibold text-gray-500 uppercase">
-                                      Services
+                              <td colSpan={isCostIssue ? 6 : 7} className="px-4 py-4">
+                                <div className="ml-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+                                  {/* Job Information Section */}
+                                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                    <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">
+                                      Job Information
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Job Number
+                                        </label>
+                                        <p className="text-sm text-[var(--text-dark)]">
+                                          {job.job_number}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Facility
+                                        </label>
+                                        <p className="text-sm text-[var(--text-dark)]">
+                                          {getFacilityName(job.facilities_id)}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Client
+                                        </label>
+                                        <p className="text-sm text-[var(--text-dark)]">
+                                          {job.client || "—"}
+                                        </p>
+                                      </div>
+                                      {job.sub_client && (
+                                        <div>
+                                          <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                            Sub Client
+                                          </label>
+                                          <p className="text-sm text-[var(--text-dark)]">
+                                            {job.sub_client}
+                                          </p>
+                                        </div>
+                                      )}
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Job Name
+                                        </label>
+                                        <p className="text-sm text-[var(--text-dark)]">
+                                          {job.job_name || "—"}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Service Type
+                                        </label>
+                                        {job.service_type ? (
+                                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                            {job.service_type}
+                                          </span>
+                                        ) : (
+                                          <p className="text-sm text-[var(--text-dark)]">—</p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Quantity
+                                        </label>
+                                        <p className="text-sm text-[var(--text-dark)]">
+                                          {job.quantity?.toLocaleString() || "—"}
+                                        </p>
+                                      </div>
+                                      <div className="md:col-span-2">
+                                        <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                          Description
+                                        </label>
+                                        <p className="text-sm text-[var(--text-dark)]">
+                                          {job.description || "—"}
+                                        </p>
+                                      </div>
                                     </div>
-                                    {editingJobIds.has(job.id) ? (
+                                  </div>
+
+                                  {/* Timeline & Versions Section */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Timeline */}
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                      <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">
+                                        Timeline
+                                      </h4>
+                                      <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                            Start Date
+                                          </label>
+                                          <p className="text-sm text-[var(--text-dark)]">
+                                            {job.start_date
+                                              ? new Date(job.start_date).toLocaleDateString("en-US", {
+                                                  weekday: "short",
+                                                  month: "numeric",
+                                                  day: "numeric",
+                                                  year: "numeric",
+                                                })
+                                              : "—"}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                            Due Date
+                                          </label>
+                                          <p className="text-sm text-[var(--text-dark)]">
+                                            {job.due_date
+                                              ? new Date(job.due_date).toLocaleDateString("en-US", {
+                                                  weekday: "short",
+                                                  month: "numeric",
+                                                  day: "numeric",
+                                                  year: "numeric",
+                                                })
+                                              : "—"}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-semibold text-[var(--text-light)] mb-1">
+                                            Time Estimate
+                                          </label>
+                                          <p className="text-sm text-[var(--text-dark)]">
+                                            {job.time_estimate ? `${job.time_estimate} hours` : "—"}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Versions */}
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                      <h4 className="text-sm font-semibold text-[var(--dark-blue)] mb-3">
+                                        Version
+                                      </h4>
                                       <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                        <span className="text-sm font-medium text-[var(--text-dark)]">
+                                          {(job as any).version_name || "v1"} (current)
+                                        </span>
+                                      </div>
+                                      {!(job as any).version_group_uuid && (
+                                        <p className="text-xs text-[var(--text-light)] italic mt-2">
+                                          This job has no other versions
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Services Section */}
+                                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="text-sm font-semibold text-[var(--dark-blue)]">
+                                        Services
+                                      </h4>
+                                      {isCostIssue && (
+                                        editingJobIds.has(job.id) ? (
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                cancelEditingServices(job.id);
+                                              }}
+                                              disabled={savingJobIds.has(job.id)}
+                                              className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                            >
+                                              Cancel
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                saveInlineServices(job.id);
+                                              }}
+                                              disabled={savingJobIds.has(job.id)}
+                                              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                            >
+                                              {savingJobIds.has(job.id) ? (
+                                                <>
+                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                  Saving...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Save className="w-3.5 h-3.5" />
+                                                  Save Services
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              startEditingServices(job);
+                                            }}
+                                            className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+                                          >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            Edit Services
+                                          </button>
+                                        )
+                                      )}
+                                    </div>
+
+                                    {/* Inline Editing Mode (cost issues only) */}
+                                    {isCostIssue && editingJobIds.has(job.id) ? (
+                                      <div className="space-y-4">
+                                        {(editingRequirements.get(job.id) || []).map((requirement, reqIdx) => (
+                                          <div
+                                            key={reqIdx}
+                                            className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4"
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <h5 className="font-semibold text-gray-900 text-sm">
+                                                Service {reqIdx + 1}
+                                              </h5>
+                                              {(editingRequirements.get(job.id) || []).length > 1 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeInlineRequirement(job.id, reqIdx)}
+                                                  className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                  Remove
+                                                </button>
+                                              )}
+                                            </div>
+                                            <DynamicRequirementFields
+                                              requirement={requirement}
+                                              onChange={(field, value) =>
+                                                handleInlineRequirementChange(job.id, reqIdx, field, value)
+                                              }
+                                              disableRequired={true}
+                                            />
+                                          </div>
+                                        ))}
                                         <button
                                           type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            cancelEditingServices(job.id);
-                                          }}
-                                          disabled={savingJobIds.has(job.id)}
-                                          className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                          onClick={() => addInlineRequirement(job.id)}
+                                          className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg font-medium text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-sm"
                                         >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            saveInlineServices(job.id);
-                                          }}
-                                          disabled={savingJobIds.has(job.id)}
-                                          className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                                        >
-                                          {savingJobIds.has(job.id) ? (
-                                            <>
-                                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                              Saving...
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Save className="w-3.5 h-3.5" />
-                                              Save Services
-                                            </>
-                                          )}
+                                          <Plus className="w-4 h-4" />
+                                          Add Another Service
                                         </button>
                                       </div>
                                     ) : (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          startEditingServices(job);
-                                        }}
-                                        className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5"
-                                      >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                        Edit Services
-                                      </button>
+                                      /* Read-only Service List with Cost Breakdown */
+                                      <>
+                                        {requirements.length > 0 ? (
+                                          <>
+                                            {requirements.map((req, idx) => {
+                                              const costs = getRequirementCosts(req);
+                                              const hasNoCost = costs.total === 0;
+                                              return (
+                                                <div
+                                                  key={idx}
+                                                  className={`py-3 border-b border-gray-200 last:border-0 ${hasNoCost && isCostIssue ? "bg-yellow-50 -mx-2 px-2 rounded" : ""}`}
+                                                >
+                                                  <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-sm font-medium text-gray-700">
+                                                      {req.process_type || "Unknown Service"}
+                                                    </span>
+                                                    {hasNoCost ? (
+                                                      <span className="text-sm font-medium text-yellow-600 italic">
+                                                        No price set
+                                                      </span>
+                                                    ) : (
+                                                      <span className="text-sm font-semibold text-gray-900">
+                                                        ${costs.total.toFixed(2)}/M
+                                                      </span>
+                                                    )}
+                                                  </div>
+
+                                                  {/* Cost Breakdown */}
+                                                  {!hasNoCost && (
+                                                    <div className="ml-4 space-y-1 text-xs text-gray-500">
+                                                      {costs.baseCost > 0 && (
+                                                        <div className="flex justify-between">
+                                                          <span>Base Price/M</span>
+                                                          <span>${costs.baseCost.toFixed(2)}</span>
+                                                        </div>
+                                                      )}
+                                                      {costs.additionalCosts.map((item, costIdx) => (
+                                                        <div key={costIdx} className="flex justify-between text-blue-600">
+                                                          <span>{item.name}</span>
+                                                          <span>+${item.cost.toFixed(2)}</span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+
+                                            {/* Total Cost Summary */}
+                                            {(() => {
+                                              const totalCost = calculateTotalCostFromRequirements(requirements);
+                                              const servicesWithPricing = requirements.filter(req => getRequirementCosts(req).total > 0).length;
+                                              return (
+                                                <div className="pt-3 mt-2 border-t border-gray-300">
+                                                  <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                      {servicesWithPricing > 0
+                                                        ? `Total Cost/M (${servicesWithPricing} of ${requirements.length} service${requirements.length !== 1 ? "s" : ""} priced)`
+                                                        : `${requirements.length} service${requirements.length !== 1 ? "s" : ""} - no pricing`
+                                                      }
+                                                    </span>
+                                                    {totalCost > 0 ? (
+                                                      <span className="text-sm font-bold text-blue-600">
+                                                        ${totalCost.toFixed(2)}
+                                                      </span>
+                                                    ) : (
+                                                      isCostIssue && (
+                                                        <span className="text-sm font-medium text-yellow-600">
+                                                          Click Edit to add prices
+                                                        </span>
+                                                      )
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })()}
+                                          </>
+                                        ) : (
+                                          <div className="text-sm text-gray-400 italic">
+                                            No services defined for this job
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>
-
-                                  {/* Inline Editing Mode */}
-                                  {editingJobIds.has(job.id) ? (
-                                    <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-                                      {(editingRequirements.get(job.id) || []).map((requirement, reqIdx) => (
-                                        <div
-                                          key={reqIdx}
-                                          className="border border-gray-200 rounded-lg p-4 bg-white space-y-4"
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <h5 className="font-semibold text-gray-900 text-sm">
-                                              Service {reqIdx + 1}
-                                            </h5>
-                                            {(editingRequirements.get(job.id) || []).length > 1 && (
-                                              <button
-                                                type="button"
-                                                onClick={() => removeInlineRequirement(job.id, reqIdx)}
-                                                className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                Remove
-                                              </button>
-                                            )}
-                                          </div>
-                                          <DynamicRequirementFields
-                                            requirement={requirement}
-                                            onChange={(field, value) =>
-                                              handleInlineRequirementChange(job.id, reqIdx, field, value)
-                                            }
-                                            disableRequired={true}
-                                          />
-                                        </div>
-                                      ))}
-                                      <button
-                                        type="button"
-                                        onClick={() => addInlineRequirement(job.id)}
-                                        className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg font-medium text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-sm"
-                                      >
-                                        <Plus className="w-4 h-4" />
-                                        Add Another Service
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    /* Read-only Service List with Cost Breakdown */
-                                    <>
-                                      {requirements.length > 0 ? (
-                                        <>
-                                          {requirements.map((req, idx) => {
-                                            const costs = getRequirementCosts(req);
-                                            const hasNoCost = costs.total === 0;
-                                            return (
-                                              <div
-                                                key={idx}
-                                                className={`py-3 border-b border-gray-200 last:border-0 ${hasNoCost ? "bg-yellow-50 -mx-2 px-2 rounded" : ""}`}
-                                              >
-                                                <div className="flex items-center justify-between mb-2">
-                                                  <span className="text-sm font-medium text-gray-700">
-                                                    {req.process_type || "Unknown Service"}
-                                                  </span>
-                                                  {hasNoCost ? (
-                                                    <span className="text-sm font-medium text-yellow-600 italic">
-                                                      No price set
-                                                    </span>
-                                                  ) : (
-                                                    <span className="text-sm font-semibold text-gray-900">
-                                                      ${costs.total.toFixed(2)}/M
-                                                    </span>
-                                                  )}
-                                                </div>
-
-                                                {/* Cost Breakdown */}
-                                                {!hasNoCost && (
-                                                  <div className="ml-4 space-y-1 text-xs text-gray-500">
-                                                    {costs.baseCost > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Base Price/M</span>
-                                                        <span>${costs.baseCost.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {costs.additionalCosts.map((item, costIdx) => (
-                                                      <div key={costIdx} className="flex justify-between text-blue-600">
-                                                        <span>{item.name}</span>
-                                                        <span>+${item.cost.toFixed(2)}</span>
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
-
-                                          {/* Total Cost Summary */}
-                                          {(() => {
-                                            const totalCost = calculateTotalCostFromRequirements(requirements);
-                                            const servicesWithPricing = requirements.filter(req => getRequirementCosts(req).total > 0).length;
-                                            return (
-                                              <div className="pt-3 mt-2 border-t border-gray-300">
-                                                <div className="flex justify-between items-center">
-                                                  <span className="text-sm font-semibold text-gray-700">
-                                                    {servicesWithPricing > 0
-                                                      ? `Total Cost/M (${servicesWithPricing} of ${requirements.length} service${requirements.length !== 1 ? "s" : ""} priced)`
-                                                      : `${requirements.length} service${requirements.length !== 1 ? "s" : ""} - no pricing`
-                                                    }
-                                                  </span>
-                                                  {totalCost > 0 ? (
-                                                    <span className="text-sm font-bold text-blue-600">
-                                                      ${totalCost.toFixed(2)}
-                                                    </span>
-                                                  ) : (
-                                                    <span className="text-sm font-medium text-yellow-600">
-                                                      Click Edit to add prices
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            );
-                                          })()}
-                                        </>
-                                      ) : (
-                                        <div className="text-sm text-gray-400 italic">
-                                          No services defined for this job
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
                                 </div>
                               </td>
                             </tr>

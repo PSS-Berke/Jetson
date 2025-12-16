@@ -66,6 +66,7 @@ export default function ProjectionsPage() {
     [],
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [scheduleFilter, setScheduleFilter] = useState<
     "all" | "confirmed" | "soft"
   >("all");
@@ -86,12 +87,22 @@ export default function ProjectionsPage() {
   const [showOnlyInDateRange, setShowOnlyInDateRange] = useState(true);
   const [showNotes, setShowNotes] = useState(false);
   const [groupByFacility, setGroupByFacility] = useState(false);
+  const [versionGroupingEnabled, setVersionGroupingEnabled] = useState(true);
   const [financialsSubView, setFinancialsSubView] = useState<"dashboard" | "revenue-table">("dashboard");
   const [dynamicFieldFilters, setDynamicFieldFilters] = useState<import("@/types").DynamicFieldFilter[]>([]);
   const [dynamicFieldFilterLogic, setDynamicFieldFilterLogic] = useState<"and" | "or">("and");
 
   const { user, isLoading: userLoading } = useUser();
   const { logout } = useAuth();
+
+  // Debounce search query to avoid triggering API calls on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // PDF export refs
   const printRef = useRef<HTMLDivElement>(null);
@@ -101,7 +112,7 @@ export default function ProjectionsPage() {
     facility: selectedFacility,
     clients: selectedClients,
     serviceTypes: selectedServiceTypes,
-    searchQuery,
+    searchQuery: debouncedSearchQuery, // Use debounced value for API calls
     granularity,
     scheduleFilter,
     filterMode,
@@ -154,7 +165,7 @@ export default function ProjectionsPage() {
   }, [
     selectedClients,
     selectedServiceTypes,
-    searchQuery,
+    debouncedSearchQuery, // Use debounced value to avoid resetting on every keystroke
     selectedFacility,
     filterMode,
     scheduleFilter,
@@ -411,6 +422,8 @@ export default function ProjectionsPage() {
             dynamicFieldFilterLogic={dynamicFieldFilterLogic}
             onDynamicFieldFilterLogicChange={setDynamicFieldFilterLogic}
             facilitiesId={selectedFacility}
+            versionGroupingEnabled={versionGroupingEnabled}
+            onVersionGroupingChange={setVersionGroupingEnabled}
           />
         </div>
 
@@ -460,6 +473,7 @@ export default function ProjectionsPage() {
                     granularity={granularity}
                     fullFilteredProjections={jobProjections}
                     lastModifiedByJob={lastModifiedByJob}
+                    versionGroupingEnabled={versionGroupingEnabled}
                   />
 
                   {/* Pagination */}
