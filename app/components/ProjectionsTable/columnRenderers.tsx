@@ -9,6 +9,7 @@ import { Edit2, Save, X } from "lucide-react";
 import type { JobNote } from "@/lib/api";
 import type { CellIdentifier } from "@/types";
 import { ProjectionColumnConfig, SortField } from "./columnConfig";
+import { timestampToDate } from "@/lib/dateUtils";
 
 // Helper to truncate job numbers for table display
 export const formatJobNumber = (jobNumber: string, maxLength = 7) => {
@@ -469,17 +470,26 @@ function renderStaticCell(
 
       const timestamp = context.lastModifiedTimestamp;
       const fallbackTimestamp = job.updated_at
-        ? new Date(job.updated_at).getTime()
+        ? (typeof job.updated_at === "number" 
+            ? timestampToDate(job.updated_at).getTime()
+            : new Date(job.updated_at).getTime())
         : undefined;
-      const displayTimestamp = timestamp ?? fallbackTimestamp;
+      
+      // Convert timestamp to milliseconds if needed, then to Date
+      let displayDate: Date | null = null;
+      if (timestamp !== undefined && timestamp !== null) {
+        displayDate = timestampToDate(timestamp);
+      } else if (fallbackTimestamp !== undefined) {
+        displayDate = new Date(fallbackTimestamp);
+      }
 
       return (
         <td
           key="updated_at"
           className="px-2 py-2 whitespace-nowrap text-xs text-center text-[var(--text-dark)]"
         >
-          {displayTimestamp
-            ? new Date(displayTimestamp).toLocaleString("en-US", {
+          {displayDate
+            ? displayDate.toLocaleString("en-US", {
                 month: "numeric",
                 day: "numeric",
                 year: "2-digit",
