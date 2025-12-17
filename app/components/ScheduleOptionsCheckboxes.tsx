@@ -157,7 +157,7 @@ export default function ScheduleOptionsCheckboxes({
           </label>
         </div>
 
-        {/* 12s All Weekend */}
+        {/* All Weekend */}
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
@@ -166,7 +166,7 @@ export default function ScheduleOptionsCheckboxes({
             disabled={disabled}
             className="w-3.5 h-3.5 text-[var(--primary-blue)] border-[var(--border)] rounded focus:ring-[var(--primary-blue)]"
           />
-          <span className="text-[var(--text-dark)]">12s All Weekend</span>
+          <span className="text-[var(--text-dark)]">All Weekend</span>
         </label>
       </div>
     );
@@ -318,7 +318,7 @@ export default function ScheduleOptionsCheckboxes({
         </div>
       </div>
 
-      {/* 12s All Weekend */}
+      {/* All Weekend */}
       <div className="pt-2 border-t border-[var(--border)]">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -329,10 +329,10 @@ export default function ScheduleOptionsCheckboxes({
             className="w-4 h-4 text-[var(--primary-blue)] border-[var(--border)] rounded focus:ring-[var(--primary-blue)]"
           />
           <span className="text-sm font-medium text-[var(--text-dark)]">
-            Run 12s All Weekend
+            All Weekend
           </span>
           <span className="text-xs text-[var(--text-light)]">
-            (Sets Sat & Sun to 12-hour shifts)
+            (Enables Sat & Sun shifts)
           </span>
         </label>
       </div>

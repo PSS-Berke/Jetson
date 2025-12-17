@@ -39,6 +39,7 @@ interface BackwardRedistributeWarningProps {
   currentTotal: number;
   difference: number;
   unlockedWeeksBefore: number[];
+  weekDisplayNumbers: Record<number, number>;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -49,14 +50,21 @@ function BackwardRedistributeWarning({
   proposedTotal,
   difference,
   unlockedWeeksBefore,
+  weekDisplayNumbers,
   onConfirm,
   onCancel,
 }: BackwardRedistributeWarningProps) {
   if (!isOpen) return null;
 
-  const perWeekAdjustment = unlockedWeeksBefore.length > 0
-    ? Math.floor(Math.abs(difference) / unlockedWeeksBefore.length)
-    : 0;
+  // Calculate per-week adjustments accounting for remainder distribution
+  const getWeekAdjustment = (weekIndex: number) => {
+    if (unlockedWeeksBefore.length === 0) return 0;
+    const baseAdjustment = Math.floor(Math.abs(difference) / unlockedWeeksBefore.length);
+    const remainder = Math.abs(difference) % unlockedWeeksBefore.length;
+    // Remainder goes to first weeks
+    const extraAmount = weekIndex < remainder ? 1 : 0;
+    return baseAdjustment + extraAmount;
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
@@ -66,7 +74,7 @@ function BackwardRedistributeWarning({
           Redistribute Backward?
         </h3>
         <p className="text-[var(--text-dark)] mb-4">
-          Week {weekNumber} is the last unlocked week. To set it to{" "}
+          Week {weekDisplayNumbers[weekNumber] ?? weekNumber} is the last unlocked week. To set it to{" "}
           <strong>{proposedTotal.toLocaleString()}</strong>, the difference of{" "}
           <strong className={difference > 0 ? "text-red-600" : "text-green-600"}>
             {difference > 0 ? "+" : ""}{difference.toLocaleString()}
@@ -79,9 +87,9 @@ function BackwardRedistributeWarning({
               The following unlocked weeks will be adjusted:
             </p>
             <ul className="text-sm text-[var(--text-light)]">
-              {unlockedWeeksBefore.map((w) => (
+              {unlockedWeeksBefore.map((w, idx) => (
                 <li key={w}>
-                  • Week {w}: {difference > 0 ? "-" : "+"}{perWeekAdjustment.toLocaleString()}
+                  • Week {weekDisplayNumbers[w] ?? w}: {difference > 0 ? "-" : "+"}{getWeekAdjustment(idx).toLocaleString()}
                 </li>
               ))}
             </ul>
@@ -136,6 +144,9 @@ export default function QuantitySplitEditor({
   // State for expanded week options
   const [expandedWeekOptions, setExpandedWeekOptions] = useState<Record<number, boolean>>({});
 
+  // State for tracking actively edited input to prevent cursor jumping
+  const [editingInput, setEditingInput] = useState<{ id: string; value: string } | null>(null);
+
   // Group results by week
   const groupedByWeek = useMemo(() => {
     const grouped = splitResults.reduce((acc, item) => {
@@ -154,12 +165,26 @@ export default function QuantitySplitEditor({
     return grouped;
   }, [splitResults]);
 
-  // Get sorted week numbers
+  // Get sorted week numbers (by date, not by CalendarWeek number)
+  // This handles year boundaries correctly (e.g., week 52 -> week 1)
   const sortedWeeks = useMemo(() => {
-    return Object.keys(groupedByWeek)
-      .map(Number)
-      .sort((a, b) => a - b);
+    const weeks = Object.keys(groupedByWeek).map(Number);
+    // Sort by the first date in each week group
+    return weeks.sort((a, b) => {
+      const dateA = new Date(groupedByWeek[a][0]?.Date || "");
+      const dateB = new Date(groupedByWeek[b][0]?.Date || "");
+      return dateA.getTime() - dateB.getTime();
+    });
   }, [groupedByWeek]);
+
+  // Create a mapping from CalendarWeek to sequential display number (1, 2, 3, ...)
+  const weekDisplayNumbers = useMemo(() => {
+    const mapping: Record<number, number> = {};
+    sortedWeeks.forEach((calendarWeek, index) => {
+      mapping[calendarWeek] = index + 1;
+    });
+    return mapping;
+  }, [sortedWeeks]);
 
   // Calculate week totals
   const weekTotals = useMemo(() => {
@@ -193,7 +218,7 @@ export default function QuantitySplitEditor({
     }));
   }, []);
 
-  // Handle week schedule options change
+  // Handle week schedule options change - also redistributes quantities based on new options
   const handleWeekScheduleChange = useCallback((weekNumber: number, options: ScheduleOptions) => {
     if (!scheduleConfig || !onScheduleConfigChange) return;
 
@@ -209,7 +234,65 @@ export default function QuantitySplitEditor({
       },
     };
     onScheduleConfigChange(newConfig);
-  }, [scheduleConfig, onScheduleConfigChange]);
+
+    // Redistribute quantities within this week based on new schedule options
+    const weekDays = groupedByWeek[weekNumber];
+    if (!weekDays || weekDays.length === 0) return;
+
+    // Calculate current week total
+    const currentWeekTotal = weekDays.reduce((sum, item) => sum + item.Quantity, 0);
+    if (currentWeekTotal === 0) return;
+
+    // Determine which days should have quantity based on schedule options
+    const saturdayEnabled = options.runSat1st || options.runSat2nd || options.run12sAllWeekend;
+    const sundayEnabled = options.runSun1st || options.runSun2nd || options.run12sAllWeekend;
+
+    // Build list of days to distribute to
+    let daysToDistribute = weekDays.filter((d) => {
+      // Always include weekdays (Mon-Fri: 1-5)
+      if (d.CalendarDayInWeek >= 1 && d.CalendarDayInWeek <= 5) return true;
+      // Include Saturday (6) if enabled
+      if (d.CalendarDayInWeek === 6 && saturdayEnabled) return true;
+      // Include Sunday (7) if enabled
+      if (d.CalendarDayInWeek === 7 && sundayEnabled) return true;
+      return false;
+    });
+
+    // Fallback to weekdays only if nothing is selected
+    if (daysToDistribute.length === 0) {
+      daysToDistribute = weekDays.filter((d) => d.CalendarDayInWeek >= 1 && d.CalendarDayInWeek <= 5);
+    }
+    if (daysToDistribute.length === 0) {
+      daysToDistribute = weekDays;
+    }
+
+    // Sort by day of week for consistent ordering
+    daysToDistribute.sort((a, b) => a.CalendarDayInWeek - b.CalendarDayInWeek);
+
+    // Calculate new distribution
+    const baseAmount = Math.floor(currentWeekTotal / daysToDistribute.length);
+    const remainder = currentWeekTotal % daysToDistribute.length;
+
+    // Create set of dates that should receive distribution
+    const datesToDistribute = new Set(daysToDistribute.map((d) => d.Date));
+
+    // Update split results
+    const newSplitResults = splitResults.map((item) => {
+      if (item.CalendarWeek !== weekNumber) return item;
+
+      // If this day is not in our distribution list, set to 0
+      if (!datesToDistribute.has(item.Date)) {
+        return { ...item, Quantity: 0 };
+      }
+
+      // Find index for remainder distribution
+      const dayIndex = daysToDistribute.findIndex((d) => d.Date === item.Date);
+      const extraAmount = dayIndex < remainder ? 1 : 0;
+      return { ...item, Quantity: baseAmount + extraAmount };
+    });
+
+    onSplitChange(newSplitResults);
+  }, [scheduleConfig, onScheduleConfigChange, groupedByWeek, splitResults, onSplitChange]);
 
   // Handle toggle "use job defaults" for a week
   const handleToggleUseJobDefaults = useCallback((weekNumber: number, useDefaults: boolean) => {
@@ -249,7 +332,7 @@ export default function QuantitySplitEditor({
     if (readOnly) return;
 
     const cleanedValue = newValue.replace(/,/g, "");
-    const newQuantity = parseInt(cleanedValue) || 0;
+    const newQuantity = Math.max(0, parseInt(cleanedValue) || 0);
 
     // Find the item and calculate the old week total
     const oldWeekTotal = weekTotals[calendarWeek];
@@ -274,8 +357,10 @@ export default function QuantitySplitEditor({
     const difference = totalQuantity - (grandTotal - oldWeekTotal + newWeekTotal);
 
     if (difference !== 0) {
+      // Use index-based comparison to handle year boundaries correctly
+      const currentWeekIndex = sortedWeeks.indexOf(calendarWeek);
       const unlockedWeeksAfter = sortedWeeks.filter(
-        (w) => w > calendarWeek && !newLockedWeeks[w]
+        (w, idx) => idx > currentWeekIndex && !newLockedWeeks[w]
       );
 
       if (unlockedWeeksAfter.length > 0) {
@@ -288,7 +373,7 @@ export default function QuantitySplitEditor({
       } else {
         // Check for unlocked weeks before
         const unlockedWeeksBefore = sortedWeeks.filter(
-          (w) => w < calendarWeek && !newLockedWeeks[w]
+          (w, idx) => idx < currentWeekIndex && !newLockedWeeks[w]
         );
 
         if (unlockedWeeksBefore.length > 0) {
@@ -312,7 +397,7 @@ export default function QuantitySplitEditor({
     if (readOnly) return;
 
     const cleanedValue = newValue.replace(/,/g, "");
-    const newTotal = parseInt(cleanedValue) || 0;
+    const newTotal = Math.max(0, parseInt(cleanedValue) || 0);
     const oldTotal = weekTotals[weekNumber];
     const weekDifference = newTotal - oldTotal;
 
@@ -372,8 +457,10 @@ export default function QuantitySplitEditor({
     const jobDifference = totalQuantity - (grandTotal + weekDifference);
 
     if (jobDifference !== 0) {
+      // Use index-based comparison to handle year boundaries correctly
+      const currentWeekIndex = sortedWeeks.indexOf(weekNumber);
       const unlockedWeeksAfter = sortedWeeks.filter(
-        (w) => w > weekNumber && !newLockedWeeks[w]
+        (w, idx) => idx > currentWeekIndex && !newLockedWeeks[w]
       );
 
       if (unlockedWeeksAfter.length > 0) {
@@ -387,7 +474,7 @@ export default function QuantitySplitEditor({
       } else {
         // Check for unlocked weeks before
         const unlockedWeeksBefore = sortedWeeks.filter(
-          (w) => w < weekNumber && !newLockedWeeks[w]
+          (w, idx) => idx < currentWeekIndex && !newLockedWeeks[w]
         );
 
         if (unlockedWeeksBefore.length > 0) {
@@ -498,8 +585,10 @@ export default function QuantitySplitEditor({
     const weekDifference = newTotal - oldTotal;
     const jobDifference = -(weekDifference); // Opposite sign - we need to remove from other weeks
 
+    // Use index-based comparison to handle year boundaries correctly
+    const currentWeekIndex = sortedWeeks.indexOf(weekNumber);
     const unlockedWeeksBefore = sortedWeeks.filter(
-      (w) => w < weekNumber && !lockedWeeks[w]
+      (w, idx) => idx < currentWeekIndex && !lockedWeeks[w]
     );
 
     if (unlockedWeeksBefore.length > 0) {
@@ -573,7 +662,7 @@ export default function QuantitySplitEditor({
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-[var(--text-dark)]">
-                    Week {week}
+                    Week {weekDisplayNumbers[week]}
                   </span>
                   <span className="text-sm text-[var(--text-light)]">
                     ({startDate} to {endDate})
@@ -582,13 +671,22 @@ export default function QuantitySplitEditor({
                   {showScheduleOptions && scheduleConfig && (
                     <button
                       type="button"
-                      onClick={() => toggleWeekOptions(week)}
+                      onClick={() => {
+                        // If currently using defaults, switch to custom and expand
+                        if (!hasOverrides) {
+                          handleToggleUseJobDefaults(week, false);
+                          setExpandedWeekOptions((prev) => ({ ...prev, [week]: true }));
+                        } else {
+                          // If already custom, just toggle expansion
+                          toggleWeekOptions(week);
+                        }
+                      }}
                       className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
                         hasOverrides
                           ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
                           : "bg-gray-100 text-[var(--text-light)] hover:bg-gray-200"
                       }`}
-                      title={hasOverrides ? "Custom schedule options" : "Using job defaults"}
+                      title={hasOverrides ? "Custom schedule options" : "Click to customize"}
                     >
                       <Settings2 className="w-3 h-3" />
                       {hasOverrides ? "Custom" : "Default"}
@@ -632,8 +730,23 @@ export default function QuantitySplitEditor({
                     ) : (
                       <input
                         type="text"
-                        value={weekTotal.toLocaleString()}
-                        onChange={(e) => handleWeekTotalChange(week, e.target.value)}
+                        value={
+                          editingInput?.id === `week-${week}`
+                            ? editingInput.value
+                            : weekTotal.toLocaleString()
+                        }
+                        onChange={(e) => {
+                          setEditingInput({ id: `week-${week}`, value: e.target.value });
+                        }}
+                        onFocus={() => {
+                          setEditingInput({ id: `week-${week}`, value: weekTotal.toString() });
+                        }}
+                        onBlur={() => {
+                          if (editingInput?.id === `week-${week}`) {
+                            handleWeekTotalChange(week, editingInput.value);
+                          }
+                          setEditingInput(null);
+                        }}
                         className={`w-28 px-2 py-1 text-right font-semibold rounded border focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] ${
                           isLocked
                             ? "text-[var(--primary-blue)] bg-blue-50 border-blue-300"
@@ -688,34 +801,50 @@ export default function QuantitySplitEditor({
 
               {/* Daily inputs */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 text-sm">
-                {weekData.map((item) => (
-                  <div key={`${item.Date}-${item.CalendarDayInWeek}`} className="flex flex-col gap-1">
-                    <label className="text-xs text-[var(--text-light)]">
-                      {dayNames[item.CalendarDayInWeek]}:
-                    </label>
-                    {readOnly ? (
-                      <span className="px-2 py-1 text-[var(--text-dark)]">
-                        {item.Quantity.toLocaleString()}
-                      </span>
-                    ) : (
-                      <input
-                        type="text"
-                        value={item.Quantity.toLocaleString()}
-                        onChange={(e) =>
-                          handleDayQuantityChange(
-                            item.Date,
-                            item.CalendarDayInWeek,
-                            item.CalendarWeek,
-                            e.target.value
-                          )
-                        }
-                        className={`w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
-                          isLocked ? "bg-blue-50/50 border-blue-200" : "bg-white border-[var(--border)]"
-                        }`}
-                      />
-                    )}
-                  </div>
-                ))}
+                {weekData.map((item) => {
+                  const dayInputId = `day-${item.Date}-${item.CalendarDayInWeek}`;
+                  return (
+                    <div key={`${item.Date}-${item.CalendarDayInWeek}`} className="flex flex-col gap-1">
+                      <label className="text-xs text-[var(--text-light)]">
+                        {dayNames[item.CalendarDayInWeek]}:
+                      </label>
+                      {readOnly ? (
+                        <span className="px-2 py-1 text-[var(--text-dark)]">
+                          {item.Quantity.toLocaleString()}
+                        </span>
+                      ) : (
+                        <input
+                          type="text"
+                          value={
+                            editingInput?.id === dayInputId
+                              ? editingInput.value
+                              : item.Quantity.toLocaleString()
+                          }
+                          onChange={(e) => {
+                            setEditingInput({ id: dayInputId, value: e.target.value });
+                          }}
+                          onFocus={() => {
+                            setEditingInput({ id: dayInputId, value: item.Quantity.toString() });
+                          }}
+                          onBlur={() => {
+                            if (editingInput?.id === dayInputId) {
+                              handleDayQuantityChange(
+                                item.Date,
+                                item.CalendarDayInWeek,
+                                item.CalendarWeek,
+                                editingInput.value
+                              );
+                            }
+                            setEditingInput(null);
+                          }}
+                          className={`w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] text-sm ${
+                            isLocked ? "bg-blue-50/50 border-blue-200" : "bg-white border-[var(--border)]"
+                          }`}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -729,9 +858,13 @@ export default function QuantitySplitEditor({
         proposedTotal={pendingWeekChange?.newTotal || 0}
         currentTotal={pendingWeekChange?.oldTotal || 0}
         difference={pendingWeekChange ? pendingWeekChange.newTotal - pendingWeekChange.oldTotal : 0}
-        unlockedWeeksBefore={sortedWeeks.filter(
-          (w) => w < (pendingWeekChange?.weekNumber || 0) && !lockedWeeks[w]
-        )}
+        unlockedWeeksBefore={(() => {
+          const currentWeekIndex = sortedWeeks.indexOf(pendingWeekChange?.weekNumber || 0);
+          return sortedWeeks.filter(
+            (w, idx) => idx < currentWeekIndex && !lockedWeeks[w]
+          );
+        })()}
+        weekDisplayNumbers={weekDisplayNumbers}
         onConfirm={handleBackwardConfirm}
         onCancel={handleBackwardCancel}
       />

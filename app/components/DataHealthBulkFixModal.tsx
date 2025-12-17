@@ -4,8 +4,10 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   getJobsByHealthIssue,
   bulkUpdateJobsWithProgress,
+  getDataHealth,
   type Job,
   type DataHealthIssueType,
+  type DataHealth,
 } from "@/lib/api";
 import {
   X,
@@ -20,6 +22,8 @@ import {
   Plus,
   Trash2,
   Save,
+  Activity,
+  ArrowLeft,
 } from "lucide-react";
 import DynamicRequirementFields from "./DynamicRequirementFields";
 import { updateJob } from "@/lib/api";
@@ -108,8 +112,16 @@ export default function DataHealthBulkFixModal({
   const [savingJobIds, setSavingJobIds] = useState<Set<number>>(new Set());
   const hasInitialFetch = useRef(false);
 
-  const config = ISSUE_CONFIG[issueType];
-  const isCostIssue = issueType === "missing_cost_per_m";
+  // View mode state for menu/fixing transition
+  const [viewMode, setViewMode] = useState<'menu' | 'fixing'>('fixing');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [selectedIssueType, setSelectedIssueType] = useState<DataHealthIssueType>(issueType);
+  const [dataHealth, setDataHealth] = useState<DataHealth | null>(null);
+  const [isLoadingHealth, setIsLoadingHealth] = useState(false);
+
+  // Use selectedIssueType for the current view
+  const config = ISSUE_CONFIG[selectedIssueType];
+  const isCostIssue = selectedIssueType === "missing_cost_per_m";
   const IconComponent = config.icon;
 
   // Debounce search query
@@ -124,9 +136,9 @@ export default function DataHealthBulkFixModal({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch jobs when modal opens
+  // Fetch jobs when modal opens or selectedIssueType changes
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || viewMode !== 'fixing') {
       hasInitialFetch.current = false;
       return;
     }
@@ -135,8 +147,8 @@ export default function DataHealthBulkFixModal({
       setIsLoading(true);
       setError(null);
       setSaveResult(null);
-      
-      // Reset state when modal first opens
+
+      // Reset state when modal first opens or issue type changes
       setEditedJobs(new Map());
       setBulkDate("");
       setBulkCost("");
@@ -150,7 +162,7 @@ export default function DataHealthBulkFixModal({
 
       try {
         const fetchedJobs = await getJobsByHealthIssue(
-          issueType,
+          selectedIssueType,
           facilitiesId,
           ""
         );
@@ -166,7 +178,7 @@ export default function DataHealthBulkFixModal({
     };
 
     fetchJobs();
-  }, [isOpen, issueType, facilitiesId]);
+  }, [isOpen, selectedIssueType, facilitiesId, viewMode]);
 
   // Fetch jobs when search query changes (debounced)
   useEffect(() => {
@@ -175,31 +187,31 @@ export default function DataHealthBulkFixModal({
       hasInitialFetch: hasInitialFetch.current,
       debouncedSearchQuery
     });
-    
-    if (!isOpen) {
-      console.log("[DataHealthBulkFixModal] Search effect skipped: modal not open");
+
+    if (!isOpen || viewMode !== 'fixing') {
+      console.log("[DataHealthBulkFixModal] Search effect skipped: modal not open or not in fixing mode");
       return;
     }
-    
+
     // If initial fetch hasn't completed, mark it as complete and proceed with search
     // This allows search to work even if user types before initial load finishes
     if (!hasInitialFetch.current) {
       hasInitialFetch.current = true;
     }
-    
+
     const fetchJobs = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const searchParam = debouncedSearchQuery && debouncedSearchQuery.trim() 
-          ? debouncedSearchQuery.trim() 
+        const searchParam = debouncedSearchQuery && debouncedSearchQuery.trim()
+          ? debouncedSearchQuery.trim()
           : "";
-        
+
         console.log("[DataHealthBulkFixModal] Fetching jobs with search:", searchParam);
-        
+
         const fetchedJobs = await getJobsByHealthIssue(
-          issueType,
+          selectedIssueType,
           facilitiesId,
           searchParam
         );
@@ -214,7 +226,7 @@ export default function DataHealthBulkFixModal({
     };
 
     fetchJobs();
-  }, [debouncedSearchQuery, isOpen, issueType, facilitiesId]);
+  }, [debouncedSearchQuery, isOpen, selectedIssueType, facilitiesId, viewMode]);
 
   // Auto-calculate cost when inline editing requirements change
   useEffect(() => {
@@ -974,6 +986,76 @@ export default function DataHealthBulkFixModal({
     }
   };
 
+  // Fetch data health stats for the menu view
+  const fetchDataHealthStats = async () => {
+    setIsLoadingHealth(true);
+    try {
+      const health = await getDataHealth(facilitiesId || 0);
+      setDataHealth(health);
+    } catch (err) {
+      console.error("[DataHealthBulkFixModal] Error fetching data health:", err);
+    } finally {
+      setIsLoadingHealth(false);
+    }
+  };
+
+  // Transition to menu view
+  const handleBackToMenu = () => {
+    setIsTransitioning(true);
+    fetchDataHealthStats();
+    // Wait for fade out (300ms), then switch view, then fade in
+    setTimeout(() => {
+      setViewMode('menu');
+      // Small delay before fading back in for smoother transition
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 300);
+  };
+
+  // Transition from menu to fixing view
+  const handleSelectIssue = (issue: DataHealthIssueType) => {
+    setIsTransitioning(true);
+    // Wait for fade out (300ms), then switch view, then fade in
+    setTimeout(() => {
+      setSelectedIssueType(issue);
+      setViewMode('fixing');
+      // Reset fixing view state
+      setJobs([]);
+      setEditedJobs(new Map());
+      setSaveResult(null);
+      setError(null);
+      setSearchQuery("");
+      setDebouncedSearchQuery("");
+      setExpandedJobs(new Set());
+      setEditedServices(new Map());
+      setEditingJobIds(new Set());
+      setEditingRequirements(new Map());
+      hasInitialFetch.current = false;
+      // Small delay before fading back in for smoother transition
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 300);
+  };
+
+  // Get issue count from data health
+  const getIssueCount = (issue: DataHealthIssueType): number => {
+    if (!dataHealth) return 0;
+    switch (issue) {
+      case 'missing_due_dates':
+        return dataHealth.missing_due_dates;
+      case 'missing_start_date':
+        return dataHealth.missing_start_date;
+      case 'start_is_after_due':
+        return dataHealth.start_is_after_due;
+      case 'missing_cost_per_m':
+        return dataHealth.missing_price_per_m;
+      default:
+        return 0;
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -985,33 +1067,182 @@ export default function DataHealthBulkFixModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col mx-4">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <IconComponent className="w-6 h-6 text-orange-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {config.title}
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {config.description}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            disabled={isSaving}
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[90vh] flex flex-col mx-4 transition-all duration-500 ease-in-out ${viewMode === 'menu' ? 'max-w-2xl' : 'max-w-4xl'}`}>
+        {/* Fade transition wrapper */}
+        <div className={`flex-1 flex flex-col min-h-0 transition-opacity duration-300 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+          {viewMode === 'menu' ? (
+            /* ========== MENU VIEW ========== */
+            <>
+              {/* Menu Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Activity className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      Data Health
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Select an issue type to fix
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+              {/* Menu Content */}
+              <div className="flex-1 overflow-auto p-6">
+                {isLoadingHealth ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    <span className="ml-3 text-gray-600">Loading data health...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Missing Due Dates Tile */}
+                    <button
+                      onClick={() => handleSelectIssue("missing_due_dates")}
+                      disabled={getIssueCount("missing_due_dates") === 0}
+                      className={`bg-gray-50 rounded-lg py-2.5 px-4 text-left transition-all border border-gray-200 ${
+                        getIssueCount("missing_due_dates") > 0
+                          ? "hover:bg-gray-100 hover:shadow-md hover:border-gray-300 cursor-pointer"
+                          : "opacity-60 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <CalendarX className="w-5 h-5 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">
+                          Missing Due Dates
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-[var(--text-dark)] mb-1">
+                        {getIssueCount("missing_due_dates")}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        Jobs missing due dates that need to be set
+                      </p>
+                    </button>
+
+                    {/* Missing Start Dates Tile */}
+                    <button
+                      onClick={() => handleSelectIssue("missing_start_date")}
+                      disabled={getIssueCount("missing_start_date") === 0}
+                      className={`bg-gray-50 rounded-lg py-2.5 px-4 text-left transition-all border border-gray-200 ${
+                        getIssueCount("missing_start_date") > 0
+                          ? "hover:bg-gray-100 hover:shadow-md hover:border-gray-300 cursor-pointer"
+                          : "opacity-60 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className="w-5 h-5 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">
+                          Missing Start Dates
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-[var(--text-dark)] mb-1">
+                        {getIssueCount("missing_start_date")}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        Jobs missing start dates that need to be set
+                      </p>
+                    </button>
+
+                    {/* Start After Due Tile */}
+                    <button
+                      onClick={() => handleSelectIssue("start_is_after_due")}
+                      disabled={getIssueCount("start_is_after_due") === 0}
+                      className={`bg-gray-50 rounded-lg py-2.5 px-4 text-left transition-all border border-gray-200 ${
+                        getIssueCount("start_is_after_due") > 0
+                          ? "hover:bg-gray-100 hover:shadow-md hover:border-gray-300 cursor-pointer"
+                          : "opacity-60 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertCircle className="w-5 h-5 text-orange-500" />
+                        <span className="text-sm font-semibold text-gray-700">
+                          Start After Due
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-[var(--text-dark)] mb-1">
+                        {getIssueCount("start_is_after_due")}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        Jobs with start dates after their due dates
+                      </p>
+                    </button>
+
+                    {/* Missing Cost Per M Tile */}
+                    <button
+                      onClick={() => handleSelectIssue("missing_cost_per_m")}
+                      disabled={getIssueCount("missing_cost_per_m") === 0}
+                      className={`bg-gray-50 rounded-lg py-2.5 px-4 text-left transition-all border border-gray-200 ${
+                        getIssueCount("missing_cost_per_m") > 0
+                          ? "hover:bg-gray-100 hover:shadow-md hover:border-gray-300 cursor-pointer"
+                          : "opacity-60 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <DollarSign className="w-5 h-5 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">
+                          Missing Cost/M
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-[var(--text-dark)] mb-1">
+                        {getIssueCount("missing_cost_per_m")}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        Jobs missing cost per thousand entries
+                      </p>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Menu Footer */}
+              <div className="flex items-center justify-end p-6 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </>
+          ) : (
+            /* ========== FIXING VIEW ========== */
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <IconComponent className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      {config.title}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {config.description}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  disabled={isSaving}
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-auto p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -1620,43 +1851,53 @@ export default function DataHealthBulkFixModal({
               </div>
             </>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <div>
-            {isSaving && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving {saveProgress.current} of {saveProgress.total}...
               </div>
-            )}
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              disabled={isSaving}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              {saveResult ? "Close" : "Cancel"}
-            </button>
-            {!saveResult && jobs.length > 0 && (
-              <button
-                onClick={handleSave}
-                disabled={isSaving || validEditedCount === 0}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  `Save ${validEditedCount} Change${validEditedCount !== 1 ? "s" : ""}`
-                )}
-              </button>
-            )}
-          </div>
+
+              {/* Fixing View Footer */}
+              <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+                <div>
+                  {isSaving && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving {saveProgress.current} of {saveProgress.total}...
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={saveResult ? onClose : handleBackToMenu}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {saveResult ? (
+                      "Close"
+                    ) : (
+                      <>
+                        <ArrowLeft className="w-4 h-4" />
+                        Back
+                      </>
+                    )}
+                  </button>
+                  {!saveResult && jobs.length > 0 && (
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving || validEditedCount === 0}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        `Save ${validEditedCount} Change${validEditedCount !== 1 ? "s" : ""}`
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

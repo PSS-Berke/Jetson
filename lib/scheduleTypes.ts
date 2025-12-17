@@ -90,6 +90,6 @@ export function getActiveOptionsSummary(options: ScheduleOptions): string {
   if (options.runSat2nd) parts.push(`Sat 2nd (${options.runSat2ndHours}h)`);
   if (options.runSun1st) parts.push(`Sun 1st (${options.runSun1stHours}h)`);
   if (options.runSun2nd) parts.push(`Sun 2nd (${options.runSun2ndHours}h)`);
-  if (options.run12sAllWeekend) parts.push("12s Weekend");
+  if (options.run12sAllWeekend) parts.push("All Weekend");
   return parts.length > 0 ? parts.join(", ") : "None";
 }

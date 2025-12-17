@@ -22,6 +22,9 @@ interface EditJobModalProps {
   job: ParsedJob | null;
   onClose: () => void;
   onSuccess?: () => void;
+  // When embedded=true, renders content only without modal shell (for inline use in JobDetailsModal)
+  embedded?: boolean;
+  onBack?: () => void;
 }
 
 interface Requirement {
@@ -62,6 +65,8 @@ export default function EditJobModal({
   job,
   onClose,
   onSuccess,
+  embedded = false,
+  onBack,
 }: EditJobModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -476,6 +481,7 @@ export default function EditJobModal({
             end: endDate,
             quantity: quantity.toString(),
             saturday: (jobOpts.runSat1st || jobOpts.runSat2nd || jobOpts.run12sAllWeekend).toString(),
+            sunday: (jobOpts.runSun1st || jobOpts.runSun2nd || jobOpts.run12sAllWeekend).toString(),
             run_1st_ot: jobOpts.run1stOT.toString(),
             run_2nd_ot: jobOpts.run2ndOT.toString(),
             run_sat_1st: jobOpts.runSat1st.toString(),
@@ -520,7 +526,8 @@ export default function EditJobModal({
 
       calculateSplit();
     }
-  }, [formData.quantity, formData.start_date, formData.due_date, scheduleConfig, currentStep]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.quantity, formData.start_date, formData.due_date, JSON.stringify(scheduleConfig.jobDefaults), currentStep]);
 
   // Handle quantity changes when weekly_split already exists - respect locked weeks
   useEffect(() => {
@@ -1100,30 +1107,42 @@ export default function EditJobModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
-      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+  // Content component - shared between modal and embedded modes
+  const content = (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+        <div className="flex items-center gap-3">
+          {embedded && onBack && (
+            <button
+              onClick={onBack}
+              className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+              aria-label="Back to job details"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
           <h2 className="text-2xl font-bold text-[var(--dark-blue)]">
             Edit Job #{job.job_number}
           </h2>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
-            >
-              Delete
-            </button>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
-            >
-              &times;
-            </button>
-          </div>
         </div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+          >
+            Delete
+          </button>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light"
+          >
+            &times;
+          </button>
+        </div>
+      </div>
 
         {/* Step Indicator */}
         <div className="flex items-center px-6 py-4 bg-gray-50 border-b border-[var(--border)]">
@@ -2163,6 +2182,73 @@ export default function EditJobModal({
             </div>
           </div>
         </form>
+    </>
+  );
+
+  // In embedded mode, return content directly without modal shell
+  if (embedded) {
+    return (
+      <>
+        {content}
+        {/* Success Toast */}
+        {showSuccessToast && (
+          <Toast
+            message={`Job #${job.job_number} updated successfully!`}
+            type="success"
+            onClose={() => setShowSuccessToast(false)}
+          />
+        )}
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full relative z-10">
+              <div className="p-6 border-b border-[var(--border)]">
+                <h3 className="text-xl font-bold text-[var(--dark-blue)]">
+                  Confirm Deletion
+                </h3>
+              </div>
+              <div className="p-6">
+                <p className="text-[var(--text-dark)] mb-4">
+                  Are you sure you want to delete{" "}
+                  <span className="font-bold">Job #{job.job_number}</span>?
+                </p>
+                <p className="text-[var(--text-light)] text-sm">
+                  This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)] bg-gray-50">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="px-6 py-2 border border-[var(--border)] rounded-lg font-semibold text-[var(--text-dark)] hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? "Deleting..." : "Delete Job"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // Standard modal mode
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="absolute inset-0 bg-black/30" onClick={handleClose} />
+      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-10">
+        {content}
       </div>
 
       {/* Success Toast */}
