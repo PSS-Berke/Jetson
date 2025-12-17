@@ -997,6 +997,9 @@ export default function EditJobModal({
         total_billing: string;
         schedule_type: string;
         actual_cost_per_m: number | null;
+        version_group_uuid: string;
+        version_name: string;
+        exclude_from_calculations: boolean;
       }> = {
         jobs_id: job.id,
         job_number: formData.job_number,
@@ -1025,6 +1028,10 @@ export default function EditJobModal({
         due_date: dueDateTimestamp && dueDateTimestamp > 0 ? dueDateTimestamp : job.due_date,
         // Include facilities_id whether it was edited or not
         facilities_id: formData.facilities_id !== null ? formData.facilities_id : job.facilities_id,
+        // Preserve version linking fields
+        version_group_uuid: (job as any).version_group_uuid,
+        version_name: (job as any).version_name,
+        exclude_from_calculations: (job as any).exclude_from_calculations,
       };
 
       // Include sub_clients_id if available (either from form or if it exists in job)
@@ -1034,26 +1041,7 @@ export default function EditJobModal({
 
       await updateJob(job.id, payload);
 
-      // Auto-sync job_cost_entry from valid requirements only
-      try {
-        const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
-        // Use start_date from payload (timestamp) or fall back to existing job start_date
-        const startDateForSync =
-          payload.start_date || new Date(job.start_date).getTime();
-        await syncJobCostEntryFromRequirements(
-          job.id,
-          JSON.stringify(cleanedRequirements),
-          startDateForSync,
-          payload.facilities_id,
-        );
-        console.log("[EditJobModal] Job cost entry synced successfully");
-      } catch (costError) {
-        console.error(
-          "[EditJobModal] Failed to sync job cost entry (non-blocking):",
-          costError,
-        );
-        // Don't fail job update if cost entry sync fails
-      }
+      // Note: actual_cost_per_m is already set in the payload, no need to sync separately
 
       setCurrentStep(1);
       setShowSuccessToast(true);

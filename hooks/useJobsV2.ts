@@ -33,6 +33,8 @@ interface UseJobsV2Return {
  * This handles the time_split data and converts machines_id array to machines array
  */
 function convertJobV2ToParsedJob(jobV2: JobV2): ParsedJob {
+  console.log("[convertJobV2ToParsedJob] Converting job:", jobV2.id, jobV2.job_number, jobV2.job_name);
+
   // Convert machines_id array to machines array format
   const machines = (jobV2.machines_id || []).map((id) => ({
     id,
@@ -48,6 +50,7 @@ function convertJobV2ToParsedJob(jobV2: JobV2): ParsedJob {
 
   // Parse the job using the existing parseJob function
   const parsed = parseJob(baseJob as any);
+  console.log("[convertJobV2ToParsedJob] Parsed job:", parsed.id, parsed.job_number, "quantity:", parsed.quantity);
 
   // Attach time_split data if available
   if (jobV2.time_split) {

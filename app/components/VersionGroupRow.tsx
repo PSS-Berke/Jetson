@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useState } from "react";
-import { Layers, ChevronDown } from "lucide-react";
+import { Layers, ChevronDown, ChevronRight } from "lucide-react";
 import { ParsedJob } from "@/hooks/useJobs";
 import { JobProjection, TimeRange, formatQuantity } from "@/lib/projectionUtils";
 import { VersionGroup, getVersionName } from "@/lib/versionGroupUtils";
@@ -99,14 +99,27 @@ export const VersionGroupHeaderRow = memo(
         {orderedColumns.map((col) => {
           if (!col.isVisible) return null;
 
-          // Custom rendering for checkbox column - show layers icon as visual indicator
+          // Custom rendering for checkbox column - show expand/collapse chevron
           if (col.config.key === "checkbox") {
             return (
               <td
                 key="checkbox"
                 className="pl-2 pr-1 py-2 w-10"
               >
-                <Layers className="w-4 h-4 text-indigo-500" />
+                <button
+                  className="version-expand-btn flex items-center justify-center p-1 hover:bg-indigo-200 rounded transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleExpand();
+                  }}
+                  title={isExpanded ? "Collapse versions" : "Expand versions"}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-indigo-500" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-indigo-500" />
+                  )}
+                </button>
               </td>
             );
           }

@@ -126,6 +126,7 @@ function AddJobModal({
   }>>([]);
   const [editingVersionIndex, setEditingVersionIndex] = useState<number | null>(null);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
     clients_id: null,
@@ -1391,23 +1392,7 @@ function AddJobModal({
 
       const results = await Promise.all(submitPromises);
 
-      // Auto-sync job_cost_entry for the first (primary) version
-      if (results.length > 0 && results[0].id) {
-        try {
-          const { syncJobCostEntryFromRequirements } = await import("@/lib/api");
-          const validRequirements = getValidRequirements(formData.requirements);
-          const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
-          await syncJobCostEntryFromRequirements(
-            results[0].id,
-            cleanedRequirements,
-            formData.start_date,
-            formData.facilities_id || undefined,
-          );
-          console.log("[AddJobModal] Job cost entry synced successfully");
-        } catch (costError) {
-          console.error("[AddJobModal] Failed to sync job cost entry (non-blocking):", costError);
-        }
-      }
+      // Note: actual_cost_per_m is already set in the payload, no need to sync separately
 
       const jobNum = parseInt(formData.job_number);
       setCreatedJobNumber(jobNum);
@@ -1559,6 +1544,7 @@ function AddJobModal({
 
         {/* Form Content */}
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="flex-1 overflow-y-auto p-4 sm:p-6"
         >
@@ -2548,11 +2534,11 @@ function AddJobModal({
                     onChange={(e) => setScheduleType(e.target.value)}
                     className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-blue)] bg-white"
                   >
-                    <option value="soft schedule">soft schedule</option>
-                    <option value="hard schedule">hard schedule</option>
-                    <option value="projected">projected</option>
-                    <option value="completed">completed</option>
-                    <option value="cancelled">cancelled</option>
+                    <option value="soft schedule">Soft Schedule</option>
+                    <option value="hard schedule">Hard Schedule</option>
+                    <option value="projected">Projected</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                   <p className="text-sm text-[var(--text-light)] mt-3">
                     {scheduleType === "hard schedule"
@@ -2655,9 +2641,8 @@ function AddJobModal({
                           setCanSubmit(true);
                           // Use setTimeout to allow state to update before form submission
                           setTimeout(() => {
-                            const form = document.querySelector("form");
-                            if (form) {
-                              form.requestSubmit();
+                            if (formRef.current) {
+                              formRef.current.requestSubmit();
                             }
                           }, 0);
                         }}

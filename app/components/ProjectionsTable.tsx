@@ -19,7 +19,7 @@ import { PrimaryCategoryRow } from "./PrimaryCategoryRow";
 import { SubCategoryRow } from "./SubCategoryRow";
 import { buildSummaryTieredData, getPrimaryCategoryValue } from "@/lib/tieredFilterUtils";
 import { groupProjectionsByVersion, isVersionGroup, type VersionGroup } from "@/lib/versionGroupUtils";
-import { VersionGroupHeaderRow } from "./VersionGroupRow";
+import { VersionGroupHeaderRow, VersionRow } from "./VersionGroupRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
@@ -1981,20 +1981,56 @@ export default function ProjectionsTable({
                 // Check if this item is a VersionGroup or a regular JobProjection
                 if (isVersionGroup(item)) {
                   const versionGroup = item as VersionGroup;
+                  const isGroupExpanded = expandedVersionGroups.has(versionGroup.groupId);
 
-                  // Render a single combined row for the version group
+                  // Render version group header with expandable version rows
                   return (
-                    <VersionGroupHeaderRow
-                      key={`version-group-${versionGroup.groupId}`}
-                      versionGroup={versionGroup}
-                      timeRanges={timeRanges}
-                      isExpanded={false}
-                      onToggleExpand={() => {}}
-                      onJobClick={handleJobClick}
-                      showNotes={showNotes}
-                      orderedColumns={orderedColumns}
-                      granularity={granularity}
-                    />
+                    <React.Fragment key={`version-group-${versionGroup.groupId}`}>
+                      <VersionGroupHeaderRow
+                        versionGroup={versionGroup}
+                        timeRanges={timeRanges}
+                        isExpanded={isGroupExpanded}
+                        onToggleExpand={() => handleToggleVersionGroup(versionGroup.groupId)}
+                        onJobClick={handleJobClick}
+                        showNotes={showNotes}
+                        orderedColumns={orderedColumns}
+                        granularity={granularity}
+                      />
+                      {/* Render individual version rows when expanded */}
+                      {isGroupExpanded && versionGroup.allVersions.map((versionProjection, vIdx) => {
+                        const vJob = versionProjection.job;
+                        const vJobNotes = showNotes ? jobNotesMap.get(vJob.id) || [] : [];
+                        const vHasNotes = vJobNotes.length > 0;
+                        const vNoteColor = vHasNotes ? vJobNotes[0].color || "#000000" : undefined;
+
+                        return (
+                          <VersionRow
+                            key={`version-${vJob.id}`}
+                            projection={versionProjection}
+                            timeRanges={timeRanges}
+                            onJobClick={handleJobClick}
+                            isSelected={selectedJobIds.has(vJob.id)}
+                            onToggleSelect={() => handleToggleSelect(vJob.id)}
+                            showNotes={showNotes}
+                            jobNotes={vJobNotes}
+                            noteColor={vNoteColor}
+                            editingNoteId={editingNoteId}
+                            editingText={editingText}
+                            onStartEdit={handleStartEdit}
+                            onCancelEdit={handleCancelEdit}
+                            onSaveEdit={handleSaveEdit}
+                            onTextChange={setEditingText}
+                            isSavingNote={isSavingNote}
+                            onOpenNotesModal={handleOpenNotesModal}
+                            granularity={granularity}
+                            cellNotesMap={cellNotesMap}
+                            orderedColumns={orderedColumns}
+                            lastModifiedByJob={lastModifiedByJob}
+                            isLastInGroup={vIdx === versionGroup.allVersions.length - 1}
+                          />
+                        );
+                      })}
+                    </React.Fragment>
                   );
                 } else {
                   // Regular JobProjection (standalone or single version)
