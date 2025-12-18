@@ -380,16 +380,14 @@ export default function JobDetailsModal({
                     {currentJob.client?.name || "Unknown"}
                   </p>
                 </div>
-                {currentJob.sub_client && (
-                  <div>
-                    <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
-                      Sub Client
-                    </label>
-                    <p className="text-base text-[var(--text-dark)]">
-                      {currentJob.sub_client}
-                    </p>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
+                    Sub Client
+                  </label>
+                  <p className="text-base text-[var(--text-dark)]">
+                    {currentJob.sub_client || "N/A"}
+                  </p>
+                </div>
                 <div>
                   <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
                     Service Type

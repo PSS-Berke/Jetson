@@ -37,7 +37,7 @@ interface Requirement {
 interface JobFormData {
   job_number: string;
   clients_id: number | null;
-  sub_clients_id: number | null;
+  sub_client_id: number | null;
   client_name: string;
   sub_client_name: string;
   job_name: string;
@@ -91,7 +91,7 @@ export default function EditJobModal({
   const [formData, setFormData] = useState<JobFormData>({
     job_number: "",
     clients_id: null,
-    sub_clients_id: null,
+    sub_client_id: null,
     client_name: "",
     sub_client_name: "",
     job_name: "",
@@ -345,7 +345,7 @@ export default function EditJobModal({
       setFormData({
         job_number: toStringValue(job.job_number),
         clients_id: clientId,
-        sub_clients_id: subClientId,
+        sub_client_id: subClientId,
         client_name: clientName,
         sub_client_name: subClientName,
         job_name: toStringValue(job.job_name),
@@ -671,7 +671,7 @@ export default function EditJobModal({
   const handleSubClientChange = (clientId: number, clientName: string) => {
     setFormData({
       ...formData,
-      sub_clients_id: clientId,
+      sub_client_id: clientId,
       sub_client_name: clientName,
     });
   };
@@ -890,6 +890,7 @@ export default function EditJobModal({
 
   // Helper function to filter out unselected/invalid requirements
   // A requirement is valid if it has a process_type and at least one other field filled
+  // OR if it has process_type and price_per_m (price_per_m counts as a valid field)
   const getValidRequirements = (requirements: Requirement[]): Requirement[] => {
     return requirements.filter((req) => {
       // Must have a process_type
@@ -897,11 +898,18 @@ export default function EditJobModal({
         return false;
       }
 
-      // Must have at least one other field filled (besides process_type, price_per_m, id, and cost fields)
+      // Check if price_per_m is valid (counts as a valid field)
+      const hasValidPricePerM = req.price_per_m !== undefined && 
+                                 req.price_per_m !== null && 
+                                 req.price_per_m !== "" &&
+                                 isFieldValueValid(req.price_per_m);
+
+      // Must have at least one other field filled (besides process_type, id, and cost fields)
+      // OR have a valid price_per_m
       const fieldCount = Object.keys(req).filter(
         (key) =>
           key !== "process_type" &&
-          key !== "price_per_m" &&
+          key !== "price_per_m" && // Still exclude from count, but check separately above
           key !== "id" &&
           !key.endsWith('_cost') && // Exclude cost fields from the count
           req[key] !== undefined &&
@@ -910,7 +918,7 @@ export default function EditJobModal({
           isFieldValueValid(req[key]),
       ).length;
 
-      return fieldCount > 0;
+      return fieldCount > 0 || hasValidPricePerM;
     });
   };
 
@@ -974,6 +982,46 @@ export default function EditJobModal({
       const actualPricePerM =
         quantity > 0 ? calculatedTotalBilling / (quantity / 1000) : null;
 
+      // Convert splitResults to daily_split format
+      const formatDateToDDMMYYYY = (dateString: string): string => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
+      };
+
+      // Get existing daily_split from job
+      const jobWithDailySplit = job as typeof job & {
+        daily_split?: Array<{ date: string; quantity: number }> | number[][];
+      };
+
+      // If splitResults exists, convert it to daily_split format
+      // Otherwise, preserve the existing daily_split from the job
+      let dailySplit: Array<{ date: string; quantity: number }> | null = null;
+      if (splitResults.length > 0) {
+        // Convert splitResults to daily_split format
+        dailySplit = splitResults.map((item) => ({
+          date: formatDateToDDMMYYYY(item.Date),
+          quantity: item.Quantity,
+        }));
+      } else if (jobWithDailySplit.daily_split && Array.isArray(jobWithDailySplit.daily_split)) {
+        // Preserve existing daily_split if it exists and splitResults is empty
+        const firstItem = jobWithDailySplit.daily_split[0];
+        if (firstItem && typeof firstItem === 'object' && 'date' in firstItem) {
+          // Already in the new format - preserve it
+          dailySplit = jobWithDailySplit.daily_split as Array<{ date: string; quantity: number }>;
+        }
+        // If it's in the old format (2D array), we leave dailySplit as null
+        // The backend should preserve the existing value if we don't send it
+        // But to be safe, we'll always include daily_split in the payload
+      }
+
+      // Determine sub_client value: use formData if available, otherwise preserve from job
+      const subClientValue = formData.sub_client_name && formData.sub_client_name.trim() !== ""
+        ? formData.sub_client_name
+        : (job.sub_client || undefined);
+
       const payload: Partial<{
         jobs_id: number;
         job_number: string;
@@ -984,7 +1032,7 @@ export default function EditJobModal({
         due_date: number;
         time_estimate: number | null;
         clients_id: number;
-        sub_clients_id: number;
+        sub_client_id: number;
         machines_id: string;
         requirements: string;
         job_name: string;
@@ -1000,6 +1048,8 @@ export default function EditJobModal({
         version_group_uuid: string;
         version_name: string;
         exclude_from_calculations: boolean;
+        daily_split: Array<{ date: string; quantity: number }> | null;
+        sub_client?: string;
       }> = {
         jobs_id: job.id,
         job_number: formData.job_number,
@@ -1032,11 +1082,17 @@ export default function EditJobModal({
         version_group_uuid: (job as any).version_group_uuid,
         version_name: (job as any).version_name,
         exclude_from_calculations: (job as any).exclude_from_calculations,
+        // Include daily_split to preserve the split when editing
+        // If splitResults exists, use that; otherwise preserve existing daily_split from job
+        daily_split: dailySplit,
+        // Include sub_client to preserve it when editing
+        // Use formData.sub_client_name if it's not empty, otherwise preserve existing from job
+        ...(subClientValue ? { sub_client: subClientValue } : {}),
       };
 
-      // Include sub_clients_id if available (either from form or if it exists in job)
-      if (formData.sub_clients_id !== null) {
-        payload.sub_clients_id = formData.sub_clients_id;
+      // Include sub_client_id if available (either from form or if it exists in job)
+      if (formData.sub_client_id !== null) {
+        payload.sub_client_id = formData.sub_client_id;
       }
 
       // Debug: log what we're sending to help diagnose issues
@@ -1222,7 +1278,7 @@ export default function EditJobModal({
                     Sub Client
                   </label>
                   <SmartClientSelect
-                    value={formData.sub_clients_id}
+                    value={formData.sub_client_id}
                     onChange={handleSubClientChange}
                     initialClientName={formData.sub_client_name}
                     required={false}
@@ -1573,6 +1629,12 @@ export default function EditJobModal({
                     <span className="text-[var(--text-light)]">Client:</span>
                     <span className="ml-2 font-semibold text-[var(--text-dark)]">
                       {formData.client_name}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-light)]">Sub Client:</span>
+                    <span className="ml-2 font-semibold text-[var(--text-dark)]">
+                      {formData.sub_client_name || "N/A"}
                     </span>
                   </div>
                   <div>

@@ -77,6 +77,11 @@ function convertJobV2ToParsedJob(jobV2: JobV2): ParsedJob {
     (parsed as any).exclude_from_calculations = (jobV2 as any).exclude_from_calculations;
   }
 
+  // Preserve sub_client from JobV2 (in case it's lost during parsing)
+  if (jobV2.sub_client !== undefined) {
+    parsed.sub_client = jobV2.sub_client;
+  }
+
   return parsed;
 }
 
