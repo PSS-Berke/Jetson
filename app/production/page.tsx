@@ -582,6 +582,7 @@ export default function ProductionPage() {
               <ServiceTypeLoadTable
                 facilitiesId={selectedFacility}
                 granularity={granularity === "day" ? "week" : granularity}
+                startDate={currentDate}
               />
             )}
           </>

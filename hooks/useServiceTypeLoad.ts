@@ -22,7 +22,12 @@ export interface ServiceTypeGroup {
   items: ParsedServiceTypeLoadItem[];
 }
 
-export function useServiceTypeLoad(facilitiesId: number | null, granularity: "week" | "month" | "quarter") {
+export function useServiceTypeLoad(
+  facilitiesId: number | null,
+  granularity: "week" | "month" | "quarter",
+  from: number | null = null,
+  to: number | null = null,
+) {
   const [data, setData] = useState<ParsedServiceTypeLoadItem[]>([]);
   const [groupedData, setGroupedData] = useState<ServiceTypeGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +40,14 @@ export function useServiceTypeLoad(facilitiesId: number | null, granularity: "we
       
       try {
         const facilities_id = facilitiesId ?? 0;
-        const response = await getServiceTypeLoad(facilities_id);
+        console.log("[useServiceTypeLoad] Fetching data with:", {
+          facilities_id,
+          from,
+          to,
+          granularity,
+        });
+        const response = await getServiceTypeLoad(facilities_id, from, to);
+        console.log("[useServiceTypeLoad] Received response:", response);
         
         // Parse JSON strings in the response
         const parsed: ParsedServiceTypeLoadItem[] = response.map((item) => ({
@@ -72,7 +84,7 @@ export function useServiceTypeLoad(facilitiesId: number | null, granularity: "we
     };
 
     fetchData();
-  }, [facilitiesId]);
+  }, [facilitiesId, from, to]);
 
   // Get date columns based on granularity
   const getDateColumns = (): string[] => {

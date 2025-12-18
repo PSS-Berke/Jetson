@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useServiceTypeLoad, type ServiceTypeGroup } from "@/hooks/useServiceTypeLoad";
+import { generateWeekRanges } from "@/lib/projectionUtils";
+import { generateMonthRanges, generateQuarterRanges } from "@/lib/dateUtils";
 
 // Map toggle granularity to property name
 const granularityToProperty = (granularity: "week" | "month" | "quarter"): "weekly" | "monthly" | "quarterly" => {
@@ -16,6 +18,7 @@ const granularityToProperty = (granularity: "week" | "month" | "quarter"): "week
 interface ServiceTypeLoadTableProps {
   facilitiesId: number | null;
   granularity: "week" | "month" | "quarter";
+  startDate?: Date; // Optional start date for calculating date range
 }
 
 function formatNumber(num: number): string {
@@ -34,10 +37,64 @@ function formatKeyLabel(key: string, value: string): string {
 export default function ServiceTypeLoadTable({
   facilitiesId,
   granularity,
+  startDate,
 }: ServiceTypeLoadTableProps) {
+  // Calculate date range based on granularity and startDate
+  const { from, to } = useMemo(() => {
+    console.log("[ServiceTypeLoadTable] Calculating date range:", {
+      startDate,
+      granularity,
+      hasStartDate: !!startDate,
+    });
+    
+    if (!startDate) {
+      console.log("[ServiceTypeLoadTable] No startDate provided, using null for from/to");
+      return { from: null, to: null };
+    }
+
+    let timeRanges;
+    switch (granularity) {
+      case "week":
+        timeRanges = generateWeekRanges(startDate);
+        break;
+      case "month":
+        timeRanges = generateMonthRanges(startDate, 6);
+        break;
+      case "quarter":
+        timeRanges = generateQuarterRanges(startDate, 6);
+        break;
+      default:
+        timeRanges = generateWeekRanges(startDate);
+    }
+
+    if (timeRanges.length === 0) {
+      return { from: null, to: null };
+    }
+
+    // Get the first range's start date and last range's end date
+    const firstRange = timeRanges[0];
+    const lastRange = timeRanges[timeRanges.length - 1];
+    
+    const result = {
+      from: firstRange.startDate.getTime(),
+      to: lastRange.endDate.getTime(),
+    };
+    console.log("[ServiceTypeLoadTable] Calculated date range:", result);
+    return result;
+  }, [granularity, startDate]);
+
+  console.log("[ServiceTypeLoadTable] Rendering with:", {
+    facilitiesId,
+    granularity,
+    from,
+    to,
+  });
+
   const { groupedData, dateColumns, isLoading, error } = useServiceTypeLoad(
     facilitiesId,
     granularity,
+    from,
+    to,
   );
   const [expandedServiceTypes, setExpandedServiceTypes] = useState<Set<string>>(
     new Set(),

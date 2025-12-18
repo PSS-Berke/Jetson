@@ -19,7 +19,7 @@ import {
   type TimeRange,
 } from "@/lib/projectionUtils";
 import { generateMonthRanges, generateQuarterRanges } from "@/lib/dateUtils";
-import { getProductionEntries, getJobEditLogs } from "@/lib/api";
+import { getProductionEntries, getJobEditLogs, getServiceTypeLoad, type ServiceTypeLoadItem } from "@/lib/api";
 import type { JobEditLog } from "./useJobEditLogs";
 import { aggregateProductionByJob } from "@/lib/productionUtils";
 import type { Granularity } from "@/app/components/GranularityToggle";
@@ -280,16 +280,28 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     fetchEditLogs();
   }, []);
 
+  // Fetch service type load data from API
+  const [serviceTypeLoadData, setServiceTypeLoadData] = useState<ServiceTypeLoadItem[]>([]);
+  const [serviceTypeLoadLoading, setServiceTypeLoadLoading] = useState(false);
+
   // Build a map of job ID to most recent edit timestamp
-  // Falls back to job's created_at if no edit logs exist
+  // Uses last_modified from jobs/v2 response if available, otherwise falls back to created_at
   const lastModifiedByJob = useMemo(() => {
     const map = new Map<number, number>();
 
-    // First, populate with job created_at timestamps as baseline
+    // Populate with last_modified from jobs/v2 response, or created_at if last_modified is null
     if (jobs) {
       for (const job of jobs) {
-        if (job.id && job.created_at) {
-          map.set(job.id, job.created_at);
+        if (job.id) {
+          // Check if last_modified exists and is not null, otherwise use created_at
+          const lastModified = (job as any).last_modified;
+          const timestamp = lastModified !== null && lastModified !== undefined 
+            ? lastModified 
+            : job.created_at;
+          
+          if (timestamp) {
+            map.set(job.id, timestamp);
+          }
         }
       }
     }
@@ -329,6 +341,40 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
         return generateWeekRanges(startDate);
     }
   }, [granularity, startDate]);
+
+  // Fetch service type load data when time ranges, facility, or granularity changes
+  useEffect(() => {
+    const fetchServiceTypeLoad = async () => {
+      if (timeRanges.length === 0) return;
+
+      setServiceTypeLoadLoading(true);
+      try {
+        const facilitiesId = filters.facility ?? 0;
+        const firstRange = timeRanges[0];
+        const lastRange = timeRanges[timeRanges.length - 1];
+        const from = firstRange.startDate.getTime();
+        const to = lastRange.endDate.getTime();
+
+        console.log("[useProjections] Fetching service type load:", {
+          facilitiesId,
+          from,
+          to,
+          granularity,
+        });
+
+        const data = await getServiceTypeLoad(facilitiesId, from, to);
+        console.log("[useProjections] Service type load data received:", data);
+        setServiceTypeLoadData(data);
+      } catch (err) {
+        console.error("[useProjections] Error fetching service type load:", err);
+        setServiceTypeLoadData([]);
+      } finally {
+        setServiceTypeLoadLoading(false);
+      }
+    };
+
+    fetchServiceTypeLoad();
+  }, [timeRanges, filters.facility, granularity]);
 
   // 2. Production aggregation - only recalculates when productionEntries changes
   const actualQuantitiesByJob = useMemo(() => {
@@ -627,15 +673,128 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
     }
   }, [adjustedJobProjections, filters]);
 
-  // 5. Service summaries and grand totals - only recalculates when filteredProjections or timeRanges change
+  // 5. Service summaries and grand totals - use API data if available, otherwise calculate from projections
   const { serviceSummaries, grandTotals } = useMemo(() => {
+    // If we have API data, transform it to ServiceTypeSummary format
+    if (serviceTypeLoadData.length > 0) {
+      console.log("[useProjections] Using service type load API data");
+      
+      // Group by service_type and aggregate
+      const summaryMap = new Map<string, ServiceTypeSummary>();
+      
+      // Determine which property to use based on granularity
+      const timeDataProperty = granularity === "week" ? "weekly" : granularity === "month" ? "monthly" : "quarterly";
+      
+      serviceTypeLoadData.forEach((item) => {
+        const serviceType = item.service_type;
+        
+        if (!summaryMap.has(serviceType)) {
+          const weeklyTotals = new Map<string, number>();
+          // Initialize all time ranges to 0
+          timeRanges.forEach((range) => {
+            weeklyTotals.set(range.label, 0);
+          });
+          
+          summaryMap.set(serviceType, {
+            serviceType,
+            weeklyTotals,
+            grandTotal: 0,
+            jobCount: 0,
+          });
+        }
+        
+        const summary = summaryMap.get(serviceType)!;
+        
+        // Parse the time data (weekly, monthly, or quarterly)
+        const timeDataStr = item[timeDataProperty] || "{}";
+        let timeData: Record<string, number> = {};
+        try {
+          timeData = JSON.parse(timeDataStr);
+        } catch (e) {
+          console.warn(`[useProjections] Failed to parse ${timeDataProperty} data for ${serviceType}:`, e);
+        }
+        
+        // Map the time data to our time range labels
+        timeRanges.forEach((range) => {
+          // Try to match the range label with keys in timeData
+          // For weeks: range.label is "MM/DD", timeData keys might be "MM/DD" or other formats
+          // For months: range.label is "MMM yyyy", timeData keys might be "YYYY-MM"
+          // For quarters: range.label is "YYYY-QN", timeData keys might be similar
+          let matchedValue = 0;
+          
+          // Try direct match first
+          if (timeData[range.label]) {
+            matchedValue = timeData[range.label];
+          } else {
+            // Try to find a matching key based on the date
+            const rangeDate = range.startDate;
+            for (const [key, value] of Object.entries(timeData)) {
+              let keyMatches = false;
+              
+              if (granularity === "week") {
+                // For weeks, compare month/day
+                const [month, day] = key.split("/").map(Number);
+                if (month === rangeDate.getMonth() + 1 && day === rangeDate.getDate()) {
+                  keyMatches = true;
+                }
+              } else if (granularity === "month") {
+                // For months, compare year-month
+                const rangeYearMonth = `${rangeDate.getFullYear()}-${String(rangeDate.getMonth() + 1).padStart(2, "0")}`;
+                if (key === rangeYearMonth || key.startsWith(rangeYearMonth)) {
+                  keyMatches = true;
+                }
+              } else if (granularity === "quarter") {
+                // For quarters, compare year-quarter
+                const quarter = Math.floor(rangeDate.getMonth() / 3) + 1;
+                const rangeYearQuarter = `${rangeDate.getFullYear()}-Q${quarter}`;
+                if (key === rangeYearQuarter || key.includes(`${rangeDate.getFullYear()}-Q${quarter}`)) {
+                  keyMatches = true;
+                }
+              }
+              
+              if (keyMatches) {
+                matchedValue = typeof value === "number" ? value : parseFloat(String(value)) || 0;
+                break;
+              }
+            }
+          }
+          
+          const currentTotal = summary.weeklyTotals.get(range.label) || 0;
+          summary.weeklyTotals.set(range.label, currentTotal + matchedValue);
+        });
+        
+        // Add to grand total (sum of all time periods) and track max job count
+        // Note: job_count might be duplicated across items, so we'll use the max
+        summary.jobCount = Math.max(summary.jobCount, item.job_count || 0);
+      });
+      
+      // Calculate grand totals from the weekly totals
+      const summaries = Array.from(summaryMap.values()).map((summary) => {
+        let grandTotal = 0;
+        summary.weeklyTotals.forEach((value) => {
+          grandTotal += value;
+        });
+        return {
+          ...summary,
+          grandTotal,
+        };
+      }).sort((a, b) =>
+        a.serviceType.localeCompare(b.serviceType),
+      );
+      
+      const totals = calculateGenericGrandTotals(summaries, timeRanges);
+      return { serviceSummaries: summaries, grandTotals: totals };
+    }
+    
+    // Fallback to calculated summaries if no API data
+    console.log("[useProjections] Using calculated service summaries (no API data)");
     const summaries = calculateGenericServiceTypeSummaries(
       filteredProjections,
       timeRanges,
     );
     const totals = calculateGenericGrandTotals(summaries, timeRanges);
     return { serviceSummaries: summaries, grandTotals: totals };
-  }, [filteredProjections, timeRanges]);
+  }, [serviceTypeLoadData, timeRanges, granularity, filteredProjections]);
 
   // 5.5. Process type summaries - only recalculates when filteredProjections or timeRanges change
   // Uses facility-grouped summaries if groupByFacility is true
@@ -779,6 +938,8 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   return {
     ...projectionsData,
     isLoading: isLoading || productionLoading,
+    isServiceTypeLoadLoading: serviceTypeLoadLoading,
+    serviceTypeLoadData,
     error,
     refetch,
   };

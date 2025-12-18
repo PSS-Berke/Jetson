@@ -22,6 +22,7 @@ import { groupProjectionsByVersion, isVersionGroup, type VersionGroup } from "@/
 import { VersionGroupHeaderRow, VersionRow } from "./VersionGroupRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
 import { bulkDeleteJobs, bulkUpdateJobs, getJobNotes, updateJobNote, type JobNote, getAllMachineVariables } from "@/lib/api";
+import type { ServiceTypeLoadItem } from "@/lib/api";
 import { getBreakdownableFields, normalizeProcessType } from "@/lib/processTypeConfig";
 import type { CellIdentifier, CellGranularity } from "@/types";
 import { useCellNotes } from "@/hooks/useCellNotes";
@@ -80,6 +81,7 @@ interface ProjectionsTableProps {
   fullFilteredProjections?: JobProjection[]; // NEW: Full filtered data for breakdown calculations
   lastModifiedByJob?: Map<number, number>; // Map of job ID to last modified timestamp
   versionGroupingEnabled?: boolean; // Whether to group job versions together
+  serviceTypeLoadData?: import("@/lib/api").ServiceTypeLoadItem[]; // API data for breakdowns
 }
 
 // Type guard to check if summary has facility information
@@ -87,6 +89,122 @@ function isFacilitySummary(
   summary: ProcessTypeSummary | ProcessTypeFacilitySummary
 ): summary is ProcessTypeFacilitySummary {
   return 'facilityId' in summary && 'facilityName' in summary;
+}
+
+// Transform service type load API data to ProcessTypeBreakdown format
+function transformServiceTypeLoadToBreakdowns(
+  serviceTypeLoadData: ServiceTypeLoadItem[],
+  processType: string,
+  fieldName: string,
+  timeRanges: TimeRange[],
+  granularity: "week" | "month" | "quarter",
+): import("@/types").ProcessTypeBreakdown[] {
+  const normalizedProcessType = normalizeProcessType(processType).toLowerCase();
+  const breakdownMap = new Map<string, import("@/types").ProcessTypeBreakdown>();
+
+  // Determine which time data property to use
+  const timeDataProperty = granularity === "week" ? "weekly" : granularity === "month" ? "monthly" : "quarterly";
+
+  // Filter API data for this process type and field
+  const relevantItems = serviceTypeLoadData.filter((item) => {
+    const itemProcessType = normalizeProcessType(item.service_type).toLowerCase();
+    return itemProcessType === normalizedProcessType && item.key === fieldName;
+  });
+
+  console.log(`[transformServiceTypeLoadToBreakdowns] Found ${relevantItems.length} items for processType="${normalizedProcessType}", field="${fieldName}"`);
+
+  relevantItems.forEach((item) => {
+    const fieldValue = item.value;
+    const breakdownKey = `${fieldName}:${fieldValue}`;
+
+    if (!breakdownMap.has(breakdownKey)) {
+      // Initialize quantities for all time ranges
+      const quantities: { [timeRangeKey: string]: number } = {};
+      timeRanges.forEach((range) => {
+        quantities[range.label] = 0;
+      });
+
+      breakdownMap.set(breakdownKey, {
+        processType: normalizedProcessType,
+        fieldName,
+        fieldValue,
+        fieldLabel: String(fieldValue),
+        quantities,
+        totalQuantity: 0,
+        jobCount: 0,
+      });
+    }
+
+    const breakdown = breakdownMap.get(breakdownKey)!;
+
+    // Parse time data from API
+    const timeDataStr = item[timeDataProperty] || "{}";
+    let timeData: Record<string, number> = {};
+    try {
+      timeData = JSON.parse(timeDataStr);
+    } catch (e) {
+      console.warn(`[transformServiceTypeLoadToBreakdowns] Failed to parse ${timeDataProperty} data:`, e);
+    }
+
+    // Map time data to time range labels
+    timeRanges.forEach((range) => {
+      let matchedValue = 0;
+
+      // Try direct match first
+      if (timeData[range.label]) {
+        matchedValue = timeData[range.label];
+      } else {
+        // Try to match by date
+        const rangeDate = range.startDate;
+        for (const [key, value] of Object.entries(timeData)) {
+          let keyMatches = false;
+
+          if (granularity === "week") {
+            const [month, day] = key.split("/").map(Number);
+            if (month === rangeDate.getMonth() + 1 && day === rangeDate.getDate()) {
+              keyMatches = true;
+            }
+          } else if (granularity === "month") {
+            const rangeYearMonth = `${rangeDate.getFullYear()}-${String(rangeDate.getMonth() + 1).padStart(2, "0")}`;
+            if (key === rangeYearMonth || key.startsWith(rangeYearMonth)) {
+              keyMatches = true;
+            }
+          } else if (granularity === "quarter") {
+            const quarter = Math.floor(rangeDate.getMonth() / 3) + 1;
+            const rangeYearQuarter = `${rangeDate.getFullYear()}-Q${quarter}`;
+            if (key === rangeYearQuarter || key.includes(`${rangeDate.getFullYear()}-Q${quarter}`)) {
+              keyMatches = true;
+            }
+          }
+
+          if (keyMatches) {
+            matchedValue = typeof value === "number" ? value : parseFloat(String(value)) || 0;
+            break;
+          }
+        }
+      }
+
+      breakdown.quantities[range.label] = (breakdown.quantities[range.label] || 0) + matchedValue;
+    });
+
+    // Update totals
+    breakdown.totalQuantity += item.key_total || 0;
+    breakdown.jobCount = Math.max(breakdown.jobCount, item.job_count || 0);
+  });
+
+  // Convert to array and sort
+  const result = Array.from(breakdownMap.values()).sort((a, b) => {
+    if (typeof a.fieldValue === "boolean" && typeof b.fieldValue === "boolean") {
+      return a.fieldValue === b.fieldValue ? 0 : a.fieldValue ? -1 : 1;
+    }
+    if (typeof a.fieldValue === "number" && typeof b.fieldValue === "number") {
+      return a.fieldValue - b.fieldValue;
+    }
+    return String(a.fieldValue).localeCompare(String(b.fieldValue));
+  });
+
+  console.log(`[transformServiceTypeLoadToBreakdowns] Returning ${result.length} breakdown entries`);
+  return result;
 }
 
 // Memoized desktop table row component
@@ -618,6 +736,7 @@ export default function ProjectionsTable({
   fullFilteredProjections,
   lastModifiedByJob,
   versionGroupingEnabled = true,
+  serviceTypeLoadData = [],
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
   const [selectedJobRelatedVersions, setSelectedJobRelatedVersions] = useState<ParsedJob[]>([]);
@@ -1698,12 +1817,28 @@ export default function ProjectionsTable({
                     console.log(`[Breakdown Debug] Expanding ${summary.processType}${isFacilitySummary(summary) ? ` (Facility: ${summary.facilityName})` : ''}, using ${facilityFilteredProjections.length} projections (filtered from ${projectionsToUse.length})`);
 
                     availableFields.forEach((field) => {
-                      const fieldBreakdowns = calculateProcessTypeBreakdownByField(
-                        facilityFilteredProjections,
-                        timeRanges,
-                        normalizedProcessType,
-                        field.name
-                      );
+                      // Use API data if available, otherwise calculate from projections
+                      let fieldBreakdowns: import("@/types").ProcessTypeBreakdown[];
+                      
+                      if (serviceTypeLoadData.length > 0) {
+                        console.log(`[Breakdown Debug] Using API data for field "${field.name}"`);
+                        fieldBreakdowns = transformServiceTypeLoadToBreakdowns(
+                          serviceTypeLoadData,
+                          summary.processType,
+                          field.name,
+                          timeRanges,
+                          granularity,
+                        );
+                      } else {
+                        console.log(`[Breakdown Debug] Calculating breakdowns from projections for field "${field.name}"`);
+                        fieldBreakdowns = calculateProcessTypeBreakdownByField(
+                          facilityFilteredProjections,
+                          timeRanges,
+                          normalizedProcessType,
+                          field.name
+                        );
+                      }
+                      
                       console.log(`[Breakdown Debug] Field "${field.name}" has ${fieldBreakdowns.length} breakdown entries:`, fieldBreakdowns);
                       // Only include fields that have actual breakdowns (multiple values)
                       if (fieldBreakdowns.length > 0) {

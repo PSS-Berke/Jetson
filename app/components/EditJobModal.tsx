@@ -1478,15 +1478,15 @@ export default function EditJobModal({
                 />
               )}
 
-              {/* Weekly Split Section */}
-              {formData.weekly_split.length > 0 && (
+              {/* Weekly Split Section - Hidden */}
+              {/* {formData.weekly_split.length > 0 && (
                 <WeeklySplitEditor
                   weeklySplit={formData.weekly_split}
                   lockedWeeks={formData.locked_weeks}
                   totalQuantity={parseInt(formData.quantity || "0")}
                   onSplitChange={handleWeeklySplitEditorChange}
                 />
-              )}
+              )} */}
 
               <div>
                 <label className="block text-sm font-semibold text-[var(--text-dark)] mb-2">

@@ -1127,12 +1127,31 @@ export interface ServiceTypeLoadItem {
 // Get service type load data
 export const getServiceTypeLoad = async (
   facilitiesId: number = 0,
+  from: number | null = null,
+  to: number | null = null,
 ): Promise<ServiceTypeLoadItem[]> => {
-  return api.post<ServiceTypeLoadItem[]>(
-    "/service_type_load",
-    { facilities_id: facilitiesId },
+  // Build query parameters
+  const params = new URLSearchParams();
+  params.append("facilities_id", facilitiesId.toString());
+  
+  if (from !== null) {
+    params.append("from", from.toString());
+  }
+  
+  if (to !== null) {
+    params.append("to", to.toString());
+  }
+  
+  const queryString = params.toString();
+  const endpoint = `/service_type_load?${queryString}`;
+  
+  console.log("[getServiceTypeLoad] Calling API with endpoint:", endpoint);
+  const result = await api.get<ServiceTypeLoadItem[]>(
+    endpoint,
     "jobs",
   );
+  console.log("[getServiceTypeLoad] API response received:", result);
+  return result;
 };
 
 // Data Health API response type

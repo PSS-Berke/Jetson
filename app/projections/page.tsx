@@ -135,6 +135,8 @@ export default function ProjectionsPage() {
     totalJobsFromAPI,
     lastModifiedByJob,
     isLoading,
+    isServiceTypeLoadLoading,
+    serviceTypeLoadData,
     error,
     refetch,
   } = useProjections(startDate, filters);
@@ -456,6 +458,22 @@ export default function ProjectionsPage() {
               {/* Table View */}
               {viewMode === "table" && (
                 <>
+                  {/* Loading indicator for service type load - fixed height to prevent layout shift */}
+                  <div className="mb-4 h-12 flex items-center justify-center">
+                    {isServiceTypeLoadLoading && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center space-x-3">
+                        <div className="relative w-5 h-5">
+                          <div 
+                            className="absolute inset-0 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" 
+                          />
+                        </div>
+                        <span className="text-sm text-blue-700 font-medium">
+                          Loading service type data for selected timeframe...
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
                   {/* Projections Table */}
                   <ProjectionsTable
                     timeRanges={timeRanges}
@@ -474,6 +492,7 @@ export default function ProjectionsPage() {
                     fullFilteredProjections={jobProjections}
                     lastModifiedByJob={lastModifiedByJob}
                     versionGroupingEnabled={versionGroupingEnabled}
+                    serviceTypeLoadData={serviceTypeLoadData}
                   />
 
                   {/* Pagination */}
