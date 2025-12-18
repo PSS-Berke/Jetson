@@ -620,6 +620,7 @@ export default function ProjectionsTable({
   versionGroupingEnabled = true,
 }: ProjectionsTableProps) {
   const [selectedJob, setSelectedJob] = useState<ParsedJob | null>(null);
+  const [selectedJobRelatedVersions, setSelectedJobRelatedVersions] = useState<ParsedJob[]>([]);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>("job_number");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -1270,6 +1271,17 @@ export default function ProjectionsTable({
 
   const handleJobClick = (job: ParsedJob) => {
     setSelectedJob(job);
+
+    // Find related versions from version groups
+    const versionGroupUuid = (job as any).version_group_uuid;
+    if (versionGroupUuid && versionGroupedData.groups.has(versionGroupUuid)) {
+      const group = versionGroupedData.groups.get(versionGroupUuid)!;
+      const relatedJobs = group.allVersions.map((v: JobProjection) => v.job);
+      setSelectedJobRelatedVersions(relatedJobs);
+    } else {
+      setSelectedJobRelatedVersions([]);
+    }
+
     setIsJobDetailsOpen(true);
   };
 
@@ -2230,6 +2242,7 @@ export default function ProjectionsTable({
         job={selectedJob}
         onClose={handleCloseModal}
         onRefresh={onRefresh}
+        relatedVersions={selectedJobRelatedVersions}
       />
 
       <JobNotesModal

@@ -232,7 +232,7 @@ export const parseJob = (job: Job): ParsedJob => {
       parsedFacility = { id: 1, name: "Bolingbrook" };
     }
 
-    return {
+    const parsed = {
       ...job,
       client: parsedClient,
       facility: parsedFacility,
@@ -241,6 +241,16 @@ export const parseJob = (job: Job): ParsedJob => {
       requirements: parsedRequirements,
       daily_split: parsedDailySplit,
     };
+
+    // Preserve version fields from API response (for version grouping in JobDetailsModal)
+    if ((job as any).version_group_uuid) {
+      (parsed as any).version_group_uuid = (job as any).version_group_uuid;
+    }
+    if ((job as any).version_name) {
+      (parsed as any).version_name = (job as any).version_name;
+    }
+
+    return parsed;
   } catch (e) {
     console.error(
       `[parseJob] Critical error parsing job ${job.job_number}:`,

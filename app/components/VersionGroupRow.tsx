@@ -227,11 +227,32 @@ export const VersionGroupHeaderRow = memo(
             );
           }
 
+          // Custom rendering for quantity column - show primary qty with aggregated sum
+          if (col.config.key === "quantity") {
+            const primaryQty = job.quantity;
+            const aggregatedQty = allVersions.reduce((sum, v) => sum + v.job.quantity, 0);
+            const showQtyParens = aggregatedQty > 0 && aggregatedQty !== primaryQty;
+            return (
+              <td
+                key="quantity"
+                className="px-2 py-2 whitespace-nowrap text-xs text-center font-medium text-[var(--text-dark)]"
+              >
+                <span>{primaryQty.toLocaleString()}</span>
+                {showQtyParens && (
+                  <span className="text-[10px] text-indigo-400 ml-1">
+                    ({aggregatedQty.toLocaleString()})
+                  </span>
+                )}
+              </td>
+            );
+          }
+
           // Custom rendering for total column - show primary qty with aggregated on click
           if (col.config.type === "total") {
             const displayTotal = showAggregatedTotal
               ? aggregatedTotalQuantity
               : primaryJob.totalQuantity;
+            const showTotalParens = !showAggregatedTotal && aggregatedTotalQuantity > 0 && aggregatedTotalQuantity !== primaryJob.totalQuantity;
             return (
               <td
                 key="total"
@@ -249,7 +270,7 @@ export const VersionGroupHeaderRow = memo(
                 <span className={showAggregatedTotal ? "text-indigo-600" : ""}>
                   {formatQuantity(Math.round(displayTotal))}
                 </span>
-                {!showAggregatedTotal && (
+                {showTotalParens && (
                   <span className="text-[10px] text-indigo-400 ml-1">
                     ({formatQuantity(Math.round(aggregatedTotalQuantity))})
                   </span>
@@ -258,13 +279,14 @@ export const VersionGroupHeaderRow = memo(
             );
           }
 
-          // Custom rendering for time range columns - show primary job's quantities
+          // Custom rendering for time range columns - show primary job's quantities with aggregated sum
           if (col.config.type === "time_range") {
             return timeRanges.map((range, index) => {
-              const periodValue = showAggregatedTotal
-                ? versionGroup.aggregatedWeeklyTotals.get(range.label) || 0
-                : primaryJob.weeklyQuantities.get(range.label) || 0;
-              const formattedValue = formatQuantity(Math.round(periodValue));
+              const primaryValue = primaryJob.weeklyQuantities.get(range.label) || 0;
+              const aggregatedValue = versionGroup.aggregatedWeeklyTotals.get(range.label) || 0;
+              const displayValue = showAggregatedTotal ? aggregatedValue : primaryValue;
+              // Only show purple aggregated if there's a value and it differs from primary
+              const showAggregatedParens = !showAggregatedTotal && aggregatedValue > 0 && aggregatedValue !== primaryValue;
 
               return (
                 <td
@@ -273,7 +295,14 @@ export const VersionGroupHeaderRow = memo(
                     index % 2 === 0 ? "bg-indigo-100/50" : "bg-indigo-50/30"
                   }`}
                 >
-                  {formattedValue}
+                  <span className={showAggregatedTotal ? "text-indigo-600" : ""}>
+                    {formatQuantity(Math.round(displayValue))}
+                  </span>
+                  {showAggregatedParens && (
+                    <span className="text-[10px] text-indigo-400 ml-1">
+                      ({formatQuantity(Math.round(aggregatedValue))})
+                    </span>
+                  )}
                 </td>
               );
             });

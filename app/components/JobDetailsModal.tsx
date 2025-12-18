@@ -14,6 +14,8 @@ interface JobDetailsModalProps {
   job: ParsedJob | null;
   onClose: () => void;
   onRefresh?: () => void;
+  /** Pre-fetched related versions (from version group) - avoids extra API call */
+  relatedVersions?: ParsedJob[];
 }
 
 export default function JobDetailsModal({
@@ -21,6 +23,7 @@ export default function JobDetailsModal({
   job,
   onClose,
   onRefresh,
+  relatedVersions,
 }: JobDetailsModalProps) {
   const [isRevisionHistoryOpen, setIsRevisionHistoryOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'details' | 'edit'>('details');
@@ -40,7 +43,6 @@ export default function JobDetailsModal({
   // Version management state
   const [versions, setVersions] = useState<ParsedJob[]>([]);
   const [displayedJob, setDisplayedJob] = useState<ParsedJob | null>(null);
-  const [loadingVersions, setLoadingVersions] = useState(false);
 
   // Sync displayedJob when job prop changes
   useEffect(() => {
@@ -49,35 +51,16 @@ export default function JobDetailsModal({
     }
   }, [job]);
 
-  // Fetch versions when modal opens and job has version_group_uuid
+  // Use relatedVersions prop if provided, otherwise versions state stays empty
   useEffect(() => {
-    const fetchVersions = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const versionGroupUuid = (job as any)?.version_group_uuid;
-      if (!versionGroupUuid || !isOpen) return;
-
-      setLoadingVersions(true);
-      try {
-        const token = await getToken();
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs?version_group_uuid=${versionGroupUuid}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          // Parse the jobs similar to how useJobs does it
-          if (Array.isArray(data)) {
-            setVersions(data);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch versions:", error);
-      } finally {
-        setLoadingVersions(false);
-      }
-    };
-    fetchVersions();
-  }, [job, isOpen]);
+    if (relatedVersions && relatedVersions.length > 0) {
+      console.log("[JobDetailsModal] Using provided relatedVersions:", relatedVersions.length);
+      setVersions(relatedVersions);
+    } else {
+      // No related versions provided - reset to empty
+      setVersions([]);
+    }
+  }, [relatedVersions]);
 
   // Handle version switch
   const handleVersionSwitch = (versionJob: ParsedJob) => {
@@ -613,15 +596,7 @@ export default function JobDetailsModal({
                 Versions
               </h3>
               <div className="space-y-2">
-                {loadingVersions ? (
-                  <div className="flex items-center gap-2 text-[var(--text-light)]">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span className="text-sm">Loading versions...</span>
-                  </div>
-                ) : versions.length > 1 ? (
+                {versions.length > 1 ? (
                   // Multiple versions available - show all with radio selection
                   <div className="space-y-2">
                     {versions.map((version) => {

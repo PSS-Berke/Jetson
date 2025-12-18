@@ -1039,6 +1039,14 @@ export default function EditJobModal({
         payload.sub_clients_id = formData.sub_clients_id;
       }
 
+      // Debug: log what we're sending to help diagnose issues
+      console.log("[EditJobModal] Updating job with payload:", {
+        jobId: job.id,
+        cleanedRequirementsCount: cleanedRequirements.length,
+        hasVersionGroupUuid: !!(job as any).version_group_uuid,
+        payload
+      });
+
       await updateJob(job.id, payload);
 
       // Note: actual_cost_per_m is already set in the payload, no need to sync separately
