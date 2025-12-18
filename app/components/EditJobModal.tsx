@@ -10,6 +10,7 @@ import ScheduleOptionsCheckboxes from "./ScheduleOptionsCheckboxes";
 import WeeklySplitEditor from "./WeeklySplitEditor";
 import { updateJob, deleteJob, getToken } from "@/lib/api";
 import { type ParsedJob } from "@/hooks/useJobs";
+import { type Job } from "@/types";
 import { getProcessTypeConfig } from "@/lib/processTypeConfig";
 import Toast from "./Toast";
 import {
@@ -1084,7 +1085,8 @@ export default function EditJobModal({
         exclude_from_calculations: (job as any).exclude_from_calculations,
         // Include daily_split to preserve the split when editing
         // If splitResults exists, use that; otherwise preserve existing daily_split from job
-        daily_split: dailySplit,
+        // Only include if not null to match Job type (which expects undefined, not null)
+        ...(dailySplit !== null ? { daily_split: dailySplit } : {}),
         // Include sub_client to preserve it when editing
         // Use formData.sub_client_name if it's not empty, otherwise preserve existing from job
         ...(subClientValue ? { sub_client: subClientValue } : {}),
@@ -1103,7 +1105,9 @@ export default function EditJobModal({
         payload
       });
 
-      await updateJob(job.id, payload);
+      // Cast payload to Partial<Job> - the API accepts the object format for daily_split
+      // even though the Job type definition expects number[][]
+      await updateJob(job.id, payload as Partial<Job>);
 
       // Note: actual_cost_per_m is already set in the payload, no need to sync separately
 
