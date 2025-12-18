@@ -1051,6 +1051,7 @@ export default function EditJobModal({
         exclude_from_calculations: boolean;
         daily_split: Array<{ date: string; quantity: number }> | null;
         sub_client?: string;
+        last_modifyed?: number;
       }> = {
         jobs_id: job.id,
         job_number: formData.job_number,
@@ -1090,6 +1091,8 @@ export default function EditJobModal({
         // Include sub_client to preserve it when editing
         // Use formData.sub_client_name if it's not empty, otherwise preserve existing from job
         ...(subClientValue ? { sub_client: subClientValue } : {}),
+        // Set last_modifyed to current timestamp
+        last_modifyed: Date.now(),
       };
 
       // Include sub_client_id if available (either from form or if it exists in job)

@@ -285,16 +285,16 @@ export function useProjections(startDate: Date, filters: ProjectionFilters) {
   const [serviceTypeLoadLoading, setServiceTypeLoadLoading] = useState(false);
 
   // Build a map of job ID to most recent edit timestamp
-  // Uses last_modified from jobs/v2 response if available, otherwise falls back to created_at
+  // Uses last_modifyed from jobs/v2 response if available, otherwise falls back to created_at
   const lastModifiedByJob = useMemo(() => {
     const map = new Map<number, number>();
 
-    // Populate with last_modified from jobs/v2 response, or created_at if last_modified is null
+    // Populate with last_modifyed from jobs/v2 response, or created_at if last_modifyed is null
     if (jobs) {
       for (const job of jobs) {
         if (job.id) {
-          // Check if last_modified exists and is not null, otherwise use created_at
-          const lastModified = (job as any).last_modified;
+          // Check if last_modifyed exists and is not null, otherwise use created_at
+          const lastModified = (job as any).last_modifyed;
           const timestamp = lastModified !== null && lastModified !== undefined 
             ? lastModified 
             : job.created_at;
