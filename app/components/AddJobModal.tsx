@@ -1202,6 +1202,7 @@ function AddJobModal({
 
   // Helper function to filter out unselected/invalid requirements
   // A requirement is valid if it has a process_type and at least one other field filled
+  // OR if it has process_type and price_per_m (price_per_m counts as a valid field)
   const getValidRequirements = (requirements: Requirement[]): Requirement[] => {
     return requirements.filter((req) => {
       // Must have a process_type
@@ -1209,11 +1210,18 @@ function AddJobModal({
         return false;
       }
 
-      // Must have at least one other field filled (besides process_type, price_per_m, id, and cost fields)
+      // Check if price_per_m is valid (counts as a valid field)
+      const hasValidPricePerM = req.price_per_m !== undefined && 
+                                 req.price_per_m !== null && 
+                                 req.price_per_m !== "" &&
+                                 isFieldValueValid(req.price_per_m);
+
+      // Must have at least one other field filled (besides process_type, id, and cost fields)
+      // OR have a valid price_per_m
       const fieldCount = Object.keys(req).filter(
         (key) =>
           key !== "process_type" &&
-          key !== "price_per_m" &&
+          key !== "price_per_m" && // Still exclude from count, but check separately above
           key !== "id" &&
           !key.endsWith('_cost') && // Exclude cost fields from the count
           req[key] !== undefined &&
@@ -1222,7 +1230,7 @@ function AddJobModal({
           isFieldValueValid(req[key]),
       ).length;
 
-      return fieldCount > 0;
+      return fieldCount > 0 || hasValidPricePerM;
     });
   };
 
