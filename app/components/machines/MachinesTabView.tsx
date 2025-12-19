@@ -4,8 +4,9 @@ import { useState } from "react";
 import type {
   Machine,
   MachineStatus,
+  Job,
 } from "@/types";
-import { FaPen, FaTrash } from "react-icons/fa6";
+import { FaPen, FaTrash, FaClipboardList } from "react-icons/fa6";
 import { getFacilityName, getFacilityColors } from "@/lib/facilityUtils";
 import ProcessTypeBadge from "@/app/components/ProcessTypeBadge";
 import { isReservedFieldName } from "@/lib/capabilityValidation";
@@ -13,16 +14,65 @@ import { isReservedFieldName } from "@/lib/capabilityValidation";
 interface MachinesTabViewProps {
   machines: any[];
   loading: boolean;
+  jobs?: any[]; // Accepts Job[] or ParsedJob[]
   onEditClick: (machine: Machine) => void;
   onDeleteClick: (machine: Machine) => void;
+  onAssignJobClick?: (machine: Machine) => void;
 }
 
 export default function MachinesTabView({
   machines,
   loading,
+  jobs = [],
   onEditClick,
   onDeleteClick,
+  onAssignJobClick,
 }: MachinesTabViewProps) {
+  // Helper to get jobs assigned to a specific machine
+  const getJobsForMachine = (machineId: number) => {
+    return jobs.filter((job: any) => {
+      // Handle ParsedJob format (machines: { id, line }[])
+      if (Array.isArray((job as any).machines)) {
+        return (job as any).machines.some((m: { id: number }) => m.id === machineId);
+      }
+      // Handle raw Job format (machines_id as string or array)
+      const machineIds = Array.isArray(job.machines_id)
+        ? job.machines_id
+        : typeof job.machines_id === 'string'
+          ? JSON.parse(job.machines_id || '[]')
+          : [];
+      return machineIds.includes(machineId);
+    });
+  };
+
+  // Helper to determine if a job is current (active today)
+  const isCurrentJob = (job: Job) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+
+    const startDate = job.start_date ? new Date(job.start_date).getTime() : null;
+    const dueDate = job.due_date ? new Date(job.due_date).getTime() : null;
+
+    if (startDate && dueDate) {
+      return startDate <= todayTime && todayTime <= dueDate;
+    }
+    return false;
+  };
+
+  // Helper to determine if a job is upcoming (starts after today)
+  const isUpcomingJob = (job: Job) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+
+    const startDate = job.start_date ? new Date(job.start_date).getTime() : null;
+
+    if (startDate) {
+      return startDate > todayTime;
+    }
+    return false;
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -77,8 +127,20 @@ export default function MachinesTabView({
             key={index}
             className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow relative"
           >
-            {/* Edit and Delete Buttons */}
+            {/* Action Buttons */}
             <div className="absolute top-4 right-4 flex gap-2">
+              {onAssignJobClick && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssignJobClick(machineForHandlers);
+                  }}
+                  className="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors shadow-sm"
+                  title="Assign Job"
+                >
+                  <FaClipboardList size="0.875em" />
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -119,29 +181,37 @@ export default function MachinesTabView({
               <div className="space-y-3">
                 <div>
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    Created At
-                  </div>
-                  <div className="text-sm text-gray-900">
-                    {machine.created_at
-                      ? new Date(machine.created_at).toLocaleString()
-                      : 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                     Line
                   </div>
                   <div className="text-sm font-medium text-gray-900">
                     {machine.line ?? 'N/A'}
                   </div>
                 </div>
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Process Type
+                  </div>
+                  <ProcessTypeBadge processType={machine.process_type_key || machine.type || 'unknown'} />
+                </div>
               </div>
               <div className="space-y-3">
                 <div>
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    Type
+                    Category
                   </div>
-                  <ProcessTypeBadge processType={machine.process_type_key || machine.type || 'unknown'} />
+                  <span
+                    className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${
+                      machine.machine_category === 'conveyance'
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : machine.machine_category === 'ancillary'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {machine.machine_category
+                      ? machine.machine_category.charAt(0).toUpperCase() + machine.machine_category.slice(1)
+                      : 'N/A'}
+                  </span>
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
@@ -177,22 +247,74 @@ export default function MachinesTabView({
                 </div>
               </div>
               <div className="space-y-3">
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    Job ID
-                  </div>
-                  <div className="text-sm text-gray-900">
-                    {machine.jobs_id ?? 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    Process Type
-                  </div>
-                  <div className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                    {machine.process_type_key || <span className="text-gray-400 italic">Empty</span>}
-                  </div>
-                </div>
+                {(() => {
+                  const machineJobs = getJobsForMachine(machine.id);
+                  const currentJob = machineJobs.find(isCurrentJob);
+                  const upcomingJobs = machineJobs
+                    .filter(isUpcomingJob)
+                    .sort((a, b) => {
+                      const aStart = a.start_date ? new Date(a.start_date).getTime() : 0;
+                      const bStart = b.start_date ? new Date(b.start_date).getTime() : 0;
+                      return aStart - bStart;
+                    });
+
+                  return (
+                    <>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Current Job
+                        </div>
+                        {currentJob ? (
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+                            <div className="text-sm font-semibold text-blue-800">
+                              {currentJob.job_number || `Job #${currentJob.id}`}
+                            </div>
+                            <div className="text-xs text-blue-600 mt-0.5">
+                              {currentJob.job_name || (typeof currentJob.client === 'object' ? currentJob.client?.name : currentJob.client) || 'No name'}
+                            </div>
+                            {currentJob.due_date && (
+                              <div className="text-xs text-blue-500 mt-1">
+                                Due: {new Date(currentJob.due_date).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400 italic">No active job</div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          Projected Jobs ({upcomingJobs.length})
+                        </div>
+                        {upcomingJobs.length > 0 ? (
+                          <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1">
+                            {upcomingJobs.map((job) => (
+                              <div
+                                key={job.id}
+                                className="bg-gray-50 border border-gray-200 rounded-md p-2 hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="text-xs font-medium text-gray-800">
+                                  {job.job_number || `Job #${job.id}`}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                                  {job.start_date && job.due_date && (
+                                    <>
+                                      <span>{new Date(job.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                      <span>-</span>
+                                      <span>{new Date(job.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400 italic">No upcoming jobs</div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
             {machine.capabilities && (

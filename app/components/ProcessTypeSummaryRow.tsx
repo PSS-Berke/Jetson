@@ -91,8 +91,7 @@ export function ProcessTypeSummaryRow({
         <th key={colKey} className="px-2 py-2"></th>
       ))}
       {/* Start & End columns - Process type name with controls */}
-      {dateColSpan > 0 && (
-      <th colSpan={dateColSpan} className="px-2 py-2 text-left">
+      <th colSpan={dateColSpan > 0 ? dateColSpan : 1} className="px-2 py-2 text-left">
         <div className="flex items-center gap-2">
           {/* Expand/collapse button */}
           {hasBreakdowns && (
@@ -113,7 +112,6 @@ export function ProcessTypeSummaryRow({
           <span className="text-gray-800 font-semibold">{displayLabel}</span>
         </div>
       </th>
-      )}
       {/* Time period totals */}
       {timeRanges.map((range, index) => {
         const periodValue = summary.weeklyTotals.get(range.label) || 0;

@@ -76,34 +76,32 @@ export function PrimaryCategoryRow({
         <td key={colKey} className="px-2 py-2"></td>
       ))}
       {/* Start & End columns - Primary category label */}
-      {dateColSpan > 0 && (
-        <td colSpan={dateColSpan} className="px-2 py-2 text-left pl-6">
-          <div className="flex items-center gap-1 text-gray-700">
-            {/* Expand/collapse button */}
-            {hasSubCategories ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleExpand();
-                }}
-                className="p-0.5 hover:bg-blue-200 rounded transition-colors"
-                title={isExpanded ? "Collapse jobs" : "Expand jobs"}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-600" />
-                )}
-              </button>
-            ) : (
-              <span className="w-5" />
-            )}
-            <span className="text-gray-500">↳</span>
-            <span className="font-medium">{category.value}</span>
-            <span className="text-xs text-gray-500">({category.count} jobs)</span>
-          </div>
-        </td>
-      )}
+      <td colSpan={dateColSpan > 0 ? dateColSpan : 1} className="px-2 py-2 text-left pl-6">
+        <div className="flex items-center gap-1 text-gray-700">
+          {/* Expand/collapse button */}
+          {hasSubCategories ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand();
+              }}
+              className="p-0.5 hover:bg-blue-200 rounded transition-colors"
+              title={isExpanded ? "Collapse jobs" : "Expand jobs"}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+              )}
+            </button>
+          ) : (
+            <span className="w-5" />
+          )}
+          <span className="text-gray-500">↳</span>
+          <span className="font-medium">{category.value}</span>
+          <span className="text-xs text-gray-500">({category.count} jobs)</span>
+        </div>
+      </td>
       {/* Time period quantities */}
       {timeRanges.map((range, index) => {
         const periodValue = category.weeklyTotals.get(range.label) || 0;

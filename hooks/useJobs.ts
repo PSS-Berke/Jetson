@@ -366,7 +366,7 @@ export const useJobs = (facilityId?: number | null): UseJobsReturn => {
     isLoading,
     error: error?.message ?? null,
     refetch: async () => {
-     // await mutate();
+      await mutate();
     },
   };
 };

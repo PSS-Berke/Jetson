@@ -19,7 +19,7 @@ import CFORevenueChart from "./CFORevenueChart";
 import CFOClientAnalysis from "./CFOClientAnalysis";
 import CFOServiceMix from "./CFOServiceMix";
 import CFOPeriodComparison from "./CFOPeriodComparison";
-import InlineJobCostEntry from "./InlineJobCostEntry";
+import FinancialDataManager from "./FinancialDataManager";
 import AlertDetailsModal from "./AlertDetailsModal";
 
 interface CFODashboardProps {
@@ -262,17 +262,16 @@ export default function CFODashboard({
         <CFOSummaryCards metrics={metrics} revenueTrend={revenueTrend} />
       </section>
 
-      {/* Inline Job Cost Entry - Directly Below Summary Cards */}
+      {/* Financial Data Manager - Replaces InlineJobCostEntry */}
       {startDate && endDate && (
         <section>
-          <InlineJobCostEntry
+          <FinancialDataManager
             jobs={jobs as ParsedJob[]}
             startDate={startDate}
             endDate={endDate}
             facilitiesId={facilitiesId}
             onSuccess={() => {
-              console.log("[CFODashboard] Cost entries saved successfully");
-              // TODO: Refresh job cost data
+              console.log("[CFODashboard] Financial data saved successfully");
             }}
           />
         </section>

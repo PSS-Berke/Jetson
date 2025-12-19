@@ -486,6 +486,24 @@ export default function JobDetailsModal({
                       {currentJob.time_estimate ? `${currentJob.time_estimate} hours` : "N/A"}
                     </p>
                   </div>
+                  {/* Max Hours Warning Threshold */}
+                  {currentJob.max_hours != null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[var(--text-light)] mb-1">
+                        Hours Threshold
+                      </label>
+                      <p className={`text-base ${
+                        currentJob.time_estimate && currentJob.time_estimate > currentJob.max_hours
+                          ? "text-amber-600 font-medium"
+                          : "text-[var(--text-dark)]"
+                      }`}>
+                        {currentJob.max_hours} hours
+                        {currentJob.time_estimate && currentJob.time_estimate > currentJob.max_hours && (
+                          <span className="ml-2 text-xs text-amber-600">(exceeded)</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

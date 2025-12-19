@@ -55,6 +55,7 @@ interface JobFormData {
   add_on_charges: string;
   ext_price: string;
   total_billing: string;
+  max_hours: string;
 }
 
 type JobCreationMode = "new" | "template" | null;
@@ -157,6 +158,7 @@ function AddJobModal({
     add_on_charges: "",
     ext_price: "",
     total_billing: "",
+    max_hours: "",
   });
 
 
@@ -364,6 +366,7 @@ function AddJobModal({
         add_on_charges: "",
         ext_price: "",
         total_billing: "",
+        max_hours: "",
       });
     }
   }, [isOpen]);
@@ -469,6 +472,7 @@ function AddJobModal({
       add_on_charges: templateData.add_on_charges?.toString() || "",
       ext_price: templateData.ext_price?.toString() || "",
       total_billing: templateData.total_billing?.toString() || "",
+      max_hours: templateData.max_hours?.toString() || "",
     });
   };
 
@@ -1306,6 +1310,7 @@ function AddJobModal({
       version_name: versionNameStr,
       exclude_from_calculations: versionNum > 1, // true for all except v1
       actual_quantity_entered: null,
+      max_hours: versionData.max_hours ? parseFloat(versionData.max_hours) : null,
     };
   };
 
@@ -1440,6 +1445,7 @@ function AddJobModal({
         add_on_charges: "",
         ext_price: "",
         total_billing: "",
+        max_hours: "",
       });
       setScheduleType("soft schedule");
       setCurrentStep(1);

@@ -89,35 +89,33 @@ export function SubCategoryRow({
         <td key={colKey} className="px-2 py-1.5"></td>
       ))}
       {/* Start & End columns - Sub-category label */}
-      {dateColSpan > 0 && (
-        <td colSpan={dateColSpan} className="px-2 py-1.5 text-left pl-12">
-          <div className="flex items-center gap-1 text-gray-600">
-            {/* Expand/collapse button */}
-            {hasJobs ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleExpand();
-                }}
-                className="p-0.5 hover:bg-gray-200 rounded transition-colors"
-                title={isExpanded ? "Collapse jobs" : "Expand jobs"}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-                )}
-              </button>
-            ) : (
-              <span className="w-4" />
-            )}
-            <span className="text-gray-400">↳↳</span>
-            <span className="text-xs text-gray-500">{subCategory.fieldLabel}:</span>
-            <span className="font-medium text-xs">{subCategory.value}</span>
-            <span className="text-xs text-gray-400">({subCategory.count})</span>
-          </div>
-        </td>
-      )}
+      <td colSpan={dateColSpan > 0 ? dateColSpan : 1} className="px-2 py-1.5 text-left pl-12">
+        <div className="flex items-center gap-1 text-gray-600">
+          {/* Expand/collapse button */}
+          {hasJobs ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand();
+              }}
+              className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+              title={isExpanded ? "Collapse jobs" : "Expand jobs"}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              )}
+            </button>
+          ) : (
+            <span className="w-4" />
+          )}
+          <span className="text-gray-400">↳↳</span>
+          <span className="text-xs text-gray-500">{subCategory.fieldLabel}:</span>
+          <span className="font-medium text-xs">{subCategory.value}</span>
+          <span className="text-xs text-gray-400">({subCategory.count})</span>
+        </div>
+      </td>
       {/* Time period quantities */}
       {timeRanges.map((range, index) => {
         const periodValue = subCategory.weeklyTotals.get(range.label) || 0;

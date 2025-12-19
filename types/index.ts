@@ -223,6 +223,7 @@ export interface Job {
   weekly_split?: number[]; // Array of quantities per week (used in frontend forms)
   locked_weeks?: boolean[]; // Array of booleans indicating which weeks are locked
   actual_cost_per_m?: number | null; // Actual cost per thousand (replaces job_cost_entry table)
+  max_hours?: number | null; // Hours warning threshold (soft cap) - informational only
 }
 
 /**

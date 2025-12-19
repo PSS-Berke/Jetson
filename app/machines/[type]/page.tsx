@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useUser } from "@/hooks/useUser";
 import { useAuth } from "@/hooks/useAuth";
 import { useMachines } from "@/hooks/useMachines";
+import { useJobs } from "@/hooks/useJobs";
 import FacilityToggle from "../../components/FacilityToggle";
 import PageHeader from "../../components/PageHeader";
 import Link from "next/link";
@@ -92,6 +93,13 @@ const DynamicFormBuilderModal = dynamic(
   },
 );
 
+const AssignJobModal = dynamic(
+  () => import("../../components/AssignJobModal"),
+  {
+    ssr: false,
+  },
+);
+
 // Machine type configurations
 const machineTypeConfig: Record<
   string,
@@ -162,6 +170,7 @@ export default function MachineTypePage() {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [machineToDelete, setMachineToDelete] = useState<{id: number; line: number | string; name?: string; type?: string} | null>(null);
+  const [machineToAssignJob, setMachineToAssignJob] = useState<Machine | null>(null);
   const [filterFacility, setFilterFacility] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [showNewMachineRow, setShowNewMachineRow] = useState(false);
@@ -182,6 +191,7 @@ export default function MachineTypePage() {
     error: machinesError,
     refetch,
   } = useMachines(filterStatus, filterFacility || undefined, apiMachineType);
+  const { jobs, isLoading: jobsLoading, refetch: refetchJobs } = useJobs();
   const { logout } = useAuth();
 
   // Get configuration for this machine type (only for label, no filtering)
@@ -555,6 +565,18 @@ export default function MachineTypePage() {
     setIsDeleteModalOpen(true);
   };
 
+  const handleAssignJobClick = (machine: Machine) => {
+    setMachineToAssignJob(machine);
+  };
+
+  const handleAssignJobModalClose = async () => {
+    setMachineToAssignJob(null);
+    // Refresh machines list and jobs list after assignment
+    refetch(filterStatus, filterFacility || undefined, apiMachineType);
+    await fetchRawMachinesResponse();
+    await refetchJobs();
+  };
+
   const handleConfirmDelete = async () => {
     if (!machineToDelete) return;
 
@@ -732,9 +754,11 @@ export default function MachineTypePage() {
             </div>
             <MachinesTabView
               machines={rawMachinesResponse || []}
-              loading={rawResponseLoading}
+              loading={rawResponseLoading || jobsLoading}
+              jobs={jobs}
               onEditClick={(machine) => setSelectedMachine(machine)}
               onDeleteClick={handleDeleteClick}
+              onAssignJobClick={handleAssignJobClick}
             />
           </div>
         )}
@@ -786,6 +810,14 @@ export default function MachineTypePage() {
         isOpen={isFormBuilderOpen}
         onClose={() => setIsFormBuilderOpen(false)}
         user={user}
+      />
+
+      {/* Assign Job Modal */}
+      <AssignJobModal
+        isOpen={machineToAssignJob !== null}
+        machine={machineToAssignJob}
+        onClose={handleAssignJobModalClose}
+        onSuccess={handleAssignJobModalClose}
       />
     </>
   );
