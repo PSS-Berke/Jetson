@@ -358,17 +358,12 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         sourceTypes?: string[];
       }> = [];
 
-      // Track which IDs belong to which normalized type for consolidation
-      const normalizedCounts: Record<string, number> = {};
-      const normalizedSources: Record<string, string[]> = {};
-      const normalizedPrimaryIds: Record<string, number> = {}; // Track the first ID for saving
-
+      // Show EVERY process type exactly as it comes from the API - NO normalization, NO filtering
       allVariables.forEach((group: MachineVariableGroup) => {
         if (group.type) {
-          // Normalize the process type (e.g., "HP Press" -> "hp", "Label/Apply" -> "affix")
-          const normalizedType = normalizeProcessType(group.type);
-
-          // Count variables for the normalized type
+          const originalType = group.type.trim();
+          
+          // Count variables for this type
           let varCount = 0;
           if (Array.isArray(group.variables)) {
             varCount = group.variables.length;
@@ -376,42 +371,33 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
             varCount = Object.keys(group.variables).length;
           }
 
-          // Accumulate counts for normalized types
-          normalizedCounts[normalizedType] = (normalizedCounts[normalizedType] || 0) + varCount;
+          // Check if we already added this exact type (case-sensitive)
+          const existingIndex = apiTypes.findIndex(pt => pt.key === originalType);
+          
+          if (existingIndex === -1) {
+            // New type - add it
+            const configMatch = PROCESS_TYPE_CONFIGS.find(
+              (c) => c.key.toLowerCase() === originalType.toLowerCase() || 
+                     c.label.toLowerCase() === originalType.toLowerCase()
+            );
 
-          // Track the original source types that map to this normalized type
-          if (!normalizedSources[normalizedType]) {
-            normalizedSources[normalizedType] = [];
-          }
-          if (!normalizedSources[normalizedType].includes(group.type)) {
-            normalizedSources[normalizedType].push(group.type);
-          }
-
-          // Track the primary ID (first record) for each normalized type
-          if (!normalizedPrimaryIds[normalizedType] && group.id) {
-            normalizedPrimaryIds[normalizedType] = group.id;
+            apiTypes.push({
+              key: originalType,
+              label: configMatch?.label || originalType,
+              color: configMatch?.color || "#6B7280",
+              sourceTypes: [originalType],
+              id: group.id,
+            });
+            
+            counts[originalType] = varCount;
+          } else {
+            // Type already exists - just update the count
+            counts[originalType] = (counts[originalType] || 0) + varCount;
           }
         }
       });
 
-      // Create the consolidated list of process types
-      Object.keys(normalizedCounts).forEach((normalizedType) => {
-        const configMatch = PROCESS_TYPE_CONFIGS.find(
-          (c) => c.key === normalizedType
-        );
-
-        apiTypes.push({
-          key: normalizedType,
-          label:
-            configMatch?.label ||
-            normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1),
-          color: configMatch?.color || "#6B7280",
-          sourceTypes: normalizedSources[normalizedType] || [],
-          id: normalizedPrimaryIds[normalizedType], // Primary ID for saving
-        });
-      });
-
-      setVariableCounts(normalizedCounts);
+      setVariableCounts(counts);
       setApiProcessTypes(apiTypes);
     } catch (error) {
       console.error(
@@ -1361,48 +1347,12 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     }
   };
 
-  // Define allowed core process types
-  const ALLOWED_CORE_TYPES = ['data', 'hp', 'laser', 'fold', 'affix', 'insert', 'inkjet', 'labeling'];
-
-  // Define deprecated process types to hide
-  const DEPRECATED_TYPES = ['9-12 in+', 'sort', 'insert +', 'insert+', '13+ in+', '13+'];
-
-  // Define all known config types (including deprecated ones we want to hide)
-  const ALL_CONFIG_TYPES = PROCESS_TYPE_CONFIGS.map(c => c.key.toLowerCase());
-
-  // Filter process types to show only:
-  // 1. Allowed core types (data, hp, laser, affix, insert)
-  // 2. Custom process types (not in PROCESS_TYPE_CONFIGS)
-  // 3. Exclude deprecated types
-  const allowedProcessTypes = apiProcessTypes.filter((pt) => {
-    const normalizedKey = pt.key.toLowerCase().trim();
-
-    // Always exclude deprecated types
-    if (DEPRECATED_TYPES.includes(normalizedKey)) {
-      return false;
-    }
-
-    // If it's in PROCESS_TYPE_CONFIGS, only show if it's in ALLOWED_CORE_TYPES
-    if (ALL_CONFIG_TYPES.includes(normalizedKey)) {
-      return ALLOWED_CORE_TYPES.includes(normalizedKey);
-    }
-
-    // If it's not in PROCESS_TYPE_CONFIGS, it's a custom type - allow it
-    return true;
-  });
-
-  // Further filter by machineType if prop is set (for individual type pages)
+  // NO FILTERING - show ALL process types
+  // Only filter by machineType if prop is set (for individual type pages)
   const filteredProcessTypes = machineType
-    ? allowedProcessTypes.filter((pt) => machineProcessTypes.includes(pt.key))
-    : allowedProcessTypes;
+    ? apiProcessTypes.filter((pt) => machineProcessTypes.includes(pt.key))
+    : apiProcessTypes;
 
-  // Debug: Log the count of process types
-  console.log('[ProcessesTabView] Total process types:', {
-    apiProcessTypes: apiProcessTypes.length,
-    allowedProcessTypes: allowedProcessTypes.length,
-    filteredProcessTypes: filteredProcessTypes.length,
-    machineType: machineType || 'none'
-  });
 
   if (loadingProcessTypes) {
     return (
