@@ -27,6 +27,7 @@ interface FormField {
   options?: string[];
   addToJobInput?: boolean;
   showInAdditionalFields?: boolean;
+  is_size?: boolean;
   order?: number;
   locked?: boolean; // If true, field cannot be deleted (but can be edited/reordered)
 }
@@ -152,6 +153,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
           ...(field.placeholder && { placeholder: field.placeholder }),
           ...(field.addToJobInput !== undefined && { addToJobInput: field.addToJobInput }),
           ...(field.showInAdditionalFields !== undefined && { showInAdditionalFields: field.showInAdditionalFields }),
+          ...(field.is_size !== undefined && { is_size: field.is_size }),
           ...(field.locked !== undefined && { locked: field.locked }), // Persist locked status
         };
       });
@@ -251,6 +253,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
               ...(field.placeholder && { placeholder: field.placeholder }),
               ...(field.addToJobInput !== undefined && { addToJobInput: field.addToJobInput }),
               ...(field.showInAdditionalFields !== undefined && { showInAdditionalFields: field.showInAdditionalFields }),
+              ...(field.is_size !== undefined && { is_size: field.is_size }),
             };
           });
 
@@ -641,6 +644,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
                     options: value.options,
                     addToJobInput: value.addToJobInput !== undefined ? value.addToJobInput : true,
                     showInAdditionalFields: value.showInAdditionalFields || false,
+                    is_size: value.is_size || false,
                     order: value.order,
                     locked: value.locked || (key === 'price_per_m'), // Lock price_per_m field
                   };
@@ -668,6 +672,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
               required: pricePerMConfig.required,
               addToJobInput: true, // Always add to job input
               showInAdditionalFields: false,
+              is_size: false,
               order: 999, // Put at the end by default
               locked: true, // Always locked
             };
@@ -1139,6 +1144,9 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
           required: field.required || false,
           ...(field.options && { options: field.options }),
           ...(field.placeholder && { placeholder: field.placeholder }),
+          ...(field.addToJobInput !== undefined && { addToJobInput: field.addToJobInput }),
+          ...(field.showInAdditionalFields !== undefined && { showInAdditionalFields: field.showInAdditionalFields }),
+          ...(field.is_size !== undefined && { is_size: field.is_size }),
         };
       });
 

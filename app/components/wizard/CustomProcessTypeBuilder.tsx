@@ -20,6 +20,7 @@ interface FormField {
   options?: string[];
   addToJobInput?: boolean;
   showInAdditionalFields?: boolean;
+  is_size?: boolean;
   order?: number;
   locked?: boolean; // If true, field cannot be deleted (but can be edited/reordered)
 }
@@ -59,6 +60,7 @@ export default function CustomProcessTypeBuilder({
   const [fieldOptions, setFieldOptions] = useState("");
   const [addToJobInput, setAddToJobInput] = useState(false);
   const [showInAdditionalFields, setShowInAdditionalFields] = useState(false);
+  const [isSize, setIsSize] = useState(false);
 
   // Preview form values
   const [previewValues, setPreviewValues] = useState<{ [key: string]: string }>(
@@ -86,6 +88,7 @@ export default function CustomProcessTypeBuilder({
     setFieldOptions("");
     setAddToJobInput(false);
     setShowInAdditionalFields(false);
+    setIsSize(false);
     setEditingFieldIndex(null);
   };
 
@@ -117,6 +120,7 @@ export default function CustomProcessTypeBuilder({
           : undefined,
       addToJobInput: addToJobInput,
       showInAdditionalFields: showInAdditionalFields,
+      is_size: isSize,
     };
 
     if (editingFieldIndex !== null) {
@@ -139,6 +143,7 @@ export default function CustomProcessTypeBuilder({
     setFieldOptions(field.options?.join(", ") || "");
     setAddToJobInput(field.addToJobInput || false);
     setShowInAdditionalFields(field.showInAdditionalFields || false);
+    setIsSize(field.is_size || false);
     setEditingFieldIndex(index);
   };
 
@@ -223,6 +228,9 @@ export default function CustomProcessTypeBuilder({
         }),
         ...(field.showInAdditionalFields !== undefined && {
           showInAdditionalFields: field.showInAdditionalFields,
+        }),
+        ...(field.is_size !== undefined && {
+          is_size: field.is_size,
         }),
         ...(field.order !== undefined && { order: field.order }),
       };
@@ -471,6 +479,19 @@ export default function CustomProcessTypeBuilder({
               />
               <label htmlFor="showInAdditionalFields" className={`ml-2 text-sm ${!addToJobInput ? 'text-gray-400' : 'text-gray-700'}`}>
                 Show in Additional Fields
+              </label>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isSize"
+                checked={isSize}
+                onChange={(e) => setIsSize(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="isSize" className="ml-2 text-sm text-gray-700">
+                Is Size
               </label>
             </div>
 

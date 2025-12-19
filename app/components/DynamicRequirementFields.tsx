@@ -314,9 +314,12 @@ export default function DynamicRequirementFields({
           
           // Build the variables object from merged variables
           // The variables object contains field definitions (type, label, required, options, etc.)
+          // Exclude fields where is_size is true (these are not job inputs)
           Object.entries(mergedVariables).forEach(([varName, varConfig]) => {
-            // Store the field definition object as-is
-            variablesObject[varName] = varConfig;
+            // Only include fields that are not size fields (is_size !== true)
+            if (varConfig.is_size !== true) {
+              variablesObject[varName] = varConfig;
+            }
           });
           
           // Store the variables JSON object (field definitions)
@@ -900,15 +903,18 @@ export default function DynamicRequirementFields({
                     // If variables is an array, convert to object
                     matchingRecord.variables.forEach((varItem: any) => {
                       const varName = varItem.variable_name || varItem.name || varItem.key;
-                      if (varName) {
-                        // Store the field definition object
+                      if (varName && varItem.is_size !== true) {
+                        // Store the field definition object, but exclude size fields
                         variablesObject[varName] = varItem;
                       }
                     });
                   } else {
                     // If variables is already an object, use it directly (it contains field definitions)
+                    // Exclude fields where is_size is true
                     Object.entries(matchingRecord.variables).forEach(([key, value]: [string, any]) => {
-                      variablesObject[key] = value;
+                      if (typeof value === 'object' && value !== null && value.is_size !== true) {
+                        variablesObject[key] = value;
+                      }
                     });
                   }
                 }

@@ -1173,7 +1173,8 @@ function AddJobModal({
     // Process all other fields
     Object.keys(req).forEach((key) => {
       // Skip fields we've already handled
-      if (key === "process_type" || key === "price_per_m" || key === "id") {
+      // variables is metadata (field definitions), not a job input field
+      if (key === "process_type" || key === "price_per_m" || key === "id" || key === "variables") {
         return;
       }
       
@@ -2042,7 +2043,7 @@ function AddJobModal({
 
                 // Check if there are any filled capability fields (excluding metadata)
                 const filledCapabilityFields = Object.keys(requirement).filter(
-                  k => k !== 'process_type' && k !== 'price_per_m' && k !== 'id' &&
+                  k => k !== 'process_type' && k !== 'price_per_m' && k !== 'id' && k !== 'variables' &&
                        requirement[k] !== undefined && requirement[k] !== null && requirement[k] !== ''
                 ).length;
 
@@ -2321,8 +2322,8 @@ function AddJobModal({
                             .filter(key => {
                               // Exclude fields already shown in processConfig
                               const isInProcessConfig = processConfig?.fields.some(f => f.name === key);
-                              // Exclude system fields
-                              const isSystemField = key === "process_type" || key === "price_per_m" || key === "id" || key.endsWith('_cost');
+                              // Exclude system fields (variables is metadata, not a display field)
+                              const isSystemField = key === "process_type" || key === "price_per_m" || key === "id" || key === "variables" || key.endsWith('_cost');
                               // Only show if field has a valid value
                               return !isInProcessConfig && !isSystemField && isFieldValueValid(req[key]);
                             })
