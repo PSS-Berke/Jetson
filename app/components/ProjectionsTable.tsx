@@ -1159,10 +1159,21 @@ export default function ProjectionsTable({
           return false;
         }
 
-        // If filtering by time range, check if job has quantity in that period
+        // If filtering by specific time range label, check if job has quantity in that period
         if (categoryFilter.timeRangeLabel) {
           const periodQuantity = projection.weeklyQuantities.get(categoryFilter.timeRangeLabel) || 0;
           if (periodQuantity <= 0) {
+            return false;
+          }
+        } else {
+          // When filtering by category (process type, size, field), only show jobs with quantities in visible timeframes
+          // Check if job has quantity in any of the visible time ranges
+          const hasQuantityInTimeframe = timeRanges.some((range) => {
+            const quantity = projection.weeklyQuantities.get(range.label) || 0;
+            return quantity > 0;
+          });
+          
+          if (!hasQuantityInTimeframe) {
             return false;
           }
         }
@@ -1173,11 +1184,26 @@ export default function ProjectionsTable({
       console.log(`[Category Filter] Filtered from ${originalCount} to ${projections.length} jobs with filter:`, categoryFilter);
     }
 
+    // Always filter out jobs with no quantities in the visible timeframe
+    // This ensures that when viewing a specific timeframe (e.g., year 2040), only jobs with quantities in that timeframe are shown
+    const originalCountBeforeTimeframe = projections.length;
+    projections = projections.filter((projection) => {
+      const hasQuantityInVisibleTimeframe = timeRanges.some((range) => {
+        const quantity = projection.weeklyQuantities.get(range.label) || 0;
+        return quantity > 0;
+      });
+      return hasQuantityInVisibleTimeframe;
+    });
+    
+    if (originalCountBeforeTimeframe !== projections.length) {
+      console.log(`[Timeframe Filter] Filtered from ${originalCountBeforeTimeframe} to ${projections.length} jobs based on visible timeframe`);
+    }
+
     if (showExpandedProcesses) {
       return expandJobProjectionsToProcesses(projections);
     }
     return projections;
-  }, [showExpandedProcesses, jobProjections, categoryFilter]);
+  }, [showExpandedProcesses, jobProjections, categoryFilter, timeRanges]);
 
   const VISIBLE_PERIODS = 3; // For mobile table view
 
