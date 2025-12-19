@@ -17,7 +17,7 @@ import { ProcessTypeSummaryRow } from "./ProcessTypeSummaryRow";
 import { ProcessTypeBreakdownRow } from "./ProcessTypeBreakdownRow";
 import { PrimaryCategoryRow } from "./PrimaryCategoryRow";
 import { SubCategoryRow } from "./SubCategoryRow";
-import { buildSummaryTieredData, getPrimaryCategoryValue } from "@/lib/tieredFilterUtils";
+import { buildSummaryTieredData, getPrimaryCategoryValue, getJobProcessTypes } from "@/lib/tieredFilterUtils";
 import { groupProjectionsByVersion, isVersionGroup, type VersionGroup } from "@/lib/versionGroupUtils";
 import { VersionGroupHeaderRow, VersionRow } from "./VersionGroupRow";
 import { Trash, Lock, Unlock, ChevronDown, ChevronRight, FileText, Eye, EyeOff, Edit2, Save, X } from "lucide-react";
@@ -42,6 +42,7 @@ import type {
   ProjectionColumnConfig,
   OrderedColumn,
 } from "./ProjectionsTable/index";
+import { getSizeFieldsForProcessTypeCached, type SizeField } from "@/lib/sizeFieldUtils";
 
 // Convert toggle granularity to cell granularity
 const toCellGranularity = (
@@ -820,10 +821,20 @@ export default function ProjectionsTable({
   const [categoryFilter, setCategoryFilter] = useState<{
     processType: string;
     primaryCategory?: string;     // Tier 2: Basic OE / Envelope Size value
-    fieldName?: string;           // Legacy: for ProcessTypeBreakdownRow compatibility
-    fieldValue?: any;             // Legacy: for ProcessTypeBreakdownRow compatibility
+    fieldName?: string;           // For non-size field breakdowns
+    fieldValue?: any;             // Field value for non-size fields
     timeRangeLabel?: string;
+    // Size filter (stored separately so it can coexist with field filters)
+    sizeFilter?: {
+      fieldName: string;
+      fieldValue: string;
+      compositeHeightField?: string; // For composite size fields (width x height)
+      compositeHeightValue?: string; // Height value for composite size fields
+    };
   } | null>(null);
+
+  // Inside the component, add state for size fields:
+  const [sizeFieldsByProcessType, setSizeFieldsByProcessType] = useState<Map<string, SizeField[]>>(new Map());
 
   // Load machine variables for field definitions
   useEffect(() => {
@@ -831,6 +842,41 @@ export default function ProjectionsTable({
       .then((variables) => setMachineVariables(variables))
       .catch((err) => console.error("Failed to load machine variables:", err));
   }, []);
+
+  // Add useEffect to fetch size fields when processTypeSummaries change:
+  useEffect(() => {
+    const fetchSizeFields = async () => {
+      if (!processTypeSummaries || processTypeSummaries.length === 0) return;
+
+      const sizeFieldsMap = new Map<string, SizeField[]>();
+
+      await Promise.all(
+        processTypeSummaries.map(async (summary) => {
+          try {
+            // Get jobs for this process type to collect distinct values
+            const relevantJobs = jobProjections
+              .filter((p) => {
+                const jobProcessTypes = getJobProcessTypes(p.job);
+                return jobProcessTypes.includes(normalizeProcessType(summary.processType));
+              })
+              .map((p) => p.job);
+
+            const sizeFields = await getSizeFieldsForProcessTypeCached(
+              summary.processType,
+              relevantJobs
+            );
+            sizeFieldsMap.set(summary.processType, sizeFields);
+          } catch (error) {
+            console.error(`[ProjectionsTable] Error fetching size fields for ${summary.processType}:`, error);
+          }
+        })
+      );
+
+      setSizeFieldsByProcessType(sizeFieldsMap);
+    };
+
+    fetchSizeFields();
+  }, [processTypeSummaries, jobProjections]);
 
   // Handler for expansion
   const handleToggleExpand = (processType: string) => {
@@ -913,7 +959,10 @@ export default function ProjectionsTable({
     subFieldValue?: string,
     timeRangeLabel?: string
   ) => {
-    // If clicking the same filter, clear it
+    // Preserve size filter if it exists
+    const currentSizeFilter = categoryFilter?.sizeFilter;
+
+    // If clicking the same filter, clear it (but preserve size filter if it exists)
     if (
       categoryFilter &&
       categoryFilter.processType === processType &&
@@ -922,17 +971,27 @@ export default function ProjectionsTable({
       String(categoryFilter.fieldValue) === String(subFieldValue) &&
       categoryFilter.timeRangeLabel === timeRangeLabel
     ) {
-      setCategoryFilter(null);
+      // If there's a size filter, keep it; otherwise clear everything
+      if (currentSizeFilter) {
+        setCategoryFilter({
+          processType,
+          sizeFilter: currentSizeFilter,
+        });
+      } else {
+        setCategoryFilter(null);
+      }
       return;
     }
 
     // Set new filter (include sub-category fields if provided)
+    // Preserve size filter if it exists
     setCategoryFilter({
       processType,
       primaryCategory,
       fieldName: subField,
       fieldValue: subFieldValue,
       timeRangeLabel,
+      sizeFilter: currentSizeFilter, // Preserve size filter
     });
   };
 
@@ -943,7 +1002,10 @@ export default function ProjectionsTable({
     fieldValue?: any,
     timeRangeLabel?: string
   ) => {
-    // If clicking the same filter, clear it
+    // Preserve size filter if it exists
+    const currentSizeFilter = categoryFilter?.sizeFilter;
+
+    // If clicking the same filter, clear it (but preserve size filter if it exists)
     if (
       categoryFilter &&
       categoryFilter.processType === processType &&
@@ -951,16 +1013,25 @@ export default function ProjectionsTable({
       categoryFilter.fieldValue === fieldValue &&
       categoryFilter.timeRangeLabel === timeRangeLabel
     ) {
-      setCategoryFilter(null);
+      // If there's a size filter, keep it; otherwise clear everything
+      if (currentSizeFilter) {
+        setCategoryFilter({
+          processType,
+          sizeFilter: currentSizeFilter,
+        });
+      } else {
+        setCategoryFilter(null);
+      }
       return;
     }
 
-    // Set new filter
+    // Set new filter (preserve size filter)
     setCategoryFilter({
       processType,
       fieldName,
       fieldValue,
       timeRangeLabel,
+      sizeFilter: currentSizeFilter, // Preserve size filter
     });
   };
 
@@ -1052,7 +1123,27 @@ export default function ProjectionsTable({
             }
           }
 
-          // Legacy: If filtering by breakdown field, check field value
+          // Apply size filter if active (check sizeFilter property)
+          if (categoryFilter.sizeFilter) {
+            const sizeFilter = categoryFilter.sizeFilter;
+            const sizeValue = req[sizeFilter.fieldName];
+            
+            // Check if this is a composite size filter
+            if (sizeFilter.compositeHeightField && sizeFilter.compositeHeightValue) {
+              const heightValue = req[sizeFilter.compositeHeightField];
+              if (!fieldValuesMatch(sizeFilter.fieldValue, sizeValue) ||
+                  !fieldValuesMatch(sizeFilter.compositeHeightValue, heightValue)) {
+                return false;
+              }
+            } else {
+              // Regular size field filter
+              if (!fieldValuesMatch(sizeFilter.fieldValue, sizeValue)) {
+                return false;
+              }
+            }
+          }
+
+          // If filtering by non-size breakdown field, check field value
           if (categoryFilter.fieldName && categoryFilter.fieldValue !== undefined) {
             const fieldValue = req[categoryFilter.fieldName];
 
@@ -1611,6 +1702,71 @@ export default function ProjectionsTable({
     );
   }, [sortedJobProjections, versionGroupingEnabled, showExpandedProcesses]);
 
+  // Add handler for size field clicks:
+  const handleSizeFieldClick = (
+    processType: string,
+    fieldName: string,
+    fieldValue: string
+  ) => {
+    // Check if this is a composite size field (width x height)
+    // Composite field names start with "COMPOSITE_"
+    if (fieldName.startsWith("COMPOSITE_") && fieldValue.includes("x")) {
+      // Extract width and height from the composite value (e.g., "3x3" -> width="3", height="3")
+      const [width, height] = fieldValue.split("x");
+      
+      // Extract the actual field names from the composite field name
+      // Format: "COMPOSITE_integer_size_width_integer_size_height" -> width="integer_size_width", height="integer_size_height"
+      const withoutPrefix = fieldName.replace("COMPOSITE_", "");
+      const parts = withoutPrefix.split("_");
+      
+      // Find where width and height are in the name
+      const widthIndex = parts.findIndex((p, i) => p === "width" && i > 0);
+      const heightIndex = parts.findIndex((p, i) => p === "height" && i > 0);
+      
+      let widthField = "integer_size_width"; // default
+      let heightField = "integer_size_height"; // default
+      
+      if (widthIndex > 0 && heightIndex > 0) {
+        // Extract width field: everything up to and including "width"
+        widthField = parts.slice(0, widthIndex + 1).join("_");
+        // Extract height field: everything up to and including "height"
+        heightField = parts.slice(0, heightIndex + 1).join("_");
+      } else if (withoutPrefix.includes("integer_size_width") && withoutPrefix.includes("integer_size_height")) {
+        widthField = "integer_size_width";
+        heightField = "integer_size_height";
+      }
+      
+      setCategoryFilter({
+        processType,
+        sizeFilter: {
+          fieldName: widthField,
+          fieldValue: width.trim(),
+          compositeHeightField: heightField,
+          compositeHeightValue: height.trim(),
+        },
+        // Preserve existing non-size field filter if it exists
+        fieldName: categoryFilter?.fieldName,
+        fieldValue: categoryFilter?.fieldValue,
+        primaryCategory: categoryFilter?.primaryCategory,
+        timeRangeLabel: categoryFilter?.timeRangeLabel,
+      });
+    } else {
+      // Regular size field
+      setCategoryFilter({
+        processType,
+        sizeFilter: {
+          fieldName,
+          fieldValue,
+        },
+        // Preserve existing non-size field filter if it exists
+        fieldName: categoryFilter?.fieldName,
+        fieldValue: categoryFilter?.fieldValue,
+        primaryCategory: categoryFilter?.primaryCategory,
+        timeRangeLabel: categoryFilter?.timeRangeLabel,
+      });
+    }
+  };
+
   return (
     <>
       {/* Category Filter Banner */}
@@ -1621,6 +1777,9 @@ export default function ProjectionsTable({
               Filtered by:{" "}
               <span className="font-normal">
                 {categoryFilter.processType}
+                {categoryFilter.sizeFilter && (
+                  <> - size: {String(categoryFilter.sizeFilter.fieldValue)}{categoryFilter.sizeFilter.compositeHeightValue ? `x${categoryFilter.sizeFilter.compositeHeightValue}` : ""}</>
+                )}
                 {categoryFilter.primaryCategory && (
                   <> → {categoryFilter.primaryCategory}</>
                 )}
@@ -1895,9 +2054,23 @@ export default function ProjectionsTable({
                   }
 
                   // Check if this summary row matches the active filter
+                  // Only active if filtering by process type only (not by field or size)
                   const isSummaryFilterActive = categoryFilter && 
                     categoryFilter.processType === summary.processType &&
-                    !categoryFilter.fieldName;
+                    !categoryFilter.fieldName &&
+                    !categoryFilter.sizeFilter &&
+                    !categoryFilter.primaryCategory;
+
+                  // Determine if there's an active size filter for this process type
+                  const activeSizeFilter = categoryFilter && 
+                    categoryFilter.processType === summary.processType &&
+                    categoryFilter.sizeFilter
+                    ? {
+                        processType: categoryFilter.processType,
+                        fieldName: categoryFilter.sizeFilter.fieldName,
+                        fieldValue: String(categoryFilter.sizeFilter.fieldValue || ""),
+                      }
+                    : null;
 
                   return (
                     <React.Fragment key={summaryKey}>
@@ -1912,23 +2085,53 @@ export default function ProjectionsTable({
                         facilityName={isFacilitySummary(summary) ? summary.facilityName : undefined}
                         expandCollapseAllButton={expandCollapseAllButton}
                         onCategoryClick={handleCategoryClick}
+                        onSizeFieldClick={handleSizeFieldClick}
                         isCategoryFilterActive={!!isSummaryFilterActive}
                         visibleStaticColumnKeys={visibleStaticColumnKeys}
                         isColumnVisible={isColumnVisible}
+                        sizeFields={sizeFieldsByProcessType.get(summary.processType) || []}
+                        activeSizeFilter={activeSizeFilter}
                       />
                       {/* Render tiered category rows (Tier 2: Primary Category / Basic OE) if expanded */}
                       {isExpanded && (() => {
                         // Get projections for this process type
-                        const projectionsToUse = fullFilteredProjections || jobProjections;
+                        let projectionsToUse = fullFilteredProjections || jobProjections;
                         const facilityFilteredProjections = isFacilitySummary(summary)
                           ? projectionsToUse.filter(p => p.job.facilities_id === summary.facilityId)
                           : projectionsToUse;
 
-                        // Build tiered summary data
+                        // Apply size filter if active for this process type
+                        let filteredProjections = facilityFilteredProjections;
+                        if (activeSizeFilter && activeSizeFilter.fieldValue) {
+                          filteredProjections = facilityFilteredProjections.filter((proj) => {
+                            const requirement = proj.job.requirements?.find(
+                              (r: any) => normalizeProcessType(r.process_type) === normalizedProcessType
+                            );
+                            if (!requirement) return false;
+                            
+                            const filteredFieldName = activeSizeFilter.fieldName;
+                            const filteredValue = activeSizeFilter.fieldValue;
+                            
+                            // Check if this is a composite size filter
+                            if (categoryFilter?.sizeFilter?.compositeHeightField && categoryFilter.sizeFilter.compositeHeightValue) {
+                              const widthValue = (requirement as any)[filteredFieldName];
+                              const heightValue = (requirement as any)[categoryFilter.sizeFilter.compositeHeightField];
+                              return String(widthValue) === categoryFilter.sizeFilter.fieldValue && 
+                                     String(heightValue) === categoryFilter.sizeFilter.compositeHeightValue;
+                            } else {
+                              // Regular size field filter
+                              const sizeValue = (requirement as any)[filteredFieldName];
+                              return fieldValuesMatch(filteredValue, sizeValue);
+                            }
+                          });
+                        }
+
+                        // Build tiered summary data (only non-size fields will be included)
                         const tieredData = buildSummaryTieredData(
-                          facilityFilteredProjections,
+                          filteredProjections,
                           normalizedProcessType,
-                          timeRanges
+                          timeRanges,
+                          machineVariables
                         );
 
                         return tieredData.primaryCategories.map((primaryCategory) => {
@@ -1941,13 +2144,44 @@ export default function ProjectionsTable({
                             categoryFilter.primaryCategory === primaryCategory.value;
 
                           // Filter jobs belonging to this primary category when expanded
+                          // Also apply size filter if active
                           const categoryJobs = isPrimaryCategoryExpanded
                             ? facilityFilteredProjections.filter((proj) => {
                                 const primaryValue = getPrimaryCategoryValue(proj.job, normalizedProcessType);
                                 if (primaryCategory.value === "Misc") {
-                                  return !primaryValue; // Jobs without primary category
+                                  if (primaryValue) return false; // Jobs without primary category
+                                } else {
+                                  if (primaryValue !== primaryCategory.value) return false;
                                 }
-                                return primaryValue === primaryCategory.value;
+                                
+                                // Also apply size filter if active
+                                if (activeSizeFilter && activeSizeFilter.fieldValue) {
+                                  const requirement = proj.job.requirements?.find(
+                                    (r: any) => normalizeProcessType(r.process_type) === normalizedProcessType
+                                  );
+                                  if (!requirement) return false;
+                                  
+                                  const filteredFieldName = activeSizeFilter.fieldName;
+                                  const filteredValue = activeSizeFilter.fieldValue;
+                                  
+                                  // Check if this is a composite size filter
+                                  if (categoryFilter?.sizeFilter?.compositeHeightField && categoryFilter.sizeFilter.compositeHeightValue) {
+                                    const widthValue = (requirement as any)[filteredFieldName];
+                                    const heightValue = (requirement as any)[categoryFilter.sizeFilter.compositeHeightField];
+                                    if (String(widthValue) !== categoryFilter.sizeFilter.fieldValue || 
+                                        String(heightValue) !== categoryFilter.sizeFilter.compositeHeightValue) {
+                                      return false;
+                                    }
+                                  } else {
+                                    // Regular size field filter
+                                    const sizeValue = (requirement as any)[filteredFieldName];
+                                    if (!fieldValuesMatch(filteredValue, sizeValue)) {
+                                      return false;
+                                    }
+                                  }
+                                }
+                                
+                                return true;
                               })
                             : [];
 
@@ -1983,15 +2217,43 @@ export default function ProjectionsTable({
                                     String(categoryFilter.fieldValue) === subCategory.value;
 
                                   // Filter jobs for this specific sub-category when expanded
-                                  // Jobs must match the sub-category field value
+                                  // Jobs must match: process type + size filter (if active) + sub-category field value
                                   const subCategoryJobs = isSubCategoryExpanded
                                     ? categoryJobs.filter((proj) => {
                                         const requirement = proj.job.requirements?.find(
                                           (r: any) => normalizeProcessType(r.process_type) === normalizedProcessType
                                         );
                                         if (!requirement) return false;
+                                        
+                                        // Check sub-category field value
                                         const fieldValue = (requirement as any)[subCategory.fieldName];
-                                        return String(fieldValue) === subCategory.value;
+                                        if (String(fieldValue) !== subCategory.value) {
+                                          return false;
+                                        }
+                                        
+                                        // Also apply size filter if active
+                                        if (activeSizeFilter && activeSizeFilter.fieldValue) {
+                                          const filteredFieldName = activeSizeFilter.fieldName;
+                                          const filteredValue = activeSizeFilter.fieldValue;
+                                          
+                                  // Check if this is a composite size filter
+                                  if (categoryFilter?.sizeFilter?.compositeHeightField && categoryFilter.sizeFilter.compositeHeightValue) {
+                                    const widthValue = (requirement as any)[filteredFieldName];
+                                    const heightValue = (requirement as any)[categoryFilter.sizeFilter.compositeHeightField];
+                                    if (String(widthValue) !== categoryFilter.sizeFilter.fieldValue || 
+                                        String(heightValue) !== categoryFilter.sizeFilter.compositeHeightValue) {
+                                      return false;
+                                    }
+                                  } else {
+                                    // Regular size field filter
+                                    const sizeValue = (requirement as any)[filteredFieldName];
+                                    if (!fieldValuesMatch(filteredValue, sizeValue)) {
+                                      return false;
+                                    }
+                                  }
+                                        }
+                                        
+                                        return true;
                                       })
                                     : [];
 

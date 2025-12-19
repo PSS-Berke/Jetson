@@ -577,6 +577,7 @@ export function getBreakdownableFields(
         label: string;
         addToJobInput?: boolean;
         showInAdditionalFields?: boolean;
+        is_size?: boolean; // Exclude size fields from breakdowns
       }
     >;
   }[],
@@ -588,8 +589,8 @@ export function getBreakdownableFields(
   const config = getProcessTypeConfig(normalizedKey);
   if (config) {
     config.fields.forEach((field) => {
-      // Exclude currency fields
-      if (field.type !== "currency") {
+      // Exclude currency fields and size fields (paper_size, basic_oe are handled as primary category)
+      if (field.type !== "currency" && field.name !== "paper_size" && field.name !== "basic_oe") {
         fields.push({
           name: field.name,
           label: field.label,
@@ -609,7 +610,12 @@ export function getBreakdownableFields(
     if (matchingVariables) {
       Object.entries(matchingVariables.variables).forEach(([fieldName, fieldDef]) => {
         // Only include fields that are used in job input and not already in static fields
-        if (fieldDef.addToJobInput && !fields.find((f) => f.name === fieldName)) {
+        // Exclude size fields (is_size === true) - these are shown next to service type, not in dropdown
+        if (
+          fieldDef.addToJobInput && 
+          !fields.find((f) => f.name === fieldName) &&
+          fieldDef.is_size !== true // Exclude size fields
+        ) {
           // Exclude currency fields
           if (fieldDef.type !== "currency") {
             fields.push({

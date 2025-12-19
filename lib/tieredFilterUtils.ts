@@ -12,7 +12,8 @@
 import type { ParsedJob } from "@/hooks/useJobs";
 import type { JobProjection } from "@/hooks/useProjections";
 import type { TimeRange } from "@/lib/projectionUtils";
-import { normalizeProcessType, getProcessTypeConfig, PROCESS_TYPE_CONFIGS } from "./processTypeConfig";
+import { normalizeProcessType, getProcessTypeConfig, PROCESS_TYPE_CONFIGS, getBreakdownableFields } from "./processTypeConfig";
+import { getAllMachineVariables } from "./api";
 
 /**
  * Represents a selected filter at any tier level
@@ -110,6 +111,23 @@ export function getPrimaryCategoryValue(
     return normalizeEnvelopeSize(paperSize);
   }
 
+  // For process types without basic_oe or paper_size, check for alternative size fields
+  // This handles process types like "development_test" that use different field names
+  if (normalizedProcessType === "development_test" || normalizedProcessType === "development test") {
+    // Check for select_size first
+    const selectSize = (requirement as any).select_size;
+    if (selectSize !== undefined && selectSize !== null && selectSize !== "" && selectSize !== "undefined" && selectSize !== "null") {
+      return String(selectSize);
+    }
+
+    // Check for integer_size_width and integer_size_height to create composite size
+    const sizeWidth = (requirement as any).integer_size_width;
+    const sizeHeight = (requirement as any).integer_size_height;
+    if (sizeWidth !== undefined && sizeWidth !== null && sizeHeight !== undefined && sizeHeight !== null) {
+      return `${sizeWidth}x${sizeHeight}`;
+    }
+  }
+
   return undefined;
 }
 
@@ -165,32 +183,75 @@ export function getJobProcessTypes(job: ParsedJob): string[] {
 }
 
 /**
- * Get the sub-category fields for a process type (excluding price and primary category)
+ * Get the sub-category fields for a process type (excluding price, primary category, and size fields)
  */
-export function getSubCategoryFields(processType: string): Array<{ name: string; label: string }> {
+export function getSubCategoryFields(
+  processType: string,
+  machineVariables?: {
+    type: string;
+    variables: Record<
+      string,
+      {
+        type: string;
+        label: string;
+        addToJobInput?: boolean;
+        showInAdditionalFields?: boolean;
+        is_size?: boolean;
+      }
+    >;
+  }[]
+): Array<{ name: string; label: string }> {
   const config = getProcessTypeConfig(processType);
-  if (!config) {
-    return [];
-  }
+  const fields: Array<{ name: string; label: string }> = [];
 
-  // Exclude price fields and the primary category fields (basic_oe and paper_size)
-  // These are used for Tier 2 (primary category) so shouldn't appear in Tier 3 (sub-categories)
-  return config.fields
-    .filter((field) => {
+  // Get static fields from config
+  if (config) {
+    config.fields.forEach((field) => {
       // Exclude currency/price fields
       if (field.type === "currency" || field.name.includes("price")) {
-        return false;
+        return;
       }
       // Exclude the primary category fields (used for envelope size grouping)
       if (field.name === "paper_size" || field.name === "basic_oe") {
-        return false;
+        return;
       }
-      return true;
-    })
-    .map((field) => ({
-      name: field.name,
-      label: field.label,
-    }));
+      fields.push({
+        name: field.name,
+        label: field.label,
+      });
+    });
+  }
+
+  // Add dynamic fields from machine variables if available, excluding size fields
+  if (machineVariables) {
+    const normalizedProcessType = normalizeProcessType(processType);
+    const matchingVariables = machineVariables.find((mv) => {
+      const mvNormalized = normalizeProcessType(mv.type);
+      return mvNormalized === normalizedProcessType;
+    });
+
+    if (matchingVariables && matchingVariables.variables) {
+      Object.entries(matchingVariables.variables).forEach(([fieldName, fieldDef]) => {
+        // Only include fields that are used in job input and not already in static fields
+        // Exclude size fields (is_size === true) - these are shown next to service type, not in dropdown
+        if (
+          fieldDef.addToJobInput && 
+          !fields.find((f) => f.name === fieldName) &&
+          fieldDef.is_size !== true // Exclude size fields
+        ) {
+          // Exclude currency fields
+          if (fieldDef.type !== "currency") {
+            fields.push({
+              name: fieldName,
+              label: fieldDef.label || fieldName,
+            });
+          }
+        }
+      });
+    }
+  }
+
+  return fields;
 }
 
 /**
@@ -438,7 +499,20 @@ export interface SummarySubCategory {
 export function buildSummaryTieredData(
   projections: JobProjection[],
   processType: string,
-  timeRanges: TimeRange[]
+  timeRanges: TimeRange[],
+  machineVariables?: {
+    type: string;
+    variables: Record<
+      string,
+      {
+        type: string;
+        label: string;
+        addToJobInput?: boolean;
+        showInAdditionalFields?: boolean;
+        is_size?: boolean;
+      }
+    >;
+  }[]
 ): {
   primaryCategories: SummaryPrimaryCategory[];
   subCategories: Map<string, SummarySubCategory[]>;
@@ -496,8 +570,11 @@ export function buildSummaryTieredData(
     });
 
     // Update sub-category totals (Tier 3) - skip for Misc category
+    // Use getBreakdownableFields which excludes size fields
     if (primaryCategory !== MISC_CATEGORY) {
-      const subFields = getSubCategoryFields(normalizedProcessType);
+      const subFields = machineVariables 
+        ? getBreakdownableFields(normalizedProcessType, machineVariables)
+        : getSubCategoryFields(normalizedProcessType, machineVariables);
 
       if (!subCategoryMap.has(primaryCategory)) {
         subCategoryMap.set(primaryCategory, new Map());
@@ -549,8 +626,11 @@ export function buildSummaryTieredData(
   primaryCategories.sort((a, b) => b.grandTotal - a.grandTotal);
 
   // Convert sub-categories to output format
+  // Use getBreakdownableFields which excludes size fields
   const subCategories = new Map<string, SummarySubCategory[]>();
-  const subFields = getSubCategoryFields(normalizedProcessType);
+  const subFields = machineVariables 
+    ? getBreakdownableFields(normalizedProcessType, machineVariables)
+    : getSubCategoryFields(normalizedProcessType, machineVariables);
 
   subCategoryMap.forEach((fieldMap, primaryCategoryValue) => {
     const items: SummarySubCategory[] = [];

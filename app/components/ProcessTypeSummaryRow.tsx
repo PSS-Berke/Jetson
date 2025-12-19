@@ -2,6 +2,7 @@
 
 import { ProcessTypeSummary, formatQuantity, TimeRange } from "@/lib/projectionUtils";
 import { ChevronRight, ChevronDown } from "lucide-react";
+import { SizeField } from "@/lib/sizeFieldUtils";
 
 interface ProcessTypeSummaryRowProps {
   summary: ProcessTypeSummary;
@@ -14,9 +15,12 @@ interface ProcessTypeSummaryRowProps {
   facilityName?: string;
   expandCollapseAllButton?: React.ReactNode;
   onCategoryClick?: (processType: string, timeRangeLabel?: string) => void;
+  onSizeFieldClick?: (processType: string, fieldName: string, fieldValue: string) => void;
   isCategoryFilterActive?: boolean;
   visibleStaticColumnKeys?: string[];
   isColumnVisible?: (key: string) => boolean;
+  sizeFields?: SizeField[]; // New prop for size fields
+  activeSizeFilter?: { fieldName: string; fieldValue: string } | null; // Active size filter to avoid duplicates
 }
 
 // Default column keys if not provided (for backward compatibility)
@@ -40,9 +44,12 @@ export function ProcessTypeSummaryRow({
   facilityName,
   expandCollapseAllButton,
   onCategoryClick,
+  onSizeFieldClick,
   isCategoryFilterActive = false,
   visibleStaticColumnKeys,
   isColumnVisible,
+  sizeFields = [],
+  activeSizeFilter = null,
 }: ProcessTypeSummaryRowProps) {
   const displayValue = summary.grandTotal;
   const formattedTotal = formatQuantity(Math.round(displayValue));
@@ -71,14 +78,15 @@ export function ProcessTypeSummaryRow({
         isCategoryFilterActive ? "bg-blue-200" : "bg-blue-50"
       } ${onCategoryClick ? "cursor-pointer hover:bg-blue-100" : ""}`}
       onClick={(e) => {
-        // Don't trigger category click when clicking expand/collapse button
-        if ((e.target as HTMLElement).closest('button')) {
+        // Don't trigger category click when clicking expand/collapse button or size fields
+        if ((e.target as HTMLElement).closest('button') || 
+            (e.target as HTMLElement).closest('.size-field')) {
           return;
         }
         onCategoryClick?.(summary.processType);
       }}
     >
-      {/* Checkbox column - with expand/collapse all button on first row */}
+      {/* Checkbox column */}
       <th className="px-2 py-2 w-12">
         {expandCollapseAllButton && (
           <div onClick={(e) => e.stopPropagation()}>
@@ -90,14 +98,17 @@ export function ProcessTypeSummaryRow({
       {staticColumnsToRender.map((colKey) => (
         <th key={colKey} className="px-2 py-2"></th>
       ))}
-      {/* Start & End columns - Process type name with controls */}
+      {/* Start & End columns - Dropdown icon (far left), size fields, and process type name */}
       <th colSpan={dateColSpan > 0 ? dateColSpan : 1} className="px-2 py-2 text-left">
         <div className="flex items-center gap-2">
-          {/* Expand/collapse button */}
-          {hasBreakdowns && (
+          {/* Expand/collapse button - always visible on far left if there are breakdowns or size fields */}
+          {(hasBreakdowns || sizeFields.length > 0) && (
             <button
-              onClick={onToggleExpand}
-              className="p-1 hover:bg-blue-200 rounded transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand();
+              }}
+              className="p-1 hover:bg-blue-200 rounded transition-colors flex-shrink-0"
               title={isExpanded ? "Collapse breakdown" : "Expand breakdown"}
             >
               {isExpanded ? (
@@ -107,6 +118,104 @@ export function ProcessTypeSummaryRow({
               )}
             </button>
           )}
+
+          {/* Size fields - displayed horizontally after dropdown icon, only when expanded */}
+          {isExpanded && sizeFields.length > 0 && (() => {
+            // Collect all unique size values and track which fields have each value
+            const valueToFields = new Map<string, SizeField[]>();
+            
+            sizeFields.forEach((sizeField) => {
+              sizeField.values.forEach((value) => {
+                if (!valueToFields.has(value)) {
+                  valueToFields.set(value, []);
+                }
+                valueToFields.get(value)!.push(sizeField);
+              });
+            });
+            
+            // Determine which values to show
+            const valuesToShow: Array<{ value: string; fields: SizeField[]; isActive: boolean }> = [];
+            
+            if (activeSizeFilter && activeSizeFilter.fieldValue) {
+              // When a filter is active:
+              // 1. Show all OTHER fields that have the same size value (highlighted)
+              const filteredValue = activeSizeFilter.fieldValue;
+              const filteredFieldName = activeSizeFilter.fieldName;
+              
+              // Find all fields that have this value but are NOT the filtered field
+              const fieldsWithFilteredValue = (valueToFields.get(filteredValue) || []).filter(field => {
+                // Exclude the exact field being filtered
+                if (field.name === filteredFieldName) return false;
+                // For composite fields, check if they contain the filtered field name
+                if (field.name.startsWith("COMPOSITE_")) {
+                  const compositeName = field.name.replace("COMPOSITE_", "");
+                  return !compositeName.includes(filteredFieldName);
+                }
+                // For regular fields being filtered as part of composite
+                if (filteredFieldName?.startsWith("COMPOSITE_")) {
+                  const compositeParts = filteredFieldName.replace("COMPOSITE_", "").split("_");
+                  return !compositeParts.includes(field.name);
+                }
+                return true;
+              });
+              
+              // If other fields have the same value, show it (highlighted)
+              if (fieldsWithFilteredValue.length > 0) {
+                valuesToShow.push({
+                  value: filteredValue,
+                  fields: fieldsWithFilteredValue,
+                  isActive: true,
+                });
+              }
+              
+              // 2. Show all other size values (not the filtered one)
+              valueToFields.forEach((fields, value) => {
+                if (value !== filteredValue) {
+                  valuesToShow.push({
+                    value,
+                    fields,
+                    isActive: false,
+                  });
+                }
+              });
+            } else {
+              // No active filter - show all unique values
+              valueToFields.forEach((fields, value) => {
+                valuesToShow.push({
+                  value,
+                  fields,
+                  isActive: false,
+                });
+              });
+            }
+            
+            return (
+              <div className="flex items-center gap-1 flex-wrap mr-2">
+                {valuesToShow.map(({ value, fields, isActive }) => {
+                  // Find the primary field (prefer non-composite, or first one)
+                  const primaryField = fields.find(f => !f.isComposite) || fields[0];
+                  
+                  return (
+                    <button
+                      key={`size-${value}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSizeFieldClick?.(summary.processType, primaryField.name, value);
+                      }}
+                      className={`size-field px-2 py-1 text-xs border rounded transition-colors ${
+                        isActive
+                          ? "bg-blue-500 text-white border-blue-600 font-semibold"
+                          : "bg-white border-blue-300 hover:bg-blue-100 hover:border-blue-400"
+                      }`}
+                      title={`Filter by size: ${value}${fields.length > 1 ? ` (${fields.map(f => f.label).join(", ")})` : ` (${primaryField.label})`}`}
+                    >
+                      <span className={isActive ? "text-white" : "text-gray-800 font-semibold"}>{value}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Process type label */}
           <span className="text-gray-800 font-semibold">{displayLabel}</span>

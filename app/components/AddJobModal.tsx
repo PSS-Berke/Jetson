@@ -602,9 +602,8 @@ function AddJobModal({
     field: keyof Requirement,
     value: string | number | boolean,
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      requirements: prev.requirements.map((req, idx) => {
+    setFormData((prev) => {
+      const updatedRequirements = prev.requirements.map((req, idx) => {
         if (idx !== requirementIndex) return req;
         
         // Check if the value is invalid/unselected
@@ -630,8 +629,22 @@ function AddJobModal({
         
         // Otherwise, update the field with the new value
         return { ...req, [field]: value };
-      }),
-    }));
+      });
+      
+      // If process_type changed for the first requirement, update service_type to match
+      if (field === "process_type" && requirementIndex === 0 && typeof value === "string" && value.trim() !== "") {
+        return {
+          ...prev,
+          requirements: updatedRequirements,
+          service_type: value, // Update service_type to match the first requirement's process_type
+        };
+      }
+      
+      return {
+        ...prev,
+        requirements: updatedRequirements,
+      };
+    });
   };
 
   const addRequirement = () => {
@@ -1156,8 +1169,10 @@ function AddJobModal({
   // This ensures that unselected fields (false, empty, null, undefined) are completely omitted from the payload
   const cleanRequirement = (req: Requirement): Requirement => {
     // process_type is required and should always be present (we only clean validated requirements)
+    // Preserve the exact process_type value as selected by the user (no normalization)
+    console.log('[AddJobModal] Cleaning requirement with process_type:', req.process_type);
     const cleaned: Requirement = {
-      process_type: req.process_type,
+      process_type: req.process_type, // Keep the exact value from the form
     };
     
     // Always include price_per_m if it exists (even if 0, as it might be intentional)
@@ -1250,6 +1265,15 @@ function AddJobModal({
     // Filter to only valid requirements
     const validRequirements = getValidRequirements(versionData.requirements);
     const cleanedRequirements = validRequirements.map(req => cleanRequirement(req));
+    
+    // Debug: Log process types before sending
+    console.log('[AddJobModal] Process types in requirements:', cleanedRequirements.map(r => r.process_type));
+    
+    // Derive service_type from the first requirement's process_type
+    // This ensures service_type matches what the user actually selected
+    const derivedServiceType = cleanedRequirements.length > 0 && cleanedRequirements[0].process_type
+      ? cleanedRequirements[0].process_type
+      : versionData.service_type || "";
 
     // Calculate total billing
     const quantity = parseInt(versionData.quantity) || 0;
@@ -1289,7 +1313,7 @@ function AddJobModal({
 
     return {
       job_number: versionData.job_number || "",
-      service_type: versionData.service_type || "",
+      service_type: derivedServiceType,
       quantity: quantity,
       description: versionData.description || "",
       start_date: startDateTimestamp && startDateTimestamp > 0 ? startDateTimestamp : null,
