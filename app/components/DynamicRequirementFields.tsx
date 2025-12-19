@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import {
-  getProcessTypeOptions,
   normalizeProcessType,
   getSourceTypesForProcessType,
   getProcessTypeConfig,
@@ -37,12 +36,53 @@ export default function DynamicRequirementFields({
   const [isLoadingFields, setIsLoadingFields] = useState(false);
   const [capabilityBuckets, setCapabilityBuckets] = useState<CapabilityBucket[]>([]);
   const [isLoadingBuckets, setIsLoadingBuckets] = useState(false);
+  const [allMachineVariables, setAllMachineVariables] = useState<any[]>([]);
+  const [typePathOptions, setTypePathOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [isLoadingTypePaths, setIsLoadingTypePaths] = useState(false);
   const populatedProcessTypeRef = useRef<string | null>(null);
   const populatedBucketRef = useRef<number | null>(null);
   const fetchedProcessTypeRef = useRef<string | null>(null);
   const isFetchingRef = useRef<boolean>(false);
   const previousProcessTypeRef = useRef<string | null>(null);
-  const processTypeOptions = getProcessTypeOptions();
+
+  // Fetch all machine variables on mount to get type options
+  useEffect(() => {
+    const fetchMachineVariables = async () => {
+      setIsLoadingTypePaths(true);
+      try {
+        const variables = await getAllMachineVariables();
+        setAllMachineVariables(variables);
+        
+        // Extract unique type values
+        const typePaths = new Set<string>();
+        variables.forEach((record: any) => {
+          // Use type field from API response
+          const typeValue = record.type;
+          if (typeValue) {
+            typePaths.add(typeValue);
+          }
+        });
+        
+        // Convert to options array, sorted alphabetically
+        const options = Array.from(typePaths)
+          .sort()
+          .map((typePath) => ({
+            value: typePath,
+            label: typePath,
+          }));
+        
+        console.log("[DynamicRequirementFields] Extracted type options:", options);
+        setTypePathOptions(options);
+      } catch (error) {
+        console.error("[DynamicRequirementFields] Error fetching machine variables:", error);
+        setTypePathOptions([]);
+      } finally {
+        setIsLoadingTypePaths(false);
+      }
+    };
+
+    fetchMachineVariables();
+  }, []);
 
   // Fetch capability buckets when process_type is "Capability Bucket"
   useEffect(() => {
@@ -229,29 +269,35 @@ export default function DynamicRequirementFields({
       setIsLoadingFields(true);
 
       try {
-        // Normalize the process type to match database keys (e.g., "Insert" -> "insert")
-        const normalizedType = normalizeProcessType(processTypeToFetch);
-
-        // Get source types that should be included for this normalized type
-        const sourceTypes = getSourceTypesForProcessType(normalizedType);
-
-  
-        // Fetch all machine variables and filter by source types
-        const allVariables = await getAllMachineVariables();
-        const response = allVariables.filter((group: any) =>
-          sourceTypes.includes(group.type)
+        // Use type_path or type to find the matching machine_variables record
+        // First check if we already have allMachineVariables in state (from the mount effect)
+        let variablesToUse = allMachineVariables;
+        
+        // If we don't have them yet, fetch them
+        if (variablesToUse.length === 0) {
+          variablesToUse = await getAllMachineVariables();
+          setAllMachineVariables(variablesToUse);
+        }
+        
+        // Find the record(s) matching the type
+        const response = variablesToUse.filter((group: any) =>
+          group.type === processTypeToFetch
         );
 
 
         // Extract fields from the API response
-        // Response structure: [{ id, type, variables: { varName: { type, label, value, required, addToJobInput } } }]
-        // NOTE: Multiple records may be returned for the same normalized type (e.g., "Insert" and "Ink jet+")
+        // Response structure: [{ id, type_path, variables: { varName: { type, label, value, required, addToJobInput } } }]
+        // NOTE: Multiple records may be returned for the same type_path
         // We need to merge all variables from all matching records
         if (response && response.length > 0) {
+          // Build the variables JSON object from the first matching record (or merge if multiple)
+          const variablesObject: Record<string, any> = {};
+          
           // Merge all variables from all records
           const mergedVariables: Record<string, any> = {};
           response.forEach((record: any, index: number) => {
-            console.log(`  Record ${index + 1}: type="${record.type}", id=${record.id}, variables count=${Object.keys(record.variables || {}).length}`);
+            const recordType = record.type;
+            console.log(`  Record ${index + 1}: type="${recordType}", id=${record.id}, variables count=${Object.keys(record.variables || {}).length}`);
 
             if (record.variables && typeof record.variables === 'object') {
               console.log(`    Fields in record ${index + 1}:`, Object.keys(record.variables).join(', '));
@@ -265,6 +311,18 @@ export default function DynamicRequirementFields({
               });
             }
           });
+          
+          // Build the variables object from merged variables
+          // The variables object contains field definitions (type, label, required, options, etc.)
+          Object.entries(mergedVariables).forEach(([varName, varConfig]) => {
+            // Store the field definition object as-is
+            variablesObject[varName] = varConfig;
+          });
+          
+          // Store the variables JSON object (field definitions)
+          if (Object.keys(variablesObject).length > 0) {
+            onChange("variables", JSON.stringify(variablesObject));
+          }
 
 
           // Check if we have any variables after merging
@@ -293,16 +351,9 @@ export default function DynamicRequirementFields({
               }))
               .sort((a, b) => a.order - b.order)
               .filter(({ varName, varConfig }) => {
-                // Exclude price_per_m from API (case-insensitive) - we'll use the one from static config instead
-                const normalizedName = varName.toLowerCase().trim();
-                if (normalizedName === "price_per_m" || 
-                    normalizedName === "priceper_m" ||
-                    normalizedName.match(/^price[_\s]?per[_\s]?m$/i)) {
-                  console.log(`  [FILTERED OUT] ${varName}: Using static config version instead`);
-                  return false;
-                }
-                // Only include variables where addToJobInput is true
-                const shouldInclude = varConfig.addToJobInput === true;
+                // Include variables where addToJobInput is true, or if addToJobInput is not specified, include by default
+                // This allows variables from the API to be shown even if they don't have addToJobInput set
+                const shouldInclude = varConfig.addToJobInput === true || varConfig.addToJobInput === undefined;
                 if (!shouldInclude) {
                   console.log(`  [FILTERED OUT] ${varConfig.label || 'unnamed'}: addToJobInput=${varConfig.addToJobInput}`);
                 }
@@ -370,7 +421,10 @@ export default function DynamicRequirementFields({
             // Use the captured process type to avoid stale closure issues
             if (populatedProcessTypeRef.current !== processTypeToFetch) {
               Object.entries(variables).forEach(([varName, varConfig]: [string, any]) => {
-                if (varConfig.addToJobInput === true) {
+                // Include variables where addToJobInput is true, or if addToJobInput is not specified, include by default
+                const shouldPopulate = varConfig.addToJobInput === true || varConfig.addToJobInput === undefined;
+                
+                if (shouldPopulate) {
                   // Handle boolean values - they can be false, which is a valid value
                   const isBoolean = varConfig.type === "boolean";
                   const hasValue = isBoolean
@@ -400,58 +454,27 @@ export default function DynamicRequirementFields({
             }
 
            
-            // Helper function to check if a field is a price_per_m variant
-            const isPricePerMField = (fieldName: string): boolean => {
-              const normalized = fieldName.toLowerCase().trim();
-              return normalized === "price_per_m" || 
-                     normalized === "priceper_m" ||
-                     !!normalized.match(/^price[_\s]?per[_\s]?m$/i);
-            };
-            
-            // Remove ALL price_per_m fields from API (case-insensitive check)
-            // We'll use only the static config version to avoid duplicates
-            // Convert any other price/cost fields to currency type (in case API returned them as number)
-            const filteredBasicFields = basicFields.filter(field => !isPricePerMField(field.name));
-            filteredBasicFields.forEach(field => {
-              const isCostField = field.name.endsWith("_cost") ||
-                (field.name.toLowerCase().includes("price") && !isPricePerMField(field.name)) ||
-                (field.name.toLowerCase().includes("cost") && !isPricePerMField(field.name));
+            // Convert any price/cost fields to currency type (in case API returned them as number)
+            // Use API version of price_per_m if available (it has proper order, placeholder, etc.)
+            basicFields.forEach(field => {
+              const isCostField = field.name === "price_per_m" ||
+                field.name.endsWith("_cost") ||
+                (field.name.toLowerCase().includes("price") && field.name.toLowerCase().includes("per")) ||
+                (field.name.toLowerCase().includes("cost"));
               if (isCostField && field.type !== "currency") {
                 field.type = "currency";
               }
             });
             
-            const filteredAdditionalFields = additionalFieldsList.filter(field => !isPricePerMField(field.name));
-            filteredAdditionalFields.forEach(field => {
-              const isCostField = field.name.endsWith("_cost") ||
-                (field.name.toLowerCase().includes("price") && !isPricePerMField(field.name)) ||
-                (field.name.toLowerCase().includes("cost") && !isPricePerMField(field.name));
+            additionalFieldsList.forEach(field => {
+              const isCostField = field.name === "price_per_m" ||
+                field.name.endsWith("_cost") ||
+                (field.name.toLowerCase().includes("price") && field.name.toLowerCase().includes("per")) ||
+                (field.name.toLowerCase().includes("cost"));
               if (isCostField && field.type !== "currency") {
                 field.type = "currency";
               }
             });
-            
-            // Always use price_per_m from static config (properly configured as currency)
-            // Remove any existing price_per_m first to ensure no duplicates
-            const staticConfig = getProcessTypeConfig(processTypeToFetch);
-            const pricePerMField = staticConfig?.fields.find(f => f.name === "price_per_m");
-            if (pricePerMField) {
-              // Double-check: remove any price_per_m that might have slipped through
-              const finalBasicFields = filteredBasicFields.filter(f => !isPricePerMField(f.name));
-              finalBasicFields.unshift(pricePerMField);
-              
-              // Update the arrays
-              basicFields.length = 0;
-              basicFields.push(...finalBasicFields);
-              additionalFieldsList.length = 0;
-              additionalFieldsList.push(...filteredAdditionalFields);
-            } else {
-              // No static config price_per_m, just use filtered fields
-              basicFields.length = 0;
-              basicFields.push(...filteredBasicFields);
-              additionalFieldsList.length = 0;
-              additionalFieldsList.push(...filteredAdditionalFields);
-            }
            
             setDynamicFields(basicFields);
             setAdditionalFields(additionalFieldsList);
@@ -840,6 +863,9 @@ export default function DynamicRequirementFields({
     }
   };
 
+  // Debug: Log current state
+  console.log("[DynamicRequirementFields] Render - typePathOptions:", typePathOptions, "isLoadingTypePaths:", isLoadingTypePaths, "allMachineVariables.length:", allMachineVariables.length);
+
   return (
     <div className="space-y-4">
       {/* Process Type Selector */}
@@ -854,7 +880,53 @@ export default function DynamicRequirementFields({
           id="process-type"
           value={requirement.process_type}
           onChange={(e) => {
-            onChange("process_type", e.target.value);
+            const selectedTypePath = e.target.value;
+            onChange("process_type", selectedTypePath);
+            
+            // Find the matching machine_variables record and build variables object
+            if (selectedTypePath && allMachineVariables.length > 0) {
+              const matchingRecord = allMachineVariables.find(
+                (record: any) => record.type === selectedTypePath
+              );
+              
+              if (matchingRecord && matchingRecord.variables) {
+                // Build the variables JSON object from the matching record
+                // The variables object contains field definitions (type, label, required, options, etc.)
+                const variablesObject: Record<string, any> = {};
+                
+                // Handle both object and array formats for variables
+                if (typeof matchingRecord.variables === 'object') {
+                  if (Array.isArray(matchingRecord.variables)) {
+                    // If variables is an array, convert to object
+                    matchingRecord.variables.forEach((varItem: any) => {
+                      const varName = varItem.variable_name || varItem.name || varItem.key;
+                      if (varName) {
+                        // Store the field definition object
+                        variablesObject[varName] = varItem;
+                      }
+                    });
+                  } else {
+                    // If variables is already an object, use it directly (it contains field definitions)
+                    Object.entries(matchingRecord.variables).forEach(([key, value]: [string, any]) => {
+                      variablesObject[key] = value;
+                    });
+                  }
+                }
+                
+                // Store the variables object in the requirement
+                // This makes the variables JSON object (field definitions) available for use
+                onChange("variables", JSON.stringify(variablesObject));
+                
+                console.log("[DynamicRequirementFields] Built variables object for type:", selectedTypePath, variablesObject);
+              } else {
+                // Clear variables if no matching record found
+                onChange("variables", "");
+              }
+            } else {
+              // Clear variables if no type selected
+              onChange("variables", "");
+            }
+            
             // Clear bucket selection when process type changes
             onChange("capability_bucket_id", "");
             populatedBucketRef.current = null;
@@ -865,13 +937,18 @@ export default function DynamicRequirementFields({
               : "border-[var(--border)] focus:ring-[var(--primary-blue)] focus:border-[var(--primary-blue)]"
           }`}
           required={!disableRequired}
+          disabled={isLoadingTypePaths}
         >
           <option value="">Select Process Type...</option>
-          {processTypeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+          {isLoadingTypePaths ? (
+            <option value="" disabled>Loading process types...</option>
+          ) : (
+            typePathOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))
+          )}
         </select>
         {errors.process_type && (
           <p className="mt-1 text-sm text-red-600">{errors.process_type}</p>

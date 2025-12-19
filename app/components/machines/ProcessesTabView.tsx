@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getAllMachineVariables, api, getCapabilityBuckets, createCapabilityBucket, updateCapabilityBucket, deleteCapabilityBucket, type CapabilityBucket } from "@/lib/api";
 import { PROCESS_TYPE_CONFIGS, normalizeProcessType } from "@/lib/processTypeConfig";
-import { Plus, Edit2, Trash2, X } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Icon } from "lucide-react";
 import CustomProcessTypeBuilder from "../wizard/CustomProcessTypeBuilder";
 import { useToast } from "@/app/components/ui/Toast";
 
@@ -68,6 +68,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
   const [newProcessTypeName, setNewProcessTypeName] = useState("");
   const [newProcessTypeFields, setNewProcessTypeFields] = useState<FormField[]>([]);
+  const [originalProcessTypeFields, setOriginalProcessTypeFields] = useState<FormField[]>([]); // Store original fields for cancel
   const [machineProcessTypes, setMachineProcessTypes] = useState<string[]>([]);
   const [loadingFields, setLoadingFields] = useState(false);
 
@@ -157,6 +158,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
 
       // PATCH existing process type
       await api.patch(`/machine_variables/${selectedType.id}`, {
+        machine_variables_id: selectedType.id,
         type: selectedProcessType,
         variables: variables,
       });
@@ -254,6 +256,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
 
           // PATCH existing process type
           await api.patch(`/machine_variables/${selectedType.id}`, {
+            machine_variables_id: selectedType.id,
             type: selectedProcessType,
             variables: variables,
           });
@@ -414,6 +417,76 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     fetchProcessTypes();
   }, [fetchProcessTypes]);
 
+  // Handle deleting a process type
+  const handleDeleteProcessType = useCallback(async (processTypeKey: string) => {
+    if (!confirm(`Are you sure you want to delete the "${processTypeKey}" process type? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Find the selected process type config to get all source types
+      const selectedConfig = apiProcessTypes.find(pt => pt.key === processTypeKey);
+      if (!selectedConfig) {
+        console.error("[ProcessesTabView] Could not find process type config");
+        showToast({
+          type: 'error',
+          message: 'Process type not found',
+          duration: 3000,
+        });
+        return;
+      }
+
+      const sourceTypes = selectedConfig.sourceTypes || [processTypeKey];
+
+      // Fetch all machine variables to find all records to delete
+      const allVariables = await getAllMachineVariables();
+
+      // Find all records that match any of the source types
+      const recordsToDelete = allVariables.filter((group: MachineVariableGroup) => 
+        sourceTypes.includes(group.type) && group.id
+      );
+
+      if (recordsToDelete.length === 0) {
+        showToast({
+          type: 'error',
+          message: 'No records found to delete',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Delete all matching records
+      const deletePromises = recordsToDelete.map((record: MachineVariableGroup) => 
+        api.delete(`/machine_variables/${record.id}`)
+      );
+
+      await Promise.all(deletePromises);
+
+      // Refresh the process types list
+      await fetchProcessTypes();
+
+      // Clear selection if the deleted type was selected
+      if (selectedProcessType === processTypeKey) {
+        setSelectedProcessType(null);
+        setNewProcessTypeFields([]);
+      }
+
+      showToast({
+        type: 'success',
+        message: `Process type "${processTypeKey}" deleted successfully`,
+        duration: 3000,
+      });
+
+    } catch (error) {
+      console.error("[ProcessesTabView] Error deleting process type:", error);
+      showToast({
+        type: 'error',
+        message: 'Failed to delete process type. Please try again.',
+        duration: 5000,
+      });
+    }
+  }, [apiProcessTypes, selectedProcessType, showToast, fetchProcessTypes]);
+
   // Handle deleting a field from a process type
   const handleDeleteField = useCallback(async (fieldId: string) => {
     if (!selectedProcessType) {
@@ -456,6 +529,7 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
             // Queue the update
             updatePromises.push(
               api.patch(`/machine_variables/${group.id}`, {
+                machine_variables_id: group.id,
                 type: sourceType,
                 variables: variables,
               })
@@ -609,6 +683,8 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         });
 
         setNewProcessTypeFields(fieldsArray);
+        // Store original fields for cancel functionality
+        setOriginalProcessTypeFields(JSON.parse(JSON.stringify(fieldsArray)));
         // Reset the user changes flag when loading fields from API
         hasUserChangesRef.current = false;
       } catch (error) {
@@ -990,15 +1066,64 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     });
   };
 
+  const handleCancelNewProcessType = () => {
+    setIsCreatingCustom(false);
+    setNewProcessTypeName("");
+    setNewProcessTypeFields([]);
+  };
+
+  const handleCancelEditProcessType = () => {
+    // Restore original fields
+    setNewProcessTypeFields(JSON.parse(JSON.stringify(originalProcessTypeFields)));
+    // Reset save status
+    setSaveStatus('idle');
+    setSaveError(null);
+    // Reset user changes flag
+    hasUserChangesRef.current = false;
+  };
+
+  const handleSaveEditProcessType = async () => {
+    if (newProcessTypeFields.length === 0) {
+      showToast({
+        type: 'error',
+        message: 'Please add at least one field.',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      await saveFieldsToAPI(newProcessTypeFields);
+      // Update original fields after successful save
+      setOriginalProcessTypeFields(JSON.parse(JSON.stringify(newProcessTypeFields)));
+      showToast({
+        type: 'success',
+        message: 'Process type saved successfully',
+        duration: 3000,
+      });
+    } catch (error) {
+      // Error is already handled in saveFieldsToAPI
+      console.error("[ProcessesTabView] Error saving process type:", error);
+    }
+  };
+
   const handleSaveCapability = async () => {
     // Validation for new process types only
     if (isCreatingCustom && !newProcessTypeName.trim()) {
-      alert("Please provide a process type name.");
+      showToast({
+        type: 'error',
+        message: 'Please provide a process type name.',
+        duration: 3000,
+      });
       return;
     }
 
     if (newProcessTypeFields.length === 0) {
-      alert("Please add at least one capability field.");
+      showToast({
+        type: 'error',
+        message: 'Please add at least one capability field.',
+        duration: 3000,
+      });
       return;
     }
 
@@ -1023,7 +1148,11 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         : selectedProcessType;
 
       if (!processTypeKey) {
-        alert("Invalid process type.");
+        showToast({
+          type: 'error',
+          message: 'Invalid process type.',
+          duration: 3000,
+        });
         return;
       }
 
@@ -1035,12 +1164,13 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
         // Send the complete variables object - this replaces the entire variables object
         // Any fields not in the variables object will be removed from the JSON
         await api.patch(`/machine_variables/${selectedType.id}`, {
+          machine_variables_id: selectedType.id,
           type: processTypeKey,
           variables: variables, // Complete replacement - deleted fields are excluded
         });
       } else {
         // Create new process type
-        await api.post("/machine-variables", {
+        await api.post("/machine_variables", {
           type: processTypeKey,
           variables: variables,
         });
@@ -1054,9 +1184,20 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
 
       // Refresh the process types list without reloading the page
       await fetchProcessTypes();
+
+      showToast({
+        type: 'success',
+        message: 'Process type saved successfully',
+        duration: 3000,
+      });
     } catch (error) {
       console.error("[ProcessesTabView] Error saving capability:", error);
-      alert("Failed to save capability. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save process type';
+      showToast({
+        type: 'error',
+        message: `Failed to save: ${errorMessage}`,
+        duration: 5000,
+      });
     }
   };
 
@@ -1217,6 +1358,32 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
           onChange={handleFieldsChange}
           onDeleteField={handleDeleteField}
         />
+
+        {/* Save and Cancel Buttons */}
+        {(isCreatingCustom || (!isCreatingCustom && selectedProcessType)) && (
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={isCreatingCustom ? handleSaveCapability : handleSaveEditProcessType}
+              disabled={
+                isCreatingCustom
+                  ? !newProcessTypeName.trim() || newProcessTypeFields.length === 0
+                  : newProcessTypeFields.length === 0 || saveStatus === 'saving'
+              }
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+              {saveStatus === 'saving' ? 'Saving...' : isCreatingCustom ? 'Save Process Type' : 'Save Changes'}
+            </button>
+            <button
+              type="button"
+              onClick={isCreatingCustom ? handleCancelNewProcessType : handleCancelEditProcessType}
+              disabled={saveStatus === 'saving'}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1586,7 +1753,9 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
     <div className="space-y-6">
       {/* Process Types Section */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Process Types</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Process Types</h3>
+        </div>
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Select Existing Process Type
@@ -1595,27 +1764,55 @@ export default function ProcessesTabView({ machineType }: ProcessesTabViewProps)
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredProcessTypes.map((processType) => {
               return (
-                <button
+                <div
                   key={processType.key}
-                  type="button"
-                  onClick={() => setSelectedProcessType(processType.key)}
-                  className="rounded-lg border-2 border-gray-200 bg-white hover:border-gray-300 p-3 text-left transition-all"
+                  className="rounded-lg border-2 border-gray-200 bg-white hover:border-gray-300 p-3 transition-all relative group"
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: processType.color }}
-                    />
-                    <span className="font-medium text-gray-900">
-                      {processType.label}
-                    </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProcessType(processType.key)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: processType.color }}
+                      />
+                      <span className="font-medium text-gray-900">
+                        {processType.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {variableCounts[processType.key] !== undefined
+                        ? `${variableCounts[processType.key]} fields configured`
+                        : "0 fields configured"}
+                    </p>
+                  </button>
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProcessType(processType.key);
+                      }}
+                      className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                      title="Edit process type"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProcessType(processType.key);
+                      }}
+                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                      title="Delete process type"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {variableCounts[processType.key] !== undefined
-                      ? `${variableCounts[processType.key]} fields configured`
-                      : "0 fields configured"}
-                  </p>
-                </button>
+                </div>
               );
             })}
           </div>
