@@ -5,6 +5,7 @@ import {
   getJobsV2,
   updateJob,
   updateMachine,
+  addMachineToJob,
   type JobV2,
   type Job,
 } from "@/lib/api";
@@ -160,20 +161,21 @@ export default function AssignJobModal({
 
       // Add machine to the array if not already present
       if (!currentMachinesId.includes(machine.id)) {
-        const updatedMachinesId = [...currentMachinesId, machine.id];
+        // Use the new API to assign machine to job
+        const jobStartDate = job.start_date || Date.now();
+        const jobDueDate = job.due_date || Date.now();
 
-        // Update the job with new machines_id
-        await updateJob(job.id, {
-          machines_id: JSON.stringify(updatedMachinesId),
-        } as Partial<Job>);
+        await addMachineToJob({
+          from: jobStartDate,
+          to: jobDueDate,
+          machines_id: machine.id,
+          jobs_id: job.id,
+        });
 
         // Check if job is active today - update machine status to "running"
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayTimestamp = today.getTime();
-
-        const jobStartDate = job.start_date;
-        const jobDueDate = job.due_date;
 
         if (jobStartDate && jobDueDate &&
             jobStartDate <= todayTimestamp &&
@@ -182,6 +184,7 @@ export default function AssignJobModal({
         }
 
         // Update local state
+        const updatedMachinesId = [...currentMachinesId, machine.id];
         setJobs((prev) =>
           prev.map((j) =>
             j.id === job.id

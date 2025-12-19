@@ -1312,6 +1312,23 @@ export const updateJob = async (
   );
 };
 
+// Add a machine to a job
+export const addMachineToJob = async (params: {
+  from: number; // Unix timestamp (start_date)
+  to: number; // Unix timestamp (due_date)
+  machines_id: number;
+  jobs_id: number;
+}): Promise<any> => {
+  return apiFetch<any>(
+    "/add_machine_to_job",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    "api",
+  );
+};
+
 // Delete a job
 export const deleteJob = async (jobId: number): Promise<void> => {
   await apiFetch<void>(

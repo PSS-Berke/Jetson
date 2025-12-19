@@ -45,6 +45,26 @@ export default function MachinesTabView({
     });
   };
 
+  // Helper to get job details for scheduled jobs
+  const getJobForScheduled = (jobId: number) => {
+    if (!jobId || jobId === 0) return null;
+    return jobs.find((job: any) => job.id === jobId);
+  };
+
+  // Format date for display
+  const formatDate = (timestamp: number | undefined | null): string => {
+    if (!timestamp) return "N/A";
+    try {
+      return new Date(timestamp).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return "N/A";
+    }
+  };
+
   // Helper to determine if a job is current (active today)
   const isCurrentJob = (job: Job) => {
     const today = new Date();
@@ -392,6 +412,66 @@ export default function MachinesTabView({
                     ) : (
                       <span className="text-sm text-gray-400 italic">No capabilities defined</span>
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+            {machine.scheduled && Array.isArray(machine.scheduled) && machine.scheduled.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Scheduled Jobs ({machine.scheduled.length})
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {machine.scheduled.map((schedule: any, index: number) => {
+                      const scheduledJob = schedule.jobs_id && schedule.jobs_id !== 0 
+                        ? getJobForScheduled(schedule.jobs_id) 
+                        : null;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-md p-3 hover:shadow-sm transition-shadow"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              {scheduledJob ? (
+                                <>
+                                  <div className="text-sm font-semibold text-indigo-900">
+                                    {scheduledJob.job_number || `Job #${scheduledJob.id}`}
+                                  </div>
+                                  <div className="text-xs text-indigo-700 mt-0.5">
+                                    {scheduledJob.job_name || 
+                                     (typeof scheduledJob.client === 'object' ? scheduledJob.client?.name : scheduledJob.client) || 
+                                     'No name'}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-sm font-semibold text-gray-600">
+                                  {schedule.jobs_id === 0 ? 'Unassigned Slot' : `Job #${schedule.jobs_id}`}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium">From:</span>
+                                  <span>{formatDate(schedule.from)}</span>
+                                </span>
+                                <span className="text-gray-400">→</span>
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium">To:</span>
+                                  <span>{formatDate(schedule.to)}</span>
+                                </span>
+                              </div>
+                            </div>
+                            {scheduledJob && scheduledJob.quantity && (
+                              <div className="text-xs text-gray-500 bg-white px-2 py-1 rounded border border-gray-200">
+                                {scheduledJob.quantity.toLocaleString()} pcs
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
